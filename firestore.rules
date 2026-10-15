@@ -1,0 +1,47 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // පින්කම් සටහන් (Merit Posts) සඳහා වන ආරක්ෂක රීති
+    match /merit_posts/{postId} {
+      // 1. පුණ්‍ය පවුරේ ඇති සියලුම පින්කම් ඕනෑම අයෙකුට සජීවීව නැරඹිය හැක
+      allow read: if true;
+      
+      // 2. අකුරු සීමා සහ වලංගු වර්ගීකරණයන් සහිත නියම දත්ත පමණක් Database එකට භාර ගනී
+      allow create: if request.resource.data.title.size() >= 3 
+                    && request.resource.data.title.size() <= 150
+                    && (request.resource.data.type == 'repost' || (request.resource.data.description.size() >= 3 && request.resource.data.description.size() <= 3000))
+                    && request.resource.data.category in ['දානමය', 'සීලමය', 'භාවනාමය', 'සමාජ සත්කාර', 'යළි බෙදාගැනීම්']
+                    && request.resource.data.type in ['merit', 'need', 'repost'];
+      
+      // 3. සාදුකාර දීම (sadhuCount), අදහස් (comments), reposts (repostCount), Pin කිරීම සහ සත්කාර සත්‍යාපනය (isVerifiedNeed) සඳහා අවසරය
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sadhuCount'])
+                    || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['comments'])
+                    || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['repostCount'])
+                    || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isPinned'])
+                    || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isVerifiedNeed'])
+                    || (request.auth != null && resource.data.uid == request.auth.uid);
+
+      // 4. සටහන Delete කිරීමේ අවසරය
+      allow delete: if true;
+    }
+    
+    // User Profile දත්ත සඳහා
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // දැනුම්දීම් (Notifications) සඳහා වන නීති
+    match /notifications/{notifId} {
+      allow read, create, update, delete: if true;
+    }
+
+    // පද්ධති නිවේදන සහ සැකසුම් (Admin Settings)
+    match /admin_settings/{settingId} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+}
+

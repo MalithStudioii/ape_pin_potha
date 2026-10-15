@@ -1,0 +1,1328 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>පිං කෙත | කල්‍යාණ මිත්‍ර පුණ්‍ය ජාලය</title>
+    
+    <!-- Google Fonts for Sinhala Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Sinhala:wght@300;400;500;600;700&family=Noto+Serif+Sinhala:wght@600;700&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- Cropper.js for Circular Avatar Cropping -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
+    
+    <!-- Core Pure CSS Design System -->
+    <link rel="stylesheet" href="css/styles.css?v=22">
+</head>
+<body>
+
+    <!-- Top Sticky Application Header -->
+    <header class="app-header">
+        <div class="header-container">
+            
+            <!-- Brand Logo -->
+            <div class="brand-section" onclick="switchTab('feed')">
+                <div class="brand-icon-wrapper">
+                    <i class="fa-solid fa-dharmachakra animate-spin-slow" style="font-size: 1.3rem;"></i>
+                </div>
+                <div>
+                    <h1 class="brand-title">පිං කෙත</h1>
+                    <span class="brand-subtitle">කල්‍යාණ මිත්‍ර පුණ්‍ය ජාලය</span>
+                </div>
+            </div>
+
+            <!-- Search Bar -->
+            <div class="search-wrapper">
+                <i class="fa-solid fa-magnifying-glass" style="font-size: 0.75rem; color: rgba(254, 243, 199, 0.7);"></i>
+                <input type="text" id="searchInput" placeholder="පින්කම් හෝ ස්ථාන සොයන්න...">
+            </div>
+
+            <!-- Center Navigation Tabs (Desktop) -->
+            <nav class="nav-tabs-desktop">
+                <button onclick="switchTab('feed')" id="desk-tab-feed" class="nav-tab-btn active">
+                    <i class="fa-solid fa-house-chimney"></i>
+                    <span>පුණ්‍ය පවුර</span>
+                </button>
+                <button onclick="switchTab('needs')" id="desk-tab-needs" class="nav-tab-btn">
+                    <i class="fa-solid fa-hand-holding-heart"></i>
+                    <span>සත්කාර හවුල</span>
+                    <span class="badge-live">Live</span>
+                </button>
+            </nav>
+
+            <!-- User Action Buttons -->
+            <div class="header-actions">
+                <button onclick="openModal('merit')" class="btn-post-action">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>සටහන් කරන්න</span>
+                </button>
+
+                <!-- Notifications Dropdown Container -->
+                <div class="notifications-wrapper" id="notificationsWrapper">
+                    <button id="notificationBellBtn" class="notification-bell-btn" title="දැනුම්දීම්" onclick="toggleNotificationDropdown(event)" aria-label="දැනුම්දීම්">
+                        <i class="fa-solid fa-bell"></i>
+                        <span id="notificationBadge" class="notification-badge" style="display: none;">0</span>
+                    </button>
+
+                    <!-- Dropdown Panel -->
+                    <div id="notificationsDropdown" class="notifications-dropdown" style="display: none;">
+                        <div class="notif-header">
+                            <div class="notif-header-title">
+                                <i class="fa-solid fa-bell" style="color: #f59e0b;"></i>
+                                <span>දැනුම්දීම්</span>
+                                <span class="notif-unread-pill" id="notifUnreadPill" style="display: none;">0ක් අලුත්</span>
+                            </div>
+                            <button class="notif-mark-read-btn" onclick="markAllNotificationsAsRead(event)" title="සියල්ල කියවූ බව සලකුණු කරන්න">
+                                <i class="fa-solid fa-check-double"></i>
+                                <span>කියවූ බව සලකුණු කරන්න</span>
+                            </button>
+                        </div>
+
+                        <!-- Filter Chips -->
+                        <div class="notif-filter-bar">
+                            <button class="notif-filter-chip active" id="notif-chip-all" onclick="filterNotifications('all', event)">සියල්ල</button>
+                            <button class="notif-filter-chip" id="notif-chip-sadhu" onclick="filterNotifications('sadhu', event)">🙏 සාදුකාර</button>
+                            <button class="notif-filter-chip" id="notif-chip-comment" onclick="filterNotifications('comment', event)">💬 අනුමෝදනා</button>
+                        </div>
+
+                        <!-- Notification List -->
+                        <div class="notif-list" id="notifList">
+                            <!-- Populated dynamically via JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings Button -->
+                <button id="navSettingsBtn" class="notification-bell-btn" title="සැකසුම් සහ ප්‍රතිපත්ති" onclick="openSettingsModal('profile')" aria-label="සැකසුම්">
+                    <i class="fa-solid fa-gear"></i>
+                </button>
+
+                <!-- Master Admin Crown Button (Visible only to silvadilan9@gmail.com) -->
+                <button id="headerAdminCrownBtn" class="header-admin-crown-btn hidden" title="👑 පිං කෙත Master Admin Panel" onclick="openSettingsModal('admin')" style="display: none;">
+                    <i class="fa-solid fa-crown"></i>
+                    <span>Admin</span>
+                </button>
+
+                <button onclick="switchTab('profile')" id="userProfileBtn" class="user-profile-btn" title="මගේ ප්‍රොෆයිලය බලන්න">
+                    <div class="user-avatar-circle" id="navAvatar">ම</div>
+                    <span id="userNameDisplay">මලිත්</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Global Broadcast Announcement Bar -->
+    <div id="globalAnnouncementBanner" class="global-announcement-banner hidden" style="display: none;">
+        <div class="announcement-content">
+            <i class="fa-solid fa-bullhorn announcement-icon"></i>
+            <span id="globalAnnouncementText"></span>
+        </div>
+    </div>
+
+    <!-- Cloud Database Status Banner (Hidden for professional clean layout) -->
+    <div id="cloudBanner" class="cloud-status-banner" style="display: none;"></div>
+
+    <!-- Main 3-Column Responsive Layout -->
+    <div class="main-layout" id="mainFeedLayout">
+
+        <!-- ================= LEFT SIDEBAR (Profile & Filters) ================= -->
+        <aside class="sidebar">
+            
+            <!-- User Mini Profile Card -->
+            <div class="card">
+                <div class="profile-card-cover" onclick="switchTab('profile')" style="cursor: pointer;">
+                    <div class="profile-card-avatar" id="sideAvatar">ම</div>
+                </div>
+                <div class="profile-card-body">
+                    <div class="profile-name" onclick="switchTab('profile')" style="cursor: pointer;">
+                        <span id="sideUserName">මලිත්</span>
+                        <i class="fa-solid fa-circle-check" style="color: #059669; font-size: 0.75rem;" title="Google සත්‍යාපිත කල්‍යාණ මිත්‍ර"></i>
+                    </div>
+                    <p class="profile-role" id="sideUserBio">කල්‍යාණ මිත්‍ර පුණ්‍ය සාමාජික</p>
+
+                    <!-- Personal Stats -->
+                    <div class="stats-grid">
+                        <div class="stat-box merits">
+                            <span class="stat-number amber" id="statMyPosts">0</span>
+                            <span class="stat-label">මගේ පින්කම්</span>
+                        </div>
+                        <div class="stat-box sadhu">
+                            <span class="stat-number green" id="statMySadhu">0</span>
+                            <span class="stat-label">ලැබුණු සාදුකාර</span>
+                        </div>
+                    </div>
+
+                    <button onclick="switchTab('profile')" class="category-item" style="margin-top: 14px; background: #fffbeb; border: 1px solid #fef3c7; justify-content: center; font-weight: 700; color: #b45309;">
+                        <i class="fa-solid fa-circle-user" style="color: #d97706; margin-right: 6px;"></i> මගේ ප්‍රොෆයිලය බලන්න
+                    </button>
+                    <button onclick="openSettingsModal('profile')" class="category-item" style="margin-top: 6px; background: transparent; border: 1px dashed rgba(217, 119, 6, 0.35); justify-content: center; font-weight: 600; color: #78350f; font-size: 0.76rem;">
+                        <i class="fa-solid fa-gear" style="color: #b45309; margin-right: 6px;"></i> සැකසුම් & ප්‍රතිපත්ති
+                    </button>
+                </div>
+            </div>
+
+            <!-- Category Filter Menu -->
+            <div class="card category-menu-card">
+                <h3 class="category-title">පින්කම් වර්ගීකරණය</h3>
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <button onclick="setCategory('සියල්ල')" data-cat="සියල්ල" class="category-item active">
+                        <span><i class="fa-solid fa-layer-group cat-icon" style="color: #b45309;"></i> සියලුම පින්කම්</span>
+                    </button>
+                    <button onclick="setCategory('දානමය')" data-cat="දානමය" class="category-item">
+                        <span><i class="fa-solid fa-bowl-rice cat-icon" style="color: #059669;"></i> දානමය පින්කම්</span>
+                    </button>
+                    <button onclick="setCategory('සීලමය')" data-cat="සීලමය" class="category-item">
+                        <span><i class="fa-solid fa-hands-praying cat-icon" style="color: #2563eb;"></i> සීලමය පින්කම්</span>
+                    </button>
+                    <button onclick="setCategory('භාවනාමය')" data-cat="භාවනාමය" class="category-item">
+                        <span><i class="fa-solid fa-spa cat-icon" style="color: #9333ea;"></i> භාවනාමය පින්කම්</span>
+                    </button>
+                    <button onclick="setCategory('සමාජ සත්කාර')" data-cat="සමාජ සත්කාර" class="category-item">
+                        <span><i class="fa-solid fa-seedling cat-icon" style="color: #e11d48;"></i> සමාජ සත්කාර</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Privacy & Terms Footer Links in Sidebar -->
+            <div style="padding: 10px 14px; text-align: center; font-size: 0.72rem; color: #94a3b8; line-height: 1.6;">
+                <a href="javascript:void(0)" onclick="openSettingsModal('privacy')" style="color: #78350f; text-decoration: none; font-weight: 600;">රහස්‍යතා ප්‍රතිපත්තිය</a> • 
+                <a href="javascript:void(0)" onclick="openSettingsModal('terms')" style="color: #78350f; text-decoration: none; font-weight: 600;">භාවිත කොන්දේසි</a> • 
+                <a href="javascript:void(0)" onclick="openSettingsModal('about')" style="color: #78350f; text-decoration: none; font-weight: 600;">පිං කෙත ගැන</a>
+                <div style="margin-top: 5px; font-size: 0.68rem; color: #64748b;">© 2026 පිං කෙත • A Digital Initiative by <strong style="color: #0284c7; font-weight: 700;">NexiaPro</strong></div>
+            </div>
+
+        </aside>
+
+        <!-- ================= CENTER COLUMN (Newsfeed Stream) ================= -->
+        <main class="main-feed-area">
+
+            <!-- "Create Post" Composer Box -->
+            <div class="card composer-card">
+                <div class="composer-top">
+                    <div class="user-avatar-circle" id="composerAvatar" style="width: 38px; height: 38px; font-size: 0.95rem;">ම</div>
+                    <button onclick="openModal('merit')" class="composer-input-btn">
+                        අද ඔබ සිදුකළ පින්කම කුමක්ද? සටහන් කරන්න...
+                    </button>
+                </div>
+                <div class="composer-actions">
+                    <button onclick="openModal('merit')" class="composer-action-btn">
+                        <i class="fa-solid fa-dharmachakra" style="color: #d97706;"></i>
+                        <span>පින්කමක්</span>
+                    </button>
+                    <button onclick="openModal('merit', true)" class="composer-action-btn">
+                        <i class="fa-solid fa-image" style="color: #059669;"></i>
+                        <span>ඡායාරූපයක්</span>
+                    </button>
+                    <button onclick="openModal('need')" class="composer-action-btn">
+                        <i class="fa-solid fa-hand-holding-heart" style="color: #e11d48;"></i>
+                        <span>සත්කාර ඉල්ලීමක්</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Mobile Category Pills -->
+            <div class="mobile-categories" style="margin-bottom: 16px;">
+                <button onclick="setCategory('සියල්ල')" data-cat="සියල්ල" class="category-pill active">සියල්ල</button>
+                <button onclick="setCategory('දානමය')" data-cat="දානමය" class="category-pill">දානමය</button>
+                <button onclick="setCategory('සීලමය')" data-cat="සීලමය" class="category-pill">සීලමය</button>
+                <button onclick="setCategory('භාවනාමය')" data-cat="භාවනාමය" class="category-pill">භාවනාමය</button>
+                <button onclick="setCategory('සමාජ සත්කාර')" data-cat="සමාජ සත්කාර" class="category-pill">සමාජ සත්කාර</button>
+            </div>
+
+            <!-- Tab Header Banner -->
+            <div id="tabHeaderBanner" style="display: none;"></div>
+
+            <!-- Newsfeed Posts Stream -->
+            <div id="postsContainer">
+                <!-- Injected safely and reactively by app.js -->
+            </div>
+
+        </main>
+
+        <!-- ================= RIGHT SIDEBAR (Widgets) ================= -->
+        <aside class="sidebar">
+            
+            <!-- Daily Dhamma Verse Card -->
+            <div class="dhamma-quote-card">
+                <i class="fa-solid fa-dharmachakra bg-icon"></i>
+                <div class="quote-title">
+                    <i class="fa-solid fa-sun"></i>
+                    <span>දවසේ ධර්ම පදය</span>
+                </div>
+                <p class="quote-pali" id="dailyDhammaPali">
+                    "පුඤ්ඤං චේ පුරිසෝ කයිරා - කයිරාථේනං පුනප්පුනං<br>
+                    තම්හි ඡන්දං කයිරාථ - සුඛෝ පුඤ්ඤස්ස උච්චයෝ"
+                </p>
+                <p class="quote-sinhala" id="dailyDhammaSinhala">
+                    යම් පුද්ගලයෙක් පිනක් කරන්නේ නම්, එය නැවත නැවතත් කරන්න. ඒ පින කෙරෙහි කැමැත්ත ඇති කරගන්න. පින් රැස් කිරීම සැපයකි.
+                </p>
+            </div>
+
+            <!-- Urgent Charity Needs Widget -->
+            <div class="widget-card">
+                <div class="widget-header">
+                    <h3 class="widget-title">
+                        <span style="width: 8px; height: 8px; border-radius: 9999px; background: #10b981; display: inline-block;" class="pulse-indicator"></span>
+                        සත්කාර හවුල (අවශ්‍යතා)
+                    </h3>
+                    <button onclick="switchTab('needs')" class="widget-sub-btn">සියල්ල</button>
+                </div>
+
+                <div id="sideNeedsList" class="side-needs-list">
+                    <!-- Dynamic Urgent Needs -->
+                </div>
+
+                <button onclick="openModal('need')" class="composer-input-btn" style="width: 100%; margin-top: 12px; text-align: center; background: #ecfdf5; border-color: #a7f3d0; color: #065f46; font-weight: 700;">
+                    + අවශ්‍යතාවයක් එක් කරන්න
+                </button>
+            </div>
+
+            <!-- Upcoming Buddhist Calendar Widget -->
+            <div class="widget-card">
+                <h3 class="widget-title" style="margin-bottom: 12px;">
+                    <i class="fa-solid fa-moon" style="color: #d97706;"></i> පුණ්‍ය දින දර්ශනය
+                </h3>
+                <div style="display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 12px; background: #fffbeb; border: 1px solid #fef3c7;">
+                    <div style="background: #d97706; color: #fff; font-weight: 800; padding: 4px 10px; border-radius: 8px; text-align: center; line-height: 1.1;">
+                        <span id="poyaMonthBadge" style="font-size: 0.65rem; display: block;">ඔක්</span>
+                        <span id="poyaDayBadge" style="font-size: 0.95rem;">25</span>
+                    </div>
+                    <div>
+                        <h4 id="poyaEventTitle" style="font-size: 0.78rem; font-weight: 700; color: #1e293b;">වප් පුර පසළොස්වක පොහොය</h4>
+                        <p id="poyaEventDesc" style="font-size: 0.68rem; color: #64748b;">කඨින චීවර මාසයේ ආරම්භය</p>
+                    </div>
+                </div>
+            </div>
+
+        </aside>
+
+    </div>
+
+    <!-- ================= FACEBOOK-STYLE PREMIUM PROFILE VIEW ================= -->
+    <div id="profilePageContainer" class="profile-page-container hidden" style="display: none;">
+        <div class="profile-header-wrapper">
+            <!-- Cover Photo Area -->
+            <div class="profile-cover-banner" id="profileCoverBanner">
+                <img id="profileCoverImg" src="https://images.unsplash.com/photo-1582510003544-4d00b7f74220?auto=format&fit=crop&w=1600&q=80" alt="Cover Photo">
+                <button onclick="openCoverModal()" class="btn-edit-cover" title="කවරයේ ඡායාරූපය වෙනස් කරන්න">
+                    <i class="fa-solid fa-camera"></i>
+                    <span>කවරය වෙනස් කරන්න</span>
+                </button>
+            </div>
+
+            <!-- Profile Info Bar (Avatar, Name, Actions) -->
+            <div class="profile-intro-bar">
+                <div class="profile-avatar-outer">
+                    <div class="profile-avatar-img-wrap" id="profAvatarWrap">
+                        <!-- Injected by app.js: img or first letter -->
+                    </div>
+                    <button class="avatar-camera-btn" onclick="document.getElementById('editProfPhotoFileInput').click()" title="ඡායාරූපය වෙනස් කර කපන්න">
+                        <i class="fa-solid fa-camera"></i>
+                    </button>
+                </div>
+
+                <div class="profile-identity-info">
+                    <div class="profile-title-row">
+                        <h1 class="profile-full-name" id="profFullName">Malith Dushmantha</h1>
+                        <span class="verified-pill" id="profVerifiedBadge">
+                            <i class="fa-solid fa-circle-check"></i>
+                            <span>Google සත්‍යාපිත කල්‍යාණ මිත්‍ර</span>
+                        </span>
+                    </div>
+                    <p class="profile-dhamma-bio" id="profDhammaBio">
+                        "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏"
+                    </p>
+                    <div class="profile-meta-tags">
+                        <span id="profMetaOccupation" style="display: none;">
+                            <i class="fa-solid fa-briefcase" style="color: #6366f1;"></i>
+                            <span id="profOccupationText">වෘත්තිය</span>
+                        </span>
+                        <span id="profMetaLocation" style="display: none;">
+                            <i class="fa-solid fa-location-dot" style="color: #ea580c;"></i>
+                            <span id="profLocationText">ශ්‍රී ලංකා</span>
+                        </span>
+                        <span id="profMetaEmail">
+                            <i class="fa-solid fa-envelope" style="color: #2563eb;"></i>
+                            <span id="profEmailText">silvadilan9@gmail.com</span>
+                        </span>
+                        <span>
+                            <i class="fa-solid fa-calendar-days" style="color: #059669;"></i>
+                            <span id="profJoinedText">2026 ඔක්තෝබර් සිට සාමාජික</span>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="profile-header-actions">
+                    <button onclick="openModal('merit')" class="btn-profile-primary">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>පින්කමක්</span>
+                    </button>
+                    <button onclick="openSettingsModal('profile')" class="btn-profile-secondary">
+                        <i class="fa-solid fa-gear"></i>
+                        <span>සැකසුම් & විස්තර</span>
+                    </button>
+                    <button id="profAuthActionBtn" onclick="handleProfileAuthAction()" class="btn-profile-danger" title="ගිණුමෙන් ඉවත් වන්න">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                        <span>Sign Out</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Profile Navigation Tabs (Just like FB) -->
+            <div class="profile-nav-tabs">
+                <button onclick="setProfileSubTab('timeline')" id="prof-sub-timeline" class="prof-nav-btn active">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    <span>පින්කම් සටහන්</span>
+                    <span class="tab-counter" id="profCountTimeline">0</span>
+                </button>
+                <button onclick="setProfileSubTab('photos')" id="prof-sub-photos" class="prof-nav-btn">
+                    <i class="fa-solid fa-images"></i>
+                    <span>පිං ඡායාරූප</span>
+                    <span class="tab-counter" id="profCountPhotos">0</span>
+                </button>
+                <button onclick="setProfileSubTab('stats')" id="prof-sub-stats" class="prof-nav-btn">
+                    <i class="fa-solid fa-chart-pie"></i>
+                    <span>කුසල් වාර්තාව</span>
+                </button>
+                <button onclick="setProfileSubTab('private')" id="prof-sub-private" class="prof-nav-btn">
+                    <i class="fa-solid fa-lock"></i>
+                    <span>පෞද්ගලික පිං කෙත</span>
+                    <span class="tab-counter" id="profCountPrivate">0</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Facebook 2-Column Content Layout Below Header -->
+        <div class="profile-content-grid">
+            <!-- Left Column: Intro, Badges, Photo preview -->
+            <div class="profile-sidebar-col">
+                <!-- Intro Card -->
+                <div class="profile-widget-card">
+                    <h3 class="widget-head-title">
+                        <i class="fa-solid fa-address-card" style="color: #d97706;"></i>
+                        හැඳින්වීම (About)
+                    </h3>
+                    <p class="prof-widget-bio" id="profWidgetBio">"සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏"</p>
+                    <button onclick="openEditProfileModal()" class="btn-edit-bio-inline">
+                        <i class="fa-solid fa-pen"></i> බයෝ එක වෙනස් කරන්න
+                    </button>
+
+                    <div class="prof-details-list">
+                        <div class="prof-detail-item">
+                            <i class="fa-solid fa-shield-halved" style="color: #059669;"></i>
+                            <span>ගිණුම: <strong id="profWidgetAccount">Google සත්‍යාපිත</strong></span>
+                        </div>
+                        <div class="prof-detail-item" id="profWidgetOccRow" style="display: none;">
+                            <i class="fa-solid fa-briefcase" style="color: #6366f1;"></i>
+                            <span>රැකියාව: <strong id="profWidgetOccupation">-</strong></span>
+                        </div>
+                        <div class="prof-detail-item" id="profWidgetLocRow" style="display: none;">
+                            <i class="fa-solid fa-location-dot" style="color: #ea580c;"></i>
+                            <span>ලිපිනය: <strong id="profWidgetLocation">ශ්‍රී ලංකා</strong></span>
+                        </div>
+                        <div class="prof-detail-item">
+                            <i class="fa-solid fa-heart" style="color: #e11d48;"></i>
+                            <span>ලැබූ සාදුකාර: <strong id="profWidgetSadhu">0</strong></span>
+                        </div>
+                        <div class="prof-detail-item">
+                            <i class="fa-solid fa-dharmachakra" style="color: #d97706;"></i>
+                            <span>සිදුකළ පින්කම්: <strong id="profWidgetPosts">0</strong></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Merit Badges Card -->
+                <div class="profile-widget-card">
+                    <h3 class="widget-head-title">
+                        <i class="fa-solid fa-award" style="color: #f59e0b;"></i>
+                        පුණ්‍ය ලාංඡන (Merit Badges)
+                    </h3>
+                    <div class="badges-flex" id="profBadgesContainer">
+                        <!-- Dynamic Badges -->
+                    </div>
+                </div>
+
+                <!-- Mini Photo Grid Card -->
+                <div class="profile-widget-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <h3 class="widget-head-title" style="margin: 0;">
+                            <i class="fa-solid fa-images" style="color: #2563eb;"></i>
+                            ඡායාරූප
+                        </h3>
+                        <button onclick="setProfileSubTab('photos')" class="widget-sub-btn">සියල්ල බලන්න</button>
+                    </div>
+                    <div class="mini-photos-grid" id="profMiniPhotosGrid">
+                        <!-- Dynamic 6 photos -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Sub-tab Active Content -->
+            <div class="profile-main-col">
+                <!-- Timeline Sub-tab -->
+                <div id="subTabTimelineView">
+                    <!-- Composer in Profile -->
+                    <div class="card composer-card" style="margin-bottom: 16px;">
+                        <div class="composer-top">
+                            <div class="user-avatar-circle" id="profComposerAvatar" style="width: 38px; height: 38px;">ම</div>
+                            <button onclick="openModal('merit')" class="composer-input-btn">
+                                අද ඔබේ පින්කම කුමක්ද? මෙහි සටහන් කරන්න...
+                            </button>
+                        </div>
+                        <div class="composer-actions">
+                            <button onclick="openModal('merit')" class="composer-action-btn">
+                                <i class="fa-solid fa-dharmachakra" style="color: #d97706;"></i>
+                                <span>පින්කමක්</span>
+                            </button>
+                            <button onclick="openModal('merit', true)" class="composer-action-btn">
+                                <i class="fa-solid fa-image" style="color: #059669;"></i>
+                                <span>ඡායාරූපයක්</span>
+                            </button>
+                            <button onclick="openModal('need')" class="composer-action-btn">
+                                <i class="fa-solid fa-hand-holding-heart" style="color: #e11d48;"></i>
+                                <span>සත්කාරයක්</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- User's Timeline Posts -->
+                    <div id="profTimelinePosts">
+                        <!-- Filtered posts rendered here -->
+                    </div>
+                </div>
+
+                <!-- Photos Sub-tab -->
+                <div id="subTabPhotosView" class="hidden">
+                    <div class="profile-widget-card">
+                        <h3 class="widget-head-title" style="margin-bottom: 16px;">
+                            <i class="fa-solid fa-images" style="color: #d97706;"></i>
+                            මගේ පිං ඡායාරූප එකතුව (Merit Gallery)
+                        </h3>
+                        <div class="full-photos-grid" id="profFullPhotosGrid">
+                            <!-- Full photo gallery grid -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats Sub-tab -->
+                <div id="subTabStatsView" class="hidden">
+                    <div class="profile-widget-card">
+                        <h3 class="widget-head-title" style="margin-bottom: 20px;">
+                            <i class="fa-solid fa-chart-pie" style="color: #d97706;"></i>
+                            පුණ්‍ය කුසල සංඛ්‍යාලේඛන වාර්තාව (Merit Analytics)
+                        </h3>
+                        <div id="profStatsDetails">
+                            <!-- Rendered by app.js -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Private Merits Sub-tab -->
+                <div id="subTabPrivateView" class="hidden">
+                    <div class="context-banner mybook" style="margin-bottom: 16px;">
+                        <h2>🔒 පෞද්ගලික පිං කෙත (Private Merits)</h2>
+                        <p>ඔබට පමණක් පෙනෙන, ඔබ සිදුකළ රහසිගත කුසල කර්මයන් සහ භාවනා සටහන් මෙහි සුරක්ෂිතව ඇත.</p>
+                    </div>
+                    <div id="profPrivatePosts">
+                        <!-- Private posts -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Bottom Navigation Bar -->
+    <nav class="mobile-bottom-bar">
+        <button onclick="switchTab('feed')" id="mob-tab-feed" class="mob-nav-item active">
+            <i class="fa-solid fa-house-chimney" style="font-size: 1.1rem;"></i>
+            <span>පවුර</span>
+        </button>
+        <button onclick="switchTab('profile')" id="mob-tab-profile" class="mob-nav-item">
+            <i class="fa-solid fa-circle-user" style="font-size: 1.1rem;"></i>
+            <span>ප්‍රොෆයිල්</span>
+        </button>
+        <button onclick="openModal('merit')" class="mob-fab-center" title="අලුත් සටහනක්">
+            <i class="fa-solid fa-plus" style="font-size: 1.2rem;"></i>
+        </button>
+        <button onclick="switchTab('needs')" id="mob-tab-needs" class="mob-nav-item">
+            <i class="fa-solid fa-hand-holding-heart" style="font-size: 1.1rem;"></i>
+            <span>සත්කාර</span>
+        </button>
+    </nav>
+
+    <!-- Create Post Modal Dialog -->
+    <div id="postModal" class="modal-overlay hidden">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <i class="fa-solid fa-feather-pointed" style="color: #d97706;"></i>
+                    අලුත් පුණ්‍ය සටහනක්
+                </h3>
+                <button onclick="closeModal()" class="modal-close-btn">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="postForm">
+                <!-- Post Type Switcher -->
+                <div class="type-toggle-grid">
+                    <button type="button" onclick="setPostType('merit')" id="typeMeritBtn" class="type-toggle-btn active">
+                        ✨ සිදුකළ පින්කමක්
+                    </button>
+                    <button type="button" onclick="setPostType('need')" id="typeNeedBtn" class="type-toggle-btn">
+                        🤝 සත්කාර ඉල්ලීමක්
+                    </button>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">මාතෘකාව *</label>
+                    <input type="text" id="postTitle" class="form-input" required maxlength="150" placeholder="උදා: රුවන්වැලිසෑය අභියස සුවඳ මල් පූජාව">
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+                    <div>
+                        <label class="form-label">වර්ගය *</label>
+                        <select id="postCategory" class="form-select">
+                            <option value="දානමය">දානමය</option>
+                            <option value="සීලමය">සීලමය</option>
+                            <option value="භාවනාමය">භාවනාමය</option>
+                            <option value="සමාජ සත්කාර">සමාජ සත්කාර</option>
+                        </select>
+                    </div>
+                    <div id="visibilityWrapper">
+                        <label class="form-label">පෙනෙන ආකාරය *</label>
+                        <select id="postVisibility" class="form-select">
+                            <option value="public">🌍 පොදු පවුරට (Public)</option>
+                            <option value="private">🔒 මට පමණක් (Private)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+                    <div>
+                        <label class="form-label">ස්ථානය / ප්‍රදේශය</label>
+                        <input type="text" id="postLocation" class="form-input" maxlength="80" placeholder="උදා: අනුරාධපුරය">
+                    </div>
+                    <div id="contactWrapper" style="display: none;">
+                        <label class="form-label" style="color: #065f46;">දුරකථන අංකය *</label>
+                        <input type="text" id="postContact" class="form-input" placeholder="උදා: 077 123 4567">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">විස්තරය *</label>
+                    <textarea id="postDesc" class="form-textarea" rows="3" required maxlength="3000" placeholder="ඔබ සිදුකළ පින්කම සහ සිත පහදවාගත් ආකාරය විස්තර කරන්න..."></textarea>
+                </div>
+
+                <!-- Master Admin Exclusive Controls (Official Post & Pin to Top) -->
+                <div id="adminPostControls" class="admin-post-controls-box hidden" style="display: none;">
+                    <div class="admin-controls-header">
+                        <i class="fa-solid fa-crown" style="color: #f59e0b;"></i>
+                        <span>පරිපාලක විශේෂ විකල්ප (Master Admin Options)</span>
+                    </div>
+                    <div class="admin-checkboxes-row">
+                        <label class="admin-checkbox-label">
+                            <input type="checkbox" id="adminIsOfficial">
+                            <span>📢 නිල නිවේදනයක් (Official Post) ලෙස පළ කරන්න</span>
+                        </label>
+                        <label class="admin-checkbox-label">
+                            <input type="checkbox" id="adminIsPinned">
+                            <span>📌 පවුරේ මුදුනටම Pin කරන්න (Pin to Top)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Multiple WebP Image Compression Uploader -->
+                <div class="form-group">
+                    <div class="image-drop-area" onclick="document.getElementById('photoInput').click()">
+                        <i class="fa-solid fa-images" style="font-size: 1.5rem; color: #b45309; margin-bottom: 6px;"></i>
+                        <span style="font-size: 0.78rem; font-weight: 700; color: #78350f; display: block;">
+                            ඡායාරූප එකක් හෝ කිහිපයක් (Collage) එක් කරන්න
+                        </span>
+                        <span style="font-size: 0.68rem; color: #92400e; display: block; margin-top: 2px;">
+                            උපරිම ඡායාරූප 5ක් දක්වා • ස්වයංක්‍රීයව WebP ලෙස සම්පීඩනය වේ
+                        </span>
+                        <input type="file" id="photoInput" accept="image/*" multiple style="display: none;" onchange="handleMultipleImagesSelected(event)">
+                    </div>
+
+                    <div id="imagePreviewContainer" style="display: none; margin-top: 10px;">
+                        <div id="imagePreviewGrid" class="composer-thumbs-grid"></div>
+                        <div id="compressStats" style="font-size: 0.72rem; color: #047857; font-weight: 600; margin-top: 6px; text-align: right;"></div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-submit-merit">
+                    පුණ්‍ය පවුරට එක් කරන්න
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- User Profile & Account Modal Dialog -->
+    <div id="profileModal" class="modal-overlay hidden">
+        <div class="modal-box" style="max-width: 440px;">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <i class="fa-solid fa-circle-user" style="color: #d97706;"></i>
+                    සාමාජික ගිණුම
+                </h3>
+                <button onclick="closeProfileModal()" class="modal-close-btn">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div style="text-align: center; padding: 10px 0 16px 0;">
+                <div class="user-avatar-circle" id="modalUserAvatar" style="width: 60px; height: 60px; font-size: 1.6rem; margin: 0 auto 10px auto;">ම</div>
+                <h4 style="font-size: 1rem; font-weight: 700; color: #1e293b;" id="modalUserDisplay">මලිත්</h4>
+                <span style="font-size: 0.72rem; color: #64748b;" id="modalUserStatus">කල්‍යාණ මිත්‍ර පුණ්‍ය සාමාජික</span>
+            </div>
+
+            <form id="profileForm" style="border-top: 1px solid #f1f5f9; padding-top: 16px; margin-bottom: 16px;">
+                <label class="form-label">ඔබේ නම (Display Name)</label>
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" id="profileNameInput" class="form-input" required maxlength="50" placeholder="ඔබේ නම ඇතුළත් කරන්න">
+                    <button type="submit" class="btn-post-action" style="white-space: nowrap; padding: 0 16px;">
+                        සුරකින්න
+                    </button>
+                </div>
+            </form>
+
+            <div style="border-top: 1px solid #f1f5f9; padding-top: 16px;">
+                <label class="form-label" style="margin-bottom: 8px;">Google Sign-In මඟින් සත්‍යාපනය</label>
+                <button type="button" id="googleLoginBtn" class="composer-input-btn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 700; background: #ffffff; border: 1px solid #cbd5e1; color: #1e293b;">
+                    <i class="fa-brands fa-google" style="color: #ea4335; font-size: 1rem;"></i>
+                    <span>Google ගිණුමෙන් සම්බන්ධ වන්න</span>
+                </button>
+                <button type="button" id="googleLogoutBtn" class="composer-input-btn hidden" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 700; background: #fee2e2; border: 1px solid #fca5a5; color: #991b1b;">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                    <span>ගිණුමෙන් ඉවත් වන්න (Sign Out)</span>
+                </button>
+                <div id="authStatusAlert" class="hidden" style="margin-top: 12px; font-size: 0.75rem; padding: 12px; border-radius: 8px; line-height: 1.5;"></div>
+                <p style="font-size: 0.68rem; color: #94a3b8; text-align: center; margin-top: 8px;">
+                    නම පමණක් ඇතුළත් කර හෝ Google Sign-In මඟින් සත්‍යාපනය වී පින්කම් එක් කළ හැක.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Profile Modal Dialog -->
+    <div id="editProfileModal" class="modal-overlay hidden">
+        <div class="modal-box" style="max-width: 480px;">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <i class="fa-solid fa-pen-to-square" style="color: #d97706;"></i>
+                    ප්‍රොෆයිල් විස්තර සංස්කරණය
+                </h3>
+                <button onclick="closeEditProfileModal()" class="modal-close-btn">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="editProfileForm">
+                <div class="form-group">
+                    <label class="form-label">ඔබේ නම (Name in 2 Parts)</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div>
+                            <input type="text" id="editProfFirstNameInput" class="form-input" required maxlength="35" placeholder="මුල් නම (First Name)">
+                        </div>
+                        <div>
+                            <input type="text" id="editProfLastNameInput" class="form-input" maxlength="35" placeholder="වාසගම / අවසන් නම (Last Name)">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">රැකියාව / වෘත්තිය (Occupation - Optional)</label>
+                    <input type="text" id="editProfOccupationInput" class="form-input" maxlength="60" placeholder="උදා: ගුරුවරයෙක් / ඉංජිනේරු / ව්‍යාපාරික / ශිෂ්‍ය...">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">ලිපිනය / ප්‍රදේශය (Address / Location - කැමතිනම් පමණක්)</label>
+                    <input type="text" id="editProfLocationInput" class="form-input" maxlength="80" placeholder="උදා: මහරගම, කොළඹ (කැමතිනම් පමණක් ඇතුළත් කරන්න)">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">ධර්ම පාඨය / හැඳින්වීම (Dharmic Bio)</label>
+                    <textarea id="editProfBioInput" class="form-textarea" rows="3" maxlength="250" placeholder="ඔබ ප්‍රිය කරන ධර්ම පාඨයක් හෝ කුඩා හැඳින්වීමක් (උදා: සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා)"></textarea>
+                    <span style="font-size: 0.68rem; color: #94a3b8; display: block; text-align: right; margin-top: 2px;">උපරිම අකුරු 250</span>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">ප්‍රොෆයිල් ඡායාරූපය (Profile Photo)</label>
+                    <div style="display: flex; gap: 14px; align-items: center; background: #fffbeb; border: 1px dashed #fcd34d; border-radius: 12px; padding: 12px;">
+                        <div class="user-avatar-circle" id="editProfPhotoPreview" style="width: 54px; height: 54px; font-size: 1.4rem; overflow: hidden; border: 2px solid #f59e0b; flex-shrink: 0; background: #fef3c7;">
+                            <!-- Live Avatar Preview -->
+                        </div>
+                        <div style="flex: 1;">
+                            <button type="button" class="btn-post-action" id="btnUploadProfPhoto" style="padding: 7px 14px; font-size: 0.76rem;" onclick="document.getElementById('editProfPhotoFileInput').click()">
+                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                                <span id="profPhotoUploadBtnText">උපාංගයෙන් තෝරන්න (Upload)</span>
+                            </button>
+                            <input type="file" id="editProfPhotoFileInput" accept="image/*" style="display: none;" onchange="handleProfilePhotoSelected(event)">
+                            <input type="hidden" id="editProfPhotoInput">
+                            <span id="profPhotoUploadStatus" style="font-size: 0.68rem; color: #78350f; display: block; margin-top: 4px;">
+                                පැහැදිලි ඡායාරූපයක් තෝරාගන්න.
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-submit-merit" style="margin-top: 8px;">
+                    සුරකින්න (Save Profile)
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Cover Photo Modal Dialog -->
+    <div id="editCoverModal" class="modal-overlay hidden">
+        <div class="modal-box" style="max-width: 580px;">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <i class="fa-solid fa-image" style="color: #d97706;"></i>
+                    කවරයේ ඡායාරූපය තෝරන්න (Cover Photo)
+                </h3>
+                <button onclick="closeCoverModal()" class="modal-close-btn">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <p style="font-size: 0.78rem; color: #64748b; margin-bottom: 12px;">
+                ඔබේ Profile එකට ගැළපෙන ශාන්ත බෞද්ධ පසුබිමක් තෝරන්න:
+            </p>
+
+            <div class="cover-presets-grid" id="coverPresetsGrid">
+                <!-- 5 Presets injected by app.js with live preview -->
+            </div>
+
+            <!-- Device Banner Upload -->
+            <div style="border-top: 1px solid #f1f5f9; padding-top: 14px; margin-top: 14px;">
+                <label class="form-label">හෝ ඔබගේ උපාංගයෙන් Banner එකක් එක් කරන්න</label>
+                <div class="image-drop-area" style="padding: 14px 10px; cursor: pointer; text-align: center;" onclick="document.getElementById('coverPhotoFileInput').click()">
+                    <i class="fa-solid fa-cloud-arrow-up" style="font-size: 1.5rem; color: #b45309; margin-bottom: 6px;"></i>
+                    <span id="coverUploadStatusText" style="font-size: 0.76rem; font-weight: 700; color: #78350f; display: block;">
+                        කවරයේ ඡායාරූපය තෝරන්න (Upload Banner)
+                    </span>
+                    <input type="file" id="coverPhotoFileInput" accept="image/*" style="display: none;" onchange="uploadCoverPhoto(event)">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Crop & Zoom Avatar Modal -->
+    <div id="cropAvatarModal" class="modal-overlay hidden" style="z-index: 1050;">
+        <div class="modal-box crop-modal-container">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <i class="fa-solid fa-crop-simple" style="color: #d97706;"></i>
+                    ප්‍රොෆයිල් ඡායාරූපය සකස් කරන්න
+                </h3>
+                <button type="button" onclick="closeCropModal()" class="modal-close-btn">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <p style="font-size: 0.76rem; color: #64748b; margin-bottom: 10px;">
+                රවුම තුළට අවශ්‍ය කොටස පැමිණෙන පරිදි ඡායාරූපය Zoom කර සකසන්න:
+            </p>
+
+            <!-- Image Cropping Area -->
+            <div class="crop-area-container">
+                <img id="imageToCrop" src="" alt="Crop preview" style="max-width: 100%; display: block;">
+            </div>
+
+            <!-- Zoom & Pan Controls -->
+            <div class="crop-controls-wrapper">
+                <div style="display: flex; align-items: center; gap: 10px; width: 100%;">
+                    <button type="button" class="btn-crop-ctrl" onclick="zoomCropper(-0.1)" title="Zoom Out">
+                        <i class="fa-solid fa-magnifying-glass-minus"></i>
+                    </button>
+                    <input type="range" id="cropperZoomRange" min="0.1" max="3" step="0.05" value="1" class="crop-zoom-slider" oninput="setCropperZoom(this.value)">
+                    <button type="button" class="btn-crop-ctrl" onclick="zoomCropper(0.1)" title="Zoom In">
+                        <i class="fa-solid fa-magnifying-glass-plus"></i>
+                    </button>
+                    <button type="button" class="btn-crop-ctrl" onclick="rotateCropper(90)" title="Rotate">
+                        <i class="fa-solid fa-rotate-right"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 14px;">
+                <button type="button" onclick="closeCropModal()" class="btn-crop-cancel" style="flex: 1;">
+                    අවලංගු කරන්න
+                </button>
+                <button type="button" id="btnSaveCroppedAvatar" onclick="applyAndSaveCroppedAvatar()" class="btn-submit-merit" style="flex: 2; margin: 0;">
+                    <i class="fa-solid fa-check"></i>
+                    <span id="btnSaveCroppedAvatarText">තහවුරු කර සුරකින්න</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- Settings & Policies Modal Dialog                                         -->
+    <!-- ========================================================================= -->
+    <div id="settingsModal" class="modal-overlay hidden">
+        <div class="modal-box settings-modal-box">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <i class="fa-solid fa-gear" style="color: #d97706;"></i>
+                    පද්ධති සැකසුම් සහ ප්‍රතිපත්ති
+                </h3>
+                <button onclick="closeSettingsModal()" class="modal-close-btn">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Settings Tabs Bar -->
+            <div class="settings-tabs-bar">
+                <button type="button" class="settings-tab-btn active" id="set-tab-profile" onclick="switchSettingsTab('profile')">
+                    <i class="fa-solid fa-user-pen"></i>
+                    <span>ප්‍රොෆයිල් තොරතුරු</span>
+                </button>
+                <button type="button" class="settings-tab-btn" id="set-tab-privacy" onclick="switchSettingsTab('privacy')">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    <span>රහස්‍යතා ප්‍රතිපත්තිය</span>
+                </button>
+                <button type="button" class="settings-tab-btn" id="set-tab-terms" onclick="switchSettingsTab('terms')">
+                    <i class="fa-solid fa-file-contract"></i>
+                    <span>භාවිත කොන්දේසි</span>
+                </button>
+                <button type="button" class="settings-tab-btn" id="set-tab-about" onclick="switchSettingsTab('about')">
+                    <i class="fa-solid fa-circle-info"></i>
+                    <span>පිං කෙත ගැන</span>
+                </button>
+                <button type="button" class="settings-tab-btn hidden" id="set-tab-admin" onclick="switchSettingsTab('admin')" style="display: none;">
+                    <i class="fa-solid fa-crown" style="color: #f59e0b;"></i>
+                    <span>👑 පරිපාලක පැනලය</span>
+                </button>
+            </div>
+
+            <!-- Settings Tab Contents Container -->
+            <div class="settings-content-wrapper">
+
+                <!-- TAB 1: Profile Information Edit -->
+                <div id="settingsContentProfile" class="settings-panel">
+                    <form id="settingsProfileForm" onsubmit="saveSettingsProfile(event)">
+                        <div class="form-group">
+                            <label class="form-label">ඔබේ නම (Name in 2 Parts)</label>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <input type="text" id="setFirstNameInput" class="form-input" required maxlength="35" placeholder="මුල් නම (First Name)">
+                                <input type="text" id="setLastNameInput" class="form-input" maxlength="35" placeholder="වාසගම (Last Name)">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">රැකියාව / වෘත්තිය (Occupation - Optional)</label>
+                            <input type="text" id="setOccupationInput" class="form-input" maxlength="60" placeholder="උදා: ගුරුවරයෙක් / ව්‍යාපාරික / ඉංජිනේරු...">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">ලිපිනය / ප්‍රදේශය (Address / Location)</label>
+                            <input type="text" id="setLocationInput" class="form-input" maxlength="80" placeholder="උදා: මහරගම, කොළඹ (කැමතිනම් පමණක්)">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">ධර්ම පාඨය / හැඳින්වීම (Dharmic Bio)</label>
+                            <textarea id="setBioInput" class="form-textarea" rows="2" maxlength="250" placeholder="ඔබ ප්‍රිය කරන ධර්ම පාඨයක් හෝ කුඩා හැඳින්වීමක්..."></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">ප්‍රොෆයිල් ඡායාරූපය සහ කවරය (Avatars & Covers)</label>
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                <button type="button" onclick="closeSettingsModal(); document.getElementById('editProfPhotoFileInput').click();" class="composer-action-btn" style="flex: 1; padding: 8px 12px; font-size: 0.76rem; border-radius: 8px; justify-content: center; background: #fffbeb; border: 1px solid #fde68a; color: #78350f;">
+                                    <i class="fa-solid fa-camera" style="color: #d97706;"></i> ප්‍රොෆයිල් පින්තූරය මාරු කරන්න
+                                </button>
+                                <button type="button" onclick="closeSettingsModal(); openCoverModal();" class="composer-action-btn" style="flex: 1; padding: 8px 12px; font-size: 0.76rem; border-radius: 8px; justify-content: center; background: #fffbeb; border: 1px solid #fde68a; color: #78350f;">
+                                    <i class="fa-solid fa-panorama" style="color: #d97706;"></i> කවරය (Banner) මාරු කරන්න
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 16px; display: flex; justify-content: flex-end;">
+                            <button type="submit" class="btn-submit-merit" style="margin: 0; min-width: 140px;">
+                                <i class="fa-solid fa-check"></i>
+                                <span>වෙනස්කම් සුරකින්න</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- TAB 2: Privacy Policy -->
+                <div id="settingsContentPrivacy" class="settings-panel hidden">
+                    <div class="policy-article">
+                        <div class="policy-banner">
+                            <i class="fa-solid fa-shield-halved" style="font-size: 1.4rem; color: #059669;"></i>
+                            <div>
+                                <h4 style="margin: 0; font-size: 0.95rem; color: #065f46;">පිං කෙත රහස්‍යතා ප්‍රතිපත්තිය (Privacy Policy)</h4>
+                                <span style="font-size: 0.7rem; color: #047857;">අවසන් යාවත්කාලීන කිරීම: 2026 ඔක්තෝබර් 15</span>
+                            </div>
+                        </div>
+
+                        <div class="policy-section">
+                            <h5>1. පෞද්ගලික කුසල් සටහන් වල රහස්‍යභාවය (Private Merits)</h5>
+                            <p>ඔබ විසින් "පෞද්ගලික (Private)" ලෙස සලකුණු කර සටහන් කරන සියලුම පින්කම්, භාවනා සහ චිත්ත සමාධි අත්දැකීම් ඔබට හැර ලෝකයේ වෙනත් කිසිදු පරිශීලකයෙකුට හෝ සෙවුම් යන්ත්‍ර වලට (Search Engines) නොපෙනේ. ඒවා ඔබගේ පුද්ගලික පරිහරණය සඳහා පමණක් ආරක්ෂිතව තැන්පත් වේ.</p>
+                        </div>
+
+                        <div class="policy-section">
+                            <h5>2. ගිණුම් තොරතුරු සුරක්ෂිතතාව (Account Security)</h5>
+                            <p>ඔබගේ ගිණුමට ප්‍රවේශ වීම Google Sign-In හරහා ආරක්ෂිතව සිදු කෙරේ. ඔබගේ මුරපද (Passwords) අපගේ පද්ධතියේ කිසිසේත්ම ගබඩා නොවන අතර Google Identity Security ප්‍රමිතීන්ට අනුව ක්‍රියාත්මක වේ.</p>
+                        </div>
+
+                        <div class="policy-section">
+                            <h5>3. වාණිජමය නොවන පාරිශුද්ධ සේවාව (Non-Commercial Purpose)</h5>
+                            <p>"පිං කෙත" යනු කිසිදු වාණිජමය හෝ වෙළඳ දැන්වීම් පරමාර්ථයකින් තොරව, බුදුදහමේ කුසල චේතනාවන් ප්‍රවර්ධනය කිරීමට සහ කල්‍යාණ මිත්‍ර පුණ්‍ය එකමුතුවක් ගොඩනැංවීමට ගොඩනැගූ ලාභ නොලබන (Non-profit) ඩිජිටල් වේදිකාවකි. ඔබගේ පුද්ගලික දත්ත කිසිදු තෙවන පාර්ශ්වයකට අලෙවි නොකෙරේ.</p>
+                        </div>
+
+                        <div class="policy-section">
+                            <h5>4. ඡායාරූප සහ දත්ත ඉවත් කිරීමේ අයිතිය (Right to Delete)</h5>
+                            <p>ඔබ පළ කරන ඕනෑම පින්කමක් හෝ උඩුගත කරන ලද ඡායාරූපයක් ඕනෑම මොහොතක පද්ධතියෙන් සම්පූර්ණයෙන්ම මකා දැමීමට (Delete) ඔබට පූර්ණ බලය ඇත.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 3: Terms & Conditions -->
+                <div id="settingsContentTerms" class="settings-panel hidden">
+                    <div class="policy-article">
+                        <div class="policy-banner" style="background: #fffbeb; border-color: #fde68a;">
+                            <i class="fa-solid fa-file-contract" style="font-size: 1.4rem; color: #d97706;"></i>
+                            <div>
+                                <h4 style="margin: 0; font-size: 0.95rem; color: #78350f;">භාවිතයේ කොන්දේසි (Terms & Conditions)</h4>
+                                <span style="font-size: 0.7rem; color: #92400e;">කල්‍යාණ මිත්‍ර ශික්ෂණය සහ ප්‍රජා නීති</span>
+                            </div>
+                        </div>
+
+                        <div class="policy-section">
+                            <h5>1. කල්‍යාණ මිත්‍ර ශික්ෂණය සහ ගෞරවය (Noble Conduct)</h5>
+                            <p>මෙම වේදිකාව තුළ පළ කරනු ලබන සියලුම පින්කම් සටහන්, ඡායාරූප, සාදුකාර සහ පුණ්‍යානුමෝදනා (Comments) ශාන්ත, ධාර්මික සහ එකිනෙකාට ගෞරව කරන සුහදශීලී අයුරින් පමණක් සිදු කළ යුතුය.</p>
+                        </div>
+
+                        <div class="policy-section">
+                            <h5>2. නුසුදුසු අන්තර්ගතයන් සම්පූර්ණයෙන්ම තහනම්ය (Prohibited Content)</h5>
+                            <p>දේශපාලනික වාද විවාද, වෛරී ප්‍රකාශන (Hate Speech), වාණිජමය වෙළඳ ප්‍රචාරණ, අසත්‍ය ප්‍රචාර හෝ අනුන්ට අපහාස වන කිසිදු අන්තර්ගතයක් පළ කිරීම සම්පූර්ණයෙන්ම තහනම් වේ. එවැනි සටහන් පරිපාලනය විසින් ක්ෂණිකව ඉවත් කෙරේ.</p>
+                        </div>
+
+                        <div class="policy-section">
+                            <h5>3. සත්කාර හවුලේ විනිවිදභාවය (Charity Guidelines)</h5>
+                            <p>සත්කාර හවුල හරහා විහාරස්ථාන හෝ සමාජ සත්කාර සඳහා අවශ්‍යතා පළ කිරීමේදී සහ ආධාර ලබාදීමේදී සත්‍ය තොරතුරු සහ නිවැරදි දුරකථන අංක පමණක් භාවිත කළ යුතුය. කිසිදු මුදල් වංචාවකට ඉඩ නොදෙන අතර සියලු පාර්ශ්වයන් විමසිලිමත්ව කටයුතු කළ යුතුය.</p>
+                        </div>
+
+                        <div class="policy-section">
+                            <h5>4. පරිශීලක වගකීම (User Responsibility)</h5>
+                            <p>තමන් විසින් පළ කරනු ලබන තොරතුරු සහ අදහස් පිළිබඳ සම්පූර්ණ වගකීම අදාළ පරිශීලකයා සතු වන අතර, කොන්දේසි කඩකරන ඕනෑම අයෙකුගේ ගිණුම අත්හිටුවීමට (Suspend) පද්ධතියට අයිතිය ඇත.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 4: About Pin Ketha -->
+                <div id="settingsContentAbout" class="settings-panel hidden">
+                    <div style="text-align: center; padding: 6px 10px 10px;">
+                        <div style="width: 52px; height: 52px; border-radius: 50%; background: linear-gradient(135deg, rgba(254, 243, 199, 0.9), rgba(253, 230, 138, 0.6)); border: 2px solid #f59e0b; display: inline-flex; align-items: center; justify-content: center; color: #d97706; font-size: 1.6rem; margin-bottom: 8px; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15);">
+                            <i class="fa-solid fa-dharmachakra"></i>
+                        </div>
+                        <h3 style="font-family: var(--font-serif); color: #78350f; font-size: 1.25rem; margin-bottom: 2px; font-weight: 700;">පිං කෙත</h3>
+                        <p style="color: #b45309; font-size: 0.78rem; font-weight: 600; margin-bottom: 12px;">කල්‍යාණ මිත්‍ර පුණ්‍ය ජාලය • Version 2.0.4</p>
+                        
+                        <!-- Core Mission Quote Box -->
+                        <div style="background: linear-gradient(to bottom, #fffbeb, #ffffff); border: 1px solid #fde68a; border-radius: 12px; padding: 10px 14px; max-width: 440px; margin: 0 auto 12px; box-shadow: 0 2px 8px rgba(217, 119, 6, 0.05);">
+                            <p style="font-family: var(--font-serif); font-size: 0.92rem; color: #92400e; font-weight: 700; margin-bottom: 6px;">
+                                "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා"
+                            </p>
+                            <p style="font-size: 0.8rem; color: #475569; line-height: 1.6; margin: 0;">
+                                සැමට දැක බලා සතුටු සිතින් අනුමෝදන් විය හැකි, කළ පින්කම් සුරක්ෂිතව සටහන් කරගත හැකි සහ සමාජ සත්කාරයන් සඳහා අත්වැල් බැඳගත හැකි <strong style="color: #0284c7; font-weight: 700;">NexiaPro</strong> විසින් ලංකාවේ පළමු වතාවට හඳුන්වා දුන් නිර්මල ඩිජිටල් පුණ්‍ය භූමියයි.
+                            </p>
+                        </div>
+
+                        <!-- NexiaPro Creator Brand Card -->
+                        <div style="background: linear-gradient(135deg, rgba(240, 249, 255, 0.95), rgba(240, 253, 250, 0.95)); border: 1px solid rgba(14, 165, 233, 0.25); border-radius: 12px; padding: 10px 14px; max-width: 440px; margin: 0 auto; display: flex; align-items: center; gap: 12px; text-align: left; box-shadow: 0 3px 12px rgba(2, 132, 199, 0.06);">
+                            <img src="assets/nexiapro-logo.png" alt="NexiaPro Logo" style="width: 52px; height: 52px; object-fit: contain; border-radius: 10px; background: #ffffff; padding: 3px; border: 1px solid rgba(14, 165, 233, 0.2); box-shadow: 0 2px 6px rgba(0,0,0,0.05); flex-shrink: 0;">
+                            <div>
+                                <div style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: #0284c7; background: rgba(2, 132, 199, 0.1); padding: 2px 7px; border-radius: 12px; margin-bottom: 2px;">
+                                    <i class="fa-solid fa-code"></i> Technology & Innovation
+                                </div>
+                                <h4 style="margin: 0 0 1px; font-size: 0.95rem; font-weight: 800; background: linear-gradient(135deg, #0284c7, #059669); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">NexiaPro</h4>
+                                <p style="margin: 0; font-size: 0.7rem; color: #64748b; line-height: 1.35;">
+                                    සංකල්පය, නිර්මාණය සහ තාක්ෂණික දායකත්වය • Digital Initiative
+                                </p>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- TAB 5: Master Admin Control Panel (silvadilan9@gmail.com Only) -->
+                <div id="settingsContentAdmin" class="settings-panel hidden">
+                    <!-- Admin Identity Banner -->
+                    <div class="admin-panel-hero">
+                        <div class="admin-hero-icon"><i class="fa-solid fa-crown"></i></div>
+                        <div>
+                            <h4 style="margin: 0; font-size: 0.96rem; color: #78350f; font-weight: 800;">
+                                ප්‍රධාන පරිපාලක පාලක පැනලය (Master Admin Panel)
+                            </h4>
+                            <span style="font-size: 0.72rem; color: #047857; font-weight: 700;">
+                                <i class="fa-solid fa-shield-check"></i> සත්‍යාපිත Master Admin: silvadilan9@gmail.com
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Platform Live Stats Grid -->
+                    <div class="admin-stats-grid">
+                        <div class="admin-stat-card">
+                            <span class="admin-stat-num" id="adminStatPosts">0</span>
+                            <span class="admin-stat-label">මුළු පින්කම් සටහන්</span>
+                        </div>
+                        <div class="admin-stat-card">
+                            <span class="admin-stat-num" id="adminStatSadhu">0</span>
+                            <span class="admin-stat-label">ලද මුළු සාදුකාර</span>
+                        </div>
+                        <div class="admin-stat-card">
+                            <span class="admin-stat-num" id="adminStatNeeds">0</span>
+                            <span class="admin-stat-label">සත්කාර ඉල්ලීම්</span>
+                        </div>
+                        <div class="admin-stat-card">
+                            <span class="admin-stat-num" id="adminStatOfficial">0</span>
+                            <span class="admin-stat-label">නිල නිවේදන</span>
+                        </div>
+                    </div>
+
+                    <!-- 1. Global Broadcast Announcement Bar Manager -->
+                    <div class="admin-section-box">
+                        <div class="admin-section-title">
+                            <i class="fa-solid fa-bullhorn" style="color: #d97706;"></i>
+                            <span>මුළු වෙබ් අඩවිය පුරා දිවෙන විශේෂ නිවේදනය (Global Broadcast)</span>
+                        </div>
+                        <p style="font-size: 0.72rem; color: #64748b; margin-bottom: 8px;">
+                            සියලුම සාමාජිකයින්ට සහ නරඹන්නන්ට වෙබ් අඩවියේ ඉහළින්ම දිස්වන රන්වන් නිවේදන පණිවිඩය මෙතැනින් කළමනාකරණය කරන්න.
+                        </p>
+                        <form id="adminAnnouncementForm" onsubmit="saveGlobalAnnouncement(event)">
+                            <div class="form-group" style="margin-bottom: 8px;">
+                                <textarea id="adminAnnounceInput" class="form-textarea" rows="2" maxlength="300" placeholder="උදා: කඨින චීවර මාසය වෙනුවෙන් දිවයින පුරා පින්කම් සඳහා සත්කාර හවුල සක්‍රීයයි..."></textarea>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                                <label class="admin-toggle-switch">
+                                    <input type="checkbox" id="adminAnnounceActive">
+                                    <span>වෙබ් අඩවියේ ප්‍රදර්ශනය කරන්න (Active)</span>
+                                </label>
+                                <button type="submit" class="btn-post-action" style="padding: 6px 16px; font-size: 0.78rem;">
+                                    <i class="fa-solid fa-floppy-disk"></i> සුරකින්න
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- 2. Daily Dhamma Verse Customizer -->
+                    <div class="admin-section-box">
+                        <div class="admin-section-title">
+                            <i class="fa-solid fa-sun" style="color: #d97706;"></i>
+                            <span>දවසේ ධර්ම පදය සංස්කරණය (Daily Dhamma Verse)</span>
+                        </div>
+                        <p style="font-size: 0.72rem; color: #64748b; margin-bottom: 8px;">
+                            දකුණු පස තීරුවේ දිස්වන පාළි ගාථාව සහ සිංහල තේරුම ක්ෂණිකව යාවත්කාලීන කරන්න.
+                        </p>
+                        <form id="adminVerseForm" onsubmit="saveDhammaVerse(event)">
+                            <div class="form-group" style="margin-bottom: 8px;">
+                                <label class="form-label" style="font-size: 0.72rem;">පාළි ගාථාව (Pali Verse)</label>
+                                <textarea id="adminVersePaliInput" class="form-textarea" rows="2" maxlength="300" placeholder="පාළි ගාථාව..."></textarea>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 10px;">
+                                <label class="form-label" style="font-size: 0.72rem;">සිංහල තේරුම (Sinhala Meaning)</label>
+                                <textarea id="adminVerseSinhalaInput" class="form-textarea" rows="2" maxlength="400" placeholder="සිංහල අර්ථය..."></textarea>
+                            </div>
+                            <div style="text-align: right;">
+                                <button type="submit" class="btn-post-action" style="padding: 6px 16px; font-size: 0.78rem;">
+                                    <i class="fa-solid fa-floppy-disk"></i> ධර්ම පදය සුරකින්න
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- 2b. Upcoming Poya Day & Buddhist Event Manager -->
+                    <div class="admin-section-box">
+                        <div class="admin-section-title">
+                            <i class="fa-solid fa-moon" style="color: #d97706;"></i>
+                            <span>පුණ්‍ය දින දර්ශනය සංස්කරණය (Poya Calendar Manager)</span>
+                        </div>
+                        <p style="font-size: 0.72rem; color: #64748b; margin-bottom: 8px;">
+                            දකුණු පස තීරුවේ දිස්වන ළඟම පොහෝ දිනය සහ ආගමික උත්සව තොරතුරු මෙතැනින් යාවත්කාලීන කරන්න.
+                        </p>
+                        <form id="adminPoyaForm" onsubmit="savePoyaCalendar(event)">
+                            <div class="poya-admin-inputs-grid">
+                                <div class="form-group" style="margin-bottom: 6px;">
+                                    <label class="form-label" style="font-size: 0.7rem;">මාසය (Badge)</label>
+                                    <input type="text" id="adminPoyaMonthInput" class="form-input" maxlength="10" placeholder="උදා: ඔක්" required>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 6px;">
+                                    <label class="form-label" style="font-size: 0.7rem;">දිනය (Day)</label>
+                                    <input type="text" id="adminPoyaDayInput" class="form-input" maxlength="6" placeholder="උදා: 25" required>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 6px;">
+                                    <label class="form-label" style="font-size: 0.7rem;">පොහොය / උත්සව නාමය</label>
+                                    <input type="text" id="adminPoyaTitleInput" class="form-input" maxlength="80" placeholder="උදා: වප් පුර පසළොස්වක පොහොය" required>
+                                </div>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 10px;">
+                                <label class="form-label" style="font-size: 0.7rem;">විශේෂ විස්තරය (Description)</label>
+                                <input type="text" id="adminPoyaDescInput" class="form-input" maxlength="120" placeholder="උදා: කඨින චීවර මාසයේ ආරම්භය">
+                            </div>
+                            <div style="text-align: right;">
+                                <button type="submit" class="btn-post-action" style="padding: 6px 16px; font-size: 0.78rem;">
+                                    <i class="fa-solid fa-floppy-disk"></i> දින දර්ශනය සුරකින්න
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- 2c. Charity Needs Verification Manager -->
+                    <div class="admin-section-box">
+                        <div class="admin-section-title">
+                            <i class="fa-solid fa-shield-heart" style="color: #059669;"></i>
+                            <span>සත්කාර හවුල සත්‍යාපනය (Charity Needs Verification)</span>
+                        </div>
+                        <p style="font-size: 0.72rem; color: #64748b; margin-bottom: 8px;">
+                            විහාරස්ථාන සහ සමාජ සත්කාර සඳහා පරිපාලනය විසින් සත්‍යාපිත නිල සහතිකය (Verified Charity Badge) ලබාදෙන්න.
+                        </p>
+                        <div id="adminCharityNeedsList" class="admin-mod-list" style="max-height: 200px;">
+                            <!-- Populated dynamically via JS -->
+                        </div>
+                    </div>
+
+                    <!-- 2d. Spam & Prohibited Words Filter Manager -->
+                    <div class="admin-section-box">
+                        <div class="admin-section-title">
+                            <i class="fa-solid fa-filter-circle-xmark" style="color: #dc2626;"></i>
+                            <span>අපහාසාත්මක සහ Spam වචන පෙරහන (Prohibited Words Filter)</span>
+                        </div>
+                        <p style="font-size: 0.72rem; color: #64748b; margin-bottom: 8px;">
+                            පවුර තුළ පළ කිරීම තහනම් වචන (දේශපාලනික, සූදු, අසභ්‍ය හෝ අපහාසාත්මක) කොමා (,) වලින් වෙන් කර මෙහි ඇතුළත් කරන්න.
+                        </p>
+                        <form id="adminBannedWordsForm" onsubmit="saveBannedWordsConfig(event)">
+                            <div class="form-group" style="margin-bottom: 8px;">
+                                <textarea id="adminBannedWordsInput" class="form-textarea" rows="2" placeholder="උදා: කැසිනෝ, සූදු, දේශපාලන, ජන්දෙ, casino, betting..."></textarea>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                                <label class="admin-toggle-switch">
+                                    <input type="checkbox" id="adminBannedWordsActive" checked>
+                                    <span>ස්වයංක්‍රීය පෙරහන ක්‍රියාත්මකයි (Filter Active)</span>
+                                </label>
+                                <button type="submit" class="btn-post-action" style="padding: 6px 16px; font-size: 0.78rem;">
+                                    <i class="fa-solid fa-shield-halved"></i> පෙරහන සුරකින්න
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- 3. Quick Post Moderation & Delete Management -->
+                    <div class="admin-section-box">
+                        <div class="admin-section-title">
+                            <i class="fa-solid fa-list-check" style="color: #d97706;"></i>
+                            <span>පින්කම් අධීක්ෂණය සහ කළමනාකරණය (Post Moderation)</span>
+                        </div>
+                        <p style="font-size: 0.72rem; color: #64748b; margin-bottom: 10px;">
+                            ඕනෑම නුසුදුසු සටහනක් Master Admin බලතල මඟින් පවුරෙන් ක්ෂණිකව ඉවත් (Delete) කරන්න.
+                        </p>
+                        <div id="adminModerationList" class="admin-mod-list">
+                            <!-- Populated dynamically via JS -->
+                        </div>
+                    </div>
+
+                    <!-- 4. Developer Test Mode Switcher -->
+                    <div class="admin-section-box" style="background: #f8fafc; border-color: #cbd5e1;">
+                        <div class="admin-section-title" style="color: #334155;">
+                            <i class="fa-solid fa-flask" style="color: #64748b;"></i>
+                            <span>පරීක්ෂණ පහසුකම (Local Testing Switcher)</span>
+                        </div>
+                        <p style="font-size: 0.72rem; color: #64748b; margin-bottom: 8px;">
+                            Google Sign-in නොමැතිව Local Sandbox පරිසරයේදී Master Admin අත්දැකීම පරීක්ෂා කිරීමට භාවිතා කළ හැක.
+                        </p>
+                        <button type="button" class="composer-input-btn" onclick="toggleSimulateMasterAdmin()" style="font-size: 0.75rem; font-weight: 700; background: #ffffff; border: 1px solid #94a3b8; color: #1e293b; padding: 6px 12px;">
+                            <i class="fa-solid fa-repeat"></i> <span id="adminSimulateBtnText">Admin Mode ක්‍රියාත්මක / අක්‍රීය කරන්න</span>
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- Repost / Re-share Modal Dialog                                            -->
+    <!-- ========================================================================= -->
+    <div id="repostModal" class="modal-overlay hidden">
+        <div class="modal-box" style="max-width: 480px;">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <i class="fa-solid fa-repeat" style="color: #059669;"></i>
+                    පින්කම යළි බෙදාගැනීම (Repost)
+                </h3>
+                <button onclick="closeRepostModal()" class="modal-close-btn">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div style="padding: 16px 20px;">
+                <!-- Quoted Original Post Preview -->
+                <div id="repostPreviewBox" class="quoted-merit-box" style="margin-bottom: 14px;">
+                    <!-- Dynamically populated -->
+                </div>
+
+                <!-- Personal Reflection / Blessing -->
+                <div class="form-group" style="margin-bottom: 10px;">
+                    <label class="form-label">ඔබේ අනුමෝදනාව හෝ සටහන (Optional)</label>
+                    <textarea id="repostCommentInput" class="form-textarea" rows="2" maxlength="250" placeholder="මේ උතුම් පින්කම පිළිබඳ ඔබේ සතුට හෝ ආශිර්වාදය සටහන් කරන්න..."></textarea>
+                </div>
+
+                <!-- Quick Blessing Chips -->
+                <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px;">
+                    <button type="button" class="blessing-chip" onclick="addRepostChip('🙏 සාදු! සාදු! සාදු!')">🙏 සාදු! සාදු!</button>
+                    <button type="button" class="blessing-chip" onclick="addRepostChip('🌸 මාගේද පුණ්‍යානුමෝදනාව වේවා!')">🌸 පුණ්‍යානුමෝදනාව වේවා!</button>
+                    <button type="button" class="blessing-chip" onclick="addRepostChip('✨ සැමට සෙතක් වේවා!')">✨ සැමට සෙතක් වේවා!</button>
+                </div>
+
+                <div style="display: flex; gap: 10px;">
+                    <button type="button" onclick="closeRepostModal()" class="btn-crop-cancel" style="flex: 1;">
+                        අවලංගු කරන්න
+                    </button>
+                    <button type="button" id="btnConfirmRepost" onclick="submitRepost()" class="btn-submit-merit" style="flex: 2; margin: 0; background: linear-gradient(135deg, #059669, #047857);">
+                        <i class="fa-solid fa-repeat"></i>
+                        <span>පවුරට Repost කරන්න</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- Fullscreen Photo Lightbox / Gallery Viewer                                -->
+    <!-- ========================================================================= -->
+    <div id="photoLightboxModal" class="lightbox-overlay hidden" onclick="closeLightboxOnBackdrop(event)">
+        <button class="lightbox-close-btn" onclick="closeLightbox()" title="වසන්න">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+
+        <button class="lightbox-nav-btn prev" id="lightboxPrevBtn" onclick="prevLightboxImage()" title="කලින් ඡායාරූපය">
+            <i class="fa-solid fa-chevron-left"></i>
+        </button>
+
+        <div class="lightbox-content-box">
+            <img id="lightboxActiveImage" src="" alt="පින්කම් ඡායාරූපය" class="lightbox-main-img">
+            <div class="lightbox-counter-badge" id="lightboxCounter">1 / 1</div>
+        </div>
+
+        <button class="lightbox-nav-btn next" id="lightboxNextBtn" onclick="nextLightboxImage()" title="ඊළඟ ඡායාරූපය">
+            <i class="fa-solid fa-chevron-right"></i>
+        </button>
+    </div>
+
+    <!-- Cropper.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+
+    <!-- Application ES Modules -->
+    <script type="module" src="js/app.js?v=22"></script>
+</body>
+</html>
