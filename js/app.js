@@ -226,11 +226,11 @@ window.switchTab = function(tab) {
   if (tab === 'profile') {
     if (feedLayout) {
       feedLayout.classList.add('hidden');
-      feedLayout.style.display = 'none';
+      feedLayout.style.setProperty('display', 'none', 'important');
     }
     if (profileContainer) {
       profileContainer.classList.remove('hidden');
-      profileContainer.style.display = 'block';
+      profileContainer.style.setProperty('display', 'block', 'important');
     }
     if (banner) banner.style.display = 'none';
 
@@ -247,11 +247,12 @@ window.switchTab = function(tab) {
   // Non-profile tabs: show main feed layout, hide profile container
   if (feedLayout) {
     feedLayout.classList.remove('hidden');
+    feedLayout.style.removeProperty('display');
     feedLayout.style.display = '';
   }
   if (profileContainer) {
     profileContainer.classList.add('hidden');
-    profileContainer.style.display = 'none';
+    profileContainer.style.setProperty('display', 'none', 'important');
   }
 
   // Context banner

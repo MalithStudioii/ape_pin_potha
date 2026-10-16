@@ -3560,13 +3560,17 @@ html, body {
 
   /* 3. Main Feed Layout on Mobile - Pure Block Flow Never Blows Out */
   .main-layout {
-    display: block !important;
+    display: block;
     padding: 10px 10px 80px 10px !important;
     width: 100% !important;
     max-width: 100% !important;
     box-sizing: border-box !important;
     min-width: 0 !important;
     overflow-x: hidden !important;
+  }
+
+  .main-layout.hidden {
+    display: none !important;
   }
 
   .main-feed-area,
@@ -3849,13 +3853,17 @@ html, body {
 
   /* 9. Profile View on Mobile - Never Overflow & Clean Alignment */
   .profile-page-container {
-    display: block !important;
+    display: block;
     padding: 0 8px 80px 8px !important;
     width: 100% !important;
     max-width: 100% !important;
     box-sizing: border-box !important;
     min-width: 0 !important;
     overflow-x: hidden !important;
+  }
+
+  .profile-page-container.hidden {
+    display: none !important;
   }
 
   .profile-header-wrapper {
