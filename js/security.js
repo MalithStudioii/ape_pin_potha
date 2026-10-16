@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * පිං කෙත | Security & Anti-XSS Sanitization Layer
+ * පිං පොත | Security & Anti-XSS Sanitization Layer
  * ============================================================================
  * Handles input sanitization, HTML escaping, strict payload validation,
  * safe URL filtering, and client-side spam mitigation.

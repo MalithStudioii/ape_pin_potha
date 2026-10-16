@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * පිං කෙත | Firebase Configuration & Initialization
+ * පිං පොත | Firebase Configuration & Initialization
  * ============================================================================
  * ඔබේ සජීවී Firebase Cloud Project (pin-ketha-app) එකේ Configuration Keys.
  */

@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * පිං කෙත | Unified Database & Storage Layer (Firebase + Secure Local Fallback)
+ * පිං පොත | Unified Database & Storage Layer (Firebase + Secure Local Fallback)
  * ============================================================================
  */
 

@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * පිං කෙත | ImgBB Cloud Image Upload Service
+ * පිං පොත | ImgBB Cloud Image Upload Service
  * ============================================================================
  * ImgBB API මගින් නොමිලේ ඡායාරූප සත්කාරක පහසුකම (Free Unlimited Image Hosting)
  * API Endpoint: https://api.imgbb.com/1/upload

@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * පිං කෙත | Main Application Controller & UI Logic
+ * පිං පොත | Main Application Controller & UI Logic
  * ============================================================================
  */
 
@@ -180,6 +180,7 @@ function updateUserInfoUI() {
   applyAvatar(navAvatarEl);
   applyAvatar(sideAvatarEl);
   applyAvatar(composerAvatarEl);
+  applyAvatar(document.getElementById('mobNavAvatar'));
 }
 
 function updateUserStats() {
@@ -259,7 +260,7 @@ window.switchTab = function(tab) {
       banner.style.display = 'block';
       banner.className = 'context-banner mybook';
       banner.innerHTML = `
-        <h2>📖 මගේ පෞද්ගලික පිං කෙත</h2>
+        <h2>📖 මගේ පෞද්ගලික පිං පොත</h2>
         <p>ඔබ පොදු පවුරට එක් කළ සහ ඔබට පමණක් පෙනෙන (Private) සියලුම කුසල සටහන් මෙහි සුරක්ෂිතව ඇත.</p>
       `;
     } else if (tab === 'needs') {
@@ -436,8 +437,8 @@ function renderPostCardHTML(post, user) {
           </div>
           <div style="display: flex; align-items: center; gap: 6px;">
             ${isMaster ? `
-              <button class="post-pin-btn ${post.isPinned ? 'pinned' : ''}" onclick="togglePinPrompt('${post.id}')" title="${post.isPinned ? 'Pin ඉවත් කරන්න' : 'මුදුනටම Pin කරන්න'}">
-                <i class="fa-solid fa-thumbtack"></i> ${post.isPinned ? 'Pinned' : 'Pin'}
+              <button class="post-pin-btn ${post.isPinned ? 'is-pinned' : ''}" onclick="togglePinPrompt('${post.id}')" title="${post.isPinned ? 'Pin ඉවත් කරන්න' : 'මුදුනටම Pin කරන්න'}">
+                <i class="fa-solid fa-thumbtack"></i>
               </button>
             ` : ''}
             ${canDelete ? `
@@ -504,12 +505,12 @@ function renderPostCardHTML(post, user) {
           <div style="display: flex; align-items: center; gap: 6px;">
             ${isMaster && isNeed ? `
               <button class="post-verify-btn ${post.isVerifiedNeed ? 'verified' : ''}" onclick="toggleVerifyNeedPrompt('${post.id}')" title="${post.isVerifiedNeed ? 'සත්‍යාපනය ඉවත් කරන්න' : 'සත්කාරය සත්‍යාපනය කරන්න'}">
-                <i class="fa-solid fa-circle-check"></i> ${post.isVerifiedNeed ? 'Verified' : 'Verify'}
+                <i class="fa-solid fa-circle-check"></i> <span class="btn-text-resp">${post.isVerifiedNeed ? 'Verified' : 'Verify'}</span>
               </button>
             ` : ''}
             ${isMaster ? `
-              <button class="post-pin-btn ${post.isPinned ? 'pinned' : ''}" onclick="togglePinPrompt('${post.id}')" title="${post.isPinned ? 'Pin ඉවත් කරන්න' : 'මුදුනටම Pin කරන්න'}">
-                <i class="fa-solid fa-thumbtack"></i> ${post.isPinned ? 'Pinned' : 'Pin'}
+              <button class="post-pin-btn ${post.isPinned ? 'is-pinned' : ''}" onclick="togglePinPrompt('${post.id}')" title="${post.isPinned ? 'Pin ඉවත් කරන්න' : 'මුදුනටම Pin කරන්න'}">
+                <i class="fa-solid fa-thumbtack"></i>
               </button>
             ` : ''}
             ${canDelete ? `
@@ -814,7 +815,7 @@ window.handleShare = function(encodedTitle) {
   const title = decodeURIComponent(encodedTitle);
   if (navigator.share) {
     navigator.share({
-      title: 'පිං කෙත | ' + title,
+      title: 'පිං පොත | ' + title,
       text: 'මේ උතුම් පින්කම දැක බලා ඔබත් සතුටු සිතින් අනුමෝදන් වන්න!',
       url: window.location.href
     }).catch(() => {});
@@ -1933,13 +1934,22 @@ window.renderNotificationsList = function() {
   const notifs = currentNotifications || [];
   const unreadCount = notifs.filter(n => !n.read).length;
 
-  // Update Badge in Navbar
+  // Update Badge in Navbar & Mobile Bottom Bar
+  const mobBadgeEl = document.getElementById('mobNotifBadge');
   if (badgeEl) {
     if (unreadCount > 0) {
       badgeEl.innerText = unreadCount > 99 ? '99+' : unreadCount;
       badgeEl.style.display = 'inline-flex';
     } else {
       badgeEl.style.display = 'none';
+    }
+  }
+  if (mobBadgeEl) {
+    if (unreadCount > 0) {
+      mobBadgeEl.innerText = unreadCount > 99 ? '99+' : unreadCount;
+      mobBadgeEl.style.display = 'inline-flex';
+    } else {
+      mobBadgeEl.style.display = 'none';
     }
   }
 
