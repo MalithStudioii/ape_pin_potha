@@ -415,9 +415,12 @@ export const StorageService = {
   },
 
   notifyNotificationListeners(notifs = null) {
-    const list = notifs || this.getNotifications();
+    if (notifs) {
+      this.cacheLocalNotifications(notifs);
+    }
+    const filteredList = this.getNotifications();
     notifListeners.forEach(cb => {
-      try { cb(list); } catch (e) { console.error(e); }
+      try { cb(filteredList); } catch (e) { console.error(e); }
     });
   },
 
@@ -733,7 +736,14 @@ export const StorageService = {
   getNotifications() {
     const all = this.getLocalNotifications();
     const uid = this.currentUser?.uid;
-    return all.filter(n => !n.recipientUid || n.recipientUid === uid || uid === 'user_malith');
+    if (!uid) return [];
+    return all.filter(n => {
+      // Must be intended specifically for this user
+      if (n.recipientUid && n.recipientUid === uid) return true;
+      // Or system-wide broadcast notification
+      if (n.recipientUid === 'all' || n.type === 'broadcast') return true;
+      return false;
+    });
   },
 
   async createNotification(notifData) {
@@ -1023,8 +1033,8 @@ export const StorageService = {
       }
     }
 
-    // Trigger Notification for the author
-    if (targetPost && targetPost.uid) {
+    // Trigger Notification for the author (only if someone else gave Sadhu)
+    if (targetPost && targetPost.uid && targetPost.uid !== this.currentUser.uid) {
       this.createNotification({
         recipientUid: targetPost.uid,
         type: 'sadhu',
@@ -1070,8 +1080,8 @@ export const StorageService = {
       }
     }
 
-    // Trigger Notification for the author
-    if (targetPost && targetPost.uid) {
+    // Trigger Notification for the author (only if someone else commented)
+    if (targetPost && targetPost.uid && targetPost.uid !== this.currentUser.uid) {
       const snippet = val.text.length > 45 ? val.text.substring(0, 45) + '...' : val.text;
       this.createNotification({
         recipientUid: targetPost.uid,

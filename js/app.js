@@ -4,9 +4,16 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=22';
-import { Security } from './security.js?v=22';
-import { uploadToImgBB } from './imgbb-service.js?v=22';
+import { StorageService } from './storage.js?v=27';
+import { Security } from './security.js?v=27';
+import { uploadToImgBB } from './imgbb-service.js?v=27';
+import { SoundService, triggerHaptic } from './sound.js?v=27';
+
+window.SoundService = SoundService;
+window.triggerHaptic = triggerHaptic;
+window.toggleSoundPreference = function(e) {
+  SoundService.setSoundEnabled(e.target.checked);
+};
 
 let activeTab = 'feed';
 let activeCategory = 'සියල්ල';
@@ -97,6 +104,59 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   setupEventListeners();
+
+  // Initialize browser history state for mobile back button navigation
+  try {
+    history.replaceState({ type: 'tab', tab: 'feed' }, '');
+  } catch (e) {}
+
+  // Sync sound preference toggle
+  const soundChk = document.getElementById('chkSoundEffects');
+  if (soundChk) {
+    soundChk.checked = SoundService.getSoundEnabled();
+  }
+
+  // Handle native hardware/browser Back Button & gesture
+  window.addEventListener('popstate', (e) => {
+    triggerHaptic(25);
+    SoundService.playClick();
+
+    // 1. If any modal overlay is visible, close the top modal
+    const openModals = Array.from(document.querySelectorAll('.modal-overlay:not(.hidden)'));
+    if (openModals.length > 0) {
+      const topModal = openModals[openModals.length - 1];
+      topModal.classList.add('hidden');
+      if (topModal.id === 'cropAvatarModal' && window.cropperInstance) {
+        window.cropperInstance.destroy();
+        window.cropperInstance = null;
+      }
+      return;
+    }
+
+    // 2. If photo lightbox is open, close it
+    const lightbox = document.getElementById('photoLightboxModal');
+    if (lightbox && !lightbox.classList.contains('hidden')) {
+      closeLightbox();
+      return;
+    }
+
+    // 3. If notifications dropdown is open, close it
+    const notifDropdown = document.getElementById('notificationsDropdown');
+    if (notifDropdown && !notifDropdown.classList.contains('hidden')) {
+      notifDropdown.classList.add('hidden');
+      return;
+    }
+
+    // 4. Tab navigation history
+    if (e.state && e.state.type === 'tab') {
+      switchTab(e.state.tab, false);
+    } else if (activeTab !== 'feed') {
+      switchTab('feed', false);
+    }
+  });
+
+  // Check URL query params for direct post sharing (?post=POST_ID)
+  checkUrlDirectPost();
 });
 
 
@@ -195,8 +255,14 @@ function updateUserStats() {
   if (statSadhuEl) statSadhuEl.innerText = totalSadhu;
 }
 
-// Tab Switching
-window.switchTab = function(tab) {
+// Tab Switching with History API integration
+window.switchTab = function(tab, pushHistory = true) {
+  triggerHaptic(12);
+  if (pushHistory && activeTab !== tab) {
+    try {
+      history.pushState({ type: 'tab', tab: tab }, '');
+    } catch (e) {}
+  }
   activeTab = tab;
 
   // Update navigation buttons (both desktop & mobile)
@@ -568,7 +634,7 @@ function renderPostCardHTML(post, user) {
             <span>අමතන්න</span>
           </a>
         ` : `
-          <button class="post-btn" onclick="handleShare('${encodeURIComponent(post.title)}')">
+          <button class="post-btn" onclick="handleShare('${post.id}')">
             <i class="fa-solid fa-share-nodes" style="color: #94a3b8;"></i>
             <span>බෙදාගන්න</span>
           </button>
@@ -731,6 +797,10 @@ function triggerSadhuFloatingAnimation(btnElement) {
 
 // Global actions exposed to HTML
 window.handleSadhuClick = async function(postId, btnElement) {
+  // Play sacred temple bell sound & haptic vibration
+  SoundService.playSadhu();
+  triggerHaptic([15, 30, 20]);
+
   // 1. Instant button bounce micro-interaction
   if (btnElement) {
     btnElement.classList.add('liked');
@@ -767,6 +837,8 @@ window.toggleCommentsSection = function(postId) {
 
 window.submitQuickBlessing = async function(postId, text) {
   try {
+    SoundService.playSadhu();
+    triggerHaptic(20);
     await StorageService.addComment(postId, text);
   } catch (err) {
     alert(err.message);
@@ -779,6 +851,8 @@ window.handleCommentSubmit = async function(event, postId) {
   if (!input) return;
 
   try {
+    SoundService.playSadhu();
+    triggerHaptic(20);
     await StorageService.addComment(postId, input.value);
     input.value = '';
   } catch (err) {
@@ -812,22 +886,89 @@ window.deletePostPrompt = async function(postId) {
   }
 };
 
-window.handleShare = function(encodedTitle) {
-  const title = decodeURIComponent(encodedTitle);
+window.handleShare = async function(postId) {
+  SoundService.playShare();
+  triggerHaptic(25);
+
+  const allPosts = StorageService.getLocalPosts();
+  const post = (allPosts && allPosts.find(p => p.id === postId)) || {
+    id: postId,
+    title: 'පින්කමක්',
+    description: '',
+    author: 'කල්‍යාණ මිත්‍ර'
+  };
+
+  // Construct absolute clean deep-link
+  const origin = window.location.origin;
+  const pathname = window.location.pathname;
+  const postUrl = `${origin}${pathname}?post=${encodeURIComponent(post.id)}`;
+
+  const authorText = post.author ? `"${post.author}" විසින් ` : '';
+  const descSnippet = post.description
+    ? `\n\n"${post.description.length > 120 ? post.description.substring(0, 120) + '...' : post.description}"`
+    : '';
+  const shareTitle = `පිං පොත | ${post.title || 'පින්කමක්'}`;
+  const shareText = `🌸 ${authorText}පිං පොතේ තැබූ උතුම් පින්කම:${descSnippet}\n\n🙏 ඔබත් දැකබලා සාදුකාර දී පින් අනුමෝදන් වන්න:\n${postUrl}`;
+
   if (navigator.share) {
-    navigator.share({
-      title: 'පිං පොත | ' + title,
-      text: 'මේ උතුම් පින්කම දැක බලා ඔබත් සතුටු සිතින් අනුමෝදන් වන්න!',
-      url: window.location.href
-    }).catch(() => {});
-  } else {
-    navigator.clipboard?.writeText(window.location.href);
-    alert("ලිපිනය (Link) පිටපත් කරගන්නා ලදී! මිතුරන් සමඟ බෙදාගන්න.");
+    try {
+      await navigator.share({
+        title: shareTitle,
+        text: shareText,
+        url: postUrl
+      });
+      return;
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+    }
+  }
+
+  // Fallback for desktop / unsupported browsers
+  try {
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(`${shareText}`);
+    }
+  } catch (e) {}
+
+  const openWhatsApp = confirm(
+    `ලිපිනය (Link) සහ විස්තරය පිටපත් කරගන්නා ලදී! 🎉\n\nWhatsApp හරහා මිතුරන් සමඟ බෙදාගැනීමට අවශ්‍යද?`
+  );
+  if (openWhatsApp) {
+    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
+    window.open(waUrl, '_blank');
   }
 };
 
+// Check for deep-linked post in URL query (?post=post_123)
+function checkUrlDirectPost() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const targetPostId = urlParams.get('post');
+  if (!targetPostId) return;
+
+  const tryScroll = () => {
+    const elem = document.getElementById(`post-elem-${targetPostId}`);
+    if (elem) {
+      elem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      elem.classList.add('highlight-shared-post');
+      setTimeout(() => {
+        elem.classList.remove('highlight-shared-post');
+      }, 4500);
+      return true;
+    }
+    return false;
+  };
+
+  if (!tryScroll()) {
+    setTimeout(tryScroll, 600);
+    setTimeout(tryScroll, 1600);
+  }
+}
+
 // Modal & Form Handling
 window.openModal = function(type = 'merit', triggerPhoto = false) {
+  try {
+    history.pushState({ type: 'modal', id: 'postModal' }, '');
+  } catch (e) {}
   const modal = document.getElementById('postModal');
   if (modal) modal.classList.remove('hidden');
   setPostType(type);
@@ -1012,6 +1153,9 @@ window.openLightbox = function(encodedImages, startIndex = 0) {
     if (nextBtn) nextBtn.style.display = currentLightboxImages.length > 1 ? 'flex' : 'none';
 
     if (modal) {
+      try {
+        history.pushState({ type: 'modal', id: 'photoLightboxModal' }, '');
+      } catch (e) {}
       modal.classList.remove('hidden');
       document.body.style.overflow = 'hidden';
     }
@@ -1094,6 +1238,8 @@ function setupEventListeners() {
         isPinned
       });
 
+      SoundService.playPublish();
+      triggerHaptic([25, 50, 25]);
       closeModal();
       if (selectedPostType === 'need') switchTab('needs');
       else if (visibility === 'private') switchTab('mybook');
@@ -1611,6 +1757,9 @@ window.openCropModalForFile = function(file) {
     if (!cropImg) return;
 
     cropImg.src = e.target.result;
+    try {
+      history.pushState({ type: 'modal', id: 'cropAvatarModal' }, '');
+    } catch (err) {}
     document.getElementById('cropAvatarModal')?.classList.remove('hidden');
 
     // Destroy previous cropper if existing
@@ -1757,6 +1906,9 @@ window.uploadCoverPhoto = async function(event) {
 };
 
 window.openCoverModal = function() {
+  try {
+    history.pushState({ type: 'modal', id: 'editCoverModal' }, '');
+  } catch (e) {}
   const currentUser = StorageService.currentUser;
   const currentImg = document.getElementById('coverCurrentPreviewImg');
   if (currentImg && currentUser) {
@@ -2082,6 +2234,9 @@ window.markAllNotificationsAsRead = async function(e) {
 // ============================================================================
 
 window.openSettingsModal = function(initialTab = 'profile') {
+  try {
+    history.pushState({ type: 'modal', id: 'settingsModal' }, '');
+  } catch (e) {}
   const modal = document.getElementById('settingsModal');
   const user = StorageService.currentUser;
   if (!modal) return;
@@ -2150,6 +2305,9 @@ let currentRepostTargetId = null;
 let currentRepostTargetPost = null;
 
 window.openRepostModal = function(postId) {
+  try {
+    history.pushState({ type: 'modal', id: 'repostModal' }, '');
+  } catch (e) {}
   currentRepostTargetId = postId;
   const modal = document.getElementById('repostModal');
   const previewBox = document.getElementById('repostPreviewBox');
@@ -2226,6 +2384,8 @@ window.submitRepost = async function() {
 
   try {
     await StorageService.repostPost(currentRepostTargetId, comment, currentRepostTargetPost);
+    SoundService.playRepost();
+    triggerHaptic([20, 40, 20]);
     closeRepostModal();
     switchTab('feed');
     window.scrollTo({ top: 0, behavior: 'smooth' });
