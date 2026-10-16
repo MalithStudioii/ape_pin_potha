@@ -1736,7 +1736,8 @@ window.uploadCoverPhoto = async function(event) {
 
   try {
     if (statusText) {
-      statusText.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> කවරයේ ඡායාරූපය සකස් වෙමින් පවතී...`;
+      statusText.style.display = 'block';
+      statusText.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> කවරයේ ඡායාරූපය Upload වෙමින් පවතී... කරුණාකර මොහොතක් රැඳෙන්න.`;
     }
 
     const uploadedUrl = await uploadToImgBB(file, `cover_${Date.now()}`);
@@ -1747,7 +1748,8 @@ window.uploadCoverPhoto = async function(event) {
   } catch (err) {
     alert("කවරයේ ඡායාරූපය Upload කිරීමේ දෝෂයකි: " + err.message);
     if (statusText) {
-      statusText.innerText = "කවරයේ ඡායාරූපය තෝරන්න (Upload Banner)";
+      statusText.style.display = 'none';
+      statusText.innerText = "";
     }
   } finally {
     event.target.value = '';
@@ -1755,15 +1757,15 @@ window.uploadCoverPhoto = async function(event) {
 };
 
 window.openCoverModal = function() {
-  const container = document.getElementById('coverPresetsGrid');
   const currentUser = StorageService.currentUser;
-  if (container) {
-    container.innerHTML = COVER_PRESETS.map(preset => `
-      <div class="cover-preset-card ${currentUser.coverImage === preset.url ? 'selected' : ''}" onclick="selectCoverPreset('${preset.url}')">
-        <img src="${preset.url}" alt="${preset.name}" loading="lazy">
-        <div class="cover-preset-title">${preset.name}</div>
-      </div>
-    `).join('');
+  const currentImg = document.getElementById('coverCurrentPreviewImg');
+  if (currentImg && currentUser) {
+    currentImg.src = currentUser.coverImage || 'https://images.unsplash.com/photo-1582510003544-4d00b7f74220?auto=format&fit=crop&w=1600&q=80';
+  }
+  const statusText = document.getElementById('coverUploadStatusText');
+  if (statusText) {
+    statusText.style.display = 'none';
+    statusText.innerText = '';
   }
   document.getElementById('editCoverModal')?.classList.remove('hidden');
 };

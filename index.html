@@ -17,7 +17,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
     
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=25">
+    <link rel="stylesheet" href="css/styles.css?v=26">
 </head>
 <body>
 
@@ -472,30 +472,6 @@
             <div class="profile-main-col">
                 <!-- Timeline Sub-tab -->
                 <div id="subTabTimelineView">
-                    <!-- Composer in Profile -->
-                    <div class="card composer-card" style="margin-bottom: 16px;">
-                        <div class="composer-top">
-                            <div class="user-avatar-circle" id="profComposerAvatar" style="width: 38px; height: 38px;">ම</div>
-                            <button onclick="openModal('merit')" class="composer-input-btn">
-                                අද ඔබේ පින්කම කුමක්ද? මෙහි සටහන් කරන්න...
-                            </button>
-                        </div>
-                        <div class="composer-actions">
-                            <button onclick="openModal('merit')" class="composer-action-btn">
-                                <i class="fa-solid fa-dharmachakra" style="color: #d97706;"></i>
-                                <span>පින්කමක්</span>
-                            </button>
-                            <button onclick="openModal('merit', true)" class="composer-action-btn">
-                                <i class="fa-solid fa-image" style="color: #059669;"></i>
-                                <span>ඡායාරූපයක්</span>
-                            </button>
-                            <button onclick="openModal('need')" class="composer-action-btn">
-                                <i class="fa-solid fa-hand-holding-heart" style="color: #e11d48;"></i>
-                                <span>සත්කාරයක්</span>
-                            </button>
-                        </div>
-                    </div>
-
                     <!-- User's Timeline Posts -->
                     <div id="profTimelinePosts">
                         <!-- Filtered posts rendered here -->
@@ -768,36 +744,47 @@
 
     <!-- Edit Cover Photo Modal Dialog -->
     <div id="editCoverModal" class="modal-overlay hidden">
-        <div class="modal-box" style="max-width: 580px;">
+        <div class="modal-box" style="max-width: 520px;">
             <div class="modal-header">
                 <h3 class="modal-title">
-                    <i class="fa-solid fa-image" style="color: #d97706;"></i>
-                    කවරයේ ඡායාරූපය තෝරන්න (Cover Photo)
+                    <i class="fa-solid fa-camera-retro" style="color: #d97706;"></i>
+                    කවරයේ ඡායාරූපය වෙනස් කරන්න (Cover Photo)
                 </h3>
-                <button onclick="closeCoverModal()" class="modal-close-btn">
+                <button onclick="closeCoverModal()" class="modal-close-btn" aria-label="වසන්න">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
 
-            <p style="font-size: 0.78rem; color: #64748b; margin-bottom: 12px;">
-                ඔබේ Profile එකට ගැළපෙන ශාන්ත බෞද්ධ පසුබිමක් තෝරන්න:
-            </p>
-
-            <div class="cover-presets-grid" id="coverPresetsGrid">
-                <!-- 5 Presets injected by app.js with live preview -->
-            </div>
-
-            <!-- Device Banner Upload -->
-            <div style="border-top: 1px solid #f1f5f9; padding-top: 14px; margin-top: 14px;">
-                <label class="form-label">හෝ ඔබගේ උපාංගයෙන් Banner එකක් එක් කරන්න</label>
-                <div class="image-drop-area" style="padding: 14px 10px; cursor: pointer; text-align: center;" onclick="document.getElementById('coverPhotoFileInput').click()">
-                    <i class="fa-solid fa-cloud-arrow-up" style="font-size: 1.5rem; color: #b45309; margin-bottom: 6px;"></i>
-                    <span id="coverUploadStatusText" style="font-size: 0.76rem; font-weight: 700; color: #78350f; display: block;">
-                        කවරයේ ඡායාරූපය තෝරන්න (Upload Banner)
-                    </span>
-                    <input type="file" id="coverPhotoFileInput" accept="image/*" style="display: none;" onchange="uploadCoverPhoto(event)">
+            <!-- Current Cover Preview -->
+            <div id="coverCurrentPreviewBox" style="position: relative; width: 100%; height: 130px; border-radius: 12px; overflow: hidden; margin-bottom: 16px; background: #f8fafc; border: 1px solid #e2e8f0;">
+                <img id="coverCurrentPreviewImg" src="" alt="Current Cover" style="width: 100%; height: 100%; object-fit: cover;">
+                <div style="position: absolute; bottom: 8px; left: 10px; background: rgba(0,0,0,0.65); backdrop-filter: blur(4px); color: #fff; padding: 4px 10px; border-radius: 6px; font-size: 0.72rem; font-weight: 600;">
+                    දැනට ඇති කවරය
                 </div>
             </div>
+
+            <!-- Direct Device Gallery Upload Area -->
+            <div class="image-drop-area" style="padding: 24px 16px; cursor: pointer; text-align: center; border: 2px dashed #f59e0b; background: #fffdf5; border-radius: 14px;" onclick="document.getElementById('coverPhotoFileInput').click()">
+                <div style="width: 52px; height: 52px; border-radius: 50%; background: #fef3c7; color: #b45309; display: inline-flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-bottom: 10px;">
+                    <i class="fa-solid fa-images"></i>
+                </div>
+                <h4 style="font-size: 0.95rem; font-weight: 700; color: #78350f; margin-bottom: 4px;">
+                    ඔබගේ Gallery එකෙන් ඡායාරූපයක් තෝරන්න
+                </h4>
+                <p style="font-size: 0.76rem; color: #92400e; margin-bottom: 12px;">
+                    ඔබගේ දුරකථනයේ හෝ පරිගණකයේ ගැලරියෙන් කැමති ඡායාරූපයක් Upload කරන්න
+                </p>
+                <button type="button" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 700; padding: 8px 18px; border-radius: 8px; font-size: 0.82rem; pointer-events: none;">
+                    <i class="fa-solid fa-arrow-up-from-bracket"></i> ඡායාරූපය තෝරන්න (Choose Image)
+                </button>
+                <div id="coverUploadStatusText" style="display: none; font-size: 0.8rem; font-weight: 700; color: #b45309; margin-top: 12px;"></div>
+                <input type="file" id="coverPhotoFileInput" accept="image/*" style="display: none;" onchange="uploadCoverPhoto(event)">
+            </div>
+
+            <p style="font-size: 0.74rem; color: #64748b; margin-top: 14px; margin-bottom: 0; text-align: center;">
+                <i class="fa-solid fa-circle-info" style="color: #d97706;"></i> 
+                Landscape (තිරස්) හැඩයේ උසස් තත්ත්වයේ ඡායාරූපයක් වඩාත් අලංකාරව දිස්වේ.
+            </p>
         </div>
     </div>
 
@@ -917,18 +904,6 @@
                         <div class="form-group">
                             <label class="form-label">ධර්ම පාඨය / හැඳින්වීම (Dharmic Bio)</label>
                             <textarea id="setBioInput" class="form-textarea" rows="2" maxlength="250" placeholder="ඔබ ප්‍රිය කරන ධර්ම පාඨයක් හෝ කුඩා හැඳින්වීමක්..."></textarea>
-                        </div>
-
-                        <div class="form-group">
-                            <label class="form-label">ප්‍රොෆයිල් ඡායාරූපය සහ කවරය (Avatars & Covers)</label>
-                            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                                <button type="button" onclick="closeSettingsModal(); document.getElementById('editProfPhotoFileInput').click();" class="composer-action-btn" style="flex: 1; padding: 8px 12px; font-size: 0.76rem; border-radius: 8px; justify-content: center; background: #fffbeb; border: 1px solid #fde68a; color: #78350f;">
-                                    <i class="fa-solid fa-camera" style="color: #d97706;"></i> ප්‍රොෆයිල් පින්තූරය මාරු කරන්න
-                                </button>
-                                <button type="button" onclick="closeSettingsModal(); openCoverModal();" class="composer-action-btn" style="flex: 1; padding: 8px 12px; font-size: 0.76rem; border-radius: 8px; justify-content: center; background: #fffbeb; border: 1px solid #fde68a; color: #78350f;">
-                                    <i class="fa-solid fa-panorama" style="color: #d97706;"></i> කවරය (Banner) මාරු කරන්න
-                                </button>
-                            </div>
                         </div>
 
                         <div style="margin-top: 16px; display: flex; justify-content: flex-end;">
@@ -1345,6 +1320,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=25"></script>
+    <script type="module" src="js/app.js?v=26"></script>
 </body>
 </html>

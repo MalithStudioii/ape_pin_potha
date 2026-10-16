@@ -2128,35 +2128,62 @@ body {
 .profile-nav-tabs {
   display: flex;
   border-top: 1px solid #f1f5f9;
-  padding: 0 24px;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 0 20px;
   gap: 6px;
   overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+  background: #ffffff;
+}
+
+.profile-nav-tabs::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .prof-nav-btn {
-  padding: 14px 20px;
+  position: relative;
+  padding: 13px 16px;
   background: transparent;
   border: none;
-  border-bottom: 3px solid transparent;
-  font-weight: 700;
-  font-size: 0.88rem;
+  font-weight: 600;
+  font-size: 0.86rem;
   color: #64748b;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
   white-space: nowrap;
-  transition: all 0.2s ease;
+  transition: color 0.2s ease;
+  flex-shrink: 0;
 }
 
 .prof-nav-btn:hover {
   color: var(--color-primary-800);
-  background: #fdfaf2;
 }
 
 .prof-nav-btn.active {
   color: var(--color-primary-700);
-  border-bottom-color: var(--color-primary-600);
+  font-weight: 700;
+}
+
+.prof-nav-btn::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 12px;
+  right: 12px;
+  height: 3px;
+  background: transparent;
+  border-radius: 3px 3px 0 0;
+  transition: all 0.2s ease;
+}
+
+.prof-nav-btn.active::after {
+  background: linear-gradient(90deg, #d97706, #f59e0b);
 }
 
 .tab-counter {
@@ -2521,37 +2548,62 @@ body {
 .settings-tabs-bar {
   display: flex;
   gap: 4px;
-  background: #fdf8ed;
-  border-bottom: 2px solid #fef3c7;
+  background: #fdfaf2;
+  border-bottom: 1px solid #fde68a;
   padding: 0 16px;
   overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.settings-tabs-bar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .settings-tab-btn {
+  position: relative;
   background: transparent;
   border: none;
-  border-bottom: 3px solid transparent;
-  padding: 10px 14px;
+  padding: 11px 14px;
   font-size: 0.78rem;
   font-weight: 600;
   color: #78350f;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
   white-space: nowrap;
   transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
 .settings-tab-btn:hover {
   color: #b45309;
-  background: rgba(245, 158, 11, 0.08);
+  background: rgba(245, 158, 11, 0.06);
 }
 
 .settings-tab-btn.active {
   color: #92400e;
-  border-bottom-color: #d97706;
   font-weight: 700;
+}
+
+.settings-tab-btn::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 10px;
+  right: 10px;
+  height: 3px;
+  background: transparent;
+  border-radius: 3px 3px 0 0;
+  transition: all 0.2s ease;
+}
+
+.settings-tab-btn.active::after {
+  background: linear-gradient(90deg, #d97706, #f59e0b);
 }
 
 .settings-content-wrapper {
@@ -3948,12 +4000,20 @@ html, body {
   }
 
   .profile-nav-tabs {
+    padding: 0 8px !important;
     gap: 4px !important;
   }
 
   .prof-nav-btn {
-    padding: 8px 10px !important;
-    font-size: 0.72rem !important;
+    padding: 10px 10px !important;
+    font-size: 0.74rem !important;
+    gap: 6px !important;
+  }
+
+  .prof-nav-btn::after {
+    left: 8px !important;
+    right: 8px !important;
+    height: 2.5px !important;
   }
 }
 
