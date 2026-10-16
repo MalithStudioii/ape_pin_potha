@@ -4,10 +4,10 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=27';
-import { Security } from './security.js?v=27';
-import { uploadToImgBB } from './imgbb-service.js?v=27';
-import { SoundService, triggerHaptic } from './sound.js?v=27';
+import { StorageService } from './storage.js?v=29';
+import { Security } from './security.js?v=29';
+import { uploadToImgBB } from './imgbb-service.js?v=29';
+import { SoundService, triggerHaptic } from './sound.js?v=29';
 
 window.SoundService = SoundService;
 window.triggerHaptic = triggerHaptic;
@@ -918,6 +918,23 @@ window.handleShare = async function(postId) {
   const targetId = (isRepost && orig && orig.id) ? orig.id : post.id;
   const postUrl = `${origin}${pathname}?post=${encodeURIComponent(targetId)}`;
 
+  // Increment Dharma Dana share counter
+  try {
+    StorageService.incrementShare(targetId);
+    if (postId !== targetId) StorageService.incrementShare(postId);
+    if (post) post.shareCount = (post.shareCount || 0) + 1;
+    if (typeof activeProfileSubTab !== 'undefined' && activeProfileSubTab === 'stats') {
+      const u = StorageService.currentUser || {};
+      const mp = currentPostsData.filter(p => p.uid && u.uid && p.uid === u.uid);
+      const mpp = currentPostsData.filter(p => p.uid && u.uid && p.uid === u.uid && p.image);
+      const mpr = currentPostsData.filter(p => p.uid && u.uid && p.uid === u.uid && p.visibility === 'private');
+      const ts = mp.reduce((acc, p) => acc + (p.sadhuCount || 0), 0);
+      renderProfileSubTabContent(u, mp, mpp, mpr, ts);
+    }
+  } catch (e) {
+    console.warn('Share increment error:', e);
+  }
+
   let shareBody = `🌸 "${realAuthor}" ගේ උතුම් පින්කම:\n✨ ${realTitle}`;
   if (isRepost && post.author && post.author !== realAuthor) {
     shareBody += `\n🔄 (යළි බෙදාගත්තේ: ${post.author})`;
@@ -1381,8 +1398,8 @@ function renderProfileView() {
   const coverImg = document.getElementById('profileCoverImg');
   if (coverImg) {
     let activeCover = user.coverImage;
-    if (!activeCover || activeCover.includes('photo-1548013146-72479768bada')) {
-      activeCover = "https://images.unsplash.com/photo-1582510003544-4d00b7f74220?auto=format&fit=crop&w=1600&q=80";
+    if (!activeCover || activeCover.includes('photo-1548013146-72479768bada') || activeCover.includes('photo-1582510003544-4d00b7f74220')) {
+      activeCover = "assets/banner.jpg";
     }
     coverImg.src = activeCover;
   }
@@ -1565,6 +1582,9 @@ function renderProfileBadges(myPosts, totalSadhu, user) {
   if (myPosts.some(p => p.category === 'සමාජ සත්කාර')) {
     badges.push({ icon: 'fa-hand-holding-heart', text: 'සත්කාර හවුල්කාර', class: 'emerald' });
   }
+  if (myPosts.some(p => p.category === 'ධර්ම දානමය' || p.isRepost || (p.shareCount && p.shareCount > 0) || (p.repostCount && p.repostCount > 0))) {
+    badges.push({ icon: 'fa-share-nodes', text: 'ධර්ම දාන පාරමිතා', class: 'blue' });
+  }
 
   if (badges.length === 0) {
     badges.push({ icon: 'fa-seedling', text: 'නවක සාමාජික', class: 'gold' });
@@ -1658,8 +1678,20 @@ function renderProfileSubTabContent(user, myPosts, myPhotosPosts, myPrivatePosts
       { key: 'දානමය', label: 'දානමය පින්කම් (Dana)', color: '#059669', icon: 'fa-bowl-rice' },
       { key: 'සීලමය', label: 'සීලමය පින්කම් (Sila)', color: '#2563eb', icon: 'fa-hands-praying' },
       { key: 'භාවනාමය', label: 'භාවනාමය පින්කම් (Bhavana)', color: '#9333ea', icon: 'fa-spa' },
-      { key: 'සමාජ සත්කාර', label: 'සමාජ සත්කාර (Social Service)', color: '#e11d48', icon: 'fa-hand-holding-heart' }
+      { key: 'සමාජ සත්කාර', label: 'සමාජ සත්කාර (Social Service)', color: '#e11d48', icon: 'fa-hand-holding-heart' },
+      { key: 'ධර්ම දානමය', label: 'ධර්ම දානමය පින්කම් (Dharma Dana)', color: '#0284c7', icon: 'fa-share-nodes' }
     ];
+
+    // Calculate Dharma Dana: shares received + reposts received on our posts + posts in ධර්ම දානමය / reposts by us
+    let totalDharmaDana = 0;
+    myPosts.forEach(p => {
+      const recShares = p.shareCount || 0;
+      const recReposts = p.repostCount || 0;
+      totalDharmaDana += (recShares + recReposts);
+      if (p.category === 'ධර්ම දානමය' || p.isRepost) {
+        totalDharmaDana += 1;
+      }
+    });
 
     const catCounts = {};
     categories.forEach(c => catCounts[c.key] = 0);
@@ -1667,23 +1699,29 @@ function renderProfileSubTabContent(user, myPosts, myPhotosPosts, myPrivatePosts
       if (catCounts[p.category] !== undefined) catCounts[p.category]++;
       else catCounts['දානමය']++;
     });
+    catCounts['ධර්ම දානමය'] = Math.max(catCounts['ධර්ම දානමය'] || 0, totalDharmaDana);
 
-    const totalP = myPosts.length || 1;
+    const totalParamiActions = Object.values(catCounts).reduce((a, b) => a + b, 0) || 1;
     const totalComments = myPosts.reduce((acc, p) => acc + (p.comments ? p.comments.length : 0), 0);
 
     statsContainer.innerHTML = `
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px;">
-        <div style="background: #fffbeb; border: 1px solid #fef3c7; border-radius: 12px; padding: 16px; text-align: center;">
-          <span style="font-size: 1.6rem; font-weight: 800; color: #b45309; display: block;">${myPosts.length}</span>
-          <span style="font-size: 0.75rem; font-weight: 700; color: #78350f;">මුළු පින්කම් සටහන්</span>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 24px;">
+        <div style="background: #fffbeb; border: 1px solid #fef3c7; border-radius: 12px; padding: 14px 10px; text-align: center;">
+          <span style="font-size: 1.5rem; font-weight: 800; color: #b45309; display: block;">${myPosts.length}</span>
+          <span style="font-size: 0.73rem; font-weight: 700; color: #78350f;">මුළු පින්කම් සටහන්</span>
         </div>
-        <div style="background: #ecfdf5; border: 1px solid #d1fae5; border-radius: 12px; padding: 16px; text-align: center;">
-          <span style="font-size: 1.6rem; font-weight: 800; color: #047857; display: block;">${totalSadhu}</span>
-          <span style="font-size: 0.75rem; font-weight: 700; color: #065f46;">ලද මුළු සාදුකාර</span>
+        <div style="background: #ecfdf5; border: 1px solid #d1fae5; border-radius: 12px; padding: 14px 10px; text-align: center;">
+          <span style="font-size: 1.5rem; font-weight: 800; color: #047857; display: block;">${totalSadhu}</span>
+          <span style="font-size: 0.73rem; font-weight: 700; color: #065f46;">ලද මුළු සාදුකාර</span>
         </div>
-        <div style="background: #eff6ff; border: 1px solid #dbeafe; border-radius: 12px; padding: 16px; text-align: center;">
-          <span style="font-size: 1.6rem; font-weight: 800; color: #1d4ed8; display: block;">${totalComments}</span>
-          <span style="font-size: 0.75rem; font-weight: 700; color: #1e40af;">පුණ්‍යානුමෝදනා (Comments)</span>
+        <div style="background: #eff6ff; border: 1px solid #dbeafe; border-radius: 12px; padding: 14px 10px; text-align: center;">
+          <span style="font-size: 1.5rem; font-weight: 800; color: #1d4ed8; display: block;">${totalComments}</span>
+          <span style="font-size: 0.73rem; font-weight: 700; color: #1e40af;">පුණ්‍යානුමෝදනා (Comments)</span>
+        </div>
+        <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 12px; padding: 14px 10px; text-align: center;">
+          <span style="font-size: 1.5rem; font-weight: 800; color: #0284c7; display: block;">${totalDharmaDana}</span>
+          <span style="font-size: 0.73rem; font-weight: 700; color: #0369a1;">ධර්ම දානමය පින්කම්</span>
+          <span style="font-size: 0.65rem; color: #64748b; display: block; margin-top: 2px;">(Shares & Reposts)</span>
         </div>
       </div>
 
@@ -1693,7 +1731,7 @@ function renderProfileSubTabContent(user, myPosts, myPhotosPosts, myPrivatePosts
       <div style="display: flex; flex-direction: column; gap: 14px;">
         ${categories.map(c => {
           const count = catCounts[c.key] || 0;
-          const percent = myPosts.length > 0 ? Math.round((count / totalP) * 100) : 0;
+          const percent = totalParamiActions > 0 ? Math.round((count / totalParamiActions) * 100) : 0;
           return `
             <div>
               <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 700; color: #334155; margin-bottom: 5px;">
@@ -1781,6 +1819,7 @@ window.closeEditProfileModal = function() {
 };
 
 let cropperInstance = null;
+let coverCropperInstance = null;
 
 window.handleProfilePhotoSelected = function(event) {
   const file = event.target.files[0];
@@ -1791,7 +1830,7 @@ window.handleProfilePhotoSelected = function(event) {
 
 window.openCropModalForFile = function(file) {
   if (!file) return;
-  if (!file.type.startsWith('image/')) {
+  if (file.type && !file.type.startsWith('image/')) {
     alert("කරුණාකර වලංගු ඡායාරූපයක් (Image file) තෝරන්න.");
     return;
   }
@@ -1801,42 +1840,46 @@ window.openCropModalForFile = function(file) {
     const cropImg = document.getElementById('imageToCrop');
     if (!cropImg) return;
 
-    cropImg.src = e.target.result;
     try {
       history.pushState({ type: 'modal', id: 'cropAvatarModal' }, '');
     } catch (err) {}
     document.getElementById('cropAvatarModal')?.classList.remove('hidden');
 
-    // Destroy previous cropper if existing
     if (cropperInstance) {
       cropperInstance.destroy();
       cropperInstance = null;
     }
 
-    // Initialize Cropper.js with 1:1 circular viewport
-    cropperInstance = new Cropper(cropImg, {
-      aspectRatio: 1,
-      viewMode: 1,
-      dragMode: 'move',
-      autoCropArea: 0.85,
-      restore: false,
-      guides: false,
-      center: true,
-      highlight: false,
-      cropBoxMovable: true,
-      cropBoxResizable: true,
-      toggleDragModeOnDblclick: false,
-      ready() {
-        const zoomRange = document.getElementById('cropperZoomRange');
-        if (zoomRange) zoomRange.value = 1;
-      },
-      zoom(e) {
-        const zoomRange = document.getElementById('cropperZoomRange');
-        if (zoomRange) {
-          zoomRange.value = Math.min(Math.max(e.detail.ratio, 0.1), 3);
-        }
+    cropImg.onload = function() {
+      if (cropperInstance) {
+        cropperInstance.destroy();
+        cropperInstance = null;
       }
-    });
+      cropperInstance = new Cropper(cropImg, {
+        aspectRatio: 1,
+        viewMode: 1,
+        dragMode: 'move',
+        autoCropArea: 0.85,
+        restore: false,
+        guides: false,
+        center: true,
+        highlight: false,
+        cropBoxMovable: true,
+        cropBoxResizable: true,
+        toggleDragModeOnDblclick: false,
+        ready() {
+          const zoomRange = document.getElementById('cropperZoomRange');
+          if (zoomRange) zoomRange.value = 1;
+        },
+        zoom(e) {
+          const zoomRange = document.getElementById('cropperZoomRange');
+          if (zoomRange && e && e.detail) {
+            zoomRange.value = Math.min(Math.max(e.detail.ratio, 0.1), 3);
+          }
+        }
+      });
+    };
+    cropImg.src = e.target.result;
   };
   reader.readAsDataURL(file);
 };
@@ -1877,21 +1920,35 @@ window.applyAndSaveCroppedAvatar = async function() {
     if (btn) btn.disabled = true;
     if (btnText) btnText.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> සුරකිමින් පවතී...`;
 
-    // 1. Get 400x400 high-resolution cropped canvas
-    const canvas = cropperInstance.getCroppedCanvas({
-      width: 400,
-      height: 400,
-      imageSmoothingEnabled: true,
-      imageSmoothingQuality: 'high'
-    });
+    // 1. Get 400x400 high-resolution cropped canvas with fallback
+    let canvas = null;
+    try {
+      canvas = cropperInstance.getCroppedCanvas({
+        width: 400,
+        height: 400,
+        imageSmoothingEnabled: true,
+        imageSmoothingQuality: 'high'
+      });
+    } catch (e) {
+      console.warn("Cropper getCroppedCanvas failed:", e);
+    }
 
-    // 2. Convert to WebP blob
+    if (!canvas) {
+      const cropImg = document.getElementById('imageToCrop');
+      canvas = document.createElement('canvas');
+      canvas.width = 400;
+      canvas.height = 400;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(cropImg, 0, 0, 400, 400);
+    }
+
+    // 2. Convert to JPEG blob (universally compatible)
     const blob = await new Promise((resolve) => {
-      canvas.toBlob((b) => resolve(b), 'image/webp', 0.90);
+      canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.88);
     });
 
-    // 3. Upload to ImgBB
-    const uploadedUrl = await uploadToImgBB(blob, `avatar_${Date.now()}`);
+    // 3. Upload to ImgBB (with automatic local fallback)
+    const uploadedUrl = await uploadToImgBB(blob || canvas.toDataURL('image/jpeg', 0.85), `avatar_${Date.now()}`);
 
     // 4. Save to StorageService and localStorage immediately!
     StorageService.updateProfile({ photo: uploadedUrl });
@@ -1922,32 +1979,148 @@ window.applyAndSaveCroppedAvatar = async function() {
   }
 };
 
-window.uploadCoverPhoto = async function(event) {
+// Cover Photo Cropper & Resizer
+window.handleCoverPhotoSelected = function(event) {
   const file = event.target.files[0];
   if (!file) return;
+  openCoverCropModal(file);
+  event.target.value = '';
+};
 
-  const statusText = document.getElementById('coverUploadStatusText');
+window.openCoverCropModal = function(file) {
+  if (!file) return;
+  if (file.type && !file.type.startsWith('image/')) {
+    alert("කරුණාකර වලංගු ඡායාරූපයක් (Image file) තෝරන්න.");
+    return;
+  }
 
-  try {
-    if (statusText) {
-      statusText.style.display = 'block';
-      statusText.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> කවරයේ ඡායාරූපය Upload වෙමින් පවතී... කරුණාකර මොහොතක් රැඳෙන්න.`;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const cropImg = document.getElementById('coverImageToCrop');
+    if (!cropImg) return;
+
+    try {
+      history.pushState({ type: 'modal', id: 'cropCoverModal' }, '');
+    } catch (err) {}
+    document.getElementById('cropCoverModal')?.classList.remove('hidden');
+
+    if (coverCropperInstance) {
+      coverCropperInstance.destroy();
+      coverCropperInstance = null;
     }
 
-    const uploadedUrl = await uploadToImgBB(file, `cover_${Date.now()}`);
+    cropImg.onload = function() {
+      if (coverCropperInstance) {
+        coverCropperInstance.destroy();
+        coverCropperInstance = null;
+      }
+      coverCropperInstance = new Cropper(cropImg, {
+        aspectRatio: 16 / 6,
+        viewMode: 1,
+        dragMode: 'move',
+        autoCropArea: 0.95,
+        restore: false,
+        guides: true,
+        center: true,
+        highlight: false,
+        cropBoxMovable: true,
+        cropBoxResizable: true,
+        toggleDragModeOnDblclick: false,
+        ready() {
+          const zoomRange = document.getElementById('coverCropperZoomRange');
+          if (zoomRange) zoomRange.value = 1;
+        },
+        zoom(e) {
+          const zoomRange = document.getElementById('coverCropperZoomRange');
+          if (zoomRange && e && e.detail) {
+            zoomRange.value = Math.min(Math.max(e.detail.ratio, 0.1), 3);
+          }
+        }
+      });
+    };
+    cropImg.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+};
 
+window.closeCoverCropModal = function() {
+  document.getElementById('cropCoverModal')?.classList.add('hidden');
+  if (coverCropperInstance) {
+    coverCropperInstance.destroy();
+    coverCropperInstance = null;
+  }
+};
+
+window.zoomCoverCropper = function(delta) {
+  if (coverCropperInstance) coverCropperInstance.zoom(delta);
+};
+
+window.setCoverCropperZoom = function(val) {
+  if (coverCropperInstance) coverCropperInstance.zoomTo(parseFloat(val));
+};
+
+window.rotateCoverCropper = function(deg) {
+  if (coverCropperInstance) coverCropperInstance.rotate(deg);
+};
+
+window.applyAndSaveCroppedCover = async function() {
+  if (!coverCropperInstance) return;
+
+  const btn = document.getElementById('btnSaveCroppedCover');
+  const btnText = document.getElementById('btnSaveCroppedCoverText');
+
+  try {
+    if (btn) btn.disabled = true;
+    if (btnText) btnText.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> කවරය සුරකිමින් පවතී...`;
+
+    // 1. Get 1200x450 high-resolution cropped canvas with fallback
+    let canvas = null;
+    try {
+      canvas = coverCropperInstance.getCroppedCanvas({
+        width: 1200,
+        height: 450,
+        imageSmoothingEnabled: true,
+        imageSmoothingQuality: 'high'
+      });
+    } catch (e) {
+      console.warn("Cover cropper getCroppedCanvas failed:", e);
+    }
+
+    if (!canvas) {
+      const cropImg = document.getElementById('coverImageToCrop');
+      canvas = document.createElement('canvas');
+      canvas.width = 1200;
+      canvas.height = 450;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(cropImg, 0, 0, 1200, 450);
+    }
+
+    // 2. Convert to JPEG blob
+    const blob = await new Promise((resolve) => {
+      canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.85);
+    });
+
+    // 3. Upload to ImgBB (with automatic local fallback)
+    const uploadedUrl = await uploadToImgBB(blob || canvas.toDataURL('image/jpeg', 0.82), `cover_${Date.now()}`);
+
+    // 4. Save to StorageService
     StorageService.updateProfile({ coverImage: uploadedUrl });
+
+    // 5. Update UI
+    closeCoverCropModal();
     closeCoverModal();
     renderProfileView();
   } catch (err) {
-    alert("කවරයේ ඡායාරූපය Upload කිරීමේ දෝෂයකි: " + err.message);
-    if (statusText) {
-      statusText.style.display = 'none';
-      statusText.innerText = "";
-    }
+    console.error("Cover crop error:", err);
+    alert("කවරයේ ඡායාරූපය සුරැකීමේ දෝෂයකි: " + err.message);
   } finally {
-    event.target.value = '';
+    if (btn) btn.disabled = false;
+    if (btnText) btnText.innerHTML = `කවරයේ ඡායාරූපය සුරකින්න`;
   }
+};
+
+window.uploadCoverPhoto = function(event) {
+  window.handleCoverPhotoSelected(event);
 };
 
 window.openCoverModal = function() {
@@ -1957,7 +2130,7 @@ window.openCoverModal = function() {
   const currentUser = StorageService.currentUser;
   const currentImg = document.getElementById('coverCurrentPreviewImg');
   if (currentImg && currentUser) {
-    currentImg.src = currentUser.coverImage || 'https://images.unsplash.com/photo-1582510003544-4d00b7f74220?auto=format&fit=crop&w=1600&q=80';
+    currentImg.src = currentUser.coverImage || 'assets/banner.jpg';
   }
   const statusText = document.getElementById('coverUploadStatusText');
   if (statusText) {

@@ -195,8 +195,8 @@ export const StorageService = {
           } catch(e) {}
 
           let userCover = savedProfile.coverImage;
-          if (!userCover || userCover.includes('photo-1548013146-72479768bada')) {
-            userCover = "https://images.unsplash.com/photo-1582510003544-4d00b7f74220?auto=format&fit=crop&w=1600&q=80";
+          if (!userCover || userCover.includes('photo-1548013146-72479768bada') || userCover.includes('photo-1582510003544-4d00b7f74220')) {
+            userCover = "assets/banner.jpg";
           }
 
           const rawName = (savedProfile.name || (user ? user.displayName : '') || '').trim();
@@ -932,7 +932,7 @@ export const StorageService = {
       ? originalData.images
       : (origImage ? [origImage] : []);
 
-    const origCategory = originalData.category && ['දානමය', 'සීලමය', 'භාවනාමය', 'සමාජ සත්කාර'].includes(originalData.category)
+    const origCategory = originalData.category && ['දානමය', 'සීලමය', 'භාවනාමය', 'සමාජ සත්කාර', 'ධර්ම දානමය'].includes(originalData.category)
       ? originalData.category
       : 'දානමය';
 
@@ -1010,6 +1010,36 @@ export const StorageService = {
     }
 
     return true;
+  },
+
+  /**
+   * Atomic Share Count Increment (Dharma Dana tracking)
+   */
+  async incrementShare(postId) {
+    if (!postId) return;
+    const allPosts = this.getLocalPosts();
+    const targetPost = allPosts.find(p => p.id === postId);
+    if (targetPost) {
+      targetPost.shareCount = (targetPost.shareCount || 0) + 1;
+      this.cacheLocal(allPosts);
+      this.notifyListeners(allPosts);
+    }
+    if (this._cachedPosts) {
+      const cached = this._cachedPosts.find(p => p.id === postId);
+      if (cached) cached.shareCount = (cached.shareCount || 0) + 1;
+    }
+
+    if (isCloudReady && db) {
+      try {
+        const { doc, updateDoc, increment } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const postRef = doc(db, COLLECTIONS.POSTS, postId);
+        await updateDoc(postRef, {
+          shareCount: increment(1)
+        });
+      } catch (e) {
+        console.warn('Failed to increment share count in Firestore', e);
+      }
+    }
   },
 
   /**

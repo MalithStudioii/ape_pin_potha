@@ -114,7 +114,7 @@ export const Security = {
     }
 
     // Category whitelist
-    const allowedCategories = ['සියල්ල', 'දානමය', 'සීලමය', 'භාවනාමය', 'සමාජ සත්කාර', 'යළි බෙදාගැනීම්'];
+    const allowedCategories = ['සියල්ල', 'දානමය', 'සීලමය', 'භාවනාමය', 'සමාජ සත්කාර', 'ධර්ම දානමය', 'යළි බෙදාගැනීම්'];
     if (!allowedCategories.includes(data.category)) {
       errors.push('වලංගු පින්කම් වර්ගයක් තෝරන්න.');
     }

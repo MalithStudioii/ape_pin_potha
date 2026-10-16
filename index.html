@@ -33,10 +33,10 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="පිං පොත | කල්‍යාණ මිත්‍ර පුණ්‍ය ජාලය">
     <meta name="twitter:description" content="දිනපතා ඔබ සිදුකරන පින්කම් සටහන් කරගන්න, මිතුරන්ගේ පින්කම් දැක සාදුකාර දෙමින් සිත පහදවා ගන්න. 🙏">
-    <meta name="twitter:image" content="https://images.unsplash.com/photo-1582510003544-4d00b7f74220?auto=format&fit=crop&w=1200&h=630&q=80">
+    <meta name="twitter:image" content="assets/banner.jpg">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=28">
+    <link rel="stylesheet" href="css/styles.css?v=29">
 </head>
 <body>
 
@@ -209,6 +209,9 @@
                     <button onclick="setCategory('සමාජ සත්කාර')" data-cat="සමාජ සත්කාර" class="category-item">
                         <span><i class="fa-solid fa-seedling cat-icon" style="color: #e11d48;"></i> සමාජ සත්කාර</span>
                     </button>
+                    <button onclick="setCategory('ධර්ම දානමය')" data-cat="ධර්ම දානමය" class="category-item">
+                        <span><i class="fa-solid fa-share-nodes cat-icon" style="color: #0284c7;"></i> ධර්ම දානමය</span>
+                    </button>
                 </div>
             </div>
 
@@ -256,6 +259,7 @@
                 <button onclick="setCategory('සීලමය')" data-cat="සීලමය" class="category-pill">සීලමය</button>
                 <button onclick="setCategory('භාවනාමය')" data-cat="භාවනාමය" class="category-pill">භාවනාමය</button>
                 <button onclick="setCategory('සමාජ සත්කාර')" data-cat="සමාජ සත්කාර" class="category-pill">සමාජ සත්කාර</button>
+                <button onclick="setCategory('ධර්ම දානමය')" data-cat="ධර්ම දානමය" class="category-pill">ධර්ම දානමය</button>
             </div>
 
             <!-- Tab Header Banner -->
@@ -332,7 +336,7 @@
         <div class="profile-header-wrapper">
             <!-- Cover Photo Area -->
             <div class="profile-cover-banner" id="profileCoverBanner">
-                <img id="profileCoverImg" src="https://images.unsplash.com/photo-1582510003544-4d00b7f74220?auto=format&fit=crop&w=1600&q=80" alt="Cover Photo">
+                <img id="profileCoverImg" src="assets/banner.jpg" alt="Cover Photo">
                 <button onclick="openCoverModal()" class="btn-edit-cover" title="කවරයේ ඡායාරූපය වෙනස් කරන්න">
                     <i class="fa-solid fa-camera"></i>
                     <span>කවරය වෙනස් කරන්න</span>
@@ -647,6 +651,7 @@
                             <option value="සීලමය">සීලමය</option>
                             <option value="භාවනාමය">භාවනාමය</option>
                             <option value="සමාජ සත්කාර">සමාජ සත්කාර</option>
+                            <option value="ධර්ම දානමය">ධර්ම දානමය</option>
                         </select>
                     </div>
                     <div id="visibilityWrapper">
@@ -870,7 +875,7 @@
                     <i class="fa-solid fa-arrow-up-from-bracket"></i> ඡායාරූපය තෝරන්න (Choose Image)
                 </button>
                 <div id="coverUploadStatusText" style="display: none; font-size: 0.8rem; font-weight: 700; color: #b45309; margin-top: 12px;"></div>
-                <input type="file" id="coverPhotoFileInput" accept="image/*" style="display: none;" onchange="uploadCoverPhoto(event)">
+                <input type="file" id="coverPhotoFileInput" accept="image/*" style="display: none;" onchange="handleCoverPhotoSelected(event)">
             </div>
 
             <p style="font-size: 0.74rem; color: #64748b; margin-top: 14px; margin-bottom: 0; text-align: center;">
@@ -925,6 +930,56 @@
                 <button type="button" id="btnSaveCroppedAvatar" onclick="applyAndSaveCroppedAvatar()" class="btn-submit-merit" style="flex: 2; margin: 0;">
                     <i class="fa-solid fa-check"></i>
                     <span id="btnSaveCroppedAvatarText">තහවුරු කර සුරකින්න</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Crop & Zoom Cover Modal -->
+    <div id="cropCoverModal" class="modal-overlay hidden" style="z-index: 1050;">
+        <div class="modal-box crop-modal-container" style="max-width: 620px !important;">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <i class="fa-solid fa-panorama" style="color: #d97706;"></i>
+                    කවරයේ ඡායාරූපය සකස් කරන්න (Cover Photo)
+                </h3>
+                <button type="button" onclick="closeCoverCropModal()" class="modal-close-btn">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <p style="font-size: 0.76rem; color: #64748b; margin-bottom: 10px;">
+                කවරයේ රාමුවට ගැලපෙන ලෙස ඡායාරූපය Zoom කර අවශ්‍ය කොටස සකසන්න:
+            </p>
+
+            <!-- Image Cropping Area -->
+            <div class="crop-area-container" style="height: 270px;">
+                <img id="coverImageToCrop" src="" alt="Cover crop preview" style="max-width: 100%; display: block;">
+            </div>
+
+            <!-- Zoom & Pan Controls -->
+            <div class="crop-controls-wrapper">
+                <div style="display: flex; align-items: center; gap: 10px; width: 100%;">
+                    <button type="button" class="btn-crop-ctrl" onclick="zoomCoverCropper(-0.1)" title="Zoom Out">
+                        <i class="fa-solid fa-magnifying-glass-minus"></i>
+                    </button>
+                    <input type="range" id="coverCropperZoomRange" min="0.1" max="3" step="0.05" value="1" class="crop-zoom-slider" oninput="setCoverCropperZoom(this.value)">
+                    <button type="button" class="btn-crop-ctrl" onclick="zoomCoverCropper(0.1)" title="Zoom In">
+                        <i class="fa-solid fa-magnifying-glass-plus"></i>
+                    </button>
+                    <button type="button" class="btn-crop-ctrl" onclick="rotateCoverCropper(90)" title="Rotate">
+                        <i class="fa-solid fa-rotate-right"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 14px;">
+                <button type="button" onclick="closeCoverCropModal()" class="btn-crop-cancel" style="flex: 1;">
+                    අවලංගු කරන්න
+                </button>
+                <button type="button" id="btnSaveCroppedCover" onclick="applyAndSaveCroppedCover()" class="btn-submit-merit" style="flex: 2; margin: 0;">
+                    <i class="fa-solid fa-check"></i>
+                    <span id="btnSaveCroppedCoverText">කවරයේ ඡායාරූපය සුරකින්න</span>
                 </button>
             </div>
         </div>
@@ -1423,6 +1478,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=28"></script>
+    <script type="module" src="js/app.js?v=29"></script>
 </body>
 </html>

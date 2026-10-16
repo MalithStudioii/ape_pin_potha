@@ -2482,6 +2482,18 @@ body {
   box-shadow: 0 0 0 1000px rgba(15, 23, 42, 0.65) !important;
 }
 
+/* Crop Cover Modal Styling */
+#cropCoverModal .cropper-view-box {
+  outline: 2px solid #f59e0b !important;
+  outline-color: rgba(245, 158, 11, 0.95) !important;
+  box-shadow: 0 0 0 1000px rgba(15, 23, 42, 0.65) !important;
+  border-radius: 8px !important;
+}
+
+#cropCoverModal .cropper-face {
+  border-radius: 8px !important;
+}
+
 .crop-controls-wrapper {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
