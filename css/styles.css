@@ -4035,5 +4035,77 @@ html, body {
   100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0); }
 }
 
+/* Daily Merit Checklist Styles */
+.checklist-item-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.checklist-item-card:hover {
+  border-color: #f59e0b;
+  background: #fffdfa;
+}
+
+.checklist-item-card.checked {
+  background: #f0fdf4;
+  border-color: #86efac;
+}
+
+.checklist-item-card.checked .checklist-title {
+  color: #166534;
+  text-decoration: line-through;
+  opacity: 0.85;
+}
+
+.checklist-checkbox-box {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 2px solid #cbd5e1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 0.75rem;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.checklist-item-card.checked .checklist-checkbox-box {
+  background: #10b981;
+  border-color: #10b981;
+}
+
+/* Spiritual Challenges Styles */
+.challenge-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: all 0.2s ease;
+}
+
+.challenge-card.active {
+  border-color: #c084fc;
+  background: #faf5ff;
+}
+
+.challenge-card.completed {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+
 
 

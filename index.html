@@ -36,7 +36,7 @@
     <meta name="twitter:image" content="https://images.unsplash.com/photo-1582510003544-4d00b7f74220?auto=format&fit=crop&w=1200&h=630&q=80">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=27">
+    <link rel="stylesheet" href="css/styles.css?v=28">
 </head>
 <body>
 
@@ -529,6 +529,79 @@
                         <h2>🔒 පෞද්ගලික පිං පොත (Private Merits)</h2>
                         <p>ඔබට පමණක් පෙනෙන, ඔබ සිදුකළ රහසිගත කුසල කර්මයන් සහ භාවනා සටහන් මෙහි සුරක්ෂිතව ඇත.</p>
                     </div>
+
+                    <!-- Daily Merit Checklist Card -->
+                    <div class="profile-widget-card" style="margin-bottom: 20px; border-left: 4px solid #d97706; background: linear-gradient(180deg, #fffdf8 0%, #ffffff 100%);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+                            <h3 class="widget-head-title" style="margin: 0; color: #78350f;">
+                                <i class="fa-solid fa-clipboard-check" style="color: #d97706;"></i>
+                                දෛනික කුසල් පිරික්සුම (Daily Checklist)
+                            </h3>
+                            <span id="dailyChecklistDateBadge" style="font-size: 0.72rem; font-weight: 700; background: #fef3c7; color: #b45309; padding: 3px 9px; border-radius: 999px;">
+                                අද දවස
+                            </span>
+                        </div>
+                        
+                        <p style="font-size: 0.78rem; color: #64748b; margin-bottom: 14px;">
+                            දිනපතා ඔබ සිදුකළ මූලික කුසල් මෙහි ලකුණු කරන්න. දවස අවසානයේ එකම ක්ලික් එකෙන් ඔබගේ පිං පොතට Auto-Log කරගත හැක.
+                        </p>
+
+                        <!-- Progress Bar -->
+                        <div style="margin-bottom: 14px;">
+                            <div style="display: flex; justify-content: space-between; font-size: 0.74rem; font-weight: 700; color: #78350f; margin-bottom: 5px;">
+                                <span>අද දවසේ ප්‍රගතිය</span>
+                                <span id="checklistProgressText">0 / 7 සම්පූර්ණයි (0%)</span>
+                            </div>
+                            <div style="width: 100%; height: 8px; background: #f1f5f9; border-radius: 999px; overflow: hidden;">
+                                <div id="checklistProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #d97706, #10b981); transition: width 0.3s ease; border-radius: 999px;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Checklist Items Container -->
+                        <div class="daily-checklist-grid" id="dailyChecklistContainer" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
+                            <!-- Injected dynamically by app.js -->
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                            <button type="button" onclick="autoLogDailyChecklist()" id="btnAutoLogChecklist" class="btn btn-primary" style="flex: 1; padding: 10px 16px; font-weight: 700; font-size: 0.82rem; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 10px;">
+                                <i class="fa-solid fa-book-bookmark"></i>
+                                <span>මගේ පිං පොතට Auto-Log කරන්න</span>
+                            </button>
+                            <button type="button" onclick="resetTodayChecklist()" class="composer-action-btn" style="padding: 10px 14px; font-size: 0.76rem; border-radius: 10px; color: #64748b; background: #f8fafc; border: 1px solid #e2e8f0;" title="Checklist එක මුල සිට සකසන්න">
+                                <i class="fa-solid fa-rotate-left"></i> Reset
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Spiritual Challenges Card -->
+                    <div class="profile-widget-card" style="margin-bottom: 20px; border-left: 4px solid #8b5cf6; background: linear-gradient(180deg, #faf5ff 0%, #ffffff 100%);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+                            <h3 class="widget-head-title" style="margin: 0; color: #5b21b6;">
+                                <i class="fa-solid fa-trophy" style="color: #8b5cf6;"></i>
+                                පුණ්‍ය අධිෂ්ඨාන (Spiritual Challenges)
+                            </h3>
+                            <span style="font-size: 0.72rem; font-weight: 700; background: #ede9fe; color: #6d28d9; padding: 3px 9px; border-radius: 999px;">
+                                පාරමී ලාංඡන දිනාගන්න
+                            </span>
+                        </div>
+
+                        <p style="font-size: 0.78rem; color: #64748b; margin-bottom: 14px;">
+                            ඔබගේ සිත පුහුණු කිරීමට අධිෂ්ඨානයක් තෝරාගෙන දිනපතා අඛණ්ඩව සම්පූර්ණ කරන්න. සම්පූර්ණ කළ පසු විශේෂ "අධිෂ්ඨාන පාරමී" ලාංඡන හිමිවේ!
+                        </p>
+
+                        <!-- Challenges Container -->
+                        <div id="spiritualChallengesContainer" style="display: flex; flex-direction: column; gap: 12px;">
+                            <!-- Injected dynamically by app.js -->
+                        </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                        <h4 style="margin: 0; font-size: 0.92rem; font-weight: 700; color: #78350f;">
+                            <i class="fa-solid fa-book" style="color: #d97706;"></i> මගේ පෞද්ගලික පින්කම් සටහන්
+                        </h4>
+                    </div>
+
                     <div id="profPrivatePosts">
                         <!-- Private posts -->
                     </div>
@@ -1350,6 +1423,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=27"></script>
+    <script type="module" src="js/app.js?v=28"></script>
 </body>
 </html>

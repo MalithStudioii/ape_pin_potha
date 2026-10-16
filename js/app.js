@@ -891,30 +891,58 @@ window.handleShare = async function(postId) {
   triggerHaptic(25);
 
   const allPosts = StorageService.getLocalPosts();
-  const post = (allPosts && allPosts.find(p => p.id === postId)) || {
-    id: postId,
-    title: 'පින්කමක්',
-    description: '',
-    author: 'කල්‍යාණ මිත්‍ර'
-  };
+  let post = (allPosts && allPosts.find(p => p.id === postId));
+  if (!post && typeof currentPostsData !== 'undefined' && Array.isArray(currentPostsData)) {
+    post = currentPostsData.find(p => p.id === postId);
+  }
+  if (!post && StorageService._cachedPosts) {
+    post = StorageService._cachedPosts.find(p => p.id === postId);
+  }
+  if (!post) {
+    post = { id: postId, title: 'පින්කමක්', description: '', author: 'කල්‍යාණ මිත්‍ර' };
+  }
+
+  // Check if this post is a repost
+  const isRepost = post.isRepost || !!post.originalPost;
+  const orig = post.originalPost || null;
+
+  // Extract REAL original author, real title, real description, real photo
+  const realAuthor = (isRepost && orig && orig.author) ? orig.author : (post.author || 'කල්‍යාණ මිත්‍ර');
+  const realTitle = (isRepost && orig && orig.title) ? orig.title : (post.title || 'පින්කම');
+  const realDesc = (isRepost && orig && orig.description) ? orig.description : (post.description || '');
+  const realImage = (isRepost && orig ? (orig.image || (orig.images && orig.images[0])) : (post.image || (post.images && post.images[0]))) || null;
 
   // Construct absolute clean deep-link
   const origin = window.location.origin;
   const pathname = window.location.pathname;
-  const postUrl = `${origin}${pathname}?post=${encodeURIComponent(post.id)}`;
+  const targetId = (isRepost && orig && orig.id) ? orig.id : post.id;
+  const postUrl = `${origin}${pathname}?post=${encodeURIComponent(targetId)}`;
 
-  const authorText = post.author ? `"${post.author}" විසින් ` : '';
-  const descSnippet = post.description
-    ? `\n\n"${post.description.length > 120 ? post.description.substring(0, 120) + '...' : post.description}"`
-    : '';
-  const shareTitle = `පිං පොත | ${post.title || 'පින්කමක්'}`;
-  const shareText = `🌸 ${authorText}පිං පොතේ තැබූ උතුම් පින්කම:${descSnippet}\n\n🙏 ඔබත් දැකබලා සාදුකාර දී පින් අනුමෝදන් වන්න:\n${postUrl}`;
+  let shareBody = `🌸 "${realAuthor}" ගේ උතුම් පින්කම:\n✨ ${realTitle}`;
+  if (isRepost && post.author && post.author !== realAuthor) {
+    shareBody += `\n🔄 (යළි බෙදාගත්තේ: ${post.author})`;
+  }
+  if (realDesc) {
+    const cleanSnippet = realDesc.replace(/<[^>]*>?/gm, '').trim();
+    if (cleanSnippet && !cleanSnippet.includes('උතුම් පින්කමක් දැක බලා සතුටු සිතින් අනුමෝදන් වෙමි')) {
+      const snippet = cleanSnippet.length > 140 ? cleanSnippet.substring(0, 140) + '...' : cleanSnippet;
+      shareBody += `\n\n"${snippet}"`;
+    }
+  }
+  if (realImage) {
+    shareBody += `\n\n🖼️ ඡායාරූපය: ${realImage}`;
+  }
+  shareBody += `\n\n🙏 මේ උතුම් පින්කම දැකබලා ඔබත් සාදුකාර දී පින් අනුමෝදන් වන්න:`;
+
+  const shareTitle = `පිං පොත | ${realTitle}`;
 
   if (navigator.share) {
     try {
+      // NOTE: Passing url: postUrl causes WhatsApp/mobile to append it automatically.
+      // So do NOT put postUrl inside shareBody text to avoid duplicate URLs!
       await navigator.share({
         title: shareTitle,
-        text: shareText,
+        text: shareBody,
         url: postUrl
       });
       return;
@@ -923,10 +951,11 @@ window.handleShare = async function(postId) {
     }
   }
 
-  // Fallback for desktop / unsupported browsers
+  // Fallback for clipboard / WhatsApp web:
+  const fullTextWithUrl = `${shareBody}\n${postUrl}`;
   try {
     if (navigator.clipboard) {
-      await navigator.clipboard.writeText(`${shareText}`);
+      await navigator.clipboard.writeText(fullTextWithUrl);
     }
   } catch (e) {}
 
@@ -934,7 +963,7 @@ window.handleShare = async function(postId) {
     `ලිපිනය (Link) සහ විස්තරය පිටපත් කරගන්නා ලදී! 🎉\n\nWhatsApp හරහා මිතුරන් සමඟ බෙදාගැනීමට අවශ්‍යද?`
   );
   if (openWhatsApp) {
-    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
+    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(fullTextWithUrl)}`;
     window.open(waUrl, '_blank');
   }
 };
@@ -1500,6 +1529,18 @@ function renderProfileBadges(myPosts, totalSadhu, user) {
 
   const badges = [];
 
+  // Check completed spiritual challenge badges
+  let earnedBadges = [];
+  try {
+    earnedBadges = JSON.parse(localStorage.getItem('pinPotha_earned_badges') || '[]');
+  } catch (e) {}
+
+  SPIRITUAL_CHALLENGES.forEach(ch => {
+    if (earnedBadges.includes(ch.id)) {
+      badges.push({ icon: ch.icon, text: ch.badgeText, class: ch.badgeClass });
+    }
+  });
+
   if (user.email && !user.isAnonymous) {
     badges.push({ icon: 'fa-shield-halved', text: 'සත්‍යාපිත සාමාජික', class: 'emerald' });
   }
@@ -1672,6 +1713,10 @@ function renderProfileSubTabContent(user, myPosts, myPhotosPosts, myPrivatePosts
   // 4. Private Merits Book
   const privateContainer = document.getElementById('profPrivatePosts');
   if (privateContainer && activeProfileSubTab === 'private') {
+    // Render Daily Checklist & Spiritual Challenges
+    renderDailyChecklist();
+    renderSpiritualChallenges();
+
     if (myPrivatePosts.length === 0) {
       privateContainer.innerHTML = `
         <div class="card" style="padding: 44px 20px; text-align: center;">
@@ -2710,3 +2755,354 @@ window.toggleVerifyNeedPrompt = async function(postId) {
 
 
 
+// ============================================================================
+// Daily Merit Checklist & Spiritual Challenges System (පෞද්ගලික පිං පොත)
+// ============================================================================
+
+const DAILY_CHECKLIST_ITEMS = [
+  { icon: 'fa-hands-praying', title: 'නිත්‍ය සීලය සමාදන් වීම (පන්සිල්)', category: 'සීලමය', hint: 'දවස ආරම්භයේදී තෙරුවන් වැඳ පන්සිල් සමාදන් වීම' },
+  { icon: 'fa-fan', title: 'බුද්ධ පූජාව (මල්, පහන්, සුවඳ දුම් හෝ පැන්)', category: 'සීලමය', hint: 'බුදුරජාණන් වහන්සේ උදෙසා ගෞරවයෙන් පූජාවක් තැබීම' },
+  { icon: 'fa-dove', title: 'තිරිසන් සතුන්ට ආහාර / පැන් ලබා දීම', category: 'දානමය', hint: 'කුරුල්ලන්ට, සුනඛයන්ට හෝ තිරිසන් සතෙකුට කරුණාවෙන් ආහාර දීම' },
+  { icon: 'fa-person-cane', title: 'දෙමාපියන් / වැඩිහිටියන්ට සැලකීම & ගරු කිරීම', category: 'සීලමය', hint: 'දෙමාපියන්ට හෝ වැඩිහිටියෙකුට වචනයෙන් හෝ ක්‍රියාවෙන් උපස්ථාන කිරීම' },
+  { icon: 'fa-spa', title: 'මෛත්‍රී භාවනාව / සිත සන්සුන් කිරීම (විනාඩි 15)', category: 'භාවනාමය', hint: 'සියලු සත්වයෝ නිදුක් වෙත්වායි මෙත් සිත පැතිරවීම' },
+  { icon: 'fa-book-open-reader', title: 'දහම් කරුණක් කියවීම හෝ පිරිත් ශ්‍රවණය', category: 'භාවනාමය', hint: 'ධර්ම දේශනාවක්, සූත්‍රයක් හෝ පිරිතක් ශ්‍රවණය කර මනස පහදවා ගැනීම' },
+  { icon: 'fa-hand-holding-heart', title: 'යමෙකුට පිහිට වීම / සත්කාරයක් කිරීම', category: 'සමාජ සත්කාර', hint: 'අසරණ කෙනෙකුට උපකාරයක් හෝ කරුණාවන්ත වචනයක් පැවසීම' }
+];
+
+const SPIRITUAL_CHALLENGES = [
+  {
+    id: 'metta_21',
+    title: 'දින 21ක මෛත්‍රී භාවනා අධිෂ්ඨානය',
+    goalDays: 21,
+    icon: 'fa-spa',
+    badgeText: '🌟 මෛත්‍රී පාරමී',
+    badgeClass: 'purple',
+    desc: 'දිනපතා අවම වශයෙන් විනාඩි 15ක් සිත සමාධිගත කර මෙත් වඩන්න.'
+  },
+  {
+    id: 'truth_7',
+    title: 'දින 7ක සත්‍යවාදී බව (මුසාවාදයෙන් වැළකීම)',
+    goalDays: 7,
+    icon: 'fa-gem',
+    badgeText: '💎 සච්ච පාරමී',
+    badgeClass: 'blue',
+    desc: 'දින 7ක් පුරා කිසිදු බොරුවක් නොකියා සත්‍යවාදී වචන පමණක් කතා කරන්න.'
+  },
+  {
+    id: 'animal_14',
+    title: 'දින 14ක අභයදාන / සත්ව කරුණාව',
+    goalDays: 14,
+    icon: 'fa-dove',
+    badgeText: '🐾 අභයදාන පාරමී',
+    badgeClass: 'emerald',
+    desc: 'දින 14ක් නොකඩවා අහිංසක සතුන්ට, පක්ෂීන්ට ආහාර හෝ ජලය පරිත්‍යාග කරන්න.'
+  },
+  {
+    id: 'pooja_30',
+    title: 'දින 30ක අඛණ්ඩ බුද්ධ වන්දනාව',
+    goalDays: 30,
+    icon: 'fa-dharmachakra',
+    badgeText: '🪷 සද්ධා පාරමී',
+    badgeClass: 'gold',
+    desc: 'දින 30ක් අඛණ්ඩව උදෑසන හෝ සවස මල්, පහන්, පැන් පූජා කර තෙරුවන් වඳින්න.'
+  }
+];
+
+function getTodayKey() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+window.renderDailyChecklist = function() {
+  const container = document.getElementById('dailyChecklistContainer');
+  if (!container) return;
+
+  const todayKey = getTodayKey();
+  const dateBadge = document.getElementById('dailyChecklistDateBadge');
+  if (dateBadge) {
+    const d = new Date();
+    dateBadge.innerText = `📅 ${d.getFullYear()} ${d.toLocaleString('si-LK', { month: 'short' })} ${d.getDate()}`;
+  }
+
+  let saved = [];
+  try {
+    const raw = localStorage.getItem(`pinPotha_checklist_${todayKey}`);
+    saved = raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    saved = [];
+  }
+
+  const checkedCount = saved.filter(Boolean).length;
+  const total = DAILY_CHECKLIST_ITEMS.length;
+  const pct = Math.round((checkedCount / total) * 100);
+
+  const progText = document.getElementById('checklistProgressText');
+  const progBar = document.getElementById('checklistProgressBar');
+  if (progText) progText.innerText = `${checkedCount} / ${total} සම්පූර්ණයි (${pct}%)`;
+  if (progBar) progBar.style.width = `${pct}%`;
+
+  container.innerHTML = DAILY_CHECKLIST_ITEMS.map((item, idx) => {
+    const isChecked = !!saved[idx];
+    return `
+      <div class="checklist-item-card ${isChecked ? 'checked' : ''}" onclick="toggleChecklistItem(${idx})">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div class="checklist-checkbox-box">
+            ${isChecked ? '<i class="fa-solid fa-check"></i>' : ''}
+          </div>
+          <div>
+            <div class="checklist-title" style="font-size: 0.84rem; font-weight: 700; color: #1e293b;">
+              <i class="fa-solid ${item.icon}" style="color: #d97706; margin-right: 6px;"></i>
+              ${item.title}
+            </div>
+            <div style="font-size: 0.7rem; color: #64748b; margin-top: 2px;">
+              ${item.hint}
+            </div>
+          </div>
+        </div>
+        <span style="font-size: 0.68rem; font-weight: 700; color: #b45309; background: #fef3c7; padding: 2px 8px; border-radius: 999px;">
+          ${item.category}
+        </span>
+      </div>
+    `;
+  }).join('');
+};
+
+window.toggleChecklistItem = function(index) {
+  const todayKey = getTodayKey();
+  let saved = [];
+  try {
+    const raw = localStorage.getItem(`pinPotha_checklist_${todayKey}`);
+    saved = raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    saved = [];
+  }
+
+  saved[index] = !saved[index];
+  localStorage.setItem(`pinPotha_checklist_${todayKey}`, JSON.stringify(saved));
+  
+  if (saved[index]) {
+    SoundService.playClick();
+    triggerHaptic(18);
+  } else {
+    triggerHaptic(10);
+  }
+
+  renderDailyChecklist();
+};
+
+window.resetTodayChecklist = function() {
+  if (confirm("අද දවසේ Checklist එක නැවත මුල සිට සකස් කිරීමට අවශ්‍ය බව තහවුරු කරන්න?")) {
+    const todayKey = getTodayKey();
+    localStorage.removeItem(`pinPotha_checklist_${todayKey}`);
+    triggerHaptic(20);
+    renderDailyChecklist();
+  }
+};
+
+window.autoLogDailyChecklist = async function() {
+  const todayKey = getTodayKey();
+  let saved = [];
+  try {
+    const raw = localStorage.getItem(`pinPotha_checklist_${todayKey}`);
+    saved = raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    saved = [];
+  }
+
+  const completedIndices = saved.map((val, idx) => val ? idx : null).filter(i => i !== null);
+  if (completedIndices.length === 0) {
+    alert("කරුණාකර අද දවසේ ඔබ සිදුකළ පින්කම් අවම වශයෙන් එකක් හෝ තෝරා (Check කර) Auto-Log කරන්න.");
+    return;
+  }
+
+  const completedItems = completedIndices.map(i => DAILY_CHECKLIST_ITEMS[i]);
+  const btn = document.getElementById('btnAutoLogChecklist');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Auto-Log වෙමින් පවතී...`;
+  }
+
+  try {
+    const d = new Date();
+    const dateFormatted = `${d.getFullYear()} ${d.toLocaleString('si-LK', { month: 'long' })} ${d.getDate()}`;
+    const desc = `🌸 අද දින (${dateFormatted}) මම සම්පූර්ණ කළ දෛනික කුසල්:\n\n` + 
+      completedItems.map(item => `✅ ${item.title}`).join('\n') + 
+      `\n\n🙏 මෙම උතුම් කුසල් මගේ සසර දුක් නිවීම පිණිසත්, සියලු සත්වයන්ගේ සුවපත්භාවය පිණිසත් හේතු වේවා!`;
+
+    await StorageService.createPost({
+      type: 'merit',
+      title: `🌸 දෛනික කුසල් සටහන (${dateFormatted})`,
+      category: 'සීලමය',
+      visibility: 'private',
+      description: desc,
+      image: null,
+      images: []
+    });
+
+    SoundService.playSadhu();
+    triggerHaptic([25, 50, 25]);
+    alert("🎉 සාදු! සාදු! අද දවසේ සිදුකළ පින්කම් එකතුව ඔබගේ පෞද්ගලික පිං පොතට සාර්ථකව ඇතුළත් විය!");
+    
+    // Refresh private view
+    setProfileSubTab('private');
+  } catch (err) {
+    alert("දෝෂයකි: " + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<i class="fa-solid fa-book-bookmark"></i> <span>මගේ පිං පොතට Auto-Log කරන්න</span>`;
+    }
+  }
+};
+
+// Spiritual Challenges Controller
+window.renderSpiritualChallenges = function() {
+  const container = document.getElementById('spiritualChallengesContainer');
+  if (!container) return;
+
+  let activeChallenges = {};
+  try {
+    const raw = localStorage.getItem('pinPotha_active_challenges');
+    activeChallenges = raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    activeChallenges = {};
+  }
+
+  const todayKey = getTodayKey();
+
+  container.innerHTML = SPIRITUAL_CHALLENGES.map(ch => {
+    const state = activeChallenges[ch.id] || { started: false, streak: 0, lastCheckIn: null, completed: false };
+    const pct = Math.min(100, Math.round((state.streak / ch.goalDays) * 100));
+    const isCheckedInToday = state.lastCheckIn === todayKey;
+
+    return `
+      <div class="challenge-card ${state.completed ? 'completed' : (state.started ? 'active' : '')}">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 38px; height: 38px; border-radius: 10px; background: ${state.completed ? '#dcfce7' : '#f3e8ff'}; color: ${state.completed ? '#15803d' : '#7e22ce'}; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">
+              <i class="fa-solid ${ch.icon}"></i>
+            </div>
+            <div>
+              <h4 style="margin: 0; font-size: 0.88rem; font-weight: 700; color: #1e293b;">${ch.title}</h4>
+              <p style="margin: 3px 0 0 0; font-size: 0.72rem; color: #64748b;">${ch.desc}</p>
+            </div>
+          </div>
+          <span style="font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #f1f5f9; color: #475569; white-space: nowrap;">
+            ${ch.badgeText}
+          </span>
+        </div>
+
+        ${state.started ? `
+          <div style="margin-top: 4px;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.72rem; font-weight: 700; color: #475569; margin-bottom: 4px;">
+              <span>ප්‍රගතිය (Daily Streak)</span>
+              <span>${state.streak} / ${ch.goalDays} දින (${pct}%)</span>
+            </div>
+            <div style="width: 100%; height: 7px; background: #e2e8f0; border-radius: 999px; overflow: hidden;">
+              <div style="width: ${pct}%; height: 100%; background: ${state.completed ? '#10b981' : 'linear-gradient(90deg, #8b5cf6, #ec4899)'}; border-radius: 999px; transition: width 0.3s ease;"></div>
+            </div>
+          </div>
+        ` : ''}
+
+        <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 2px;">
+          ${!state.started ? `
+            <button type="button" onclick="startSpiritualChallenge('${ch.id}')" class="btn btn-primary" style="padding: 6px 14px; font-size: 0.75rem; border-radius: 8px; background: #7c3aed; border-color: #7c3aed;">
+              <i class="fa-solid fa-play"></i> අධිෂ්ඨානය අරඹන්න
+            </button>
+          ` : (state.completed ? `
+            <span style="font-size: 0.78rem; font-weight: 700; color: #15803d; display: inline-flex; align-items: center; gap: 5px;">
+              <i class="fa-solid fa-circle-check"></i> අධිෂ්ඨානය සම්පූර්ණයි! 🎉
+            </span>
+          ` : `
+            <button type="button" onclick="checkInSpiritualChallenge('${ch.id}')" class="btn btn-primary" ${isCheckedInToday ? 'disabled' : ''} style="padding: 6px 14px; font-size: 0.75rem; border-radius: 8px; ${isCheckedInToday ? 'background: #94a3b8; border-color: #94a3b8; opacity: 0.8;' : 'background: #059669; border-color: #059669;'}">
+              <i class="fa-solid ${isCheckedInToday ? 'fa-check-double' : 'fa-circle-check'}"></i> 
+              <span>${isCheckedInToday ? 'අද දින Check-in සම්පූර්ණයි' : 'අද දවස සම්පූර්ණ කළා'}</span>
+            </button>
+          `)}
+        </div>
+      </div>
+    `;
+  }).join('');
+};
+
+window.startSpiritualChallenge = function(challengeId) {
+  let active = {};
+  try {
+    active = JSON.parse(localStorage.getItem('pinPotha_active_challenges') || '{}');
+  } catch (e) {}
+
+  active[challengeId] = {
+    started: true,
+    streak: 0,
+    lastCheckIn: null,
+    completed: false,
+    startedAt: Date.now()
+  };
+
+  localStorage.setItem('pinPotha_active_challenges', JSON.stringify(active));
+  SoundService.playShare();
+  triggerHaptic(25);
+  renderSpiritualChallenges();
+};
+
+window.checkInSpiritualChallenge = async function(challengeId) {
+  let active = {};
+  try {
+    active = JSON.parse(localStorage.getItem('pinPotha_active_challenges') || '{}');
+  } catch (e) {}
+
+  const chMeta = SPIRITUAL_CHALLENGES.find(c => c.id === challengeId);
+  if (!chMeta) return;
+
+  const state = active[challengeId] || { started: true, streak: 0, lastCheckIn: null, completed: false };
+  const todayKey = getTodayKey();
+
+  if (state.lastCheckIn === todayKey) {
+    alert("ඔබ අද දින සඳහා දැනටමත් Check-in සම්පූර්ණ කර ඇත. හෙට දවසේද අඛණ්ඩව කරගෙන යන්න!");
+    return;
+  }
+
+  state.streak = (state.streak || 0) + 1;
+  state.lastCheckIn = todayKey;
+
+  // Check if goal reached!
+  if (state.streak >= chMeta.goalDays) {
+    state.completed = true;
+    
+    // Save earned badge
+    let earnedBadges = [];
+    try {
+      earnedBadges = JSON.parse(localStorage.getItem('pinPotha_earned_badges') || '[]');
+    } catch (e) {}
+    if (!earnedBadges.includes(chMeta.id)) {
+      earnedBadges.push(chMeta.id);
+      localStorage.setItem('pinPotha_earned_badges', JSON.stringify(earnedBadges));
+    }
+
+    SoundService.playPublish();
+    triggerHaptic([30, 60, 30, 60, 40]);
+    alert(`🎉 සාදු! සාදු! ඔබ "${chMeta.title}" සාර්ථකව සම්පූර්ණ කළා!\n\nඔබගේ Profile එකට විශේෂ "${chMeta.badgeText}" ලාංඡනය හිමි විය! 🌟`);
+
+    // Auto-create celebratory merit post
+    try {
+      await StorageService.createPost({
+        type: 'merit',
+        title: `🏆 පුණ්‍ය අධිෂ්ඨානය සම්පූර්ණ කිරීම: ${chMeta.title}`,
+        category: 'භාවනාමය',
+        visibility: 'public',
+        description: `අද දින මම "${chMeta.title}" අඛණ්ඩව දින ${chMeta.goalDays}ක් පුරා සම්පූර්ණ කළෙමි! ඒ වෙනුවෙන් ලැබූ "${chMeta.badgeText}" ලාංඡනය දැක ඔබත් සතුටු සිතින් අනුමෝදන් වෙත්වා! 🙏`,
+        image: null,
+        images: []
+      });
+    } catch (e) {}
+  } else {
+    SoundService.playSadhu();
+    triggerHaptic(20);
+    alert(`සාදු! අද දින සාර්ථකව සම්පූර්ණ කළා! ඔබ දැන් දින ${state.streak}/${chMeta.goalDays}ක් ඉදිරියට පැමිණ ඇත. තවත් දින ${chMeta.goalDays - state.streak}යි! 🌟`);
+  }
+
+  active[challengeId] = state;
+  localStorage.setItem('pinPotha_active_challenges', JSON.stringify(active));
+  renderSpiritualChallenges();
+  updateUserStats();
+};
