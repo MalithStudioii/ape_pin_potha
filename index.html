@@ -17,7 +17,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
     
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=23">
+    <link rel="stylesheet" href="css/styles.css?v=24">
 </head>
 <body>
 
@@ -77,10 +77,15 @@
                                 <span>දැනුම්දීම්</span>
                                 <span class="notif-unread-pill" id="notifUnreadPill" style="display: none;">0ක් අලුත්</span>
                             </div>
-                            <button class="notif-mark-read-btn" onclick="markAllNotificationsAsRead(event)" title="සියල්ල කියවූ බව සලකුණු කරන්න">
-                                <i class="fa-solid fa-check-double"></i>
-                                <span>කියවූ බව සලකුණු කරන්න</span>
-                            </button>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <button class="notif-mark-read-btn" onclick="markAllNotificationsAsRead(event)" title="සියල්ල කියවූ බව සලකුණු කරන්න">
+                                    <i class="fa-solid fa-check-double"></i>
+                                    <span class="btn-text-resp">කියවූ බව සලකුණු කරන්න</span>
+                                </button>
+                                <button type="button" class="notif-close-btn" onclick="closeNotificationDropdown()" title="වසන්න">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
                         </div>
 
                         <!-- Filter Chips -->
@@ -536,25 +541,6 @@
             </div>
         </div>
     </div>
-
-    <!-- Mobile Bottom Navigation Bar -->
-    <nav class="mobile-bottom-bar">
-        <button onclick="switchTab('feed')" id="mob-tab-feed" class="mob-nav-item active">
-            <i class="fa-solid fa-house-chimney" style="font-size: 1.1rem;"></i>
-            <span>පවුර</span>
-        </button>
-        <button onclick="switchTab('profile')" id="mob-tab-profile" class="mob-nav-item">
-            <i class="fa-solid fa-circle-user" style="font-size: 1.1rem;"></i>
-            <span>ප්‍රොෆයිල්</span>
-        </button>
-        <button onclick="openModal('merit')" class="mob-fab-center" title="අලුත් සටහනක්">
-            <i class="fa-solid fa-plus" style="font-size: 1.2rem;"></i>
-        </button>
-        <button onclick="switchTab('needs')" id="mob-tab-needs" class="mob-nav-item">
-            <i class="fa-solid fa-hand-holding-heart" style="font-size: 1.1rem;"></i>
-            <span>සත්කාර</span>
-        </button>
-    </nav>
 
     <!-- Create Post Modal Dialog -->
     <div id="postModal" class="modal-overlay hidden">
@@ -1359,6 +1345,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=23"></script>
+    <script type="module" src="js/app.js?v=24"></script>
 </body>
 </html>

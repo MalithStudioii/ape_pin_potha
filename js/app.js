@@ -1885,6 +1885,7 @@ window.toggleNotificationDropdown = function(e) {
   if (e) e.stopPropagation();
   const dropdown = document.getElementById('notificationsDropdown');
   const btn = document.getElementById('notificationBellBtn');
+  const mobBtn = document.getElementById('mob-tab-notif');
   if (!dropdown) return;
 
   const isHidden = dropdown.style.display === 'none' || dropdown.classList.contains('hidden');
@@ -1892,22 +1893,26 @@ window.toggleNotificationDropdown = function(e) {
     dropdown.style.display = 'flex';
     dropdown.classList.remove('hidden');
     if (btn) btn.classList.add('active');
+    if (mobBtn) mobBtn.classList.add('active');
     renderNotificationsList();
   } else {
     dropdown.style.display = 'none';
     dropdown.classList.add('hidden');
     if (btn) btn.classList.remove('active');
+    if (mobBtn) mobBtn.classList.remove('active');
   }
 };
 
 window.closeNotificationDropdown = function() {
   const dropdown = document.getElementById('notificationsDropdown');
   const btn = document.getElementById('notificationBellBtn');
+  const mobBtn = document.getElementById('mob-tab-notif');
   if (dropdown) {
     dropdown.style.display = 'none';
     dropdown.classList.add('hidden');
   }
   if (btn) btn.classList.remove('active');
+  if (mobBtn) mobBtn.classList.remove('active');
 };
 
 window.filterNotifications = function(filterType, e) {
