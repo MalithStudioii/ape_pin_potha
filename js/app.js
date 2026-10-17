@@ -468,6 +468,7 @@ function renderPostCardHTML(post, user) {
   const canDelete = isOwner || isMaster;
   const comments = post.comments || [];
   const isNeed = post.type === 'need';
+  const isGeneral = post.type === 'general';
   const isRepost = post.type === 'repost' || post.isRepost === true || !!post.originalPost;
   const orig = post.originalPost;
 
@@ -523,7 +524,7 @@ function renderPostCardHTML(post, user) {
         ` : ''}
 
         ${orig ? `
-          <div class="quoted-merit-box">
+          <div class="quoted-merit-box" onclick="viewOriginalPost('${orig.id}', '${post.id}')" title="සම්පූර්ණ මුල් සටහන බලන්න ක්ලික් කරන්න">
             <div class="quoted-merit-header">
               <div style="display: flex; align-items: center; gap: 8px;">
                 <div class="quoted-avatar">${Security.escapeHTML((orig.author || 'ක').charAt(0))}</div>
@@ -532,7 +533,12 @@ function renderPostCardHTML(post, user) {
                   <div style="font-size: 0.68rem; color: #94a3b8;">${Security.escapeHTML(orig.date || 'මෑතකදී')} ${orig.location ? '• ' + Security.escapeHTML(orig.location) : ''}</div>
                 </div>
               </div>
-              <span class="post-badge category">${Security.escapeHTML(orig.category || 'පින්කම')}</span>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span class="post-badge category">${Security.escapeHTML(orig.category || 'පින්කම')}</span>
+                <span style="font-size: 0.72rem; color: #d97706; font-weight: 600; background: rgba(245, 158, 11, 0.12); padding: 2px 7px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px;">
+                  <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 10px;"></i> බලන්න
+                </span>
+              </div>
             </div>
             <h4 class="quoted-merit-title">${Security.escapeHTML(orig.title)}</h4>
             <p class="quoted-merit-desc">${Security.escapeHTML(orig.description || '')}</p>
@@ -558,6 +564,7 @@ function renderPostCardHTML(post, user) {
                 ` : ''}
                 <span class="post-badge category">${Security.escapeHTML(post.category)}</span>
                 ${isNeed ? '<span class="post-badge need">🤝 සත්කාර ඉල්ලීමක්</span>' : ''}
+                ${isGeneral ? '<span class="post-badge" style="background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd;"><i class="fa-solid fa-mug-hot"></i> සාමාන්‍ය සටහනක්</span>' : ''}
                 ${isNeed && post.isVerifiedNeed ? '<span class="verified-need-badge" title="පරිපාලනය විසින් සත්‍යාපනය කරන ලද සත්කාරයකි"><i class="fa-solid fa-circle-check"></i> සත්‍යාපිත සත්කාරයකි</span>' : ''}
                 ${post.visibility === 'private' ? '<span class="post-badge private"><i class="fa-solid fa-lock" style="font-size: 9px;"></i> Private</span>' : ''}
               </div>
@@ -605,7 +612,7 @@ function renderPostCardHTML(post, user) {
           <span style="font-weight: 700; color: #78350f;"><strong id="count-${post.id}">${post.sadhuCount || 0}</strong> දෙනෙක් සාදුකාර දුන්හ</span>
         </div>
         <span style="cursor: pointer;" onclick="toggleCommentsSection('${post.id}')">
-          පුණ්‍යානුමෝදනා (${comments.length})
+          ${isGeneral ? 'සුබපැතුම්' : 'පුණ්‍යානුමෝදනා'} (${comments.length})
         </span>
       </div>
 
@@ -618,7 +625,7 @@ function renderPostCardHTML(post, user) {
 
         <button class="post-btn" onclick="toggleCommentsSection('${post.id}')">
           <i class="fa-regular fa-comment-dots" style="color: #d97706;"></i>
-          <span>ප්‍රාර්ථනා (${comments.length})</span>
+          <span>${isGeneral ? 'සුබපැතුම්' : 'ප්‍රාර්ථනා'} (${comments.length})</span>
         </button>
 
         ${!isNeed && post.visibility !== 'private' ? `
@@ -641,18 +648,33 @@ function renderPostCardHTML(post, user) {
         `}
       </div>
 
-      <!-- Comments & Blessings Section -->
-      <div class="comments-section" id="comments-box-${post.id}">
+      <!-- Comments & Blessings Section (Collapsed by default) -->
+      <div class="comments-section" id="comments-box-${post.id}" style="display: none;">
         <div class="quick-blessings-scroll">
-          <button class="blessing-chip" onclick="submitQuickBlessing('${post.id}', 'සාදු! සාදු! සාදු! 🙏')">
-            🙏 සාදු! සාදු! සාදු!
-          </button>
-          <button class="blessing-chip" onclick="submitQuickBlessing('${post.id}', 'මේ උතුම් පිනෙන් නිදුක් නීරෝගී සුවය ලැබේවා! 🪷')">
-            🪷 නිදුක් නීරෝගී සුව ලැබේවා!
-          </button>
-          <button class="blessing-chip" onclick="submitQuickBlessing('${post.id}', 'සියලු දෙනාටම උතුම් ධර්මාවබෝධය පිණිසම හේතු වේවා! ✨')">
-            ✨ ධර්මාවබෝධය වේවා!
-          </button>
+          ${(isGeneral || post.category === 'සුබපැතුම්' || post.category === 'සිතුවිලි') ? `
+            <button class="blessing-chip" onclick="submitQuickBlessing('${post.id}', 'සුබ උදෑසනක් වේවා! 🌅🙏')">
+              🌅 සුබ උදෑසනක් වේවා!
+            </button>
+            <button class="blessing-chip" onclick="submitQuickBlessing('${post.id}', 'තෙරුවන් සරණයි! වාසනාවන්ත දිනයක් වේවා! 🪷')">
+              🙏 තෙරුවන් සරණයි!
+            </button>
+            <button class="blessing-chip" onclick="submitQuickBlessing('${post.id}', 'සුවපත් ප්‍රීතිමත් දවසක් වේවා! ✨')">
+              ✨ සුවපත් දිනයක් වේවා!
+            </button>
+            <button class="blessing-chip" onclick="submitQuickBlessing('${post.id}', 'සාදු! සාදු! සාදු! 🙏')">
+              🙏 සාදු! සාදු!
+            </button>
+          ` : `
+            <button class="blessing-chip" onclick="submitQuickBlessing('${post.id}', 'සාදු! සාදු! සාදු! 🙏')">
+              🙏 සාදු! සාදු! සාදු!
+            </button>
+            <button class="blessing-chip" onclick="submitQuickBlessing('${post.id}', 'මේ උතුම් පිනෙන් නිදුක් නීරෝගී සුවය ලැබේවා! 🪷')">
+              🪷 නිදුක් නීරෝගී සුව ලැබේවා!
+            </button>
+            <button class="blessing-chip" onclick="submitQuickBlessing('${post.id}', 'සියලු දෙනාටම උතුම් ධර්මාවබෝධය පිණිසම හේතු වේවා! ✨')">
+              ✨ ධර්මාවබෝධය වේවා!
+            </button>
+          `}
         </div>
 
         <div class="comments-list" id="comments-list-${post.id}">
@@ -671,7 +693,7 @@ function renderPostCardHTML(post, user) {
         </div>
 
         <form class="comment-form" onsubmit="handleCommentSubmit(event, '${post.id}')">
-          <input type="text" id="comment-input-${post.id}" class="comment-input" required placeholder="පුණ්‍යානුමෝදනා සටහනක් එක් කරන්න...">
+          <input type="text" id="comment-input-${post.id}" class="comment-input" required placeholder="${isGeneral ? 'සුබපැතුමක් හෝ සටහනක් එක් කරන්න...' : 'පුණ්‍යානුමෝදනා සටහනක් එක් කරන්න...'}">
           <button type="submit" class="comment-send-btn">
             <i class="fa-solid fa-paper-plane"></i>
           </button>
@@ -831,12 +853,22 @@ window.handleSadhuClick = async function(postId, btnElement) {
 window.toggleCommentsSection = function(postId) {
   const box = document.getElementById(`comments-box-${postId}`);
   if (box) {
-    box.style.display = (box.style.display === 'none') ? 'block' : 'none';
+    const isHidden = (box.style.display === 'none' || window.getComputedStyle(box).display === 'none');
+    if (isHidden) {
+      box.style.display = 'block';
+      setTimeout(() => {
+        document.getElementById(`comment-input-${postId}`)?.focus();
+      }, 100);
+    } else {
+      box.style.display = 'none';
+    }
   }
 };
 
 window.submitQuickBlessing = async function(postId, text) {
   try {
+    const box = document.getElementById(`comments-box-${postId}`);
+    if (box) box.style.display = 'block';
     SoundService.playSadhu();
     triggerHaptic(20);
     await StorageService.addComment(postId, text);
@@ -851,6 +883,8 @@ window.handleCommentSubmit = async function(event, postId) {
   if (!input) return;
 
   try {
+    const box = document.getElementById(`comments-box-${postId}`);
+    if (box) box.style.display = 'block';
     SoundService.playSadhu();
     triggerHaptic(20);
     await StorageService.addComment(postId, input.value);
@@ -858,6 +892,95 @@ window.handleCommentSubmit = async function(event, postId) {
   } catch (err) {
     alert(err.message);
   }
+};
+
+// Open and view original post in full detail (when clicked from repost)
+window.viewOriginalPost = function(origId, parentPostId) {
+  SoundService.playTap?.() || triggerHaptic(15);
+
+  // 1. If element is currently visible in feed DOM, smoothly scroll to it and highlight
+  const targetElem = document.getElementById(`post-elem-${origId}`);
+  if (targetElem && targetElem.offsetParent !== null) {
+    targetElem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    targetElem.classList.add('highlight-shared-post');
+    setTimeout(() => {
+      targetElem.classList.remove('highlight-shared-post');
+    }, 4000);
+    return;
+  }
+
+  // 2. Otherwise find the post data and open it in the full detail modal
+  let post = null;
+  const allPosts = StorageService.getLocalPosts() || [];
+  post = allPosts.find(p => p.id === origId);
+  if (!post && typeof currentPostsData !== 'undefined' && Array.isArray(currentPostsData)) {
+    post = currentPostsData.find(p => p.id === origId);
+  }
+  if (!post && StorageService._cachedPosts) {
+    post = StorageService._cachedPosts.find(p => p.id === origId);
+  }
+
+  // 3. Fallback: reconstruct from parent repost's originalPost object
+  if (!post && parentPostId) {
+    const parentPost = allPosts.find(p => p.id === parentPostId) || (typeof currentPostsData !== 'undefined' ? currentPostsData.find(p => p.id === parentPostId) : null);
+    if (parentPost && parentPost.originalPost) {
+      const orig = parentPost.originalPost;
+      post = {
+        id: orig.id || origId,
+        author: orig.author || 'කල්‍යාණ මිත්‍ර',
+        title: orig.title || 'පින්කම',
+        description: orig.description || '',
+        category: orig.category || 'දානමය',
+        location: orig.location || '',
+        date: orig.date || 'මෑතකදී',
+        image: orig.image || null,
+        images: orig.images || (orig.image ? [orig.image] : []),
+        type: orig.type || 'merit',
+        visibility: 'public',
+        sadhuCount: orig.sadhuCount || 0,
+        comments: orig.comments || []
+      };
+    }
+  }
+
+  if (post) {
+    openPostDetailModal(post);
+  } else {
+    alert("මෙම මුල් සටහනේ සම්පූර්ණ තොරතුරු සොයා ගැනීමට නොහැකි විය.");
+  }
+};
+
+window.openPostDetailModal = function(post) {
+  const modal = document.getElementById('postDetailModal');
+  const body = document.getElementById('postDetailModalBody');
+  const title = document.getElementById('postDetailModalHeaderTitle');
+  if (!modal || !body) return;
+
+  if (title) {
+    title.innerText = `${post.author || 'කල්‍යාණ මිත්‍ර'} ගේ සටහන`;
+  }
+
+  const currentUser = StorageService.currentUser;
+  body.innerHTML = renderPostCardHTML(post, currentUser);
+
+  // Ensure comments section inside the detail modal is opened for immediate reading
+  const innerCommentsBox = body.querySelector(`.comments-section`);
+  if (innerCommentsBox) {
+    innerCommentsBox.style.display = 'block';
+  }
+
+  try {
+    history.pushState({ type: 'modal', id: 'postDetailModal' }, '');
+  } catch (e) {}
+
+  modal.classList.remove('hidden');
+};
+
+window.closePostDetailModal = function() {
+  const modal = document.getElementById('postDetailModal');
+  const body = document.getElementById('postDetailModalBody');
+  if (modal) modal.classList.add('hidden');
+  if (body) body.innerHTML = '';
 };
 
 window.deletePostPrompt = async function(postId) {
@@ -1058,20 +1181,47 @@ window.closeModal = function() {
 window.setPostType = function(type) {
   selectedPostType = type;
   const meritBtn = document.getElementById('typeMeritBtn');
+  const generalBtn = document.getElementById('typeGeneralBtn');
   const needBtn = document.getElementById('typeNeedBtn');
   const visWrap = document.getElementById('visibilityWrapper');
   const contactWrap = document.getElementById('contactWrapper');
+  const catSelect = document.getElementById('postCategory');
+  const titleInput = document.getElementById('postTitle');
+  const descInput = document.getElementById('postDesc');
 
-  if (type === 'merit') {
-    meritBtn?.classList.add('active');
-    needBtn?.classList.remove('active-need');
+  // Reset active classes
+  meritBtn?.classList.remove('active');
+  generalBtn?.classList.remove('active-general');
+  needBtn?.classList.remove('active-need');
+
+  if (type === 'general') {
+    generalBtn?.classList.add('active-general');
     if (visWrap) visWrap.style.display = 'block';
     if (contactWrap) contactWrap.style.display = 'none';
-  } else {
+    if (catSelect && ['දානමය', 'සීලමය', 'භාවනාමය'].includes(catSelect.value)) {
+      catSelect.value = 'සුබපැතුම්';
+    }
+    if (titleInput) titleInput.placeholder = 'මාතෘකාව (උදා: සුබ උදෑසනක් වේවා!, දවසේ සිතුවිල්ල...)';
+    if (descInput) descInput.placeholder = 'අද දවසේ සිතුවිලි, සුබපැතුම් හෝ සාමාන්‍ය සටහන මෙහි ලියන්න...';
+  } else if (type === 'need') {
     needBtn?.classList.add('active-need');
-    meritBtn?.classList.remove('active');
     if (visWrap) visWrap.style.display = 'none';
     if (contactWrap) contactWrap.style.display = 'block';
+    if (catSelect && ['සුබපැතුම්', 'සිතුවිලි', 'සාමාන්‍ය'].includes(catSelect.value)) {
+      catSelect.value = 'සමාජ සත්කාර';
+    }
+    if (titleInput) titleInput.placeholder = 'සත්කාරයේ හෝ ආධාරයේ මාතෘකාව';
+    if (descInput) descInput.placeholder = 'අවශ්‍යතාවය, ලැබිය යුතු ආකාරය සහ නිවැරදි තොරතුරු විස්තර කරන්න...';
+  } else {
+    // Default: 'merit'
+    meritBtn?.classList.add('active');
+    if (visWrap) visWrap.style.display = 'block';
+    if (contactWrap) contactWrap.style.display = 'none';
+    if (catSelect && ['සුබපැතුම්', 'සිතුවිලි', 'සාමාන්‍ය'].includes(catSelect.value)) {
+      catSelect.value = 'දානමය';
+    }
+    if (titleInput) titleInput.placeholder = 'පින්කමේ මාතෘකාව (උදා: කඨින චීවර පූජාව...)';
+    if (descInput) descInput.placeholder = 'සිදුකළ උතුම් කුසලය පිළිබඳ විස්තරය මෙහි ලියන්න...';
   }
 };
 

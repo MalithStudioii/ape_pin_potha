@@ -114,13 +114,13 @@ export const Security = {
     }
 
     // Category whitelist
-    const allowedCategories = ['සියල්ල', 'දානමය', 'සීලමය', 'භාවනාමය', 'සමාජ සත්කාර', 'ධර්ම දානමය', 'යළි බෙදාගැනීම්'];
+    const allowedCategories = ['සියල්ල', 'දානමය', 'සීලමය', 'භාවනාමය', 'සමාජ සත්කාර', 'ධර්ම දානමය', 'සුබපැතුම්', 'සිතුවිලි', 'සාමාන්‍ය', 'යළි බෙදාගැනීම්'];
     if (!allowedCategories.includes(data.category)) {
       errors.push('වලංගු පින්කම් වර්ගයක් තෝරන්න.');
     }
 
     // Type whitelist
-    const allowedTypes = ['merit', 'need', 'repost'];
+    const allowedTypes = ['merit', 'need', 'repost', 'general'];
     if (!allowedTypes.includes(data.type)) {
       errors.push('වලංගු සටහන් වර්ගයක් නොවේ.');
     }

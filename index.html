@@ -36,7 +36,7 @@
     <meta name="twitter:image" content="assets/banner.jpg">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=29">
+    <link rel="stylesheet" href="css/styles.css?v=30">
 </head>
 <body>
 
@@ -212,6 +212,9 @@
                     <button onclick="setCategory('ධර්ම දානමය')" data-cat="ධර්ම දානමය" class="category-item">
                         <span><i class="fa-solid fa-share-nodes cat-icon" style="color: #0284c7;"></i> ධර්ම දානමය</span>
                     </button>
+                    <button onclick="setCategory('සුබපැතුම්')" data-cat="සුබපැතුම්" class="category-item">
+                        <span><i class="fa-solid fa-sun cat-icon" style="color: #f59e0b;"></i> සුබපැතුම් / සිතුවිලි</span>
+                    </button>
                 </div>
             </div>
 
@@ -241,13 +244,17 @@
                         <i class="fa-solid fa-dharmachakra" style="color: #d97706;"></i>
                         <span>පින්කමක්</span>
                     </button>
+                    <button onclick="openModal('general')" class="composer-action-btn">
+                        <i class="fa-solid fa-mug-hot" style="color: #0284c7;"></i>
+                        <span>සුබපැතුම්</span>
+                    </button>
                     <button onclick="openModal('merit', true)" class="composer-action-btn">
                         <i class="fa-solid fa-image" style="color: #059669;"></i>
                         <span>ඡායාරූපයක්</span>
                     </button>
                     <button onclick="openModal('need')" class="composer-action-btn">
                         <i class="fa-solid fa-hand-holding-heart" style="color: #e11d48;"></i>
-                        <span>සත්කාර ඉල්ලීමක්</span>
+                        <span>සත්කාරයක්</span>
                     </button>
                 </div>
             </div>
@@ -260,6 +267,7 @@
                 <button onclick="setCategory('භාවනාමය')" data-cat="භාවනාමය" class="category-pill">භාවනාමය</button>
                 <button onclick="setCategory('සමාජ සත්කාර')" data-cat="සමාජ සත්කාර" class="category-pill">සමාජ සත්කාර</button>
                 <button onclick="setCategory('ධර්ම දානමය')" data-cat="ධර්ම දානමය" class="category-pill">ධර්ම දානමය</button>
+                <button onclick="setCategory('සුබපැතුම්')" data-cat="සුබපැතුම්" class="category-pill">සුබපැතුම්</button>
             </div>
 
             <!-- Tab Header Banner -->
@@ -631,7 +639,10 @@
                 <!-- Post Type Switcher -->
                 <div class="type-toggle-grid">
                     <button type="button" onclick="setPostType('merit')" id="typeMeritBtn" class="type-toggle-btn active">
-                        ✨ සිදුකළ පින්කමක්
+                        ✨ පින්කමක්
+                    </button>
+                    <button type="button" onclick="setPostType('general')" id="typeGeneralBtn" class="type-toggle-btn">
+                        🌸 සාමාන්‍ය සටහනක්
                     </button>
                     <button type="button" onclick="setPostType('need')" id="typeNeedBtn" class="type-toggle-btn">
                         🤝 සත්කාර ඉල්ලීමක්
@@ -652,6 +663,9 @@
                             <option value="භාවනාමය">භාවනාමය</option>
                             <option value="සමාජ සත්කාර">සමාජ සත්කාර</option>
                             <option value="ධර්ම දානමය">ධර්ම දානමය</option>
+                            <option value="සුබපැතුම්">සුබපැතුම් (Good Morning / GM)</option>
+                            <option value="සිතුවිලි">දවසේ සිතුවිලි (Thoughts)</option>
+                            <option value="සාමාන්‍ය">සාමාන්‍ය (General)</option>
                         </select>
                     </div>
                     <div id="visibilityWrapper">
@@ -1417,6 +1431,26 @@
     </div>
 
     <!-- ========================================================================= -->
+    <!-- Full Post Detail Modal Dialog (For viewing clicked repost / deep-linked post) -->
+    <!-- ========================================================================= -->
+    <div id="postDetailModal" class="modal-overlay hidden" style="z-index: 1060;" onclick="if(event.target === this) closePostDetailModal()">
+        <div class="modal-box" style="max-width: 620px; width: 95%; max-height: 90vh; overflow-y: auto; padding: 0;">
+            <div class="modal-header" style="position: sticky; top: 0; background: #ffffff; z-index: 10; padding: 14px 18px; border-bottom: 1px solid #f1f5f9;">
+                <h3 class="modal-title" style="font-size: 0.95rem; display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-file-lines" style="color: #d97706;"></i>
+                    <span id="postDetailModalHeaderTitle">මුල් පින්කම් සටහන</span>
+                </h3>
+                <button type="button" onclick="closePostDetailModal()" class="modal-close-btn" aria-label="වසන්න">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div id="postDetailModalBody" style="padding: 16px;">
+                <!-- Full Post Card Rendered Dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
     <!-- Fullscreen Photo Lightbox / Gallery Viewer                                -->
     <!-- ========================================================================= -->
     <div id="photoLightboxModal" class="lightbox-overlay hidden" onclick="closeLightboxOnBackdrop(event)">
@@ -1478,6 +1512,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=29"></script>
+    <script type="module" src="js/app.js?v=30"></script>
 </body>
 </html>

@@ -988,8 +988,8 @@ body {
 
 .composer-actions {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid #f1f5f9;
@@ -1656,7 +1656,7 @@ body {
 
 .type-toggle-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 6px;
   background: #f1f5f9;
   padding: 4px;
@@ -1685,6 +1685,12 @@ body {
 .type-toggle-btn.active-need {
   background: #ffffff;
   color: var(--color-charity-800);
+  box-shadow: var(--shadow-sm);
+}
+
+.type-toggle-btn.active-general {
+  background: #ffffff;
+  color: #0284c7;
   box-shadow: var(--shadow-sm);
 }
 
@@ -2722,11 +2728,21 @@ body {
   padding: 12px;
   margin-bottom: 12px;
   transition: all 0.2s ease;
+  cursor: pointer;
 }
 
 .quoted-merit-box:hover {
   border-color: #f59e0b;
-  box-shadow: 0 2px 10px rgba(245, 158, 11, 0.15);
+  background: #fffdf5;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.18);
+  transform: translateY(-1px);
+}
+
+#postDetailModal .post-card {
+  margin-bottom: 0;
+  box-shadow: none;
+  border: none;
+  background: transparent;
 }
 
 .quoted-merit-header {
