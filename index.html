@@ -36,7 +36,7 @@
     <meta name="twitter:image" content="assets/banner.jpg">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=30">
+    <link rel="stylesheet" href="css/styles.css?v=31">
 </head>
 <body>
 
@@ -649,13 +649,13 @@
                     </button>
                 </div>
 
-                <div class="form-group">
-                    <label class="form-label">මාතෘකාව *</label>
+                <div class="form-group" id="titleWrapper">
+                    <label class="form-label" id="titleLabel">මාතෘකාව *</label>
                     <input type="text" id="postTitle" class="form-input" required maxlength="150" placeholder="උදා: රුවන්වැලිසෑය අභියස සුවඳ මල් පූජාව">
                 </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
-                    <div>
+                <div id="categoryVisibilityRow" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+                    <div id="categoryWrapper">
                         <label class="form-label">වර්ගය *</label>
                         <select id="postCategory" class="form-select">
                             <option value="දානමය">දානමය</option>
@@ -677,8 +677,8 @@
                     </div>
                 </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
-                    <div>
+                <div id="locationContactRow" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+                    <div id="locationWrapper">
                         <label class="form-label">ස්ථානය / ප්‍රදේශය</label>
                         <input type="text" id="postLocation" class="form-input" maxlength="80" placeholder="උදා: අනුරාධපුරය">
                     </div>
@@ -688,8 +688,8 @@
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label class="form-label">විස්තරය *</label>
+                <div class="form-group" id="descWrapper">
+                    <label class="form-label" id="descLabel">විස්තරය *</label>
                     <textarea id="postDesc" class="form-textarea" rows="3" required maxlength="3000" placeholder="ඔබ සිදුකළ පින්කම සහ සිත පහදවාගත් ආකාරය විස්තර කරන්න..."></textarea>
                 </div>
 
@@ -730,8 +730,8 @@
                     </div>
                 </div>
 
-                <button type="submit" class="btn-submit-merit">
-                    පුණ්‍ය පවුරට එක් කරන්න
+                <button type="submit" class="btn-submit-merit" id="submitPostBtn">
+                    <span id="submitMeritBtnText">පුණ්‍ය පවුරට එක් කරන්න</span>
                 </button>
             </form>
         </div>
@@ -1512,6 +1512,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=30"></script>
+    <script type="module" src="js/app.js?v=31"></script>
 </body>
 </html>

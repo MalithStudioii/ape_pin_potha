@@ -562,7 +562,7 @@ function renderPostCardHTML(post, user) {
                 ${(post.authorRole === 'admin' || post.isOfficial || (post.authorEmail && post.authorEmail.toLowerCase() === 'silvadilan9@gmail.com')) ? `
                   <span class="official-author-badge" title="Verified Master Admin"><i class="fa-solid fa-crown"></i> Master Admin</span>
                 ` : ''}
-                <span class="post-badge category">${Security.escapeHTML(post.category)}</span>
+                ${!isGeneral ? `<span class="post-badge category">${Security.escapeHTML(post.category)}</span>` : ''}
                 ${isNeed ? '<span class="post-badge need">🤝 සත්කාර ඉල්ලීමක්</span>' : ''}
                 ${isGeneral ? '<span class="post-badge" style="background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd;"><i class="fa-solid fa-mug-hot"></i> සාමාන්‍ය සටහනක්</span>' : ''}
                 ${isNeed && post.isVerifiedNeed ? '<span class="verified-need-badge" title="පරිපාලනය විසින් සත්‍යාපනය කරන ලද සත්කාරයකි"><i class="fa-solid fa-circle-check"></i> සත්‍යාපිත සත්කාරයකි</span>' : ''}
@@ -597,7 +597,7 @@ function renderPostCardHTML(post, user) {
 
         <!-- Post Content Body -->
         <div class="post-content-body">
-          <h3 class="post-title">${Security.escapeHTML(post.title)}</h3>
+          ${(post.title && post.title.trim()) ? `<h3 class="post-title">${Security.escapeHTML(post.title)}</h3>` : ''}
           <p class="post-desc">${Security.escapeHTML(post.description)}</p>
         </div>
 
@@ -894,22 +894,11 @@ window.handleCommentSubmit = async function(event, postId) {
   }
 };
 
-// Open and view original post in full detail (when clicked from repost)
+// Open and view original post in full detail in-place (when clicked from repost)
 window.viewOriginalPost = function(origId, parentPostId) {
   SoundService.playTap?.() || triggerHaptic(15);
 
-  // 1. If element is currently visible in feed DOM, smoothly scroll to it and highlight
-  const targetElem = document.getElementById(`post-elem-${origId}`);
-  if (targetElem && targetElem.offsetParent !== null) {
-    targetElem.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    targetElem.classList.add('highlight-shared-post');
-    setTimeout(() => {
-      targetElem.classList.remove('highlight-shared-post');
-    }, 4000);
-    return;
-  }
-
-  // 2. Otherwise find the post data and open it in the full detail modal
+  // Directly retrieve post data and open it in the modal dialog right here
   let post = null;
   const allPosts = StorageService.getLocalPosts() || [];
   post = allPosts.find(p => p.id === origId);
@@ -920,7 +909,7 @@ window.viewOriginalPost = function(origId, parentPostId) {
     post = StorageService._cachedPosts.find(p => p.id === origId);
   }
 
-  // 3. Fallback: reconstruct from parent repost's originalPost object
+  // Fallback: reconstruct from parent repost's originalPost object
   if (!post && parentPostId) {
     const parentPost = allPosts.find(p => p.id === parentPostId) || (typeof currentPostsData !== 'undefined' ? currentPostsData.find(p => p.id === parentPostId) : null);
     if (parentPost && parentPost.originalPost) {
@@ -928,7 +917,7 @@ window.viewOriginalPost = function(origId, parentPostId) {
       post = {
         id: orig.id || origId,
         author: orig.author || 'කල්‍යාණ මිත්‍ර',
-        title: orig.title || 'පින්කම',
+        title: orig.title || '',
         description: orig.description || '',
         category: orig.category || 'දානමය',
         location: orig.location || '',
@@ -1169,10 +1158,12 @@ window.closeModal = function() {
   const modal = document.getElementById('postModal');
   if (modal) modal.classList.add('hidden');
   document.getElementById('postForm')?.reset();
-  const chkOfficial = document.getElementById('postIsOfficial');
-  const chkPinned = document.getElementById('postIsPinned');
+  const chkOfficial = document.getElementById('adminIsOfficial') || document.getElementById('postIsOfficial');
+  const chkPinned = document.getElementById('adminIsPinned') || document.getElementById('postIsPinned');
   if (chkOfficial) chkOfficial.checked = false;
   if (chkPinned) chkPinned.checked = false;
+  const titleInput = document.getElementById('postTitle');
+  if (titleInput) titleInput.required = true;
   compressedBase64Image = null;
   selectedImagesList = [];
   renderComposerThumbnails();
@@ -1183,11 +1174,20 @@ window.setPostType = function(type) {
   const meritBtn = document.getElementById('typeMeritBtn');
   const generalBtn = document.getElementById('typeGeneralBtn');
   const needBtn = document.getElementById('typeNeedBtn');
-  const visWrap = document.getElementById('visibilityWrapper');
-  const contactWrap = document.getElementById('contactWrapper');
-  const catSelect = document.getElementById('postCategory');
+  const titleWrap = document.getElementById('titleWrapper');
+  const titleLabel = document.getElementById('titleLabel');
   const titleInput = document.getElementById('postTitle');
+  const categoryVisibilityRow = document.getElementById('categoryVisibilityRow');
+  const categoryWrap = document.getElementById('categoryWrapper');
+  const catSelect = document.getElementById('postCategory');
+  const visWrap = document.getElementById('visibilityWrapper');
+  const locationContactRow = document.getElementById('locationContactRow');
+  const locationWrap = document.getElementById('locationWrapper');
+  const locInput = document.getElementById('postLocation');
+  const contactWrap = document.getElementById('contactWrapper');
+  const descLabel = document.getElementById('descLabel');
   const descInput = document.getElementById('postDesc');
+  const submitBtnText = document.getElementById('submitMeritBtnText');
 
   // Reset active classes
   meritBtn?.classList.remove('active');
@@ -1196,32 +1196,87 @@ window.setPostType = function(type) {
 
   if (type === 'general') {
     generalBtn?.classList.add('active-general');
-    if (visWrap) visWrap.style.display = 'block';
-    if (contactWrap) contactWrap.style.display = 'none';
-    if (catSelect && ['දානමය', 'සීලමය', 'භාවනාමය'].includes(catSelect.value)) {
-      catSelect.value = 'සුබපැතුම්';
+
+    // 1. Hide Title
+    if (titleWrap) titleWrap.style.display = 'none';
+    if (titleInput) {
+      titleInput.required = false;
+      titleInput.value = '';
     }
-    if (titleInput) titleInput.placeholder = 'මාතෘකාව (උදා: සුබ උදෑසනක් වේවා!, දවසේ සිතුවිල්ල...)';
+
+    // 2. Hide Category & make Visibility span full width
+    if (categoryWrap) categoryWrap.style.display = 'none';
+    if (categoryVisibilityRow) categoryVisibilityRow.style.gridTemplateColumns = '1fr';
+    if (visWrap) visWrap.style.display = 'block';
+    if (catSelect) catSelect.value = 'සාමාන්‍ය';
+
+    // 3. Hide Location & Contact
+    if (locationContactRow) locationContactRow.style.display = 'none';
+    if (locationWrap) locationWrap.style.display = 'none';
+    if (contactWrap) contactWrap.style.display = 'none';
+    if (locInput) locInput.value = '';
+
+    // 4. Update labels & placeholder
+    if (descLabel) descLabel.innerText = 'සටහන / සුබපැතුම *';
     if (descInput) descInput.placeholder = 'අද දවසේ සිතුවිලි, සුබපැතුම් හෝ සාමාන්‍ය සටහන මෙහි ලියන්න...';
+    if (submitBtnText) submitBtnText.innerText = 'පවුරට එක් කරන්න';
+
   } else if (type === 'need') {
     needBtn?.classList.add('active-need');
-    if (visWrap) visWrap.style.display = 'none';
-    if (contactWrap) contactWrap.style.display = 'block';
-    if (catSelect && ['සුබපැතුම්', 'සිතුවිලි', 'සාමාන්‍ය'].includes(catSelect.value)) {
-      catSelect.value = 'සමාජ සත්කාර';
+
+    // 1. Show Title for need
+    if (titleWrap) titleWrap.style.display = 'block';
+    if (titleLabel) titleLabel.innerText = 'සත්කාරයේ මාතෘකාව *';
+    if (titleInput) {
+      titleInput.required = true;
+      titleInput.placeholder = 'සත්කාරයේ හෝ ආධාරයේ මාතෘකාව';
     }
-    if (titleInput) titleInput.placeholder = 'සත්කාරයේ හෝ ආධාරයේ මාතෘකාව';
+
+    // 2. Show Category (full width since visibility is hidden for needs)
+    if (categoryWrap) categoryWrap.style.display = 'block';
+    if (categoryVisibilityRow) categoryVisibilityRow.style.gridTemplateColumns = '1fr';
+    if (visWrap) visWrap.style.display = 'none';
+    if (catSelect) catSelect.value = 'සමාජ සත්කාර';
+
+    // 3. Show Location & Contact
+    if (locationContactRow) locationContactRow.style.display = 'grid';
+    if (locationWrap) locationWrap.style.display = 'block';
+    if (contactWrap) contactWrap.style.display = 'block';
+
+    // 4. Update labels & placeholder
+    if (descLabel) descLabel.innerText = 'විස්තරය *';
     if (descInput) descInput.placeholder = 'අවශ්‍යතාවය, ලැබිය යුතු ආකාරය සහ නිවැරදි තොරතුරු විස්තර කරන්න...';
+    if (submitBtnText) submitBtnText.innerText = 'සත්කාර ඉල්ලීම පළ කරන්න';
+
   } else {
     // Default: 'merit'
     meritBtn?.classList.add('active');
+
+    // 1. Show Title for merit
+    if (titleWrap) titleWrap.style.display = 'block';
+    if (titleLabel) titleLabel.innerText = 'මාතෘකාව *';
+    if (titleInput) {
+      titleInput.required = true;
+      titleInput.placeholder = 'උදා: රුවන්වැලිසෑය අභියස සුවඳ මල් පූජාව';
+    }
+
+    // 2. Show Category & Visibility side-by-side
+    if (categoryWrap) categoryWrap.style.display = 'block';
+    if (categoryVisibilityRow) categoryVisibilityRow.style.gridTemplateColumns = '1fr 1fr';
     if (visWrap) visWrap.style.display = 'block';
-    if (contactWrap) contactWrap.style.display = 'none';
-    if (catSelect && ['සුබපැතුම්', 'සිතුවිලි', 'සාමාන්‍ය'].includes(catSelect.value)) {
+    if (catSelect && ['සුබපැතුම්', 'සිතුවිලි', 'සාමාන්‍ය', 'සමාජ සත්කාර'].includes(catSelect.value)) {
       catSelect.value = 'දානමය';
     }
-    if (titleInput) titleInput.placeholder = 'පින්කමේ මාතෘකාව (උදා: කඨින චීවර පූජාව...)';
-    if (descInput) descInput.placeholder = 'සිදුකළ උතුම් කුසලය පිළිබඳ විස්තරය මෙහි ලියන්න...';
+
+    // 3. Show Location, hide Contact
+    if (locationContactRow) locationContactRow.style.display = 'grid';
+    if (locationWrap) locationWrap.style.display = 'block';
+    if (contactWrap) contactWrap.style.display = 'none';
+
+    // 4. Update labels & placeholder
+    if (descLabel) descLabel.innerText = 'විස්තරය *';
+    if (descInput) descInput.placeholder = 'ඔබ සිදුකළ පින්කම සහ සිත පහදවාගත් ආකාරය විස්තර කරන්න...';
+    if (submitBtnText) submitBtnText.innerText = 'පුණ්‍ය පවුරට එක් කරන්න';
   }
 };
 
@@ -1408,16 +1463,16 @@ function setupEventListeners() {
   document.getElementById('postForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    const title = document.getElementById('postTitle')?.value || '';
-    const category = document.getElementById('postCategory')?.value || 'දානමය';
+    const title = selectedPostType === 'general' ? '' : (document.getElementById('postTitle')?.value || '').trim();
+    const category = selectedPostType === 'general' ? (document.getElementById('postCategory')?.value || 'සාමාන්‍ය') : (document.getElementById('postCategory')?.value || 'දානමය');
     const visibility = selectedPostType === 'need' ? 'public' : (document.getElementById('postVisibility')?.value || 'public');
-    const location = document.getElementById('postLocation')?.value || '';
-    const contact = document.getElementById('postContact')?.value || '';
-    const description = document.getElementById('postDesc')?.value || '';
+    const location = selectedPostType === 'general' ? '' : (document.getElementById('postLocation')?.value || '').trim();
+    const contact = selectedPostType === 'need' ? (document.getElementById('postContact')?.value || '').trim() : '';
+    const description = (document.getElementById('postDesc')?.value || '').trim();
 
     const isMaster = StorageService.isMasterAdmin();
-    const isOfficial = isMaster && !!document.getElementById('postIsOfficial')?.checked;
-    const isPinned = isMaster && !!document.getElementById('postIsPinned')?.checked;
+    const isOfficial = isMaster && (!!document.getElementById('adminIsOfficial')?.checked || !!document.getElementById('postIsOfficial')?.checked);
+    const isPinned = isMaster && (!!document.getElementById('adminIsPinned')?.checked || !!document.getElementById('postIsPinned')?.checked);
 
     try {
       await StorageService.createPost({

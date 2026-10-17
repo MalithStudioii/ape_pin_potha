@@ -88,12 +88,18 @@ export const Security = {
   validatePost(data, bannedWords = []) {
     const errors = [];
 
-    // Title validation
+    // Title validation (Optional for general posts)
     const title = this.sanitizeText(data.title || '');
-    if (!title || title.length < 3) {
-      errors.push('මාතෘකාව අකුරු 3කට වඩා වැඩි විය යුතුය.');
-    } else if (title.length > 150) {
-      errors.push('මාතෘකාව අකුරු 150කට වඩා අඩු විය යුතුය.');
+    if (data.type !== 'general') {
+      if (!title || title.length < 3) {
+        errors.push('මාතෘකාව අකුරු 3කට වඩා වැඩි විය යුතුය.');
+      } else if (title.length > 150) {
+        errors.push('මාතෘකාව අකුරු 150කට වඩා අඩු විය යුතුය.');
+      }
+    } else {
+      if (title.length > 150) {
+        errors.push('මාතෘකාව අකුරු 150කට වඩා අඩු විය යුතුය.');
+      }
     }
 
     // Description validation
