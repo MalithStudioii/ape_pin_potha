@@ -4,7 +4,7 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=32';
+import { StorageService } from './storage.js?v=33';
 import { Security } from './security.js?v=32';
 import { uploadToImgBB } from './imgbb-service.js?v=32';
 import { SoundService, triggerHaptic } from './sound.js?v=32';
@@ -14,6 +14,58 @@ window.triggerHaptic = triggerHaptic;
 window.toggleSoundPreference = function(e) {
   SoundService.setSoundEnabled(e.target.checked);
 };
+
+export function isGuestUser() {
+  const user = StorageService.currentUser;
+  return !user || user.isAnonymous || !user.email;
+}
+window.isGuestUser = isGuestUser;
+
+window.showAuthRequiredModal = function(actionName = 'මෙම ක්‍රියාව සිදු කිරීමට') {
+  triggerHaptic(20);
+  SoundService.playClick();
+  const actEl = document.getElementById('authRequiredActionText');
+  if (actEl) {
+    actEl.innerText = `${actionName} සඳහා කරුණාකර Google මඟින් Login වන්න.`;
+  }
+  try {
+    history.pushState({ type: 'modal', id: 'authRequiredModal' }, '');
+  } catch (e) {}
+  document.getElementById('authRequiredModal')?.classList.remove('hidden');
+};
+
+window.closeAuthRequiredModal = function() {
+  document.getElementById('authRequiredModal')?.classList.add('hidden');
+};
+
+window.closeAuthRequiredOnBackdrop = function(e) {
+  if (e.target.id === 'authRequiredModal') {
+    closeAuthRequiredModal();
+  }
+};
+
+window.openMandatoryNameModal = function() {
+  const user = StorageService.currentUser || {};
+  const fNameInp = document.getElementById('mandatoryFirstNameInput');
+  const lNameInp = document.getElementById('mandatoryLastNameInput');
+  if (fNameInp) fNameInp.value = user.firstName || (user.name && user.name !== 'අමුත්තා' ? user.name.split(' ')[0] : '');
+  if (lNameInp) lNameInp.value = user.lastName || (user.name && user.name !== 'අමුත්තා' ? user.name.split(' ').slice(1).join(' ') : '');
+  document.getElementById('mandatoryNameModal')?.classList.remove('hidden');
+};
+
+window.closeMandatoryNameModal = function() {
+  document.getElementById('mandatoryNameModal')?.classList.add('hidden');
+};
+
+function checkAndPromptMandatoryName() {
+  const user = StorageService.currentUser;
+  if (!user || user.isAnonymous || !user.email) return;
+  const name = (user.name || '').trim();
+  if (!name || name === 'අමුත්තා' || name === 'කල්‍යාණ මිත්‍ර' || user.needsNameConfirmation) {
+    openMandatoryNameModal();
+  }
+}
+window.checkAndPromptMandatoryName = checkAndPromptMandatoryName;
 
 let activeTab = 'feed';
 let activeCategory = 'සියල්ල';
@@ -255,9 +307,159 @@ function updateUserStats() {
   if (statSadhuEl) statSadhuEl.innerText = totalSadhu;
 }
 
+// Member Profile Modal Controllers (Facebook-Style Profile Viewer)
+window.viewUserProfile = async function(uid, authorName) {
+  triggerHaptic(15);
+  SoundService.playClick();
+
+  if (isGuestUser()) {
+    showAuthRequiredModal('සාමාජිකයින්ගේ Profile බැලීමට');
+    return;
+  }
+
+  const current = StorageService.currentUser;
+  if (current && ((uid && current.uid && uid === current.uid) || (!uid && authorName && current.name && authorName === current.name))) {
+    switchTab('profile');
+    return;
+  }
+
+  await openMemberProfileModal(uid, authorName);
+};
+
+window.openMemberProfileModal = async function(uid, authorName) {
+  const modal = document.getElementById('memberProfileModal');
+  if (!modal) return;
+
+  try {
+    history.pushState({ type: 'modal', id: 'memberProfileModal' }, '');
+  } catch (e) {}
+  modal.classList.remove('hidden');
+
+  // Load profile from StorageService
+  const member = await StorageService.getUserProfile(uid) || {
+    uid,
+    name: authorName || 'කල්‍යාණ මිත්‍ර',
+    photo: null,
+    coverImage: 'assets/banner.jpg',
+    bio: "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏",
+    location: '',
+    occupation: '',
+    joinedDate: '2026 ඔක්තෝබර්'
+  };
+
+  const coverImg = document.getElementById('memCoverImg');
+  if (coverImg) coverImg.src = member.coverImage || 'assets/banner.jpg';
+
+  const avatarWrap = document.getElementById('memAvatarWrap');
+  if (avatarWrap) {
+    if (member.photo) {
+      avatarWrap.innerHTML = `<img src="${member.photo}" alt="${member.name}" onerror="this.parentElement.innerText = '${(member.name || 'ක').charAt(0)}';">`;
+    } else {
+      avatarWrap.innerText = (member.name || authorName || 'ක').trim().charAt(0);
+    }
+  }
+
+  const nameEl = document.getElementById('memFullName');
+  if (nameEl) nameEl.innerText = member.name || authorName || 'කල්‍යාණ මිත්‍ර';
+
+  const badgeEl = document.getElementById('memVerifiedBadge');
+  if (badgeEl) {
+    if (member.isAdmin) {
+      badgeEl.className = 'official-author-badge';
+      badgeEl.innerHTML = `<i class="fa-solid fa-crown"></i> <span>Master Admin</span>`;
+    } else if (member.email) {
+      badgeEl.className = 'verified-pill';
+      badgeEl.innerHTML = `<i class="fa-solid fa-circle-check"></i> <span>Google සත්‍යාපිත කල්‍යාණ මිත්‍ර</span>`;
+    } else {
+      badgeEl.className = 'verified-pill';
+      badgeEl.innerHTML = `<i class="fa-solid fa-seedling"></i> <span>පිංවත් සාමාජික</span>`;
+    }
+  }
+
+  const bioEl = document.getElementById('memBio');
+  if (bioEl) bioEl.innerText = `"${member.bio || "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏"}"`;
+
+  const occEl = document.getElementById('memOccupationText');
+  const occWrap = document.getElementById('memMetaOccupation');
+  if (occEl && occWrap) {
+    if (member.occupation) {
+      occEl.innerText = member.occupation;
+      occWrap.style.display = 'inline-flex';
+    } else {
+      occWrap.style.display = 'none';
+    }
+  }
+
+  const locEl = document.getElementById('memLocationText');
+  const locWrap = document.getElementById('memMetaLocation');
+  if (locEl && locWrap) {
+    if (member.location) {
+      locEl.innerText = member.location;
+      locWrap.style.display = 'inline-flex';
+    } else {
+      locWrap.style.display = 'none';
+    }
+  }
+
+  const joinedEl = document.getElementById('memJoinedText');
+  if (joinedEl) joinedEl.innerText = `${member.joinedDate || '2026 ඔක්තෝබර්'} සිට සාමාජික`;
+
+  // Filter public posts for this member
+  const memberPosts = currentPostsData.filter(p => {
+    const matchUid = uid && p.uid && p.uid === uid;
+    const matchAuthor = (member.name && p.author === member.name) || (authorName && p.author === authorName);
+    return (matchUid || matchAuthor) && p.visibility !== 'private';
+  });
+
+  const totalSadhu = memberPosts.reduce((acc, p) => acc + (p.sadhuCount || 0), 0);
+  const totalPhotos = memberPosts.filter(p => p.image || (p.images && p.images.length > 0)).length;
+
+  const statMerits = document.getElementById('memStatMerits');
+  const statSadhu = document.getElementById('memStatSadhu');
+  const statPhotos = document.getElementById('memStatPhotos');
+  if (statMerits) statMerits.innerText = memberPosts.length;
+  if (statSadhu) statSadhu.innerText = totalSadhu;
+  if (statPhotos) statPhotos.innerText = totalPhotos;
+
+  const headingEl = document.getElementById('memTimelineHeading');
+  if (headingEl) headingEl.innerText = `${member.name || 'මෙම කල්‍යාණ මිත්‍රයා'} විසින් සිදුකළ පින්කම් (${memberPosts.length})`;
+
+  const feedEl = document.getElementById('memPostsFeed');
+  if (feedEl) {
+    if (memberPosts.length === 0) {
+      feedEl.innerHTML = `
+        <div style="text-align: center; padding: 40px 16px; background: #ffffff; border-radius: 12px; border: 1px dashed #cbd5e1;">
+          <i class="fa-solid fa-seedling" style="font-size: 2rem; color: #d97706; margin-bottom: 8px; display: block;"></i>
+          <p style="font-weight: 700; color: #1e293b; margin-bottom: 4px;">තවම ප්‍රසිද්ධ පින්කම් පළ කර නොමැත</p>
+          <p style="font-size: 0.76rem; color: #64748b;">මෙම කල්‍යාණ මිත්‍රයා විසින් ප්‍රසිද්ධ පින්කම් පළ කළ පසු ඒවා මෙහි දැකගත හැක.</p>
+        </div>
+      `;
+    } else {
+      feedEl.innerHTML = memberPosts.map(p => renderPostCardHTML(p, StorageService.currentUser)).join('');
+    }
+  }
+};
+
+window.closeMemberProfileModal = function() {
+  document.getElementById('memberProfileModal')?.classList.add('hidden');
+};
+
+window.closeMemberProfileOnBackdrop = function(e) {
+  if (e.target.id === 'memberProfileModal') {
+    closeMemberProfileModal();
+  }
+};
+
 // Tab Switching with History API integration
 window.switchTab = function(tab, pushHistory = true) {
   triggerHaptic(12);
+
+  // Auth guard: Guest users cannot access private profile or personal merit book
+  if ((tab === 'profile' || tab === 'mybook') && isGuestUser()) {
+    showAuthRequiredModal(tab === 'profile' ? 'ඔබගේ Profile එක බැලීමට' : 'පෞද්ගලික පිං පොත බැලීමට');
+    return;
+  }
+
   if (pushHistory && activeTab !== tab) {
     try {
       history.pushState({ type: 'tab', tab: tab }, '');
@@ -564,11 +766,11 @@ function renderPostCardHTML(post, user) {
       ${isRepost ? `
         <div class="repost-header-tag">
           <div style="display: flex; align-items: center; gap: 8px;">
-            <div class="repost-icon-circle">
+            <div class="repost-icon-circle" onclick="viewUserProfile('${post.uid}', '${Security.escapeHTML(post.author || '')}')" style="cursor: pointer;" title="${Security.escapeHTML(post.author || 'කල්‍යාණ මිත්‍ර')} ගේ Profile එක බලන්න">
               <i class="fa-solid fa-repeat"></i>
             </div>
             <div>
-              <span class="repost-actor-name"><strong>${Security.escapeHTML(post.author || 'කල්‍යාණ මිත්‍ර')}</strong> විසින් යළි බෙදාගන්නා ලදී</span>
+              <span class="repost-actor-name author-click-link" onclick="viewUserProfile('${post.uid}', '${Security.escapeHTML(post.author || '')}')" title="${Security.escapeHTML(post.author || 'කල්‍යාණ මිත්‍ර')} ගේ Profile එක බලන්න"><strong>${Security.escapeHTML(post.author || 'කල්‍යාණ මිත්‍ර')}</strong> විසින් යළි බෙදාගන්නා ලදී</span>
               <span class="repost-time">${Security.escapeHTML(formatRelativeTimeSinhala(post.timestamp, post.date || 'දැන්'))}</span>
             </div>
           </div>
@@ -596,9 +798,9 @@ function renderPostCardHTML(post, user) {
           <div class="quoted-merit-box" onclick="viewOriginalPost('${orig.id}', '${post.id}')" title="සම්පූර්ණ මුල් සටහන බලන්න ක්ලික් කරන්න">
             <div class="quoted-merit-header">
               <div style="display: flex; align-items: center; gap: 8px;">
-                <div class="quoted-avatar">${Security.escapeHTML((orig.author || 'ක').charAt(0))}</div>
+                <div class="quoted-avatar" onclick="event.stopPropagation(); viewUserProfile('${orig.uid}', '${Security.escapeHTML(orig.author || '')}')" style="cursor: pointer;" title="${Security.escapeHTML(orig.author || '')} ගේ Profile එක බලන්න">${Security.escapeHTML((orig.author || 'ක').charAt(0))}</div>
                 <div>
-                  <div style="font-weight: 700; font-size: 0.82rem; color: #78350f;">${Security.escapeHTML(orig.author || 'කල්‍යාණ මිත්‍ර')}</div>
+                  <div class="author-click-link" onclick="event.stopPropagation(); viewUserProfile('${orig.uid}', '${Security.escapeHTML(orig.author || '')}')" title="${Security.escapeHTML(orig.author || '')} ගේ Profile එක බලන්න" style="font-weight: 700; font-size: 0.82rem; color: #78350f;">${Security.escapeHTML(orig.author || 'කල්‍යාණ මිත්‍ර')}</div>
                   <div style="font-size: 0.68rem; color: #94a3b8;">${Security.escapeHTML(formatRelativeTimeSinhala(orig.timestamp, orig.date || 'මෑතකදී'))} ${orig.location ? '• ' + Security.escapeHTML(orig.location) : ''}</div>
                 </div>
               </div>
@@ -622,12 +824,12 @@ function renderPostCardHTML(post, user) {
         <!-- Standard Post Header -->
         <div class="post-header">
           <div class="post-author-info">
-            <div class="post-avatar ${isNeed ? 'need' : ''}">
-              ${Security.escapeHTML((post.author || 'ක').charAt(0))}
+            <div class="post-avatar ${isNeed ? 'need' : ''}" onclick="viewUserProfile('${post.uid}', '${Security.escapeHTML(post.author || '')}')" style="cursor: pointer;" title="${Security.escapeHTML(post.author || 'කල්‍යාණ මිත්‍ර')} ගේ Profile එක බලන්න">
+              ${post.authorPhoto ? `<img src="${Security.sanitizeUrl(post.authorPhoto)}" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover;">` : Security.escapeHTML((post.author || 'ක').charAt(0))}
             </div>
             <div>
               <div class="post-badges-wrap">
-                <span class="post-author-name">${Security.escapeHTML(post.author || 'කල්‍යාණ මිත්‍ර')}</span>
+                <span class="post-author-name author-click-link" onclick="viewUserProfile('${post.uid}', '${Security.escapeHTML(post.author || '')}')" style="cursor: pointer;" title="${Security.escapeHTML(post.author || 'කල්‍යාණ මිත්‍ර')} ගේ Profile එක බලන්න">${Security.escapeHTML(post.author || 'කල්‍යාණ මිත්‍ර')}</span>
                 ${(post.authorRole === 'admin' || post.isOfficial || (post.authorEmail && post.authorEmail.toLowerCase() === 'silvadilan9@gmail.com')) ? `
                   <span class="official-author-badge" title="Verified Master Admin"><i class="fa-solid fa-crown"></i> Master Admin</span>
                 ` : ''}
@@ -761,10 +963,10 @@ function renderPostCardHTML(post, user) {
         <div class="comments-list" id="comments-list-${post.id}">
           ${comments.map(c => `
             <div class="comment-bubble">
-              <div class="comment-avatar">${Security.escapeHTML((c.author || 'ක').charAt(0))}</div>
+              <div class="comment-avatar" onclick="viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(c.author || '')}')" style="cursor: pointer;" title="${Security.escapeHTML(c.author || 'කල්‍යාණ මිත්‍ර')} ගේ Profile එක බලන්න">${Security.escapeHTML((c.author || 'ක').charAt(0))}</div>
               <div class="comment-text-box">
                 <div class="comment-author-row">
-                  <span>${Security.escapeHTML(c.author || 'කල්‍යාණ මිත්‍ර')}</span>
+                  <span class="author-click-link" onclick="viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(c.author || '')}')" style="cursor: pointer; font-weight: 700; color: #1e293b;" title="${Security.escapeHTML(c.author || 'කල්‍යාණ මිත්‍ර')} ගේ Profile එක බලන්න">${Security.escapeHTML(c.author || 'කල්‍යාණ මිත්‍ර')}</span>
                   <span class="comment-time">${Security.escapeHTML(formatRelativeTimeSinhala(c.timestamp, c.time || 'දැන්'))}</span>
                 </div>
                 <div class="comment-body">${Security.escapeHTML(c.text)}</div>
@@ -900,6 +1102,11 @@ function triggerSadhuFloatingAnimation(btnElement) {
 
 // Global actions exposed to HTML
 window.handleSadhuClick = async function(postId, btnElement) {
+  if (isGuestUser()) {
+    showAuthRequiredModal('සාදුකාර ලබා දීමට');
+    return;
+  }
+
   try {
     const res = await StorageService.giveSadhu(postId);
 
@@ -955,6 +1162,11 @@ window.toggleCommentsSection = function(postId) {
 };
 
 window.submitQuickBlessing = async function(postId, text) {
+  if (isGuestUser()) {
+    showAuthRequiredModal('ප්‍රාර්ථනා / ආශිර්වාද එක් කිරීමට');
+    return;
+  }
+
   try {
     const box = document.getElementById(`comments-box-${postId}`);
     if (box) box.style.display = 'block';
@@ -974,6 +1186,11 @@ window.submitQuickBlessing = async function(postId, text) {
 
 window.handleCommentSubmit = async function(event, postId) {
   event.preventDefault();
+  if (isGuestUser()) {
+    showAuthRequiredModal('ප්‍රාර්ථනා සටහන් කිරීමට');
+    return;
+  }
+
   const input = document.getElementById(`comment-input-${postId}`);
   if (!input) return;
 
@@ -1100,6 +1317,11 @@ window.deletePostPrompt = async function(postId) {
 };
 
 window.handleShare = async function(postId) {
+  if (isGuestUser()) {
+    showAuthRequiredModal('පින්කම් පිටතට බෙදා ගැනීමට (Share)');
+    return;
+  }
+
   SoundService.playShare();
   triggerHaptic(25);
 
@@ -1229,6 +1451,11 @@ function checkUrlDirectPost() {
 
 // Modal & Form Handling
 window.openModal = function(type = 'merit', triggerPhoto = false) {
+  if (isGuestUser()) {
+    showAuthRequiredModal('නව පින්කමක් හෝ සටහනක් පළ කිරීමට');
+    return;
+  }
+
   try {
     history.pushState({ type: 'modal', id: 'postModal' }, '');
   } catch (e) {}
@@ -1260,6 +1487,11 @@ window.openModal = function(type = 'merit', triggerPhoto = false) {
 };
 
 window.openPrivateMeritComposer = function() {
+  if (isGuestUser()) {
+    showAuthRequiredModal('පෞද්ගලික පිං පොත භාවිතා කිරීමට');
+    return;
+  }
+
   window.openModal('merit');
   const visSelect = document.getElementById('postVisibility');
   if (visSelect) {
@@ -1951,8 +2183,10 @@ function setupEventListeners() {
 
     if (res && res.success) {
       closeProfileModal();
+      closeAuthRequiredModal();
       updateUserInfoUI();
       if (activeTab === 'profile') renderProfileView();
+      checkAndPromptMandatoryName();
     } else if (res && !res.success && !res.cancelled && res.message && res.code !== 'auth/popup-closed-by-user') {
       if (alertBox) {
         alertBox.classList.remove('hidden');
@@ -1967,6 +2201,48 @@ function setupEventListeners() {
         `;
       }
     }
+  });
+
+  document.getElementById('authGuardLoginBtn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('authGuardLoginBtn');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>සම්බන්ධ වෙමින් පවතී...</span>`;
+    }
+
+    const res = await StorageService.loginWithGoogle();
+
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<i class="fa-brands fa-google" style="color: #ea4335; font-size: 1.1rem;"></i> <span>Google ගිණුමෙන් Login වන්න</span>`;
+    }
+
+    if (res && res.success) {
+      closeAuthRequiredModal();
+      closeProfileModal();
+      updateUserInfoUI();
+      if (activeTab === 'profile') renderProfileView();
+      checkAndPromptMandatoryName();
+    } else if (res && !res.success && !res.cancelled && res.message && res.code !== 'auth/popup-closed-by-user') {
+      alert(res.message);
+    }
+  });
+
+  document.getElementById('mandatoryNameForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fName = (document.getElementById('mandatoryFirstNameInput')?.value || '').trim();
+    const lName = (document.getElementById('mandatoryLastNameInput')?.value || '').trim();
+    if (!fName || fName.length < 2) {
+      alert('කරුණාකර ඔබගේ නම (First Name) ඇතුළත් කරන්න.');
+      return;
+    }
+    const fullName = `${fName} ${lName}`.trim();
+    await StorageService.updateProfile({ firstName: fName, lastName: lName, name: fullName });
+    closeMandatoryNameModal();
+    updateUserInfoUI();
+    if (activeTab === 'profile') renderProfileView();
+    triggerHaptic([25, 50, 25]);
+    SoundService.playSadhu();
   });
 
   document.getElementById('googleLogoutBtn')?.addEventListener('click', async () => {
@@ -3122,6 +3398,11 @@ let currentRepostTargetId = null;
 let currentRepostTargetPost = null;
 
 window.openRepostModal = function(postId) {
+  if (isGuestUser()) {
+    showAuthRequiredModal('පින්කම් යළි බෙදා ගැනීමට (Repost)');
+    return;
+  }
+
   try {
     history.pushState({ type: 'modal', id: 'repostModal' }, '');
   } catch (e) {}

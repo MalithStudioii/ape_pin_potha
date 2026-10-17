@@ -4215,6 +4215,238 @@ html, body {
   background: #f0fdf4;
 }
 
+/* ==========================================================================
+   Clickable Author Profile Links (Facebook-style)
+   ========================================================================== */
+.author-click-link {
+  cursor: pointer !important;
+  transition: color 0.15s ease, text-decoration 0.15s ease;
+}
+
+.author-click-link:hover {
+  color: #b45309 !important;
+  text-decoration: underline;
+}
+
+.post-avatar,
+.quoted-avatar,
+.repost-icon-circle,
+.comment-avatar {
+  cursor: pointer !important;
+  transition: transform 0.18s cubic-bezier(0.2, 0, 0.2, 1), box-shadow 0.18s ease;
+}
+
+.post-avatar:hover,
+.quoted-avatar:hover,
+.repost-icon-circle:hover,
+.comment-avatar:hover {
+  transform: scale(1.08);
+  box-shadow: 0 4px 10px rgba(217, 119, 6, 0.25);
+}
+
+/* ==========================================================================
+   Facebook-Style Member Profile Modal View
+   ========================================================================== */
+.member-profile-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.22);
+  overflow: hidden !important;
+}
+
+.member-profile-header {
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  position: relative;
+}
+
+.member-profile-cover {
+  width: 100%;
+  height: 200px;
+  position: relative;
+  background: #1e293b;
+  overflow: hidden;
+}
+
+.member-profile-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.member-modal-close-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(6px);
+  color: #ffffff;
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+  z-index: 20;
+}
+
+.member-modal-close-btn:hover {
+  background: rgba(0, 0, 0, 0.9);
+  transform: scale(1.08);
+}
+
+.member-profile-intro {
+  padding: 0 22px 14px;
+  display: flex;
+  gap: 16px;
+  position: relative;
+}
+
+.member-avatar-ring {
+  width: 98px;
+  height: 98px;
+  border-radius: 50%;
+  border: 4px solid #ffffff;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #ffffff;
+  font-size: 2.3rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: -49px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
+  overflow: hidden;
+  flex-shrink: 0;
+  user-select: none;
+  z-index: 5;
+}
+
+.member-avatar-ring img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.member-info-col {
+  flex: 1;
+  padding-top: 8px;
+}
+
+.member-name-text {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.member-bio-text {
+  font-size: 0.82rem;
+  color: #475569;
+  margin: 5px 0 8px;
+  font-style: italic;
+  line-height: 1.45;
+}
+
+.member-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 0.74rem;
+  color: #64748b;
+}
+
+.member-meta-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.member-stats-bar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 12px 22px;
+  background: #f8fafc;
+  border-top: 1px solid #f1f5f9;
+}
+
+.member-stat-box {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 8px 12px;
+  text-align: center;
+}
+
+.member-stat-box .stat-num {
+  font-size: 1.18rem;
+  font-weight: 700;
+  color: #1e293b;
+  display: block;
+}
+
+.member-stat-box .stat-lbl {
+  font-size: 0.7rem;
+  color: #64748b;
+  margin-top: 2px;
+  display: block;
+}
+
+.member-section-heading {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #78350f;
+  margin: 0 0 14px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.member-timeline-wrapper {
+  padding: 18px 20px 24px;
+}
+
+.member-posts-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (max-width: 640px) {
+  .member-profile-cover {
+    height: 140px;
+  }
+  .member-avatar-ring {
+    width: 76px;
+    height: 76px;
+    font-size: 1.8rem;
+    margin-top: -38px;
+  }
+  .member-name-text {
+    font-size: 1.1rem;
+  }
+  .member-profile-intro {
+    padding: 0 14px 12px;
+    gap: 12px;
+  }
+  .member-stats-bar {
+    padding: 10px 14px;
+    gap: 6px;
+  }
+  .member-timeline-wrapper {
+    padding: 14px 12px 20px;
+  }
+}
+
+
 
 
 

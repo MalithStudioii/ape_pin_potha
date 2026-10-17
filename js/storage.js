@@ -187,61 +187,8 @@ export const StorageService = {
         isCloudReady = true;
 
         // Listen for Auth changes
-        onAuthStateChanged(auth, (user) => {
-          let savedProfile = {};
-          try {
-            const raw = localStorage.getItem('pinPotha_currentUser');
-            if (raw) savedProfile = JSON.parse(raw);
-          } catch(e) {}
-
-          let userCover = savedProfile.coverImage;
-          if (!userCover || userCover.includes('photo-1548013146-72479768bada') || userCover.includes('photo-1582510003544-4d00b7f74220')) {
-            userCover = "assets/banner.jpg";
-          }
-
-          const rawName = (savedProfile.name || (user ? user.displayName : '') || '').trim();
-          const nameParts = rawName ? rawName.split(' ') : [];
-          const fName = savedProfile.firstName || (nameParts.length > 0 ? nameParts[0] : (user ? "කල්‍යාණ" : "අමුත්තා"));
-          const lName = savedProfile.lastName || (nameParts.length > 1 ? nameParts.slice(1).join(' ') : "");
-          const fullName = savedProfile.name || `${fName} ${lName}`.trim() || (user ? "කල්‍යාණ මිත්‍ර" : "අමුත්තා");
-
-          if (user) {
-            const isMaster = (user.email || '').trim().toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase();
-            this.currentUser = {
-              uid: user.uid,
-              firstName: fName,
-              lastName: lName,
-              name: fullName,
-              email: user.email,
-              isAdmin: isMaster,
-              photo: savedProfile.photo || user.photoURL || null,
-              bio: savedProfile.bio || "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏",
-              location: savedProfile.location || "",
-              occupation: savedProfile.occupation || "",
-              coverImage: userCover,
-              joinedDate: savedProfile.joinedDate || "2026 ඔක්තෝබර්",
-              isAnonymous: false
-            };
-          } else {
-            this.currentUser = {
-              uid: "user_guest_" + Math.random().toString(36).substring(2, 7),
-              firstName: fName || "අමුත්තා",
-              lastName: lName || "",
-              name: fullName || "අමුත්තා",
-              photo: savedProfile.photo || null,
-              email: null,
-              isAdmin: false,
-              bio: savedProfile.bio || "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏",
-              location: savedProfile.location || "",
-              occupation: savedProfile.occupation || "",
-              coverImage: userCover,
-              joinedDate: savedProfile.joinedDate || "2026 ඔක්තෝබර්",
-              isAnonymous: true
-            };
-          }
-          localStorage.setItem('pinPotha_currentUser', JSON.stringify(this.currentUser));
-          this.notifyListeners();
-          this.notifyNotificationListeners();
+        onAuthStateChanged(auth, async (user) => {
+          await this.restoreUserProfile(user);
         });
 
         // Real-time Firestore Feed Subscription
@@ -1200,9 +1147,211 @@ export const StorageService = {
   },
 
   /**
+   * Restore and auto-fill user profile upon login or auth state change
+   */
+  async restoreUserProfile(user) {
+    if (!user) {
+      this.currentUser = {
+        uid: "user_guest_" + Math.random().toString(36).substring(2, 7),
+        firstName: "අමුත්තා",
+        lastName: "",
+        name: "අමුත්තා",
+        photo: null,
+        email: null,
+        isAdmin: false,
+        bio: "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏",
+        location: "",
+        occupation: "",
+        coverImage: "assets/banner.jpg",
+        joinedDate: "2026 ඔක්තෝබර්",
+        isAnonymous: true,
+        needsNameConfirmation: false
+      };
+      localStorage.setItem('pinPotha_currentUser', JSON.stringify(this.currentUser));
+      this.notifyListeners();
+      this.notifyNotificationListeners();
+      return this.currentUser;
+    }
+
+    // 1. Check local profile cached by UID
+    let savedProfile = {};
+    try {
+      const rawUid = localStorage.getItem('pinPotha_profile_' + user.uid);
+      if (rawUid) savedProfile = JSON.parse(rawUid);
+    } catch (e) {}
+
+    // 2. Check local profile cached by Email
+    if ((!savedProfile.name || savedProfile.name === 'අමුත්තා') && user.email) {
+      try {
+        const lastSavedName = localStorage.getItem('pinPotha_last_user_name_' + user.email.toLowerCase());
+        if (lastSavedName) {
+          savedProfile.name = lastSavedName;
+        }
+      } catch (e) {}
+    }
+
+    // 3. Check current user cache
+    if (!savedProfile.name || savedProfile.name === 'අමුත්තා') {
+      try {
+        const rawCurr = localStorage.getItem('pinPotha_currentUser');
+        if (rawCurr) {
+          const parsed = JSON.parse(rawCurr);
+          if (parsed && parsed.email === user.email && parsed.name && parsed.name !== 'අමුත්තා') {
+            savedProfile = { ...savedProfile, ...parsed };
+          }
+        }
+      } catch (e) {}
+    }
+
+    let userCover = savedProfile.coverImage;
+    if (!userCover || userCover.includes('photo-1548013146-72479768bada') || userCover.includes('photo-1582510003544-4d00b7f74220')) {
+      userCover = "assets/banner.jpg";
+    }
+
+    // Resolve user's confirmed name
+    let confirmedName = (savedProfile.name || '').trim();
+    if (!confirmedName || confirmedName === 'අමුත්තා') {
+      confirmedName = (user.displayName || '').trim();
+    }
+    const nameParts = confirmedName ? confirmedName.split(' ') : [];
+    const fName = savedProfile.firstName || (nameParts.length > 0 ? nameParts[0] : "");
+    const lName = savedProfile.lastName || (nameParts.length > 1 ? nameParts.slice(1).join(' ') : "");
+    const fullName = confirmedName || `${fName} ${lName}`.trim() || "";
+
+    const isMaster = (user.email || '').trim().toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase();
+
+    this.currentUser = {
+      uid: user.uid,
+      firstName: fName,
+      lastName: lName,
+      name: fullName || (user.displayName || "කල්‍යාණ මිත්‍ර"),
+      email: user.email,
+      isAdmin: isMaster,
+      photo: savedProfile.photo || user.photoURL || null,
+      bio: savedProfile.bio || "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏",
+      location: savedProfile.location || "",
+      occupation: savedProfile.occupation || "",
+      coverImage: userCover,
+      joinedDate: savedProfile.joinedDate || "2026 ඔක්තෝබර්",
+      isAnonymous: false,
+      needsNameConfirmation: (!fullName || fullName === 'අමුත්තා' || fullName.length < 2)
+    };
+
+    localStorage.setItem('pinPotha_currentUser', JSON.stringify(this.currentUser));
+    localStorage.setItem('pinPotha_profile_' + user.uid, JSON.stringify(this.currentUser));
+    if (user.email && this.currentUser.name && this.currentUser.name !== 'අමුත්තා') {
+      localStorage.setItem('pinPotha_last_user_name_' + user.email.toLowerCase(), this.currentUser.name);
+    }
+    this.notifyListeners();
+    this.notifyNotificationListeners();
+
+    // 4. Asynchronously query Firestore users collection to get latest cloud profile and sync
+    if (isCloudReady && db) {
+      try {
+        const { doc, getDoc, setDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const userDocRef = doc(db, COLLECTIONS.USERS, user.uid);
+        const snap = await getDoc(userDocRef);
+        if (snap.exists()) {
+          const cloudData = snap.data();
+          if (cloudData.name && cloudData.name !== 'අමුත්තා') {
+            this.currentUser.name = cloudData.name;
+            this.currentUser.firstName = cloudData.firstName || cloudData.name.split(' ')[0] || '';
+            this.currentUser.lastName = cloudData.lastName || cloudData.name.split(' ').slice(1).join(' ') || '';
+            this.currentUser.needsNameConfirmation = false;
+          }
+          if (cloudData.photo) this.currentUser.photo = cloudData.photo;
+          if (cloudData.coverImage) this.currentUser.coverImage = cloudData.coverImage;
+          if (cloudData.bio) this.currentUser.bio = cloudData.bio;
+          if (cloudData.location) this.currentUser.location = cloudData.location;
+          if (cloudData.occupation) this.currentUser.occupation = cloudData.occupation;
+          if (cloudData.joinedDate) this.currentUser.joinedDate = cloudData.joinedDate;
+
+          localStorage.setItem('pinPotha_currentUser', JSON.stringify(this.currentUser));
+          localStorage.setItem('pinPotha_profile_' + user.uid, JSON.stringify(this.currentUser));
+          if (user.email) {
+            localStorage.setItem('pinPotha_last_user_name_' + user.email.toLowerCase(), this.currentUser.name);
+          }
+          this.notifyListeners();
+          this.notifyNotificationListeners();
+        } else if (this.currentUser.name && this.currentUser.name !== 'අමුත්තා') {
+          // Sync existing initial data to cloud
+          await setDoc(userDocRef, {
+            uid: this.currentUser.uid,
+            name: this.currentUser.name,
+            firstName: this.currentUser.firstName,
+            lastName: this.currentUser.lastName,
+            email: this.currentUser.email,
+            photo: this.currentUser.photo,
+            coverImage: this.currentUser.coverImage,
+            bio: this.currentUser.bio,
+            location: this.currentUser.location,
+            occupation: this.currentUser.occupation,
+            joinedDate: this.currentUser.joinedDate,
+            updatedAt: Date.now()
+          }, { merge: true });
+        }
+      } catch (err) {
+        console.warn('[Storage] Background Firestore user fetch error:', err);
+      }
+    }
+
+    return this.currentUser;
+  },
+
+  /**
+   * Fetch a member's public profile by UID (from cache, cloud Firestore, or post fallback)
+   */
+  async getUserProfile(uid) {
+    if (!uid) return null;
+    if (this.currentUser && this.currentUser.uid === uid) {
+      return this.currentUser;
+    }
+
+    // 1. Check local cache
+    try {
+      const raw = localStorage.getItem('pinPotha_profile_' + uid);
+      if (raw) return JSON.parse(raw);
+    } catch (e) {}
+
+    // 2. Check Firestore
+    if (isCloudReady && db) {
+      try {
+        const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const snap = await getDoc(doc(db, COLLECTIONS.USERS, uid));
+        if (snap.exists()) {
+          const data = snap.data();
+          localStorage.setItem('pinPotha_profile_' + uid, JSON.stringify(data));
+          return data;
+        }
+      } catch (e) {
+        console.warn('[Storage] Cloud getUserProfile warning:', e);
+      }
+    }
+
+    // 3. Fallback: derive from existing posts in memory
+    const allPosts = this.getLocalPosts();
+    const userPost = allPosts.find(p => p.uid === uid);
+    if (userPost) {
+      return {
+        uid: userPost.uid,
+        name: userPost.author || 'කල්‍යාණ මිත්‍ර',
+        photo: userPost.authorPhoto || null,
+        coverImage: userPost.authorCover || 'assets/banner.jpg',
+        bio: "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏",
+        location: userPost.location || '',
+        occupation: '',
+        joinedDate: '2026 ඔක්තෝබර්',
+        isAdmin: userPost.authorRole === 'admin'
+      };
+    }
+
+    return null;
+  },
+
+  /**
    * Update full user profile details (First & Last Name, Occupation, Location/Address, Bio, Photo, Cover Image)
    */
-  updateProfile({ firstName, lastName, name, bio, location, occupation, coverImage, photo }) {
+  async updateProfile({ firstName, lastName, name, bio, location, occupation, coverImage, photo }) {
     if (firstName !== undefined || lastName !== undefined) {
       if (firstName !== undefined) {
         this.currentUser.firstName = Security.escapeHTML(Security.sanitizeText(firstName.trim()));
@@ -1234,8 +1383,46 @@ export const StorageService = {
       this.currentUser.photo = photo;
     }
 
+    this.currentUser.needsNameConfirmation = false;
+
+    // Cache locally
     localStorage.setItem('pinPotha_currentUser', JSON.stringify(this.currentUser));
+    if (this.currentUser.uid) {
+      localStorage.setItem('pinPotha_profile_' + this.currentUser.uid, JSON.stringify(this.currentUser));
+    }
+    if (this.currentUser.email && this.currentUser.name && this.currentUser.name !== 'අමුත්තා') {
+      localStorage.setItem('pinPotha_last_user_name_' + this.currentUser.email.toLowerCase(), this.currentUser.name);
+    }
+
+    // Sync with Firestore collection 'users'
+    if (isCloudReady && db && this.currentUser.uid && !this.currentUser.isAnonymous) {
+      try {
+        const { doc, setDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        await setDoc(doc(db, COLLECTIONS.USERS, this.currentUser.uid), {
+          uid: this.currentUser.uid,
+          name: this.currentUser.name,
+          firstName: this.currentUser.firstName || '',
+          lastName: this.currentUser.lastName || '',
+          email: this.currentUser.email || null,
+          photo: this.currentUser.photo || null,
+          coverImage: this.currentUser.coverImage || 'assets/banner.jpg',
+          bio: this.currentUser.bio || '',
+          location: this.currentUser.location || '',
+          occupation: this.currentUser.occupation || '',
+          joinedDate: this.currentUser.joinedDate || '2026 ඔක්තෝබර්',
+          updatedAt: Date.now()
+        }, { merge: true });
+      } catch (e) {
+        console.warn('[Firestore] Failed to save user profile to cloud:', e);
+      }
+    }
+
     this.notifyListeners();
+    return this.currentUser;
+  },
+
+  setUserName(name) {
+    return this.updateProfile({ name });
   },
 
   /**
@@ -1252,6 +1439,10 @@ export const StorageService = {
       const { GoogleAuthProvider, signInWithPopup } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js');
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
+      
+      // Auto-restore saved profile and populate previous name
+      await this.restoreUserProfile(result.user);
+
       return { success: true, user: result.user };
     } catch (err) {
       console.warn('[Auth] Google Sign-In error:', err);
@@ -1292,10 +1483,14 @@ export const StorageService = {
     }
     this.currentUser = {
       uid: "user_guest_" + Math.random().toString(36).substring(2, 7),
+      firstName: "අමුත්තා",
+      lastName: "",
       name: "අමුත්තා",
       photo: null,
       email: null,
-      isAnonymous: true
+      isAdmin: false,
+      isAnonymous: true,
+      needsNameConfirmation: false
     };
     localStorage.setItem('pinPotha_currentUser', JSON.stringify(this.currentUser));
     this.notifyListeners();
