@@ -949,8 +949,8 @@ export const StorageService = {
       category: origCategory,
       location: originalData.location || '',
       description: finalDesc,
-      image: origImage,
-      images: origImages,
+      image: null,
+      images: [],
       timestamp: Date.now(),
       date: "දැන්",
       sadhuCount: 1,
@@ -966,8 +966,7 @@ export const StorageService = {
         description: String(originalData.description || original.description || ''),
         category: String(originalData.category || 'දානමය'),
         location: String(originalData.location || ''),
-        image: origImage,
-        images: origImages,
+        image: origImage, // Single image preview only
         date: String(originalData.date || 'මෑතකදී'),
         timestamp: originalData.timestamp || original.timestamp || Date.now()
       }
@@ -987,7 +986,7 @@ export const StorageService = {
           repostCount: increment(1)
         });
       } catch (e) {
-        console.warn('Failed to increment repost count in Firestore', e);
+        console.warn('Failed to increment repost count on original doc in Firestore (ignored):', e);
       }
     } else {
       const posts = this.getLocalPosts();

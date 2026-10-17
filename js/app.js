@@ -4,10 +4,10 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=31';
-import { Security } from './security.js?v=31';
-import { uploadToImgBB } from './imgbb-service.js?v=31';
-import { SoundService, triggerHaptic } from './sound.js?v=31';
+import { StorageService } from './storage.js?v=32';
+import { Security } from './security.js?v=32';
+import { uploadToImgBB } from './imgbb-service.js?v=32';
+import { SoundService, triggerHaptic } from './sound.js?v=32';
 
 window.SoundService = SoundService;
 window.triggerHaptic = triggerHaptic;
@@ -1259,6 +1259,33 @@ window.openModal = function(type = 'merit', triggerPhoto = false) {
   }
 };
 
+window.openPrivateMeritComposer = function() {
+  window.openModal('merit');
+  const visSelect = document.getElementById('postVisibility');
+  if (visSelect) {
+    visSelect.value = 'private';
+  }
+};
+
+window.viewCoverPhoto = function(e) {
+  if (e) e.stopPropagation();
+  const coverImg = document.getElementById('profileCoverImg');
+  const src = coverImg ? (coverImg.getAttribute('src') || coverImg.src) : null;
+  if (src && !src.includes('data:image/svg+xml')) {
+    window.openLightbox([src], 0);
+  }
+};
+
+window.viewProfilePhoto = function(e) {
+  if (e) e.stopPropagation();
+  const user = StorageService.currentUser || {};
+  if (user.photo) {
+    window.openLightbox([user.photo], 0);
+  } else {
+    document.getElementById('editProfPhotoFileInput')?.click();
+  }
+};
+
 window.closeModal = function() {
   const modal = document.getElementById('postModal');
   if (modal) modal.classList.add('hidden');
@@ -1432,15 +1459,25 @@ function compressSingleImageFile(file) {
       const img = new Image();
       img.onload = function() {
         const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 900;
-        const scaleSize = MAX_WIDTH / img.width;
-        canvas.width = img.width > MAX_WIDTH ? MAX_WIDTH : img.width;
-        canvas.height = img.width > MAX_WIDTH ? (img.height * scaleSize) : img.height;
+        const MAX_DIM = 800;
+        let w = img.width;
+        let h = img.height;
+        if (w > MAX_DIM || h > MAX_DIM) {
+          if (w > h) {
+            h = Math.round((h * MAX_DIM) / w);
+            w = MAX_DIM;
+          } else {
+            w = Math.round((w * MAX_DIM) / h);
+            h = MAX_DIM;
+          }
+        }
+        canvas.width = w;
+        canvas.height = h;
 
         const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, w, h);
 
-        const webpData = canvas.toDataURL('image/webp', 0.72);
+        const webpData = canvas.toDataURL('image/webp', 0.65);
         resolve(webpData);
       };
       img.onerror = () => resolve(null);
@@ -2316,12 +2353,15 @@ function renderProfileSubTabContent(user, myPosts, myPhotosPosts, myPrivatePosts
 
     if (myPrivatePosts.length === 0) {
       privateContainer.innerHTML = `
-        <div class="card" style="padding: 44px 20px; text-align: center;">
-          <i class="fa-solid fa-lock" style="font-size: 2.2rem; color: #d97706; margin-bottom: 12px; opacity: 0.7;"></i>
+        <div class="card" style="padding: 38px 20px; text-align: center;">
+          <i class="fa-solid fa-book-bookmark" style="font-size: 2.2rem; color: #d97706; margin-bottom: 12px; opacity: 0.8;"></i>
           <h3 style="font-size: 1rem; font-weight: 700; color: #334155;">පෞද්ගලික සටහන් කිසිවක් නැත</h3>
-          <p style="font-size: 0.78rem; color: #94a3b8; margin-top: 4px;">
-            පින්කමක් පළ කරන විට Visibility එක "🔒 මට පමණයි (Private)" තෝරා රහසිගතව සුරැකිය හැක.
+          <p style="font-size: 0.8rem; color: #64748b; margin-top: 6px; max-width: 480px; margin-left: auto; margin-right: auto;">
+            දෛනික Checklist එක Auto-Log කිරීමෙන් හෝ ඔබට පමණක් බලා ගැනීමට අවශ්‍ය ඔබ සිදුකළ විශේෂ පින්කම් මෙහි සටහන් කරගත හැක.
           </p>
+          <button type="button" class="btn btn-primary" onclick="openPrivateMeritComposer()" style="margin-top: 16px; padding: 9px 20px; font-size: 0.84rem; font-weight: 700; border-radius: 10px; display: inline-flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-plus"></i> වෙනත් පින්කමක් සටහන් කරන්න
+          </button>
         </div>
       `;
     } else {
@@ -3148,6 +3188,40 @@ window.addRepostChip = function(text) {
   }
 };
 
+function createFastThumbnail(dataUrl, maxDim = 420, quality = 0.55) {
+  if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image')) {
+    return Promise.resolve(dataUrl);
+  }
+  return new Promise((resolve) => {
+    try {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let w = img.width;
+        let h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) {
+            h = Math.round((h * maxDim) / w);
+            w = maxDim;
+          } else {
+            w = Math.round((w * maxDim) / h);
+            h = maxDim;
+          }
+        }
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/webp', quality));
+      };
+      img.onerror = () => resolve(dataUrl);
+      img.src = dataUrl;
+    } catch (e) {
+      resolve(dataUrl);
+    }
+  });
+}
+
 window.submitRepost = async function() {
   if (!currentRepostTargetId) return;
   const commentInput = document.getElementById('repostCommentInput');
@@ -3160,7 +3234,26 @@ window.submitRepost = async function() {
   }
 
   try {
-    await StorageService.repostPost(currentRepostTargetId, comment, currentRepostTargetPost);
+    let postToPass = currentRepostTargetPost;
+    if (postToPass) {
+      const orig = postToPass.originalPost || postToPass;
+      const rawImg = orig.image || (orig.images && orig.images[0]);
+      if (rawImg && typeof rawImg === 'string' && rawImg.startsWith('data:image')) {
+        const thumb = await createFastThumbnail(rawImg, 420, 0.55);
+        postToPass = {
+          ...postToPass,
+          image: thumb,
+          images: [thumb],
+          originalPost: postToPass.originalPost ? {
+            ...postToPass.originalPost,
+            image: thumb,
+            images: [thumb]
+          } : undefined
+        };
+      }
+    }
+
+    await StorageService.repostPost(currentRepostTargetId, comment, postToPass);
     SoundService.playRepost();
     triggerHaptic([20, 40, 20]);
 

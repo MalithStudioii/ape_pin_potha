@@ -36,7 +36,7 @@
     <meta name="twitter:image" content="assets/banner.jpg">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=31">
+    <link rel="stylesheet" href="css/styles.css?v=32">
 </head>
 <body>
 
@@ -343,9 +343,9 @@
     <div id="profilePageContainer" class="profile-page-container hidden" style="display: none;">
         <div class="profile-header-wrapper">
             <!-- Cover Photo Area -->
-            <div class="profile-cover-banner" id="profileCoverBanner">
+            <div class="profile-cover-banner" id="profileCoverBanner" onclick="viewCoverPhoto(event)" title="කවරයේ ඡායාරූපය බලන්න (Click to view full cover)">
                 <img id="profileCoverImg" src="assets/banner.jpg" alt="Cover Photo">
-                <button onclick="openCoverModal()" class="btn-edit-cover" title="කවරයේ ඡායාරූපය වෙනස් කරන්න">
+                <button onclick="event.stopPropagation(); openCoverModal()" class="btn-edit-cover" title="කවරයේ ඡායාරූපය වෙනස් කරන්න">
                     <i class="fa-solid fa-camera"></i>
                     <span>කවරය වෙනස් කරන්න</span>
                 </button>
@@ -354,10 +354,10 @@
             <!-- Profile Info Bar (Avatar, Name, Actions) -->
             <div class="profile-intro-bar">
                 <div class="profile-avatar-outer">
-                    <div class="profile-avatar-img-wrap" id="profAvatarWrap">
+                    <div class="profile-avatar-img-wrap" id="profAvatarWrap" onclick="viewProfilePhoto(event)" title="පැතිකඩ ඡායාරූපය බලන්න (Click to view full photo)">
                         <!-- Injected by app.js: img or first letter -->
                     </div>
-                    <button class="avatar-camera-btn" onclick="document.getElementById('editProfPhotoFileInput').click()" title="ඡායාරූපය වෙනස් කර කපන්න">
+                    <button class="avatar-camera-btn" onclick="event.stopPropagation(); document.getElementById('editProfPhotoFileInput').click()" title="ඡායාරූපය වෙනස් කර කපන්න">
                         <i class="fa-solid fa-camera"></i>
                     </button>
                 </div>
@@ -539,7 +539,7 @@
                 <div id="subTabPrivateView" class="hidden">
                     <div class="context-banner mybook" style="margin-bottom: 16px;">
                         <h2>🔒 පෞද්ගලික පිං පොත (Private Merits)</h2>
-                        <p>ඔබට පමණක් පෙනෙන, ඔබ සිදුකළ රහසිගත කුසල කර්මයන් සහ භාවනා සටහන් මෙහි සුරක්ෂිතව ඇත.</p>
+                        <p>ඔබට පමණක් බලා ගැනීමට අවශ්‍ය, ඔබ සිදුකළ කුසල කර්මයන් සහ භාවනා සටහන් මෙහි සුරක්ෂිතව ඇත.</p>
                     </div>
 
                     <!-- Daily Merit Checklist Card -->
@@ -576,9 +576,13 @@
 
                         <!-- Action Buttons -->
                         <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-                            <button type="button" onclick="autoLogDailyChecklist()" id="btnAutoLogChecklist" class="btn btn-primary" style="flex: 1; padding: 10px 16px; font-weight: 700; font-size: 0.82rem; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 10px;">
+                            <button type="button" onclick="autoLogDailyChecklist()" id="btnAutoLogChecklist" class="btn btn-primary" style="flex: 1; min-width: 200px; padding: 10px 16px; font-weight: 700; font-size: 0.82rem; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 10px;">
                                 <i class="fa-solid fa-book-bookmark"></i>
                                 <span>මගේ පිං පොතට Auto-Log කරන්න</span>
+                            </button>
+                            <button type="button" onclick="openPrivateMeritComposer()" class="composer-action-btn" style="padding: 10px 14px; font-size: 0.78rem; border-radius: 10px; color: #78350f; background: #fef3c7; border: 1px solid #fde68a; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;" title="වෙනත් ඕනෑම පින්කමක් සටහන් කරන්න">
+                                <i class="fa-solid fa-feather-pointed" style="color: #d97706;"></i>
+                                <span>වෙනත් පින්කමක් සටහන් කරන්න</span>
                             </button>
                             <button type="button" onclick="resetTodayChecklist()" class="composer-action-btn" style="padding: 10px 14px; font-size: 0.76rem; border-radius: 10px; color: #64748b; background: #f8fafc; border: 1px solid #e2e8f0;" title="Checklist එක මුල සිට සකසන්න">
                                 <i class="fa-solid fa-rotate-left"></i> Reset
@@ -608,10 +612,13 @@
                         </div>
                     </div>
 
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-                        <h4 style="margin: 0; font-size: 0.92rem; font-weight: 700; color: #78350f;">
-                            <i class="fa-solid fa-book" style="color: #d97706;"></i> මගේ පෞද්ගලික පින්කම් සටහන්
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
+                        <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: #78350f; display: flex; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-book-bookmark" style="color: #d97706;"></i> මගේ පෞද්ගලික පින්කම් සටහන්
                         </h4>
+                        <button type="button" onclick="openPrivateMeritComposer()" class="btn btn-primary" style="padding: 7px 14px; font-size: 0.78rem; font-weight: 700; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px;">
+                            <i class="fa-solid fa-plus"></i> වෙනත් පින්කමක් එක් කරන්න
+                        </button>
                     </div>
 
                     <div id="profPrivatePosts">
@@ -1528,6 +1535,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=31"></script>
+    <script type="module" src="js/app.js?v=32"></script>
 </body>
 </html>
