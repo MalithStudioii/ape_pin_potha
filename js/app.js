@@ -1023,13 +1023,52 @@ function renderFeed() {
   });
 
   if (filtered.length === 0) {
-    container.innerHTML = `
-      <div class="card" style="padding: 48px 20px; text-align: center;">
-        <i class="fa-solid fa-dharmachakra" style="font-size: 2.5rem; color: #f59e0b; margin-bottom: 12px; opacity: 0.8;"></i>
-        <h3 style="font-size: 1rem; font-weight: 700; color: #334155;">මෙම කොටසේ තවම සටහන් නොමැත</h3>
-        <p style="font-size: 0.78rem; color: #94a3b8; margin-top: 4px;">පළමු පුණ්‍ය සටහන එක් කරමින් ආරම්භ කරන්න!</p>
-      </div>
-    `;
+    if (activeTab === 'mybook') {
+      container.innerHTML = `
+        <div class="card" style="padding: 48px 20px; text-align: center; border: 1.5px dashed rgba(217, 119, 6, 0.35); border-radius: 20px; background: linear-gradient(180deg, #fffdf8, #fff8ea);">
+          <div style="width: 72px; height: 72px; border-radius: 50%; background: #fffbeb; border: 2px solid #fef3c7; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px; box-shadow: 0 4px 16px rgba(245, 158, 11, 0.18);">
+            <i class="fa-solid fa-dharmachakra animate-spin-slow" style="font-size: 2.2rem; color: #d97706;"></i>
+          </div>
+          <h3 style="font-family: var(--font-serif); font-size: 1.15rem; font-weight: 700; color: #451a03; margin-bottom: 6px;">ඔබ තවම පින්කම් සටහන් කර නැත</h3>
+          <p style="font-size: 0.82rem; color: #78350f; max-width: 440px; margin: 0 auto 20px auto; line-height: 1.6;">
+            ඔබ සිදුකරන පින්කම් සහ කුසල ක්‍රියා මෙහි සටහන් කර ඔබේ ජීවිතයේ පුණ්‍ය පොත සම්පූර්ණ කරගන්න!
+          </p>
+          <button type="button" onclick="openModal('merit')" class="btn-profile-primary" style="display: inline-flex; align-items: center; gap: 8px; padding: 11px 24px; font-weight: 700; font-size: 0.88rem; border-radius: 9999px; background: linear-gradient(135deg, #f59e0b, #d97706); color: #ffffff; border: none; cursor: pointer; box-shadow: 0 6px 18px rgba(217, 119, 6, 0.35);">
+            <i class="fa-solid fa-plus"></i> පළමු සටහන එක් කරන්න!
+          </button>
+        </div>
+      `;
+    } else if (activeTab === 'needs') {
+      container.innerHTML = `
+        <div class="card" style="padding: 48px 20px; text-align: center; border: 1.5px dashed rgba(5, 150, 105, 0.35); border-radius: 20px; background: linear-gradient(180deg, #f0fdf4, #ecfdf5);">
+          <div style="width: 72px; height: 72px; border-radius: 50%; background: #ecfdf5; border: 2px solid #a7f3d0; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px; box-shadow: 0 4px 16px rgba(5, 150, 105, 0.18);">
+            <i class="fa-solid fa-hand-holding-heart" style="font-size: 2.2rem; color: #059669;"></i>
+          </div>
+          <h3 style="font-family: var(--font-serif); font-size: 1.15rem; font-weight: 700; color: #065f46; margin-bottom: 6px;">දැනට සත්කාර ඉල්ලීම් නොමැත</h3>
+          <p style="font-size: 0.82rem; color: #047857; max-width: 440px; margin: 0 auto 20px auto; line-height: 1.6;">
+            විහාරස්ථාන, දුෂ්කර පාසල් හෝ සමාජ සත්කාරයක් සඳහා අවශ්‍යතාවයක් මෙහි සටහන් කරන්න.
+          </p>
+          <button type="button" onclick="openModal('need')" class="btn-profile-primary" style="display: inline-flex; align-items: center; gap: 8px; padding: 11px 24px; font-weight: 700; font-size: 0.88rem; border-radius: 9999px; background: linear-gradient(135deg, #059669, #047857); color: #ffffff; border: none; cursor: pointer; box-shadow: 0 6px 18px rgba(5, 150, 105, 0.35);">
+            <i class="fa-solid fa-plus"></i> අවශ්‍යතාවයක් එක් කරන්න
+          </button>
+        </div>
+      `;
+    } else {
+      container.innerHTML = `
+        <div class="card" style="padding: 48px 20px; text-align: center; border: 1.5px dashed rgba(217, 119, 6, 0.35); border-radius: 20px; background: linear-gradient(180deg, #fffdf8, #fff8ea);">
+          <div style="width: 72px; height: 72px; border-radius: 50%; background: #fffbeb; border: 2px solid #fef3c7; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px; box-shadow: 0 4px 16px rgba(245, 158, 11, 0.18);">
+            <i class="fa-solid fa-dharmachakra animate-spin-slow" style="font-size: 2.2rem; color: #d97706;"></i>
+          </div>
+          <h3 style="font-family: var(--font-serif); font-size: 1.15rem; font-weight: 700; color: #451a03; margin-bottom: 6px;">මෙම කොටසේ තවම සටහන් නොමැත</h3>
+          <p style="font-size: 0.82rem; color: #78350f; max-width: 440px; margin: 0 auto 20px auto; line-height: 1.6;">
+            පළමු පුණ්‍ය සටහන එක් කරමින් අනෙක් පින්වතුන් සමඟ බෙදාගන්න!
+          </p>
+          <button type="button" onclick="openModal('merit')" class="btn-profile-primary" style="display: inline-flex; align-items: center; gap: 8px; padding: 11px 24px; font-weight: 700; font-size: 0.88rem; border-radius: 9999px; background: linear-gradient(135deg, #f59e0b, #d97706); color: #ffffff; border: none; cursor: pointer; box-shadow: 0 6px 18px rgba(217, 119, 6, 0.35);">
+            <i class="fa-solid fa-plus"></i> පළමු සටහන එක් කරන්න!
+          </button>
+        </div>
+      `;
+    }
     return;
   }
 
@@ -1316,7 +1355,15 @@ window.deletePostPrompt = async function(postId) {
   }
 };
 
-window.handleShare = async function(postId) {
+// ==========================================================================
+// Viral Share & WhatsApp Status Card Image Generator (html2canvas)
+// ==========================================================================
+let currentShareTargetPostId = null;
+let currentGeneratedStatusCardDataUrl = null;
+let currentGeneratedStatusCardBlob = null;
+let currentGeneratedStatusCardFileName = null;
+
+window.handleShare = function(postId) {
   if (isGuestUser()) {
     showAuthRequiredModal('පින්කම් පිටතට බෙදා ගැනීමට (Share)');
     return;
@@ -1324,6 +1371,291 @@ window.handleShare = async function(postId) {
 
   SoundService.playShare();
   triggerHaptic(25);
+  currentShareTargetPostId = postId;
+
+  const modal = document.getElementById('shareChoiceModal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    try {
+      history.pushState({ type: 'modal', id: 'shareChoiceModal' }, '');
+    } catch (e) {}
+  } else {
+    executeNativeOrWhatsAppShare();
+  }
+};
+
+window.closeShareChoiceModal = function() {
+  const modal = document.getElementById('shareChoiceModal');
+  if (modal) modal.classList.add('hidden');
+};
+
+window.closeShareChoiceModalOnBackdrop = function(e) {
+  if (e.target.id === 'shareChoiceModal') {
+    closeShareChoiceModal();
+  }
+};
+
+window.closeStatusCardPreviewModal = function() {
+  const modal = document.getElementById('statusCardPreviewModal');
+  if (modal) modal.classList.add('hidden');
+};
+
+window.closeStatusCardPreviewOnBackdrop = function(e) {
+  if (e.target.id === 'statusCardPreviewModal') {
+    closeStatusCardPreviewModal();
+  }
+};
+
+window.generateWhatsAppStatusCardFromModal = async function() {
+  const postId = currentShareTargetPostId;
+  if (!postId) return;
+
+  const btn = document.getElementById('btnShareWhatsAppStatus');
+  const originalBtnHTML = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `
+      <div style="width: 44px; height: 44px; border-radius: 12px; background: #059669; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0;">
+        <i class="fa-solid fa-spinner fa-spin"></i>
+      </div>
+      <div style="flex: 1; min-width: 0;">
+        <div style="font-size: 0.88rem; font-weight: 700; color: #065f46;">
+          Status ඡායාරූපය සකසමින් පවතී...
+        </div>
+        <div style="font-size: 0.72rem; color: #047857; margin-top: 2px;">
+          තත්පර කිහිපයකින් PNG කාඩ්පත සූදානම් වේ
+        </div>
+      </div>
+    `;
+  }
+
+  try {
+    const allPosts = StorageService.getLocalPosts();
+    let post = (allPosts && allPosts.find(p => p.id === postId));
+    if (!post && typeof currentPostsData !== 'undefined' && Array.isArray(currentPostsData)) {
+      post = currentPostsData.find(p => p.id === postId);
+    }
+    if (!post && StorageService._cachedPosts) {
+      post = StorageService._cachedPosts.find(p => p.id === postId);
+    }
+    if (!post) {
+      post = { id: postId, title: 'පින්කමක්', description: '', author: 'කල්‍යාණ මිත්‍ර' };
+    }
+
+    const isRepost = post.isRepost || !!post.originalPost;
+    const orig = post.originalPost || null;
+
+    const realAuthor = (isRepost && orig && orig.author) ? orig.author : (post.author || 'කල්‍යාණ මිත්‍ර');
+    const realTitle = (isRepost && orig && orig.title) ? orig.title : (post.title || 'පින්කම');
+    const realDesc = (isRepost && orig && orig.description) ? orig.description : (post.description || '');
+    const realImage = (isRepost && orig ? (orig.image || (orig.images && orig.images[0])) : (post.image || (post.images && post.images[0]))) || null;
+    const realCategory = (isRepost && orig && orig.category) ? orig.category : (post.category || 'පින්කම');
+    const realLocation = (isRepost && orig && orig.location) ? orig.location : (post.location || '');
+    const realDate = (isRepost && orig && orig.date) ? orig.date : (post.date || 'අද');
+    const authorAvatar = (isRepost && orig && orig.authorAvatar) ? orig.authorAvatar : (post.authorAvatar || null);
+
+    const authorInitial = realAuthor ? realAuthor.charAt(0) : 'ම';
+    const avatarInner = authorAvatar 
+      ? `<img src="${authorAvatar}" style="width: 100%; height: 100%; object-fit: cover; display: block;" crossorigin="anonymous">`
+      : `<span style="font-family: serif; font-size: 1.3rem; font-weight: 700; color: #ffffff;">${authorInitial}</span>`;
+
+    const origin = window.location.origin;
+    const pathname = window.location.pathname;
+    const targetId = (isRepost && orig && orig.id) ? orig.id : post.id;
+    const postUrl = `${origin}${pathname}?post=${encodeURIComponent(targetId)}`;
+
+    const renderBox = document.getElementById('viralStatusCardRenderBox');
+    if (!renderBox) throw new Error('Render box not found');
+
+    const cleanDesc = realDesc ? realDesc.replace(/<[^>]*>?/gm, '').trim() : '';
+
+    renderBox.innerHTML = `
+      <div id="statusCardRoot" style="width: 580px; background: #fffcf7; border: 10px solid #78350f; border-radius: 26px; overflow: hidden; font-family: 'Noto Sans Sinhala', -apple-system, BlinkMacSystemFont, sans-serif; box-shadow: 0 10px 40px rgba(0,0,0,0.3); color: #1e293b; box-sizing: border-box;">
+        
+        <!-- Top Golden Gradient Strip -->
+        <div style="background: linear-gradient(90deg, #d97706, #fbbf24, #f59e0b, #b45309); height: 8px;"></div>
+        
+        <!-- Header with Branding -->
+        <div style="background: linear-gradient(135deg, #451a03 0%, #78350f 60%, #92400e 100%); padding: 18px 24px; color: #fff; display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 14px;">
+            <div style="width: 48px; height: 48px; border-radius: 50%; background: rgba(251, 191, 36, 0.2); border: 2px solid #fbbf24; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: #fbbf24;">
+              ☸️
+            </div>
+            <div>
+              <div style="font-family: 'Noto Serif Sinhala', serif; font-size: 1.35rem; font-weight: 700; color: #fffbeb; letter-spacing: 0.5px;">පිං පොත</div>
+              <div style="font-size: 0.74rem; color: #fef3c7; opacity: 0.9;">කල්‍යාණ මිත්‍ර පුණ්‍ය ජාලය • www.pinpotha.org</div>
+            </div>
+          </div>
+          <div style="background: rgba(251, 191, 36, 0.25); border: 1px solid #fbbf24; color: #fef3c7; font-size: 0.74rem; font-weight: 700; padding: 4px 12px; border-radius: 9999px;">
+            ${Security.escapeHTML(realCategory)}
+          </div>
+        </div>
+
+        <!-- Author Info Row -->
+        <div style="padding: 16px 24px 12px 24px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px dashed rgba(217, 119, 6, 0.25); background: #ffffff;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="width: 48px; height: 48px; border-radius: 50%; background: #f59e0b; color: #fff; font-size: 1.25rem; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 2.5px solid #d97706; overflow: hidden; flex-shrink: 0;">
+              ${avatarInner}
+            </div>
+            <div>
+              <div style="font-size: 1.05rem; font-weight: 700; color: #451a03; display: flex; align-items: center; gap: 6px;">
+                <span>${Security.escapeHTML(realAuthor)}</span>
+                <span style="color: #059669; font-size: 0.85rem;" title="සත්‍යාපිත කල්‍යාණ මිත්‍ර">✓</span>
+              </div>
+              <div style="font-size: 0.75rem; color: #64748b; margin-top: 2px;">
+                📅 ${Security.escapeHTML(realDate)} ${realLocation ? `• 📍 ${Security.escapeHTML(realLocation)}` : ''}
+              </div>
+            </div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 0.74rem; font-weight: 700; color: #b45309; background: #fffbeb; padding: 4px 12px; border-radius: 8px; border: 1px solid #fde68a;">
+              🙏 සාදු සාදු සාදු!
+            </div>
+          </div>
+        </div>
+
+        <!-- Post Content Body -->
+        <div style="padding: 20px 24px; background: #fffcf7;">
+          <h2 style="font-family: 'Noto Serif Sinhala', serif; font-size: 1.25rem; font-weight: 700; color: #451a03; line-height: 1.45; margin-bottom: 12px;">
+            ${Security.escapeHTML(realTitle)}
+          </h2>
+
+          ${cleanDesc ? `
+          <p style="font-size: 0.92rem; color: #334155; line-height: 1.65; white-space: pre-line; margin-bottom: 16px;">
+            ${Security.escapeHTML(cleanDesc)}
+          </p>
+          ` : ''}
+
+          ${realImage ? `
+          <div style="border-radius: 16px; overflow: hidden; border: 2px solid #fde68a; box-shadow: 0 4px 18px rgba(0,0,0,0.08); margin-top: 10px; background: #000; text-align: center;">
+            <img src="${realImage}" style="max-width: 100%; max-height: 380px; width: 100%; object-fit: contain; display: block;" crossorigin="anonymous">
+          </div>
+          ` : ''}
+        </div>
+
+        <!-- Bottom Footer Banner -->
+        <div style="background: linear-gradient(135deg, #78350f, #451a03); padding: 16px 24px; color: #fff; display: flex; align-items: center; justify-content: space-between; border-top: 3px solid #fbbf24;">
+          <div>
+            <div style="font-size: 0.95rem; font-weight: 700; color: #fef08a;">
+              🙏 දැකබලා සතුටු සිතින් අනුමෝදන් වන්න!
+            </div>
+            <div style="font-size: 0.74rem; color: #fef3c7; opacity: 0.9; margin-top: 2px;">
+              ඔබ සිදුකරන පින්කම් සටහන් කරගන්න පිං පොතට එක්වන්න
+            </div>
+          </div>
+          <div style="background: #fbbf24; color: #451a03; font-weight: 800; font-size: 0.78rem; padding: 6px 14px; border-radius: 9999px; white-space: nowrap;">
+            🌐 pinpotha.org
+          </div>
+        </div>
+      </div>
+    `;
+
+    await new Promise(r => setTimeout(r, 250));
+
+    if (typeof html2canvas !== 'function') {
+      throw new Error('html2canvas library is not loaded');
+    }
+
+    const cardRoot = document.getElementById('statusCardRoot');
+    const canvas = await html2canvas(cardRoot, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
+      logging: false
+    });
+
+    const dataUrl = canvas.toDataURL('image/png');
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+    const fileName = `pin_potha_status_${postId}.png`;
+
+    currentGeneratedStatusCardDataUrl = dataUrl;
+    currentGeneratedStatusCardBlob = blob;
+    currentGeneratedStatusCardFileName = fileName;
+
+    // Increment share counter
+    try {
+      StorageService.incrementShare(targetId);
+      if (postId !== targetId) StorageService.incrementShare(postId);
+      if (post) post.shareCount = (post.shareCount || 0) + 1;
+      const shareBtnEl = document.getElementById(`shares-btn-${postId}`);
+      const shareStatEl = document.getElementById(`stat-shares-${postId}`);
+      if (shareBtnEl) shareBtnEl.innerText = post.shareCount;
+      if (shareStatEl) shareStatEl.innerText = post.shareCount;
+    } catch (e) {}
+
+    closeShareChoiceModal();
+
+    let sharedViaFile = false;
+    if (blob && navigator.canShare) {
+      try {
+        const file = new File([blob], fileName, { type: 'image/png' });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: `පිං පොත | ${realTitle}`,
+            text: `🌸 "${realAuthor}" ගේ උතුම් පින්කම:\n✨ ${realTitle}\n\n🙏 මේ උතුම් පින්කම දැකබලා ඔබත් සාදුකාර දී පින් අනුමෝදන් වන්න:\n${postUrl}`
+          });
+          sharedViaFile = true;
+        }
+      } catch (shareErr) {
+        if (shareErr.name === 'AbortError') {
+          sharedViaFile = true;
+        }
+      }
+    }
+
+    const previewImg = document.getElementById('statusCardPreviewImg');
+    const previewModal = document.getElementById('statusCardPreviewModal');
+    if (previewImg && previewModal) {
+      previewImg.src = dataUrl;
+      previewModal.classList.remove('hidden');
+      try {
+        history.pushState({ type: 'modal', id: 'statusCardPreviewModal' }, '');
+      } catch (e) {}
+    }
+
+    if (!sharedViaFile) {
+      downloadCurrentStatusCard();
+    }
+
+  } catch (err) {
+    console.error('[StatusCard] Generation failed:', err);
+    alert('WhatsApp Status ඡායාරූපය සැකසීමේදී දෝෂයක් ඇතිවිය: ' + (err.message || 'කරුණාකර නැවත උත්සාහ කරන්න.'));
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalBtnHTML;
+    }
+  }
+};
+
+window.downloadCurrentStatusCard = function() {
+  if (!currentGeneratedStatusCardDataUrl) return;
+  const a = document.createElement('a');
+  a.href = currentGeneratedStatusCardDataUrl;
+  a.download = currentGeneratedStatusCardFileName || `pin_potha_status_${Date.now()}.png`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+};
+
+window.openWhatsAppForStatusShare = function() {
+  const postId = currentShareTargetPostId;
+  const allPosts = StorageService.getLocalPosts() || [];
+  const post = allPosts.find(p => p.id === postId) || {};
+  const origin = window.location.origin;
+  const pathname = window.location.pathname;
+  const postUrl = `${origin}${pathname}?post=${encodeURIComponent(postId || '')}`;
+  const shareText = `🌸 "${post.author || 'කල්‍යාණ මිත්‍ර'}" ගේ උතුම් පින්කම: ${post.title || ''}\n🙏 දැකබලා සතුටු සිතින් අනුමෝදන් වන්න:\n${postUrl}`;
+  const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
+  window.open(waUrl, '_blank');
+};
+
+window.executeNativeOrWhatsAppShare = async function() {
+  closeShareChoiceModal();
+  const postId = currentShareTargetPostId;
+  if (!postId) return;
 
   const allPosts = StorageService.getLocalPosts();
   let post = (allPosts && allPosts.find(p => p.id === postId));
@@ -1337,23 +1669,18 @@ window.handleShare = async function(postId) {
     post = { id: postId, title: 'පින්කමක්', description: '', author: 'කල්‍යාණ මිත්‍ර' };
   }
 
-  // Check if this post is a repost
   const isRepost = post.isRepost || !!post.originalPost;
   const orig = post.originalPost || null;
-
-  // Extract REAL original author, real title, real description, real photo
   const realAuthor = (isRepost && orig && orig.author) ? orig.author : (post.author || 'කල්‍යාණ මිත්‍ර');
   const realTitle = (isRepost && orig && orig.title) ? orig.title : (post.title || 'පින්කම');
   const realDesc = (isRepost && orig && orig.description) ? orig.description : (post.description || '');
   const realImage = (isRepost && orig ? (orig.image || (orig.images && orig.images[0])) : (post.image || (post.images && post.images[0]))) || null;
 
-  // Construct absolute clean deep-link
   const origin = window.location.origin;
   const pathname = window.location.pathname;
   const targetId = (isRepost && orig && orig.id) ? orig.id : post.id;
   const postUrl = `${origin}${pathname}?post=${encodeURIComponent(targetId)}`;
 
-  // Increment Dharma Dana share counter
   try {
     StorageService.incrementShare(targetId);
     if (postId !== targetId) StorageService.incrementShare(postId);
@@ -1362,17 +1689,7 @@ window.handleShare = async function(postId) {
     const shareStatEl = document.getElementById(`stat-shares-${postId}`);
     if (shareBtnEl) shareBtnEl.innerText = post.shareCount;
     if (shareStatEl) shareStatEl.innerText = post.shareCount;
-    if (typeof activeProfileSubTab !== 'undefined' && activeProfileSubTab === 'stats') {
-      const u = StorageService.currentUser || {};
-      const mp = currentPostsData.filter(p => p.uid && u.uid && p.uid === u.uid);
-      const mpp = currentPostsData.filter(p => p.uid && u.uid && p.uid === u.uid && p.image);
-      const mpr = currentPostsData.filter(p => p.uid && u.uid && p.uid === u.uid && p.visibility === 'private');
-      const ts = mp.reduce((acc, p) => acc + (p.sadhuCount || 0), 0);
-      renderProfileSubTabContent(u, mp, mpp, mpr, ts);
-    }
-  } catch (e) {
-    console.warn('Share increment error:', e);
-  }
+  } catch (e) {}
 
   let shareBody = `🌸 "${realAuthor}" ගේ උතුම් පින්කම:\n✨ ${realTitle}`;
   if (isRepost && post.author && post.author !== realAuthor) {
@@ -1394,8 +1711,6 @@ window.handleShare = async function(postId) {
 
   if (navigator.share) {
     try {
-      // NOTE: Passing url: postUrl causes WhatsApp/mobile to append it automatically.
-      // So do NOT put postUrl inside shareBody text to avoid duplicate URLs!
       await navigator.share({
         title: shareTitle,
         text: shareBody,
@@ -1407,7 +1722,7 @@ window.handleShare = async function(postId) {
     }
   }
 
-  // Fallback for clipboard / WhatsApp web:
+  // Fallback for clipboard / WhatsApp web
   const fullTextWithUrl = `${shareBody}\n${postUrl}`;
   try {
     if (navigator.clipboard) {
@@ -1421,6 +1736,22 @@ window.handleShare = async function(postId) {
   if (openWhatsApp) {
     const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(fullTextWithUrl)}`;
     window.open(waUrl, '_blank');
+  }
+};
+
+window.copyPostLinkFromModal = async function() {
+  closeShareChoiceModal();
+  const postId = currentShareTargetPostId;
+  const origin = window.location.origin;
+  const pathname = window.location.pathname;
+  const postUrl = `${origin}${pathname}?post=${encodeURIComponent(postId || '')}`;
+  try {
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(postUrl);
+    }
+    alert('ලිපිනය (Link) සාර්ථකව Copy කරගන්නා ලදී! 🎉');
+  } catch (e) {
+    prompt('මෙම Link එක Copy කරගන්න:', postUrl);
   }
 };
 
@@ -1677,6 +2008,7 @@ window.handleMultipleImagesSelected = async function(event) {
     }
   }
 
+  if (statsEl) statsEl.innerText = `ඡායාරූප ${selectedImagesList.length}ක් සාර්ථකව සූදානම් කෙරිණි (WebP, ~40KB)`;
   renderComposerThumbnails();
   event.target.value = '';
 };
@@ -1691,7 +2023,7 @@ function compressSingleImageFile(file) {
       const img = new Image();
       img.onload = function() {
         const canvas = document.createElement('canvas');
-        const MAX_DIM = 800;
+        const MAX_DIM = 700; // Optimal 600px-700px limit for fast mobile compression & small KB footprint
         let w = img.width;
         let h = img.height;
         if (w > MAX_DIM || h > MAX_DIM) {
@@ -1707,9 +2039,11 @@ function compressSingleImageFile(file) {
         canvas.height = h;
 
         const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'medium';
         ctx.drawImage(img, 0, 0, w, h);
 
-        const webpData = canvas.toDataURL('image/webp', 0.65);
+        const webpData = canvas.toDataURL('image/webp', 0.60);
         resolve(webpData);
       };
       img.onerror = () => resolve(null);
@@ -2506,10 +2840,17 @@ function renderProfileSubTabContent(user, myPosts, myPhotosPosts, myPrivatePosts
   if (timelineContainer && activeProfileSubTab === 'timeline') {
     if (myPosts.length === 0) {
       timelineContainer.innerHTML = `
-        <div class="card" style="padding: 44px 20px; text-align: center;">
-          <i class="fa-solid fa-clock-rotate-left" style="font-size: 2.2rem; color: #f59e0b; margin-bottom: 12px; opacity: 0.8;"></i>
-          <h3 style="font-size: 1rem; font-weight: 700; color: #334155;">ඔබගේ පින්කම් සටහන් මෙතෙක් නැත</h3>
-          <p style="font-size: 0.78rem; color: #94a3b8; margin-top: 4px;">ඉහත ඇති පෝරමය මඟින් ඔබ සිදුකළ පින්කමක් සටහන් කරන්න!</p>
+        <div class="card" style="padding: 48px 20px; text-align: center; border: 1.5px dashed rgba(217, 119, 6, 0.35); border-radius: 20px; background: linear-gradient(180deg, #fffdf8, #fff8ea);">
+          <div style="width: 72px; height: 72px; border-radius: 50%; background: #fffbeb; border: 2px solid #fef3c7; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px; box-shadow: 0 4px 16px rgba(245, 158, 11, 0.18);">
+            <i class="fa-solid fa-dharmachakra animate-spin-slow" style="font-size: 2.2rem; color: #d97706;"></i>
+          </div>
+          <h3 style="font-family: var(--font-serif); font-size: 1.15rem; font-weight: 700; color: #451a03; margin-bottom: 6px;">ඔබ තවම පින්කම් සටහන් කර නැත</h3>
+          <p style="font-size: 0.82rem; color: #78350f; max-width: 440px; margin: 0 auto 20px auto; line-height: 1.6;">
+            ඔබ සිදුකරන පින්කම් සහ කුසල ක්‍රියා මෙහි සටහන් කර ඔබේ ජීවිතයේ පුණ්‍ය පොත සම්පූර්ණ කරගන්න!
+          </p>
+          <button type="button" onclick="openModal('merit')" class="btn-profile-primary" style="display: inline-flex; align-items: center; gap: 8px; padding: 11px 24px; font-weight: 700; font-size: 0.88rem; border-radius: 9999px; background: linear-gradient(135deg, #f59e0b, #d97706); color: #ffffff; border: none; cursor: pointer; box-shadow: 0 6px 18px rgba(217, 119, 6, 0.35);">
+            <i class="fa-solid fa-plus"></i> පළමු සටහන එක් කරන්න!
+          </button>
         </div>
       `;
     } else {

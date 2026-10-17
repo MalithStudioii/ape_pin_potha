@@ -3717,15 +3717,35 @@ html, body {
     font-size: 0.88rem !important;
   }
 
+  /* Completely hide both left and right sidebars on mobile screens <= 768px */
+  .sidebar,
+  aside.sidebar,
+  .main-layout > aside,
+  #mainFeedLayout > aside {
+    display: none !important;
+    visibility: hidden !important;
+    width: 0 !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    overflow: hidden !important;
+    position: absolute !important;
+    pointer-events: none !important;
+  }
+
   /* 3. Main Feed Layout on Mobile - Pure Block Flow Never Blows Out */
-  .main-layout {
-    display: block;
-    padding: 10px 10px 80px 10px !important;
+  .main-layout,
+  #mainFeedLayout {
+    display: block !important;
+    padding: 10px 12px 84px 12px !important;
     width: 100% !important;
     max-width: 100% !important;
+    margin: 0 auto !important;
     box-sizing: border-box !important;
     min-width: 0 !important;
     overflow-x: hidden !important;
+    gap: 0 !important;
   }
 
   .main-layout.hidden {
@@ -3733,9 +3753,12 @@ html, body {
   }
 
   .main-feed-area,
-  .feed-container {
+  .feed-container,
+  #postsContainer {
     width: 100% !important;
     max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
     box-sizing: border-box !important;
     min-width: 0 !important;
   }
@@ -3904,6 +3927,24 @@ html, body {
     line-height: 1.55 !important;
     word-break: break-word !important;
     overflow-wrap: break-word !important;
+  }
+
+  .post-image-wrapper {
+    width: 100% !important;
+    max-height: 520px !important;
+    background: #0f172a !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 0 !important;
+  }
+
+  .post-image-wrapper img {
+    width: 100% !important;
+    max-height: 520px !important;
+    object-fit: contain !important;
+    display: block !important;
+    margin: 0 auto !important;
   }
 
   /* Post Engagement Stats Row */
@@ -4445,6 +4486,42 @@ html, body {
     padding: 14px 12px 20px;
   }
 }
+
+/* ==========================================================================
+   WhatsApp Status & Viral Post Card Image Generator Styling
+   ========================================================================== */
+#viralStatusCardRenderBox {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+  width: 620px;
+  z-index: -9999;
+  pointer-events: none;
+  opacity: 1;
+}
+
+.share-choice-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 14px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+}
+
+.share-choice-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
+
+.share-choice-btn:active {
+  transform: scale(0.98);
+}
+
 
 
 

@@ -36,7 +36,7 @@
     <meta name="twitter:image" content="assets/banner.jpg">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=33">
+    <link rel="stylesheet" href="css/styles.css?v=34">
 </head>
 <body>
 
@@ -1526,8 +1526,109 @@
                     <!-- Dynamic Posts List -->
                 </div>
             </div>
+    <!-- ========================================================================= -->
+    <!-- Share Choice & WhatsApp Status Card Generator Modal                       -->
+    <!-- ========================================================================= -->
+    <div id="shareChoiceModal" class="modal-overlay hidden" onclick="closeShareChoiceModalOnBackdrop(event)">
+        <div class="modal-dialog" style="max-width: 440px; border-radius: 20px; overflow: hidden; background: #ffffff; box-shadow: 0 20px 50px rgba(0,0,0,0.3); border: 1px solid rgba(217,119,6,0.2);">
+            <div class="modal-header" style="background: linear-gradient(135deg, #451a03, #78350f); color: #fff; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-share-nodes" style="color: #fbbf24;"></i>
+                    <h3 style="font-size: 0.96rem; font-weight: 700; color: #fffbeb;">පින්කම බෙදාගන්න (Share Merit)</h3>
+                </div>
+                <button type="button" onclick="closeShareChoiceModal()" class="modal-close-btn" style="color: #fff; background: rgba(255,255,255,0.1); border: none; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div style="padding: 18px;">
+                <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 14px; line-height: 1.5;">
+                    මෙම උතුම් කුසලය අන් අයටත් දැකබලා අනුමෝදන් වීමට පහත ආකාරයෙන් බෙදාගන්න:
+                </p>
+
+                <!-- Option 1: WhatsApp Status / Story Image Card -->
+                <button type="button" id="btnShareWhatsAppStatus" onclick="generateWhatsAppStatusCardFromModal()" class="share-choice-btn" style="border: 1.5px solid #a7f3d0; background: linear-gradient(135deg, #ecfdf5, #f0fdf4); color: #065f46; margin-bottom: 10px;">
+                    <div style="width: 44px; height: 44px; border-radius: 12px; background: #10b981; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">
+                        <i class="fa-brands fa-whatsapp"></i>
+                    </div>
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-size: 0.88rem; font-weight: 700; color: #065f46; display: flex; align-items: center; gap: 6px;">
+                            <span>WhatsApp Status ඡායාරූපය සාදන්න</span>
+                            <span style="background: #059669; color: #fff; font-size: 0.58rem; padding: 1px 6px; border-radius: 9999px; font-weight: 800;">Viral Card</span>
+                        </div>
+                        <div style="font-size: 0.72rem; color: #047857; margin-top: 2px;">
+                            WhatsApp Status, FB Story සඳහා ලස්සන ඡායාරූප කාඩ්පතක් සාදා ගන්න (PNG)
+                        </div>
+                    </div>
+                </button>
+
+                <!-- Option 2: Social / WhatsApp Link & Text -->
+                <button type="button" id="btnShareDirectLink" onclick="executeNativeOrWhatsAppShare()" class="share-choice-btn" style="border: 1.5px solid #fef3c7; background: #fffbeb; color: #92400e; margin-bottom: 10px;">
+                    <div style="width: 44px; height: 44px; border-radius: 12px; background: #f59e0b; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </div>
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-size: 0.88rem; font-weight: 700; color: #78350f;">
+                            WhatsApp / සමාජ මාධ්‍ය වෙත යවන්න
+                        </div>
+                        <div style="font-size: 0.72rem; color: #b45309; margin-top: 2px;">
+                            පින්කමේ සබැඳිය (Link) සහ විස්තරය කෙලින්ම Share කරන්න
+                        </div>
+                    </div>
+                </button>
+
+                <!-- Option 3: Copy Link -->
+                <button type="button" onclick="copyPostLinkFromModal()" class="share-choice-btn" style="border: 1px solid #e2e8f0; background: #f8fafc; color: #334155;">
+                    <div style="width: 40px; height: 40px; border-radius: 10px; background: #e2e8f0; color: #475569; display: flex; align-items: center; justify-content: center; font-size: 1.05rem; flex-shrink: 0;">
+                        <i class="fa-regular fa-copy"></i>
+                    </div>
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-size: 0.84rem; font-weight: 700; color: #1e293b;">
+                            Link එක කොපි කරගන්න (Copy Link)
+                        </div>
+                        <div style="font-size: 0.7rem; color: #64748b; margin-top: 1px;">
+                            වෙබ් ලිපිනය ක්ලිප්බෝඩ් එකට පිටපත් වේ
+                        </div>
+                    </div>
+                </button>
+            </div>
         </div>
     </div>
+
+    <!-- Status Card Preview & Download Modal -->
+    <div id="statusCardPreviewModal" class="modal-overlay hidden" onclick="closeStatusCardPreviewOnBackdrop(event)">
+        <div class="modal-dialog" style="max-width: 460px; border-radius: 20px; overflow: hidden; background: #ffffff; box-shadow: 0 20px 50px rgba(0,0,0,0.3); border: 1px solid rgba(5,150,105,0.25);">
+            <div class="modal-header" style="background: linear-gradient(135deg, #065f46, #047857); color: #fff; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-brands fa-whatsapp" style="color: #6ee7b7; font-size: 1.25rem;"></i>
+                    <h3 style="font-size: 0.96rem; font-weight: 700; color: #fffbeb;">WhatsApp Status ඡායාරූපය</h3>
+                </div>
+                <button type="button" onclick="closeStatusCardPreviewModal()" class="modal-close-btn" style="color: #fff; background: rgba(255,255,255,0.1); border: none; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div style="padding: 16px; text-align: center;">
+                <p style="font-size: 0.82rem; color: #065f46; font-weight: 700; margin-bottom: 12px;">
+                    ✨ ඔබගේ WhatsApp Status කාඩ්පත සාර්ථකව සකසන ලදී!
+                </p>
+                <div style="max-height: 380px; overflow-y: auto; border: 1.5px solid #d1fae5; border-radius: 14px; padding: 8px; background: #f0fdf4; margin-bottom: 16px;">
+                    <img id="statusCardPreviewImg" src="" alt="WhatsApp Status Card" style="width: 100%; height: auto; border-radius: 10px; display: block; box-shadow: 0 4px 14px rgba(0,0,0,0.08);">
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <button type="button" id="btnDownloadStatusCard" onclick="downloadCurrentStatusCard()" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px; border-radius: 12px; background: linear-gradient(135deg, #059669, #047857); color: #fff; font-weight: 700; font-size: 0.9rem; border: none; cursor: pointer; box-shadow: 0 4px 14px rgba(5, 150, 105, 0.3);">
+                        <i class="fa-solid fa-download"></i>
+                        <span>ඡායාරූපය බාගත කරන්න (Download PNG)</span>
+                    </button>
+                    <button type="button" id="btnShareStatusWhatsApp" onclick="openWhatsAppForStatusShare()" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 11px; border-radius: 12px; background: #25d366; color: #fff; font-weight: 700; font-size: 0.88rem; border: none; cursor: pointer;">
+                        <i class="fa-brands fa-whatsapp"></i>
+                        <span>WhatsApp වෙත යොමු කරන්න</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Offscreen Container for Generating Status Card Image -->
+    <div id="viralStatusCardRenderBox" aria-hidden="true"></div>
 
     <!-- ========================================================================= -->
     <!-- Google Sign-In Required Auth Guard Modal                                  -->
@@ -1666,7 +1767,10 @@
     <!-- Cropper.js Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 
+    <!-- html2canvas Library for WhatsApp Status & Post Card Image Generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=33"></script>
+    <script type="module" src="js/app.js?v=34"></script>
 </body>
 </html>
