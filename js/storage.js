@@ -835,7 +835,7 @@ export const StorageService = {
     }
 
     // 2. Anti-spam Rate Limit check
-    const rateCheck = Security.checkRateLimit('last_merit_post', 3000);
+    const rateCheck = Security.checkRateLimit('last_merit_post', 1500);
     if (!rateCheck.allowed) {
       throw new Error(`කරුණාකර තත්පර ${rateCheck.waitSec}ක් රැඳී සිට නැවත උත්සාහ කරන්න.`);
     }
@@ -861,7 +861,10 @@ export const StorageService = {
       timestamp: Date.now(),
       date: "දැන්",
       sadhuCount: 1,
-      comments: []
+      sadhuUsers: [this.currentUser.uid],
+      comments: [],
+      shareCount: 0,
+      repostCount: 0
     };
 
     if (isCloudReady && db) {
@@ -951,8 +954,10 @@ export const StorageService = {
       timestamp: Date.now(),
       date: "දැන්",
       sadhuCount: 1,
+      sadhuUsers: [this.currentUser.uid || 'anonymous'],
       comments: [],
       repostCount: 0,
+      shareCount: 0,
       originalPost: {
         id: String(originalData.id || original.id || ''),
         uid: String(originalData.uid || original.uid || ''),
@@ -963,7 +968,8 @@ export const StorageService = {
         location: String(originalData.location || ''),
         image: origImage,
         images: origImages,
-        date: String(originalData.date || 'මෑතකදී')
+        date: String(originalData.date || 'මෑතකදී'),
+        timestamp: originalData.timestamp || original.timestamp || Date.now()
       }
     };
 
@@ -1043,29 +1049,56 @@ export const StorageService = {
   },
 
   /**
-   * Atomic Sadhu Increment & Notification Trigger
+   * Atomic Sadhu Toggle (Strictly 1 Sadhu per user) & Notification Trigger
    */
   async giveSadhu(postId) {
     const allPosts = this.getLocalPosts();
     const targetPost = allPosts.find(p => p.id === postId);
+    const userUid = this.currentUser.uid || 'anonymous';
+
+    if (!targetPost) return { action: 'none', count: 0, hasGiven: false };
+
+    targetPost.sadhuUsers = Array.isArray(targetPost.sadhuUsers) ? targetPost.sadhuUsers : [];
+    const alreadyGiven = targetPost.sadhuUsers.includes(userUid);
+
+    let action = 'added';
+    if (alreadyGiven) {
+      // Toggle off / remove Sadhu
+      targetPost.sadhuUsers = targetPost.sadhuUsers.filter(uid => uid !== userUid);
+      targetPost.sadhuCount = Math.max(0, (targetPost.sadhuCount || 1) - 1);
+      action = 'removed';
+    } else {
+      // Add Sadhu (first time)
+      targetPost.sadhuUsers.push(userUid);
+      targetPost.sadhuCount = (targetPost.sadhuCount || 0) + 1;
+      action = 'added';
+    }
 
     if (isCloudReady && db) {
-      const { doc, updateDoc, increment } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
-      const postRef = doc(db, COLLECTIONS.POSTS, postId);
-      await updateDoc(postRef, {
-        sadhuCount: increment(1)
-      });
-    } else {
-      // Sandbox mode
-      if (targetPost) {
-        targetPost.sadhuCount = (targetPost.sadhuCount || 0) + 1;
-        this.cacheLocal(allPosts);
-        this.notifyListeners(allPosts);
+      try {
+        const { doc, updateDoc, increment, arrayUnion, arrayRemove } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const postRef = doc(db, COLLECTIONS.POSTS, postId);
+        if (action === 'added') {
+          await updateDoc(postRef, {
+            sadhuCount: increment(1),
+            sadhuUsers: arrayUnion(userUid)
+          });
+        } else {
+          await updateDoc(postRef, {
+            sadhuCount: increment(-1),
+            sadhuUsers: arrayRemove(userUid)
+          });
+        }
+      } catch (err) {
+        console.warn('[Sadhu Cloud] Fallback to local:', err);
       }
     }
 
+    this.cacheLocal(allPosts);
+    this.notifyListeners(allPosts);
+
     // Trigger Notification for the author (only if someone else gave Sadhu)
-    if (targetPost && targetPost.uid && targetPost.uid !== this.currentUser.uid) {
+    if (action === 'added' && targetPost.uid && targetPost.uid !== userUid) {
       this.createNotification({
         recipientUid: targetPost.uid,
         type: 'sadhu',
@@ -1074,6 +1107,8 @@ export const StorageService = {
         message: 'ඔබගේ පින්කමට සාදුකාරයක් ලබා දුන්නා 🙏'
       });
     }
+
+    return { action, count: targetPost.sadhuCount, hasGiven: (action === 'added') };
   },
 
   /**

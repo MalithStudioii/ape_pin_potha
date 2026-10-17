@@ -4,10 +4,10 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=29';
-import { Security } from './security.js?v=29';
-import { uploadToImgBB } from './imgbb-service.js?v=29';
-import { SoundService, triggerHaptic } from './sound.js?v=29';
+import { StorageService } from './storage.js?v=31';
+import { Security } from './security.js?v=31';
+import { uploadToImgBB } from './imgbb-service.js?v=31';
+import { SoundService, triggerHaptic } from './sound.js?v=31';
 
 window.SoundService = SoundService;
 window.triggerHaptic = triggerHaptic;
@@ -364,6 +364,72 @@ window.setCategory = function(cat) {
   renderFeed();
 };
 
+/**
+ * Dynamic Relative Time Formatter in Sinhala
+ * Returns natural human-readable relative time strings:
+ * "දැන්", "1 වි. කලින්", "පැයකට පෙර", "පැය 4කට පෙර", "ඊයේ", "දවස් 10 කට පෙර", "මසකට පෙර", "අවුරුදු 3කට කලින්"
+ */
+export function formatRelativeTimeSinhala(timestamp, fallbackText = 'දැන්') {
+  if (!timestamp) return fallbackText;
+
+  let timeMs = 0;
+  if (typeof timestamp === 'number') {
+    timeMs = timestamp;
+  } else if (timestamp instanceof Date) {
+    timeMs = timestamp.getTime();
+  } else if (typeof timestamp === 'string') {
+    const parsed = Date.parse(timestamp);
+    if (!isNaN(parsed)) {
+      timeMs = parsed;
+    } else {
+      return timestamp; // Already localized text (e.g. 'දැන්', 'මෑතකදී')
+    }
+  } else if (timestamp && typeof timestamp.toMillis === 'function') {
+    timeMs = timestamp.toMillis();
+  } else if (timestamp && typeof timestamp.seconds === 'number') {
+    timeMs = timestamp.seconds * 1000;
+  } else {
+    return fallbackText;
+  }
+
+  const now = Date.now();
+  const diffSec = Math.floor((now - timeMs) / 1000);
+
+  if (diffSec < 45) {
+    return 'දැන්';
+  }
+
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) {
+    return `${diffMin} වි. කලින්`;
+  }
+
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) {
+    if (diffHours === 1) return 'පැයකට පෙර';
+    return `පැය ${diffHours}කට පෙර`;
+  }
+
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 30) {
+    if (diffDays === 1) return 'ඊයේ';
+    return `දවස් ${diffDays} කට පෙර`;
+  }
+
+  const diffMonths = Math.floor(diffDays / 30);
+  if (diffMonths < 12) {
+    if (diffMonths === 1) return 'මසකට පෙර';
+    return `මස ${diffMonths}කට පෙර`;
+  }
+
+  const diffYears = Math.floor(diffDays / 365);
+  if (diffYears <= 1) {
+    return 'වසරකට පෙර';
+  }
+  return `අවුරුදු ${diffYears}කට කලින්`;
+}
+window.formatRelativeTimeSinhala = formatRelativeTimeSinhala;
+
 // Photo Collage Generator for Post Cards
 function renderPostImagesCollage(post) {
   const images = (post.images && post.images.length > 0)
@@ -471,6 +537,9 @@ function renderPostCardHTML(post, user) {
   const isGeneral = post.type === 'general';
   const isRepost = post.type === 'repost' || post.isRepost === true || !!post.originalPost;
   const orig = post.originalPost;
+  const currentUserUid = user && user.uid ? user.uid : 'anonymous';
+  const sadhuUsers = Array.isArray(post.sadhuUsers) ? post.sadhuUsers : [];
+  const hasGivenSadhu = sadhuUsers.includes(currentUserUid);
 
   return `
     <article class="post-card ${isNeed ? 'need-card' : ''} ${isRepost ? 'repost-card' : ''} ${post.isOfficial ? 'official-card' : ''}" id="post-elem-${post.id}">
@@ -500,7 +569,7 @@ function renderPostCardHTML(post, user) {
             </div>
             <div>
               <span class="repost-actor-name"><strong>${Security.escapeHTML(post.author || 'කල්‍යාණ මිත්‍ර')}</strong> විසින් යළි බෙදාගන්නා ලදී</span>
-              <span class="repost-time">${Security.escapeHTML(post.date || 'දැන්')}</span>
+              <span class="repost-time">${Security.escapeHTML(formatRelativeTimeSinhala(post.timestamp, post.date || 'දැන්'))}</span>
             </div>
           </div>
           <div style="display: flex; align-items: center; gap: 6px;">
@@ -530,7 +599,7 @@ function renderPostCardHTML(post, user) {
                 <div class="quoted-avatar">${Security.escapeHTML((orig.author || 'ක').charAt(0))}</div>
                 <div>
                   <div style="font-weight: 700; font-size: 0.82rem; color: #78350f;">${Security.escapeHTML(orig.author || 'කල්‍යාණ මිත්‍ර')}</div>
-                  <div style="font-size: 0.68rem; color: #94a3b8;">${Security.escapeHTML(orig.date || 'මෑතකදී')} ${orig.location ? '• ' + Security.escapeHTML(orig.location) : ''}</div>
+                  <div style="font-size: 0.68rem; color: #94a3b8;">${Security.escapeHTML(formatRelativeTimeSinhala(orig.timestamp, orig.date || 'මෑතකදී'))} ${orig.location ? '• ' + Security.escapeHTML(orig.location) : ''}</div>
                 </div>
               </div>
               <div style="display: flex; align-items: center; gap: 6px;">
@@ -569,7 +638,7 @@ function renderPostCardHTML(post, user) {
                 ${post.visibility === 'private' ? '<span class="post-badge private"><i class="fa-solid fa-lock" style="font-size: 9px;"></i> Private</span>' : ''}
               </div>
               <div class="post-meta-sub">
-                <span>${Security.escapeHTML(post.date || 'මෑතකදී')}</span>
+                <span>${Security.escapeHTML(formatRelativeTimeSinhala(post.timestamp, post.date || 'දැන්'))}</span>
                 ${post.location ? `<span>• <i class="fa-solid fa-location-dot" style="color: #d97706;"></i> ${Security.escapeHTML(post.location)}</span>` : ''}
                 <span>• <i class="fa-solid ${post.visibility === 'private' ? 'fa-lock' : 'fa-earth-asia'}" style="font-size: 10px;"></i></span>
               </div>
@@ -611,27 +680,39 @@ function renderPostCardHTML(post, user) {
           <span class="sadhu-emoji-circle">🙏</span>
           <span style="font-weight: 700; color: #78350f;"><strong id="count-${post.id}">${post.sadhuCount || 0}</strong> දෙනෙක් සාදුකාර දුන්හ</span>
         </div>
-        <span style="cursor: pointer;" onclick="toggleCommentsSection('${post.id}')">
-          ${isGeneral ? 'සුබපැතුම්' : 'පුණ්‍යානුමෝදනා'} (${comments.length})
-        </span>
+        <div class="post-stats-metrics">
+          <span style="cursor: pointer;" onclick="toggleCommentsSection('${post.id}')" title="ප්‍රාර්ථනා බලන්න">
+            <i class="fa-regular fa-comment-dots" style="color: #d97706;"></i> <strong id="stat-comments-${post.id}">${comments.length}</strong> ${isGeneral ? 'සුබපැතුම්' : 'ප්‍රාර්ථනා'}
+          </span>
+          ${!isNeed && post.visibility !== 'private' ? `
+            <span class="stat-dot">•</span>
+            <span title="යළි බෙදාගැනීම් ගණන">
+              <i class="fa-solid fa-repeat" style="color: #059669;"></i> <strong id="stat-reposts-${post.id}">${post.repostCount || 0}</strong> යළි බෙදාගැනීම්
+            </span>
+          ` : ''}
+          <span class="stat-dot">•</span>
+          <span title="බෙදාගැනීම් ගණන">
+            <i class="fa-solid fa-share-nodes" style="color: #64748b;"></i> <strong id="stat-shares-${post.id}">${post.shareCount || 0}</strong> බෙදාගැනීම්
+          </span>
+        </div>
       </div>
 
       <!-- Action Buttons Grid -->
       <div class="post-actions-grid">
-        <button class="post-btn" id="sadhu-btn-${post.id}" onclick="handleSadhuClick('${post.id}', this)">
+        <button class="post-btn ${hasGivenSadhu ? 'liked' : ''}" id="sadhu-btn-${post.id}" onclick="handleSadhuClick('${post.id}', this)" title="${hasGivenSadhu ? 'සාදුකාරය ඉවත් කරන්න' : 'සාදුකාරයක් ලබා දෙන්න'}">
           <span style="font-size: 1rem;">🙏</span>
-          <span>සාදු!</span>
+          <span>සාදු! (<strong id="count-btn-${post.id}">${post.sadhuCount || 0}</strong>)</span>
         </button>
 
-        <button class="post-btn" onclick="toggleCommentsSection('${post.id}')">
+        <button class="post-btn" onclick="toggleCommentsSection('${post.id}')" title="ප්‍රාර්ථනා බලන්න හෝ එක් කරන්න">
           <i class="fa-regular fa-comment-dots" style="color: #d97706;"></i>
-          <span>${isGeneral ? 'සුබපැතුම්' : 'ප්‍රාර්ථනා'} (${comments.length})</span>
+          <span>${isGeneral ? 'සුබපැතුම්' : 'ප්‍රාර්ථනා'} (<strong id="comments-btn-${post.id}">${comments.length}</strong>)</span>
         </button>
 
         ${!isNeed && post.visibility !== 'private' ? `
           <button class="post-btn" onclick="openRepostModal('${isRepost && orig ? orig.id : post.id}')" title="පවුරට Repost කරන්න">
             <i class="fa-solid fa-repeat" style="color: #059669;"></i>
-            <span>යළි බෙදාගන්න ${post.repostCount > 0 ? `(${post.repostCount})` : ''}</span>
+            <span>යළි බෙදාගන්න (<strong id="reposts-btn-${post.id}">${post.repostCount || 0}</strong>)</span>
           </button>
         ` : ''}
 
@@ -641,9 +722,9 @@ function renderPostCardHTML(post, user) {
             <span>අමතන්න</span>
           </a>
         ` : `
-          <button class="post-btn" onclick="handleShare('${post.id}')">
+          <button class="post-btn" onclick="handleShare('${post.id}')" title="බාහිරව බෙදාගන්න">
             <i class="fa-solid fa-share-nodes" style="color: #94a3b8;"></i>
-            <span>බෙදාගන්න</span>
+            <span>බෙදාගන්න (<strong id="shares-btn-${post.id}">${post.shareCount || 0}</strong>)</span>
           </button>
         `}
       </div>
@@ -684,7 +765,7 @@ function renderPostCardHTML(post, user) {
               <div class="comment-text-box">
                 <div class="comment-author-row">
                   <span>${Security.escapeHTML(c.author || 'කල්‍යාණ මිත්‍ර')}</span>
-                  <span class="comment-time">${Security.escapeHTML(c.time || 'දැන්')}</span>
+                  <span class="comment-time">${Security.escapeHTML(formatRelativeTimeSinhala(c.timestamp, c.time || 'දැන්'))}</span>
                 </div>
                 <div class="comment-body">${Security.escapeHTML(c.text)}</div>
               </div>
@@ -819,34 +900,42 @@ function triggerSadhuFloatingAnimation(btnElement) {
 
 // Global actions exposed to HTML
 window.handleSadhuClick = async function(postId, btnElement) {
-  // Play sacred temple bell sound & haptic vibration
-  SoundService.playSadhu();
-  triggerHaptic([15, 30, 20]);
-
-  // 1. Instant button bounce micro-interaction
-  if (btnElement) {
-    btnElement.classList.add('liked');
-    btnElement.style.transform = 'scale(1.1)';
-    setTimeout(() => {
-      if (btnElement) btnElement.style.transform = '';
-    }, 180);
-  }
-
-  // 2. Instant local count increment for zero-latency user feedback
-  const countEl = document.getElementById(`count-${postId}`);
-  if (countEl) {
-    const current = parseInt(countEl.innerText || '0', 10);
-    countEl.innerText = current + 1;
-  }
-
-  // 3. Trigger robust floating animation on document.body
-  triggerSadhuFloatingAnimation(btnElement);
-
-  // 4. Persist to storage & cloud database
   try {
-    await StorageService.giveSadhu(postId);
+    const res = await StorageService.giveSadhu(postId);
+
+    const countEl = document.getElementById(`count-${postId}`);
+    const btnCountEl = document.getElementById(`count-btn-${postId}`);
+
+    if (countEl) countEl.innerText = res.count;
+    if (btnCountEl) btnCountEl.innerText = res.count;
+
+    if (res.action === 'added') {
+      // Play sacred temple bell sound & haptic vibration
+      SoundService.playSadhu();
+      triggerHaptic([15, 30, 20]);
+
+      // Button bounce & liked state
+      if (btnElement) {
+        btnElement.classList.add('liked');
+        btnElement.title = 'සාදුකාරය ඉවත් කරන්න';
+        btnElement.style.transform = 'scale(1.12)';
+        setTimeout(() => {
+          if (btnElement) btnElement.style.transform = '';
+        }, 180);
+      }
+
+      // Trigger robust floating animation on document.body
+      triggerSadhuFloatingAnimation(btnElement);
+    } else if (res.action === 'removed') {
+      // Withdrew Sadhu
+      triggerHaptic(15);
+      if (btnElement) {
+        btnElement.classList.remove('liked');
+        btnElement.title = 'සාදුකාරයක් ලබා දෙන්න';
+      }
+    }
   } catch (err) {
-    console.warn('[Sadhu] Increment error:', err);
+    console.warn('[Sadhu] Toggle error:', err);
   }
 };
 
@@ -871,6 +960,12 @@ window.submitQuickBlessing = async function(postId, text) {
     if (box) box.style.display = 'block';
     SoundService.playSadhu();
     triggerHaptic(20);
+
+    const btnC = document.getElementById(`comments-btn-${postId}`);
+    const statC = document.getElementById(`stat-comments-${postId}`);
+    if (btnC) btnC.innerText = parseInt(btnC.innerText || '0', 10) + 1;
+    if (statC) statC.innerText = parseInt(statC.innerText || '0', 10) + 1;
+
     await StorageService.addComment(postId, text);
   } catch (err) {
     alert(err.message);
@@ -887,6 +982,12 @@ window.handleCommentSubmit = async function(event, postId) {
     if (box) box.style.display = 'block';
     SoundService.playSadhu();
     triggerHaptic(20);
+
+    const btnC = document.getElementById(`comments-btn-${postId}`);
+    const statC = document.getElementById(`stat-comments-${postId}`);
+    if (btnC) btnC.innerText = parseInt(btnC.innerText || '0', 10) + 1;
+    if (statC) statC.innerText = parseInt(statC.innerText || '0', 10) + 1;
+
     await StorageService.addComment(postId, input.value);
     input.value = '';
   } catch (err) {
@@ -1035,6 +1136,10 @@ window.handleShare = async function(postId) {
     StorageService.incrementShare(targetId);
     if (postId !== targetId) StorageService.incrementShare(postId);
     if (post) post.shareCount = (post.shareCount || 0) + 1;
+    const shareBtnEl = document.getElementById(`shares-btn-${postId}`);
+    const shareStatEl = document.getElementById(`stat-shares-${postId}`);
+    if (shareBtnEl) shareBtnEl.innerText = post.shareCount;
+    if (shareStatEl) shareStatEl.innerText = post.shareCount;
     if (typeof activeProfileSubTab !== 'undefined' && activeProfileSubTab === 'stats') {
       const u = StorageService.currentUser || {};
       const mp = currentPostsData.filter(p => p.uid && u.uid && p.uid === u.uid);
@@ -1383,13 +1488,59 @@ window.removeSelectedComposerImage = function(index) {
   }
 };
 
-// Fullscreen Photo Lightbox Gallery
+// Fullscreen Photo Lightbox Gallery with Zoom & Touch Gesture Navigation
+let currentLightboxZoom = 1;
+let currentLightboxPanX = 0;
+let currentLightboxPanY = 0;
+
+function applyLightboxTransform(isDragging = false) {
+  const imgEl = document.getElementById('lightboxActiveImage');
+  if (!imgEl) return;
+  if (currentLightboxZoom <= 1) {
+    currentLightboxZoom = 1;
+    currentLightboxPanX = 0;
+    currentLightboxPanY = 0;
+    imgEl.style.transform = 'translate(0px, 0px) scale(1)';
+    imgEl.style.cursor = 'default';
+  } else {
+    imgEl.style.transform = `translate(${currentLightboxPanX}px, ${currentLightboxPanY}px) scale(${currentLightboxZoom})`;
+    imgEl.style.cursor = isDragging ? 'grabbing' : 'grab';
+  }
+  imgEl.style.transition = isDragging ? 'none' : 'transform 0.22s cubic-bezier(0.2, 0, 0.2, 1)';
+}
+
+window.zoomInLightbox = function(step = 0.5) {
+  currentLightboxZoom = Math.min(4, Math.round((currentLightboxZoom + step) * 10) / 10);
+  applyLightboxTransform(false);
+  triggerHaptic(10);
+};
+
+window.zoomOutLightbox = function(step = 0.5) {
+  currentLightboxZoom = Math.max(1, Math.round((currentLightboxZoom - step) * 10) / 10);
+  if (currentLightboxZoom === 1) {
+    currentLightboxPanX = 0;
+    currentLightboxPanY = 0;
+  }
+  applyLightboxTransform(false);
+  triggerHaptic(10);
+};
+
+window.resetZoomLightbox = function() {
+  currentLightboxZoom = 1;
+  currentLightboxPanX = 0;
+  currentLightboxPanY = 0;
+  applyLightboxTransform(false);
+  triggerHaptic(10);
+};
+
 window.openLightbox = function(encodedImages, startIndex = 0) {
   try {
     const images = typeof encodedImages === 'string' ? JSON.parse(decodeURIComponent(encodedImages)) : encodedImages;
     if (!images || !Array.isArray(images) || images.length === 0) return;
     currentLightboxImages = images;
     currentLightboxIndex = startIndex >= 0 && startIndex < images.length ? startIndex : 0;
+
+    resetZoomLightbox();
 
     const modal = document.getElementById('photoLightboxModal');
     const imgEl = document.getElementById('lightboxActiveImage');
@@ -1416,6 +1567,7 @@ window.openLightbox = function(encodedImages, startIndex = 0) {
 };
 
 window.closeLightbox = function() {
+  resetZoomLightbox();
   const modal = document.getElementById('photoLightboxModal');
   if (modal) {
     modal.classList.add('hidden');
@@ -1424,8 +1576,12 @@ window.closeLightbox = function() {
 };
 
 window.closeLightboxOnBackdrop = function(e) {
-  if (e.target.id === 'photoLightboxModal') {
-    window.closeLightbox();
+  if (e.target.id === 'photoLightboxModal' || e.target.id === 'lightboxContentBox') {
+    if (currentLightboxZoom > 1) {
+      resetZoomLightbox();
+    } else {
+      window.closeLightbox();
+    }
   }
 };
 
@@ -1433,35 +1589,221 @@ window.nextLightboxImage = function() {
   if (currentLightboxImages.length <= 1) return;
   currentLightboxIndex = (currentLightboxIndex + 1) % currentLightboxImages.length;
   updateLightboxView();
+  triggerHaptic(15);
 };
 
 window.prevLightboxImage = function() {
   if (currentLightboxImages.length <= 1) return;
   currentLightboxIndex = (currentLightboxIndex - 1 + currentLightboxImages.length) % currentLightboxImages.length;
   updateLightboxView();
+  triggerHaptic(15);
 };
 
 function updateLightboxView() {
+  resetZoomLightbox();
   const imgEl = document.getElementById('lightboxActiveImage');
   const counterEl = document.getElementById('lightboxCounter');
   if (imgEl) imgEl.src = currentLightboxImages[currentLightboxIndex];
   if (counterEl) counterEl.innerText = `${currentLightboxIndex + 1} / ${currentLightboxImages.length}`;
 }
 
-// Arrow key navigation for Lightbox
+// Arrow key & keyboard zoom navigation for Lightbox
 document.addEventListener('keydown', (e) => {
   const modal = document.getElementById('photoLightboxModal');
   if (modal && !modal.classList.contains('hidden')) {
     if (e.key === 'ArrowRight') window.nextLightboxImage();
     else if (e.key === 'ArrowLeft') window.prevLightboxImage();
     else if (e.key === 'Escape') window.closeLightbox();
+    else if (e.key === '+' || e.key === '=') window.zoomInLightbox();
+    else if (e.key === '-' || e.key === '_') window.zoomOutLightbox();
+    else if (e.key === '0') window.resetZoomLightbox();
   }
 });
 
+// Touch Gestures: Swipe left/right, Pinch to zoom, Double-tap to zoom, Pan when enlarged
+function initLightboxTouchGestures() {
+  const modal = document.getElementById('photoLightboxModal');
+  const contentBox = document.getElementById('lightboxContentBox') || modal;
+  const imgEl = document.getElementById('lightboxActiveImage');
+  if (!modal || !contentBox || !imgEl) return;
+
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let touchDeltaX = 0;
+  let touchDeltaY = 0;
+  let isTouching = false;
+  let isPinching = false;
+  let isDraggingPan = false;
+  let panStartX = 0;
+  let panStartY = 0;
+  let initialPinchDistance = 0;
+  let pinchStartZoom = 1;
+  let lastTapTime = 0;
+
+  contentBox.addEventListener('touchstart', (e) => {
+    if (e.target.closest('.lightbox-top-bar') || e.target.closest('.lightbox-nav-btn')) return;
+
+    if (e.touches.length === 1) {
+      isTouching = true;
+      isPinching = false;
+      const t = e.touches[0];
+      touchStartX = t.clientX;
+      touchStartY = t.clientY;
+      touchDeltaX = 0;
+      touchDeltaY = 0;
+
+      if (currentLightboxZoom > 1) {
+        isDraggingPan = true;
+        panStartX = t.clientX - currentLightboxPanX;
+        panStartY = t.clientY - currentLightboxPanY;
+      }
+    } else if (e.touches.length === 2) {
+      isTouching = false;
+      isDraggingPan = false;
+      isPinching = true;
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      initialPinchDistance = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+      pinchStartZoom = currentLightboxZoom;
+    }
+  }, { passive: false });
+
+  contentBox.addEventListener('touchmove', (e) => {
+    if (isPinching && e.touches.length === 2) {
+      e.preventDefault();
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const currentDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+      if (initialPinchDistance > 0) {
+        const factor = currentDist / initialPinchDistance;
+        currentLightboxZoom = Math.min(4, Math.max(1, Math.round((pinchStartZoom * factor) * 100) / 100));
+        applyLightboxTransform(true);
+      }
+    } else if (isTouching && e.touches.length === 1) {
+      const t = e.touches[0];
+      touchDeltaX = t.clientX - touchStartX;
+      touchDeltaY = t.clientY - touchStartY;
+
+      if (currentLightboxZoom > 1 && isDraggingPan) {
+        e.preventDefault();
+        currentLightboxPanX = t.clientX - panStartX;
+        currentLightboxPanY = t.clientY - panStartY;
+        applyLightboxTransform(true);
+      } else if (currentLightboxZoom === 1) {
+        if (Math.abs(touchDeltaX) > Math.abs(touchDeltaY) && currentLightboxImages.length > 1) {
+          e.preventDefault();
+          imgEl.style.transform = `translate(${touchDeltaX * 0.35}px, 0px) scale(1)`;
+          imgEl.style.transition = 'none';
+        }
+      }
+    }
+  }, { passive: false });
+
+  contentBox.addEventListener('touchend', (e) => {
+    if (isPinching) {
+      isPinching = false;
+      if (currentLightboxZoom < 1.05) {
+        resetZoomLightbox();
+      } else {
+        applyLightboxTransform(false);
+      }
+      return;
+    }
+
+    if (isTouching) {
+      isTouching = false;
+      const now = Date.now();
+      const tapDist = Math.hypot(touchDeltaX, touchDeltaY);
+
+      // Double-tap to zoom in / reset
+      if (tapDist < 12 && (now - lastTapTime) < 300) {
+        lastTapTime = 0;
+        if (currentLightboxZoom > 1) {
+          resetZoomLightbox();
+        } else {
+          currentLightboxZoom = 2.2;
+          applyLightboxTransform(false);
+          triggerHaptic(15);
+        }
+        return;
+      }
+      lastTapTime = now;
+
+      if (currentLightboxZoom > 1) {
+        isDraggingPan = false;
+        applyLightboxTransform(false);
+      } else {
+        // Horizontal Swipe navigation
+        imgEl.style.transition = 'transform 0.22s cubic-bezier(0.2, 0, 0.2, 1)';
+        if (Math.abs(touchDeltaX) > 45 && Math.abs(touchDeltaX) > Math.abs(touchDeltaY) * 1.2 && currentLightboxImages.length > 1) {
+          if (touchDeltaX < 0) {
+            window.nextLightboxImage();
+          } else {
+            window.prevLightboxImage();
+          }
+        } else {
+          imgEl.style.transform = 'translate(0px, 0px) scale(1)';
+        }
+      }
+    }
+  });
+
+  // Desktop Mouse Drag when Zoomed
+  let isMouseDragging = false;
+  let mouseStartX = 0;
+  let mouseStartY = 0;
+
+  imgEl.addEventListener('mousedown', (e) => {
+    if (currentLightboxZoom > 1) {
+      e.preventDefault();
+      isMouseDragging = true;
+      mouseStartX = e.clientX - currentLightboxPanX;
+      mouseStartY = e.clientY - currentLightboxPanY;
+      imgEl.style.cursor = 'grabbing';
+    }
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (isMouseDragging && currentLightboxZoom > 1) {
+      e.preventDefault();
+      currentLightboxPanX = e.clientX - mouseStartX;
+      currentLightboxPanY = e.clientY - mouseStartY;
+      applyLightboxTransform(true);
+    }
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (isMouseDragging) {
+      isMouseDragging = false;
+      if (imgEl) imgEl.style.cursor = currentLightboxZoom > 1 ? 'grab' : 'default';
+      applyLightboxTransform(false);
+    }
+  });
+
+  // Desktop Mouse Wheel Zoom
+  modal.addEventListener('wheel', (e) => {
+    if (modal.classList.contains('hidden')) return;
+    e.preventDefault();
+    if (e.deltaY < 0) {
+      window.zoomInLightbox(0.3);
+    } else {
+      window.zoomOutLightbox(0.3);
+    }
+  }, { passive: false });
+}
+
 // Setup Listeners
 function setupEventListeners() {
+  initLightboxTouchGestures();
+
+  let isSubmittingPost = false;
+
   document.getElementById('postForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (isSubmittingPost) return;
+
+    const submitBtn = document.getElementById('submitPostBtn') || e.target.querySelector('button[type="submit"]');
+    const originalBtnHTML = submitBtn ? submitBtn.innerHTML : '';
 
     const title = selectedPostType === 'general' ? '' : (document.getElementById('postTitle')?.value || '').trim();
     const category = selectedPostType === 'general' ? (document.getElementById('postCategory')?.value || 'සාමාන්‍ය') : (document.getElementById('postCategory')?.value || 'දානමය');
@@ -1475,6 +1817,12 @@ function setupEventListeners() {
     const isPinned = isMaster && (!!document.getElementById('adminIsPinned')?.checked || !!document.getElementById('postIsPinned')?.checked);
 
     try {
+      isSubmittingPost = true;
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> පළවෙමින් පවතී...';
+      }
+
       await StorageService.createPost({
         type: selectedPostType,
         title,
@@ -1497,6 +1845,12 @@ function setupEventListeners() {
       else switchTab('feed');
     } catch (err) {
       alert("දෝෂයකි: " + err.message);
+    } finally {
+      isSubmittingPost = false;
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtnHTML;
+      }
     }
   });
 
@@ -2755,7 +3109,7 @@ window.openRepostModal = function(postId) {
           <div class="quoted-avatar">${Security.escapeHTML((orig.author || 'ක').charAt(0))}</div>
           <div>
             <div style="font-weight: 700; font-size: 0.82rem; color: #78350f;">${Security.escapeHTML(orig.author || 'කල්‍යාණ මිත්‍ර')}</div>
-            <div style="font-size: 0.68rem; color: #94a3b8;">${Security.escapeHTML(orig.date || 'මෑතකදී')} ${orig.location ? '• ' + Security.escapeHTML(orig.location) : ''}</div>
+            <div style="font-size: 0.68rem; color: #94a3b8;">${Security.escapeHTML(formatRelativeTimeSinhala(orig.timestamp, orig.date || 'මෑතකදී'))} ${orig.location ? '• ' + Security.escapeHTML(orig.location) : ''}</div>
           </div>
         </div>
         <span class="post-badge category">${Security.escapeHTML(orig.category || 'පින්කම')}</span>
@@ -2809,6 +3163,12 @@ window.submitRepost = async function() {
     await StorageService.repostPost(currentRepostTargetId, comment, currentRepostTargetPost);
     SoundService.playRepost();
     triggerHaptic([20, 40, 20]);
+
+    const repostBtnEl = document.getElementById(`reposts-btn-${currentRepostTargetId}`);
+    const repostStatEl = document.getElementById(`stat-reposts-${currentRepostTargetId}`);
+    if (repostBtnEl) repostBtnEl.innerText = parseInt(repostBtnEl.innerText || '0', 10) + 1;
+    if (repostStatEl) repostStatEl.innerText = parseInt(repostStatEl.innerText || '0', 10) + 1;
+
     closeRepostModal();
     switchTab('feed');
     window.scrollTo({ top: 0, behavior: 'smooth' });

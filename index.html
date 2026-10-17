@@ -1454,17 +1454,33 @@
     <!-- Fullscreen Photo Lightbox / Gallery Viewer                                -->
     <!-- ========================================================================= -->
     <div id="photoLightboxModal" class="lightbox-overlay hidden" onclick="closeLightboxOnBackdrop(event)">
-        <button class="lightbox-close-btn" onclick="closeLightbox()" title="වසන්න">
-            <i class="fa-solid fa-xmark"></i>
-        </button>
+        <!-- Top Toolbar with Counter, Zoom Controls, and Close Button -->
+        <div class="lightbox-top-bar" onclick="event.stopPropagation()">
+            <div class="lightbox-counter-badge" id="lightboxCounter">1 / 1</div>
+
+            <div class="lightbox-zoom-controls">
+                <button type="button" class="lightbox-tool-btn" onclick="zoomInLightbox()" title="විශාල කරන්න (Zoom In)">
+                    <i class="fa-solid fa-magnifying-glass-plus"></i>
+                </button>
+                <button type="button" class="lightbox-tool-btn" onclick="zoomOutLightbox()" title="කුඩා කරන්න (Zoom Out)">
+                    <i class="fa-solid fa-magnifying-glass-minus"></i>
+                </button>
+                <button type="button" class="lightbox-tool-btn" onclick="resetZoomLightbox()" title="මුල් ප්‍රමාණය (Reset)">
+                    <i class="fa-solid fa-rotate-left"></i>
+                </button>
+            </div>
+
+            <button type="button" class="lightbox-close-btn" onclick="closeLightbox()" title="වසන්න">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
 
         <button class="lightbox-nav-btn prev" id="lightboxPrevBtn" onclick="prevLightboxImage()" title="කලින් ඡායාරූපය">
             <i class="fa-solid fa-chevron-left"></i>
         </button>
 
-        <div class="lightbox-content-box">
+        <div class="lightbox-content-box" id="lightboxContentBox">
             <img id="lightboxActiveImage" src="" alt="පින්කම් ඡායාරූපය" class="lightbox-main-img">
-            <div class="lightbox-counter-badge" id="lightboxCounter">1 / 1</div>
         </div>
 
         <button class="lightbox-nav-btn next" id="lightboxNextBtn" onclick="nextLightboxImage()" title="ඊළඟ ඡායාරූපය">
