@@ -4,7 +4,7 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=37';
+import { StorageService } from './storage.js?v=38';
 import { Security } from './security.js?v=32';
 import { uploadToImgBB } from './imgbb-service.js?v=32';
 import { SoundService, triggerHaptic } from './sound.js?v=32';
@@ -880,7 +880,7 @@ function renderPostCardHTML(post, user) {
       <div class="post-stats-bar">
         <div class="sadhu-stat-pill">
           <span class="sadhu-emoji-circle">🙏</span>
-          <span style="font-weight: 700; color: #78350f;"><strong id="count-${post.id}">${post.sadhuCount || 0}</strong> දෙනෙක් සාදුකාර දුන්හ</span>
+          <span style="font-weight: 700; color: #78350f;"><strong id="count-${post.id}">${Math.max(0, parseInt(post.sadhuCount, 10) || 0)}</strong> දෙනෙක් සාදුකාර දුන්හ</span>
         </div>
         <div class="post-stats-metrics">
           <span style="cursor: pointer;" onclick="toggleCommentsSection('${post.id}')" title="ප්‍රාර්ථනා බලන්න">
@@ -903,7 +903,7 @@ function renderPostCardHTML(post, user) {
       <div class="post-actions-grid">
         <button class="post-btn ${hasGivenSadhu ? 'liked' : ''}" id="sadhu-btn-${post.id}" onclick="handleSadhuClick('${post.id}', this)" title="${hasGivenSadhu ? 'සාදුකාරය ඉවත් කරන්න' : 'සාදුකාරයක් ලබා දෙන්න'}">
           <span style="font-size: 1rem;">🙏</span>
-          <span>සාදු! (<strong id="count-btn-${post.id}">${post.sadhuCount || 0}</strong>)</span>
+          <span>සාදු! (<strong id="count-btn-${post.id}">${Math.max(0, parseInt(post.sadhuCount, 10) || 0)}</strong>)</span>
         </button>
 
         <button class="post-btn" onclick="toggleCommentsSection('${post.id}')" title="ප්‍රාර්ථනා බලන්න හෝ එක් කරන්න">
@@ -1193,7 +1193,7 @@ window.handleSadhuClick = async function(postId, btnElement) {
   const isCurrentlyLiked = btn ? btn.classList.contains('liked') : false;
   const countEl = document.getElementById(`count-${postId}`);
   const btnCountEl = document.getElementById(`count-btn-${postId}`);
-  const currentCount = parseInt(btnCountEl?.innerText || countEl?.innerText || '0', 10) || 0;
+  const currentCount = Math.max(0, parseInt(btnCountEl?.innerText || countEl?.innerText || '0', 10) || 0);
 
   // 3. Immediate Optimistic UI Feedback
   if (!isCurrentlyLiked) {
@@ -1252,8 +1252,9 @@ window.handleSadhuClick = async function(postId, btnElement) {
     const freshCountEl = document.getElementById(`count-${postId}`);
     const freshBtnCountEl = document.getElementById(`count-btn-${postId}`);
 
-    if (freshCountEl) freshCountEl.innerText = res.count;
-    if (freshBtnCountEl) freshBtnCountEl.innerText = res.count;
+    const confirmedCount = Math.max(0, parseInt(res.count, 10) || 0);
+    if (freshCountEl) freshCountEl.innerText = confirmedCount;
+    if (freshBtnCountEl) freshBtnCountEl.innerText = confirmedCount;
 
     if (freshBtn) {
       if (res.action === 'added') {

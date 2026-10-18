@@ -199,7 +199,14 @@ export const StorageService = {
           snapshot.forEach((doc) => {
             const data = doc.data();
             if (!deletedIds.includes(doc.id) && data.isDeleted !== true) {
-              posts.push({ id: doc.id, ...data });
+              const rawSadhu = typeof data.sadhuCount === 'number' ? data.sadhuCount : 0;
+              const sanitizedSadhu = Math.max(0, rawSadhu);
+              posts.push({
+                id: doc.id,
+                ...data,
+                sadhuCount: sanitizedSadhu,
+                sadhuUsers: Array.isArray(data.sadhuUsers) ? data.sadhuUsers : []
+              });
             }
           });
           this.syncPostsWithUserSadhus(posts);
@@ -358,28 +365,25 @@ export const StorageService = {
     if (!post) return false;
     const userUid = uid || this.currentUser?.uid || 'anonymous';
     const sadhuUsers = Array.isArray(post.sadhuUsers) ? post.sadhuUsers : [];
-    if (sadhuUsers.includes(userUid)) return true;
-    const mySadhus = this.getUserSadhus(userUid);
-    return mySadhus.includes(post.id);
+    return sadhuUsers.includes(userUid);
   },
 
   syncPostsWithUserSadhus(posts) {
     const userUid = this.currentUser?.uid || 'anonymous';
     const mySadhus = this.getUserSadhus(userUid);
-    const mySadhuSet = new Set(mySadhus);
 
     (posts || []).forEach(post => {
       if (!Array.isArray(post.sadhuUsers)) {
         post.sadhuUsers = [];
       }
-      if (post.sadhuUsers.includes(userUid)) {
-        mySadhuSet.add(post.id);
-      } else if (mySadhuSet.has(post.id)) {
+      post.sadhuCount = Math.max(0, parseInt(post.sadhuCount, 10) || 0);
+
+      if (mySadhus.includes(post.id) && !post.sadhuUsers.includes(userUid)) {
         post.sadhuUsers.push(userUid);
+        if (post.sadhuCount === 0) post.sadhuCount = 1;
       }
     });
 
-    this.setUserSadhus(Array.from(mySadhuSet), userUid);
     return posts;
   },
 
@@ -892,8 +896,8 @@ export const StorageService = {
       authorEmail: this.currentUser.email || null,
       timestamp: Date.now(),
       date: "දැන්",
-      sadhuCount: 1,
-      sadhuUsers: [this.currentUser.uid],
+      sadhuCount: 0,
+      sadhuUsers: [],
       comments: [],
       shareCount: 0,
       repostCount: 0
@@ -985,8 +989,8 @@ export const StorageService = {
       images: [],
       timestamp: Date.now(),
       date: "දැන්",
-      sadhuCount: 1,
-      sadhuUsers: [this.currentUser.uid || 'anonymous'],
+      sadhuCount: 0,
+      sadhuUsers: [],
       comments: [],
       repostCount: 0,
       shareCount: 0,
@@ -1090,13 +1094,15 @@ export const StorageService = {
     if (!targetPost) return { action: 'none', count: 0, hasGiven: false };
 
     targetPost.sadhuUsers = Array.isArray(targetPost.sadhuUsers) ? targetPost.sadhuUsers : [];
-    const alreadyGiven = targetPost.sadhuUsers.includes(userUid) || this.getUserSadhus(userUid).includes(postId);
+    targetPost.sadhuCount = Math.max(0, parseInt(targetPost.sadhuCount, 10) || 0);
+
+    const alreadyGiven = targetPost.sadhuUsers.includes(userUid);
 
     let action = 'added';
     if (alreadyGiven) {
       // Toggle off / remove Sadhu
       targetPost.sadhuUsers = targetPost.sadhuUsers.filter(uid => uid !== userUid);
-      targetPost.sadhuCount = Math.max(0, (targetPost.sadhuCount || 1) - 1);
+      targetPost.sadhuCount = Math.max(0, targetPost.sadhuCount - 1);
       this.recordUserSadhu(postId, false, userUid);
       action = 'removed';
     } else {
@@ -1104,7 +1110,7 @@ export const StorageService = {
       if (!targetPost.sadhuUsers.includes(userUid)) {
         targetPost.sadhuUsers.push(userUid);
       }
-      targetPost.sadhuCount = (targetPost.sadhuCount || 0) + 1;
+      targetPost.sadhuCount = targetPost.sadhuCount + 1;
       this.recordUserSadhu(postId, true, userUid);
       action = 'added';
     }
@@ -1115,17 +1121,17 @@ export const StorageService = {
 
     if (isCloudReady && db) {
       try {
-        const { doc, updateDoc, increment, arrayUnion, arrayRemove } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const { doc, updateDoc, arrayUnion, arrayRemove } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
         const postRef = doc(db, COLLECTIONS.POSTS, postId);
         try {
           if (action === 'added') {
             await updateDoc(postRef, {
-              sadhuCount: increment(1),
+              sadhuCount: Math.max(1, targetPost.sadhuCount),
               sadhuUsers: arrayUnion(userUid)
             });
           } else {
             await updateDoc(postRef, {
-              sadhuCount: increment(-1),
+              sadhuCount: Math.max(0, targetPost.sadhuCount),
               sadhuUsers: arrayRemove(userUid)
             });
           }
@@ -1133,7 +1139,7 @@ export const StorageService = {
           console.warn('[Sadhu Cloud] Full update blocked, falling back to sadhuCount only:', cloudErr);
           try {
             await updateDoc(postRef, {
-              sadhuCount: action === 'added' ? increment(1) : increment(-1)
+              sadhuCount: Math.max(0, targetPost.sadhuCount)
             });
           } catch (countErr) {
             console.warn('[Sadhu Cloud] Fallback sadhuCount write also failed:', countErr);
