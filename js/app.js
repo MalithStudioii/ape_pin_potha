@@ -4,11 +4,11 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=44';
+import { StorageService } from './storage.js?v=45';
 import { Security } from './security.js?v=32';
 import { uploadToImgBB } from './imgbb-service.js?v=32';
 import { SoundService, triggerHaptic } from './sound.js?v=32';
-import { FeedAlgorithm } from './algorithm.js?v=44';
+import { FeedAlgorithm } from './algorithm.js?v=45';
 
 window.FeedAlgorithm = FeedAlgorithm;
 window.SoundService = SoundService;
@@ -438,7 +438,8 @@ window.openMemberProfileModal = async function(uid, authorName) {
   // Filter public posts for this member
   const memberPosts = currentPostsData.filter(p => {
     const matchUid = uid && p.uid && p.uid === uid;
-    const matchAuthor = (member.name && p.author === member.name) || (authorName && p.author === authorName);
+    const resolvedName = StorageService.resolveAuthorName(p);
+    const matchAuthor = (member.name && resolvedName === member.name) || (authorName && resolvedName === authorName);
     return (matchUid || matchAuthor) && p.visibility !== 'private';
   });
 
@@ -786,6 +787,12 @@ function renderPostCardHTML(post, user) {
 
   const isTrending = (currentFeedSort === 'trending' && FeedAlgorithm.isTrendingPost(post, currentPostsData));
 
+  // Dynamically resolved author details (syncs immediately when someone updates profile name/photo)
+  const postAuthorName = StorageService.resolveAuthorName(post);
+  const postAuthorPhoto = StorageService.resolveAuthorPhoto(post);
+  const origAuthorName = orig ? StorageService.resolveAuthorName(orig) : '';
+  const origAuthorPhoto = orig ? StorageService.resolveAuthorPhoto(orig) : null;
+
   return `
     <article class="post-card ${isNeed ? 'need-card' : ''} ${isRepost ? 'repost-card' : ''} ${post.isOfficial ? 'official-card' : ''}" id="post-elem-${post.id}">
       
@@ -809,11 +816,11 @@ function renderPostCardHTML(post, user) {
       ${isRepost ? `
         <div class="repost-header-tag">
           <div style="display: flex; align-items: center; gap: 8px;">
-            <div class="repost-icon-circle" onclick="viewUserProfile('${post.uid}', '${Security.escapeHTML(post.author || '')}')" style="cursor: pointer;" title="${Security.escapeHTML(post.author || 'කල්‍යාණ මිත්‍ර')} ගේ Profile එක බලන්න">
+            <div class="repost-icon-circle" onclick="viewUserProfile('${post.uid}', '${Security.escapeHTML(postAuthorName)}')" style="cursor: pointer;" title="${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න">
               <i class="fa-solid fa-repeat"></i>
             </div>
             <div>
-              <span class="repost-actor-name ${post.isOfficial ? '' : 'author-click-link'}" ${post.isOfficial ? '' : `onclick="viewUserProfile('${post.uid}', '${Security.escapeHTML(post.author || '')}')" title="${Security.escapeHTML(post.author || 'කල්‍යාණ මිත්‍ර')} ගේ Profile එක බලන්න"`}><strong>${Security.escapeHTML(post.isOfficial ? 'අපේ පිං පොත' : (post.author || 'කල්‍යාණ මිත්‍ර'))}</strong> විසින් යළි බෙදාගන්නා ලදී</span>
+              <span class="repost-actor-name ${post.isOfficial ? '' : 'author-click-link'}" ${post.isOfficial ? '' : `onclick="viewUserProfile('${post.uid}', '${Security.escapeHTML(postAuthorName)}')"`} title="${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න"><strong>${Security.escapeHTML(post.isOfficial ? 'අපේ පිං පොත' : postAuthorName)}</strong> විසින් යළි බෙදාගන්නා ලදී</span>
               <span class="repost-time">${Security.escapeHTML(formatRelativeTimeSinhala(post.timestamp, post.date || 'දැන්'))}</span>
             </div>
           </div>
@@ -841,9 +848,9 @@ function renderPostCardHTML(post, user) {
           <div class="quoted-merit-box" onclick="viewOriginalPost('${orig.id}', '${post.id}')" title="සම්පූර්ණ මුල් සටහන බලන්න ක්ලික් කරන්න">
             <div class="quoted-merit-header">
               <div style="display: flex; align-items: center; gap: 8px;">
-                <div class="quoted-avatar" onclick="event.stopPropagation(); viewUserProfile('${orig.uid}', '${Security.escapeHTML(orig.author || '')}')" style="cursor: pointer;" title="${Security.escapeHTML(orig.author || '')} ගේ Profile එක බලන්න">${Security.escapeHTML((orig.author || 'ක').charAt(0))}</div>
+                <div class="quoted-avatar" onclick="event.stopPropagation(); viewUserProfile('${orig.uid}', '${Security.escapeHTML(origAuthorName)}')" style="cursor: pointer;" title="${Security.escapeHTML(origAuthorName)} ගේ Profile එක බලන්න">${origAuthorPhoto ? `<img src="${Security.sanitizeUrl(origAuthorPhoto)}" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover;">` : Security.escapeHTML(origAuthorName.charAt(0))}</div>
                 <div>
-                  <div class="author-click-link" onclick="event.stopPropagation(); viewUserProfile('${orig.uid}', '${Security.escapeHTML(orig.author || '')}')" title="${Security.escapeHTML(orig.author || '')} ගේ Profile එක බලන්න" style="font-weight: 700; font-size: 0.82rem; color: #78350f;">${Security.escapeHTML(orig.author || 'කල්‍යාණ මිත්‍ර')}</div>
+                  <div class="author-click-link" onclick="event.stopPropagation(); viewUserProfile('${orig.uid}', '${Security.escapeHTML(origAuthorName)}')" title="${Security.escapeHTML(origAuthorName)} ගේ Profile එක බලන්න" style="font-weight: 700; font-size: 0.82rem; color: #78350f;">${Security.escapeHTML(origAuthorName)}</div>
                   <div style="font-size: 0.68rem; color: #94a3b8;">${Security.escapeHTML(formatRelativeTimeSinhala(orig.timestamp, orig.date || 'මෑතකදී'))} ${orig.location ? '• ' + Security.escapeHTML(orig.location) : ''}</div>
                 </div>
               </div>
@@ -886,12 +893,12 @@ function renderPostCardHTML(post, user) {
                 </div>
               </div>
             ` : `
-              <div class="post-avatar ${isNeed ? 'need' : ''}" onclick="viewUserProfile('${post.uid}', '${Security.escapeHTML(post.author || '')}')" style="cursor: pointer;" title="${Security.escapeHTML(post.author || 'කල්‍යාණ මිත්‍ර')} ගේ Profile එක බලන්න">
-                ${post.authorPhoto ? `<img src="${Security.sanitizeUrl(post.authorPhoto)}" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover;">` : Security.escapeHTML((post.author || 'ක').charAt(0))}
+              <div class="post-avatar ${isNeed ? 'need' : ''}" onclick="viewUserProfile('${post.uid}', '${Security.escapeHTML(postAuthorName)}')" style="cursor: pointer;" title="${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න">
+                ${postAuthorPhoto ? `<img src="${Security.sanitizeUrl(postAuthorPhoto)}" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover;">` : Security.escapeHTML(postAuthorName.charAt(0))}
               </div>
               <div>
                 <div class="post-badges-wrap">
-                  <span class="post-author-name author-click-link" onclick="viewUserProfile('${post.uid}', '${Security.escapeHTML(post.author || '')}')" style="cursor: pointer;" title="${Security.escapeHTML(post.author || 'කල්‍යාණ මිත්‍ර')} ගේ Profile එක බලන්න">${Security.escapeHTML(post.author || 'කල්‍යාණ මිත්‍ර')}</span>
+                  <span class="post-author-name author-click-link" onclick="viewUserProfile('${post.uid}', '${Security.escapeHTML(postAuthorName)}')" style="cursor: pointer;" title="${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න">${Security.escapeHTML(postAuthorName)}</span>
                   ${(post.authorRole === 'admin' || (post.authorEmail && post.authorEmail.toLowerCase() === 'silvadilan9@gmail.com')) ? `
                     <span class="official-author-badge" title="Verified Master Admin"><i class="fa-solid fa-crown"></i> Master Admin</span>
                   ` : ''}
@@ -941,61 +948,73 @@ function renderPostCardHTML(post, user) {
       `}
 
       <!-- Stats Row -->
-      <div class="post-stats-bar">
+      <div class="post-stats-bar ${post.isOfficial ? 'official-stats-bar' : ''}">
         <div class="sadhu-stat-pill">
           <span class="sadhu-emoji-circle">🙏</span>
           <span style="font-weight: 700; color: #78350f;"><strong id="count-${post.id}">${Math.max(0, parseInt(post.sadhuCount, 10) || 0)}</strong> දෙනෙක් සාදුකාර දුන්හ</span>
         </div>
-        <div class="post-stats-metrics">
-          <span style="cursor: pointer;" onclick="toggleCommentsSection('${post.id}')" title="ප්‍රාර්ථනා බලන්න">
-            <i class="fa-regular fa-comment-dots" style="color: #d97706;"></i> <strong id="stat-comments-${post.id}">${comments.length}</strong> ${isGeneral ? 'සුබපැතුම්' : 'ප්‍රාර්ථනා'}
-          </span>
-          ${!isNeed && post.visibility !== 'private' ? `
-            <span class="stat-dot">•</span>
-            <span title="යළි බෙදාගැනීම් ගණන">
-              <i class="fa-solid fa-repeat" style="color: #059669;"></i> <strong id="stat-reposts-${post.id}">${post.repostCount || 0}</strong> යළි බෙදාගැනීම්
+        ${post.isOfficial ? '' : `
+          <div class="post-stats-metrics">
+            <span style="cursor: pointer;" onclick="toggleCommentsSection('${post.id}')" title="ප්‍රාර්ථනා බලන්න">
+              <i class="fa-regular fa-comment-dots" style="color: #d97706;"></i> <strong id="stat-comments-${post.id}">${comments.length}</strong> ${isGeneral ? 'සුබපැතුම්' : 'ප්‍රාර්ථනා'}
             </span>
-          ` : ''}
-          <span class="stat-dot">•</span>
-          <span title="බෙදාගැනීම් ගණන">
-            <i class="fa-solid fa-share-nodes" style="color: #64748b;"></i> <strong id="stat-shares-${post.id}">${post.shareCount || 0}</strong> බෙදාගැනීම්
-          </span>
-        </div>
-      </div>
-
-      <!-- Action Buttons Grid -->
-      <div class="post-actions-grid">
-        <button class="post-btn ${hasGivenSadhu ? 'liked' : ''}" id="sadhu-btn-${post.id}" onclick="handleSadhuClick('${post.id}', this)" title="${hasGivenSadhu ? 'සාදුකාරය ඉවත් කරන්න' : 'සාදුකාරයක් ලබා දෙන්න'}">
-          <span style="font-size: 1rem;">🙏</span>
-          <span>සාදු! (<strong id="count-btn-${post.id}">${Math.max(0, parseInt(post.sadhuCount, 10) || 0)}</strong>)</span>
-        </button>
-
-        <button class="post-btn" onclick="toggleCommentsSection('${post.id}')" title="ප්‍රාර්ථනා බලන්න හෝ එක් කරන්න">
-          <i class="fa-regular fa-comment-dots" style="color: #d97706;"></i>
-          <span>${isGeneral ? 'සුබපැතුම්' : 'ප්‍රාර්ථනා'} (<strong id="comments-btn-${post.id}">${comments.length}</strong>)</span>
-        </button>
-
-        ${!isNeed && post.visibility !== 'private' ? `
-          <button class="post-btn" onclick="openRepostModal('${isRepost && orig ? orig.id : post.id}')" title="පවුරට Repost කරන්න">
-            <i class="fa-solid fa-repeat" style="color: #059669;"></i>
-            <span>යළි බෙදාගන්න (<strong id="reposts-btn-${post.id}">${post.repostCount || 0}</strong>)</span>
-          </button>
-        ` : ''}
-
-        ${isNeed && post.contact ? `
-          <a href="tel:${Security.sanitizePhone(post.contact)}" class="post-btn call-action">
-            <i class="fa-solid fa-phone"></i>
-            <span>අමතන්න</span>
-          </a>
-        ` : `
-          <button class="post-btn" onclick="handleShare('${post.id}')" title="බාහිරව බෙදාගන්න">
-            <i class="fa-solid fa-share-nodes" style="color: #94a3b8;"></i>
-            <span>බෙදාගන්න (<strong id="shares-btn-${post.id}">${post.shareCount || 0}</strong>)</span>
-          </button>
+            ${!isNeed && post.visibility !== 'private' ? `
+              <span class="stat-dot">•</span>
+              <span title="යළි බෙදාගැනීම් ගණන">
+                <i class="fa-solid fa-repeat" style="color: #059669;"></i> <strong id="stat-reposts-${post.id}">${post.repostCount || 0}</strong> යළි බෙදාගැනීම්
+              </span>
+            ` : ''}
+            <span class="stat-dot">•</span>
+            <span title="බෙදාගැනීම් ගණන">
+              <i class="fa-solid fa-share-nodes" style="color: #64748b;"></i> <strong id="stat-shares-${post.id}">${post.shareCount || 0}</strong> බෙදාගැනීම්
+            </span>
+          </div>
         `}
       </div>
 
-      <!-- Comments & Blessings Section (Collapsed by default) -->
+      <!-- Action Buttons Grid -->
+      ${post.isOfficial ? `
+        <div class="post-actions-grid official-actions-single">
+          <button class="post-btn official-sadhu-only-btn ${hasGivenSadhu ? 'liked' : ''}" id="sadhu-btn-${post.id}" onclick="handleSadhuClick('${post.id}', this)" title="${hasGivenSadhu ? 'සාදුකාරය ඉවත් කරන්න' : 'සාදුකාරයක් ලබා දෙන්න'}">
+            <span style="font-size: 1.15rem;">🙏</span>
+            <span style="font-weight: 700;">සාදුකාර දෙන්න (<strong id="count-btn-${post.id}">${Math.max(0, parseInt(post.sadhuCount, 10) || 0)}</strong>)</span>
+          </button>
+        </div>
+      ` : `
+        <div class="post-actions-grid">
+          <button class="post-btn ${hasGivenSadhu ? 'liked' : ''}" id="sadhu-btn-${post.id}" onclick="handleSadhuClick('${post.id}', this)" title="${hasGivenSadhu ? 'සාදුකාරය ඉවත් කරන්න' : 'සාදුකාරයක් ලබා දෙන්න'}">
+            <span style="font-size: 1rem;">🙏</span>
+            <span>සාදු! (<strong id="count-btn-${post.id}">${Math.max(0, parseInt(post.sadhuCount, 10) || 0)}</strong>)</span>
+          </button>
+
+          <button class="post-btn" onclick="toggleCommentsSection('${post.id}')" title="ප්‍රාර්ථනා බලන්න හෝ එක් කරන්න">
+            <i class="fa-regular fa-comment-dots" style="color: #d97706;"></i>
+            <span>${isGeneral ? 'සුබපැතුම්' : 'ප්‍රාර්ථනා'} (<strong id="comments-btn-${post.id}">${comments.length}</strong>)</span>
+          </button>
+
+          ${!isNeed && post.visibility !== 'private' ? `
+            <button class="post-btn" onclick="openRepostModal('${isRepost && orig ? orig.id : post.id}')" title="පවුරට Repost කරන්න">
+              <i class="fa-solid fa-repeat" style="color: #059669;"></i>
+              <span>යළි බෙදාගන්න (<strong id="reposts-btn-${post.id}">${post.repostCount || 0}</strong>)</span>
+            </button>
+          ` : ''}
+
+          ${isNeed && post.contact ? `
+            <a href="tel:${Security.sanitizePhone(post.contact)}" class="post-btn call-action">
+              <i class="fa-solid fa-phone"></i>
+              <span>අමතන්න</span>
+            </a>
+          ` : `
+            <button class="post-btn" onclick="handleShare('${post.id}')" title="බාහිරව බෙදාගන්න">
+              <i class="fa-solid fa-share-nodes" style="color: #94a3b8;"></i>
+              <span>බෙදාගන්න (<strong id="shares-btn-${post.id}">${post.shareCount || 0}</strong>)</span>
+            </button>
+          `}
+        </div>
+      `}
+
+      <!-- Comments & Blessings Section (Collapsed by default, disabled on official posts) -->
+      ${post.isOfficial ? '' : `
       <div class="comments-section" id="comments-box-${post.id}" style="display: none;">
         <div class="quick-blessings-scroll">
           ${(isGeneral || post.category === 'සුබපැතුම්' || post.category === 'සිතුවිලි') ? `
@@ -1025,18 +1044,22 @@ function renderPostCardHTML(post, user) {
         </div>
 
         <div class="comments-list" id="comments-list-${post.id}">
-          ${comments.map(c => `
+          ${comments.map(c => {
+            const cAuthorName = StorageService.resolveAuthorName(c);
+            const cAuthorPhoto = StorageService.resolveAuthorPhoto(c);
+            return `
             <div class="comment-bubble">
-              <div class="comment-avatar" onclick="viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(c.author || '')}')" style="cursor: pointer;" title="${Security.escapeHTML(c.author || 'කල්‍යාණ මිත්‍ර')} ගේ Profile එක බලන්න">${Security.escapeHTML((c.author || 'ක').charAt(0))}</div>
+              <div class="comment-avatar" onclick="viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(cAuthorName)}')" style="cursor: pointer;" title="${Security.escapeHTML(cAuthorName)} ගේ Profile එක බලන්න">${cAuthorPhoto ? `<img src="${Security.sanitizeUrl(cAuthorPhoto)}" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover;">` : Security.escapeHTML(cAuthorName.charAt(0))}</div>
               <div class="comment-text-box">
                 <div class="comment-author-row">
-                  <span class="author-click-link" onclick="viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(c.author || '')}')" style="cursor: pointer; font-weight: 700; color: #1e293b;" title="${Security.escapeHTML(c.author || 'කල්‍යාණ මිත්‍ර')} ගේ Profile එක බලන්න">${Security.escapeHTML(c.author || 'කල්‍යාණ මිත්‍ර')}</span>
+                  <span class="author-click-link" onclick="viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(cAuthorName)}')" style="cursor: pointer; font-weight: 700; color: #1e293b;" title="${Security.escapeHTML(cAuthorName)} ගේ Profile එක බලන්න">${Security.escapeHTML(cAuthorName)}</span>
                   <span class="comment-time">${Security.escapeHTML(formatRelativeTimeSinhala(c.timestamp, c.time || 'දැන්'))}</span>
                 </div>
                 <div class="comment-body">${Security.escapeHTML(c.text)}</div>
               </div>
             </div>
-          `).join('')}
+          `;
+          }).join('')}
         </div>
 
         <form class="comment-form" onsubmit="handleCommentSubmit(event, '${post.id}')">
@@ -1046,6 +1069,7 @@ function renderPostCardHTML(post, user) {
           </button>
         </form>
       </div>
+      `}
     </article>
   `;
 }
@@ -1475,7 +1499,7 @@ window.openPostDetailModal = function(post) {
   if (!modal || !body) return;
 
   if (title) {
-    title.innerText = post.isOfficial ? 'පිං පොත නිල නිවේදනය' : `${post.author || 'කල්‍යාණ මිත්‍ර'} ගේ සටහන`;
+    title.innerText = post.isOfficial ? 'පිං පොත නිල නිවේදනය' : `${StorageService.resolveAuthorName(post)} ගේ සටහන`;
   }
 
   const currentUser = StorageService.currentUser;
@@ -1629,14 +1653,14 @@ window.generateWhatsAppStatusCardFromModal = async function() {
     const isRepost = post.isRepost || !!post.originalPost;
     const orig = post.originalPost || null;
 
-    const realAuthor = post.isOfficial ? 'අපේ පිං පොත' : ((isRepost && orig && orig.author) ? orig.author : (post.author || 'කල්‍යාණ මිත්‍ර'));
+    const realAuthor = post.isOfficial ? 'අපේ පිං පොත' : ((isRepost && orig) ? StorageService.resolveAuthorName(orig) : StorageService.resolveAuthorName(post));
     const realTitle = (isRepost && orig && orig.title) ? orig.title : (post.title || 'පින්කම');
     const realDesc = (isRepost && orig && orig.description) ? orig.description : (post.description || '');
     const realImage = (isRepost && orig ? (orig.image || (orig.images && orig.images[0])) : (post.image || (post.images && post.images[0]))) || null;
     const realCategory = (isRepost && orig && orig.category) ? orig.category : (post.category || 'පින්කම');
     const realLocation = (isRepost && orig && orig.location) ? orig.location : (post.location || '');
     const realDate = (isRepost && orig && orig.date) ? orig.date : (post.date || 'අද');
-    const authorAvatar = (isRepost && orig && orig.authorAvatar) ? orig.authorAvatar : (post.authorAvatar || null);
+    const authorAvatar = (isRepost && orig) ? StorageService.resolveAuthorPhoto(orig) : StorageService.resolveAuthorPhoto(post);
 
     const authorInitial = realAuthor ? realAuthor.charAt(0) : 'ම';
     const avatarInner = post.isOfficial
@@ -1834,9 +1858,10 @@ window.openWhatsAppForStatusShare = function() {
   const pathname = window.location.pathname;
   const postUrl = `${origin}${pathname}?post=${encodeURIComponent(postId || '')}`;
   const isOfficial = !!post.isOfficial;
+  const authorName = StorageService.resolveAuthorName(post);
   const shareText = isOfficial
     ? `📢 අපේ පිං පොත නිල නිවේදනය: ${post.title || ''}\n🙏 කියවා අන් අයටද දැනුම් දෙන්න:\n${postUrl}`
-    : `🌸 "${post.author || 'කල්‍යාණ මිත්‍ර'}" ගේ උතුම් පින්කම: ${post.title || ''}\n🙏 දැකබලා සතුටු සිතින් අනුමෝදන් වන්න:\n${postUrl}`;
+    : `🌸 "${authorName}" ගේ උතුම් පින්කම: ${post.title || ''}\n🙏 දැකබලා සතුටු සිතින් අනුමෝදන් වන්න:\n${postUrl}`;
   const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
   window.open(waUrl, '_blank');
 };
@@ -1861,7 +1886,7 @@ window.executeNativeOrWhatsAppShare = async function() {
   const isRepost = post.isRepost || !!post.originalPost;
   const orig = post.originalPost || null;
   const isOfficial = !!post.isOfficial;
-  const realAuthor = isOfficial ? 'අපේ පිං පොත' : ((isRepost && orig && orig.author) ? orig.author : (post.author || 'කල්‍යාණ මිත්‍ර'));
+  const realAuthor = isOfficial ? 'අපේ පිං පොත' : ((isRepost && orig) ? StorageService.resolveAuthorName(orig) : StorageService.resolveAuthorName(post));
   const realTitle = (isRepost && orig && orig.title) ? orig.title : (post.title || 'පින්කම');
   const realDesc = (isRepost && orig && orig.description) ? orig.description : (post.description || '');
   const realImage = (isRepost && orig ? (orig.image || (orig.images && orig.images[0])) : (post.image || (post.images && post.images[0]))) || null;
@@ -1884,8 +1909,11 @@ window.executeNativeOrWhatsAppShare = async function() {
   let shareBody = isOfficial 
     ? `📢 අපේ පිං පොත නිල නිවේදනය:\n✨ ${realTitle}`
     : `🌸 "${realAuthor}" ගේ උතුම් පින්කම:\n✨ ${realTitle}`;
-  if (!isOfficial && isRepost && post.author && post.author !== realAuthor) {
-    shareBody += `\n🔄 (යළි බෙදාගත්තේ: ${post.author})`;
+  if (!isOfficial && isRepost) {
+    const reposterName = StorageService.resolveAuthorName(post);
+    if (reposterName && reposterName !== realAuthor) {
+      shareBody += `\n🔄 (යළි බෙදාගත්තේ: ${reposterName})`;
+    }
   }
   if (realDesc) {
     const cleanSnippet = realDesc.replace(/<[^>]*>?/gm, '').trim();
@@ -2670,7 +2698,7 @@ function setupEventListeners() {
   });
 
 
-  document.getElementById('editProfileForm')?.addEventListener('submit', (e) => {
+  document.getElementById('editProfileForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const firstName = document.getElementById('editProfFirstNameInput')?.value || '';
     const lastName = document.getElementById('editProfLastNameInput')?.value || '';
@@ -2679,10 +2707,11 @@ function setupEventListeners() {
     const bio = document.getElementById('editProfBioInput')?.value || '';
     const photo = document.getElementById('editProfPhotoInput')?.value || '';
 
-    StorageService.updateProfile({ firstName, lastName, occupation, location, bio, photo });
+    await StorageService.updateProfile({ firstName, lastName, occupation, location, bio, photo });
     closeEditProfileModal();
     updateUserInfoUI();
     renderProfileView();
+    renderFeed();
   });
 
   document.getElementById('profileForm')?.addEventListener('submit', (e) => {
@@ -2775,6 +2804,7 @@ function setupEventListeners() {
     closeMandatoryNameModal();
     updateUserInfoUI();
     if (activeTab === 'profile') renderProfileView();
+    renderFeed();
     triggerHaptic([25, 50, 25]);
     SoundService.playSadhu();
   });
@@ -3916,7 +3946,7 @@ window.switchSettingsTab = function(tabName) {
   }
 };
 
-window.saveSettingsProfile = function(e) {
+window.saveSettingsProfile = async function(e) {
   if (e) e.preventDefault();
   const firstName = document.getElementById('setFirstNameInput')?.value || '';
   const lastName = document.getElementById('setLastNameInput')?.value || '';
@@ -3924,9 +3954,10 @@ window.saveSettingsProfile = function(e) {
   const location = document.getElementById('setLocationInput')?.value || '';
   const bio = document.getElementById('setBioInput')?.value || '';
 
-  StorageService.updateProfile({ firstName, lastName, occupation, location, bio });
+  await StorageService.updateProfile({ firstName, lastName, occupation, location, bio });
   updateUserInfoUI();
   if (activeTab === 'profile') renderProfileView();
+  renderFeed();
   closeSettingsModal();
   alert("ඔබගේ ප්‍රොෆයිල් තොරතුරු සාර්ථකව යාවත්කාලීන විය! 🙏");
 };

@@ -1520,6 +1520,68 @@ export const StorageService = {
   },
 
   /**
+   * Resolve freshest author name for any post or comment
+   */
+  resolveAuthorName(item) {
+    if (!item) return 'කල්‍යාණ මිත්‍ර';
+    if (item.isOfficial) return 'අපේ පිං පොත';
+
+    const targetUid = item.uid;
+
+    // 1. Current user active session check
+    if (this.currentUser && this.currentUser.uid && targetUid && targetUid === this.currentUser.uid) {
+      return this.currentUser.name || item.author || 'කල්‍යාණ මිත්‍ර';
+    }
+
+    // 2. Cached profile check for other users
+    if (targetUid) {
+      try {
+        const cached = localStorage.getItem('pinPotha_profile_' + targetUid);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && parsed.name && parsed.name.trim().length > 0) {
+            return parsed.name;
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 3. Fallback to item stored author
+    return item.author || 'කල්‍යාණ මිත්‍ර';
+  },
+
+  /**
+   * Resolve freshest author photo for any post or comment
+   */
+  resolveAuthorPhoto(item) {
+    if (!item) return null;
+    if (item.isOfficial) return null;
+
+    const targetUid = item.uid;
+
+    // 1. Current user active session check
+    if (this.currentUser && this.currentUser.uid && targetUid && targetUid === this.currentUser.uid) {
+      return this.currentUser.photo || item.authorPhoto || null;
+    }
+
+    // 2. Cached profile check for other users
+    if (targetUid) {
+      try {
+        const cached = localStorage.getItem('pinPotha_profile_' + targetUid);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && parsed.photo !== undefined) {
+            return parsed.photo;
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 3. Fallback to item stored author photo
+    return item.authorPhoto || null;
+  },
+
+  /**
    * Update full user profile details (First & Last Name, Occupation, Location/Address, Bio, Photo, Cover Image)
    */
   async updateProfile({ firstName, lastName, name, bio, location, occupation, coverImage, photo }) {
@@ -1565,7 +1627,61 @@ export const StorageService = {
       localStorage.setItem('pinPotha_last_user_name_' + this.currentUser.email.toLowerCase(), this.currentUser.name);
     }
 
-    // Sync with Firestore collection 'users'
+    // Immediately update all posts authored by this user in memory and local storage
+    const updatedAuthorName = this.currentUser.name;
+    const updatedAuthorPhoto = this.currentUser.photo;
+    const targetUid = this.currentUser.uid;
+
+    if (targetUid && updatedAuthorName) {
+      let postsLocallyChanged = false;
+      if (Array.isArray(this._cachedPosts)) {
+        this._cachedPosts.forEach(p => {
+          if (p.uid === targetUid && !p.isOfficial) {
+            p.author = updatedAuthorName;
+            if (updatedAuthorPhoto !== undefined) p.authorPhoto = updatedAuthorPhoto;
+            postsLocallyChanged = true;
+          }
+          if (p.originalPost && p.originalPost.uid === targetUid && !p.originalPost.isOfficial) {
+            p.originalPost.author = updatedAuthorName;
+            if (updatedAuthorPhoto !== undefined) p.originalPost.authorPhoto = updatedAuthorPhoto;
+            postsLocallyChanged = true;
+          }
+        });
+      }
+
+      try {
+        const rawLocal = localStorage.getItem('pinPotha_posts');
+        if (rawLocal) {
+          const localList = JSON.parse(rawLocal);
+          if (Array.isArray(localList)) {
+            let locChanged = false;
+            localList.forEach(p => {
+              if (p.uid === targetUid && !p.isOfficial) {
+                p.author = updatedAuthorName;
+                if (updatedAuthorPhoto !== undefined) p.authorPhoto = updatedAuthorPhoto;
+                locChanged = true;
+              }
+              if (p.originalPost && p.originalPost.uid === targetUid && !p.originalPost.isOfficial) {
+                p.originalPost.author = updatedAuthorName;
+                if (updatedAuthorPhoto !== undefined) p.originalPost.authorPhoto = updatedAuthorPhoto;
+                locChanged = true;
+              }
+            });
+            if (locChanged) {
+              localStorage.setItem('pinPotha_posts', JSON.stringify(localList));
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[Storage] Error updating local cached posts author:', e);
+      }
+
+      if (postsLocallyChanged) {
+        this.cacheLocal(this._cachedPosts);
+      }
+    }
+
+    // Sync with Firestore collection 'users' and batch-update 'merit_posts'
     if (isCloudReady && db && this.currentUser.uid && !this.currentUser.isAnonymous) {
       try {
         const { doc, setDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
@@ -1586,14 +1702,38 @@ export const StorageService = {
       } catch (e) {
         console.warn('[Firestore] Failed to save user profile to cloud:', e);
       }
+
+      // Batch update all posts created by this user so their new name persists in cloud Firestore
+      try {
+        const { collection, query, where, getDocs, writeBatch, doc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const postQ = query(collection(db, COLLECTIONS.POSTS), where('uid', '==', this.currentUser.uid));
+        const postSnap = await getDocs(postQ);
+        if (!postSnap.empty) {
+          const batch = writeBatch(db);
+          postSnap.forEach(postDoc => {
+            const data = postDoc.data();
+            if (!data.isOfficial) {
+              const updatePayload = { author: this.currentUser.name };
+              if (this.currentUser.photo) {
+                updatePayload.authorPhoto = this.currentUser.photo;
+              }
+              batch.update(doc(db, COLLECTIONS.POSTS, postDoc.id), updatePayload);
+            }
+          });
+          await batch.commit();
+          console.log(`[Firestore] Successfully batch updated author name on ${postSnap.size} posts.`);
+        }
+      } catch (postBatchErr) {
+        console.warn('[Firestore] Batch updating author posts in cloud warning:', postBatchErr);
+      }
     }
 
-    this.notifyListeners();
+    this.notifyListeners(this._cachedPosts);
     return this.currentUser;
   },
 
-  setUserName(name) {
-    return this.updateProfile({ name });
+  async setUserName(name) {
+    return await this.updateProfile({ name });
   },
 
   /**
