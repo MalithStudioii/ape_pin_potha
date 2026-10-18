@@ -4,11 +4,11 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=45';
+import { StorageService } from './storage.js?v=46';
 import { Security } from './security.js?v=32';
 import { uploadToImgBB } from './imgbb-service.js?v=32';
 import { SoundService, triggerHaptic } from './sound.js?v=32';
-import { FeedAlgorithm } from './algorithm.js?v=45';
+import { FeedAlgorithm } from './algorithm.js?v=46';
 
 window.FeedAlgorithm = FeedAlgorithm;
 window.SoundService = SoundService;
@@ -946,31 +946,6 @@ function renderPostCardHTML(post, user) {
         <!-- Media Images Collage Grid -->
         ${renderPostImagesCollage(post)}
       `}
-
-      <!-- Stats Row -->
-      <div class="post-stats-bar ${post.isOfficial ? 'official-stats-bar' : ''}">
-        <div class="sadhu-stat-pill">
-          <span class="sadhu-emoji-circle">🙏</span>
-          <span style="font-weight: 700; color: #78350f;"><strong id="count-${post.id}">${Math.max(0, parseInt(post.sadhuCount, 10) || 0)}</strong> දෙනෙක් සාදුකාර දුන්හ</span>
-        </div>
-        ${post.isOfficial ? '' : `
-          <div class="post-stats-metrics">
-            <span style="cursor: pointer;" onclick="toggleCommentsSection('${post.id}')" title="ප්‍රාර්ථනා බලන්න">
-              <i class="fa-regular fa-comment-dots" style="color: #d97706;"></i> <strong id="stat-comments-${post.id}">${comments.length}</strong> ${isGeneral ? 'සුබපැතුම්' : 'ප්‍රාර්ථනා'}
-            </span>
-            ${!isNeed && post.visibility !== 'private' ? `
-              <span class="stat-dot">•</span>
-              <span title="යළි බෙදාගැනීම් ගණන">
-                <i class="fa-solid fa-repeat" style="color: #059669;"></i> <strong id="stat-reposts-${post.id}">${post.repostCount || 0}</strong> යළි බෙදාගැනීම්
-              </span>
-            ` : ''}
-            <span class="stat-dot">•</span>
-            <span title="බෙදාගැනීම් ගණන">
-              <i class="fa-solid fa-share-nodes" style="color: #64748b;"></i> <strong id="stat-shares-${post.id}">${post.shareCount || 0}</strong> බෙදාගැනීම්
-            </span>
-          </div>
-        `}
-      </div>
 
       <!-- Action Buttons Grid -->
       ${post.isOfficial ? `
