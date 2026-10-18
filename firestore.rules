@@ -11,11 +11,14 @@ service cloud.firestore {
       allow create: if request.resource.data.title.size() >= 3 
                     && request.resource.data.title.size() <= 150
                     && (request.resource.data.type == 'repost' || (request.resource.data.description.size() >= 3 && request.resource.data.description.size() <= 3000))
-                    && request.resource.data.category in ['දානමය', 'සීලමය', 'භාවනාමය', 'සමාජ සත්කාර', 'යළි බෙදාගැනීම්']
-                    && request.resource.data.type in ['merit', 'need', 'repost'];
+                    && request.resource.data.category in ['දානමය', 'සීලමය', 'භාවනාමය', 'සමාජ සත්කාර', 'යළි බෙදාගැනීම්', 'සුබපැතුම්', 'සිතුවිලි']
+                    && request.resource.data.type in ['merit', 'need', 'repost', 'general'];
       
-      // 3. සාදුකාර දීම (sadhuCount), අදහස් (comments), reposts (repostCount), Pin කිරීම සහ සත්කාර සත්‍යාපනය (isVerifiedNeed) සඳහා අවසරය
+      // 3. සාදුකාර දීම (sadhuCount, sadhuUsers), බෙදාගැනීම් (shareCount), අදහස් (comments), reposts (repostCount), Pin කිරීම සහ සත්කාර සත්‍යාපනය (isVerifiedNeed) සඳහා අවසරය
       allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sadhuCount'])
+                    || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sadhuUsers'])
+                    || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sadhuCount', 'sadhuUsers'])
+                    || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['shareCount'])
                     || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['comments'])
                     || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['repostCount'])
                     || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isPinned'])

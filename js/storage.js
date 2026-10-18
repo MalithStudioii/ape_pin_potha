@@ -201,11 +201,14 @@ export const StorageService = {
               posts.push({ id: doc.id, ...doc.data() });
             }
           });
+          this.syncPostsWithUserSadhus(posts);
           this.cacheLocal(posts);
           this.notifyListeners(posts);
         }, (error) => {
           console.warn('[Firestore] Realtime error, falling back to local cache', error);
-          this.notifyListeners(this.getLocalPosts());
+          const localPosts = this.getLocalPosts();
+          this.syncPostsWithUserSadhus(localPosts);
+          this.notifyListeners(localPosts);
         });
 
         // Real-time Firestore Notifications Subscription
@@ -299,19 +302,77 @@ export const StorageService = {
     }
   },
 
+  getUserSadhus(uid = null) {
+    const userUid = uid || this.currentUser?.uid || 'anonymous';
+    try {
+      return JSON.parse(localStorage.getItem('pinPotha_sadhus_' + userUid) || '[]');
+    } catch {
+      return [];
+    }
+  },
+
+  setUserSadhus(postIds, uid = null) {
+    const userUid = uid || this.currentUser?.uid || 'anonymous';
+    try {
+      localStorage.setItem('pinPotha_sadhus_' + userUid, JSON.stringify(postIds));
+    } catch {}
+  },
+
+  recordUserSadhu(postId, isAdd, uid = null) {
+    const userUid = uid || this.currentUser?.uid || 'anonymous';
+    const list = this.getUserSadhus(userUid);
+    const set = new Set(list);
+    if (isAdd) {
+      set.add(postId);
+    } else {
+      set.delete(postId);
+    }
+    this.setUserSadhus(Array.from(set), userUid);
+  },
+
+  hasUserGivenSadhu(post, uid = null) {
+    if (!post) return false;
+    const userUid = uid || this.currentUser?.uid || 'anonymous';
+    const sadhuUsers = Array.isArray(post.sadhuUsers) ? post.sadhuUsers : [];
+    if (sadhuUsers.includes(userUid)) return true;
+    const mySadhus = this.getUserSadhus(userUid);
+    return mySadhus.includes(post.id);
+  },
+
+  syncPostsWithUserSadhus(posts) {
+    const userUid = this.currentUser?.uid || 'anonymous';
+    const mySadhus = this.getUserSadhus(userUid);
+    const mySadhuSet = new Set(mySadhus);
+
+    (posts || []).forEach(post => {
+      if (!Array.isArray(post.sadhuUsers)) {
+        post.sadhuUsers = [];
+      }
+      if (post.sadhuUsers.includes(userUid)) {
+        mySadhuSet.add(post.id);
+      } else if (mySadhuSet.has(post.id)) {
+        post.sadhuUsers.push(userUid);
+      }
+    });
+
+    this.setUserSadhus(Array.from(mySadhuSet), userUid);
+    return posts;
+  },
+
   getLocalPosts() {
     const deletedIds = this.getDeletedPostIds();
     if (this._cachedPosts && Array.isArray(this._cachedPosts) && this._cachedPosts.length > 0) {
-      return this._cachedPosts.filter(p => !deletedIds.includes(p.id));
+      const clean = this._cachedPosts.filter(p => !deletedIds.includes(p.id));
+      return this.syncPostsWithUserSadhus(clean);
     }
     try {
       const data = localStorage.getItem('pinPotha_sandbox_posts');
       const posts = data ? JSON.parse(data) : SEED_POSTS;
       const clean = (Array.isArray(posts) ? posts : SEED_POSTS).filter(p => !deletedIds.includes(p.id));
       this._cachedPosts = clean;
-      return clean;
+      return this.syncPostsWithUserSadhus(clean);
     } catch {
-      return SEED_POSTS.filter(p => !deletedIds.includes(p.id));
+      return this.syncPostsWithUserSadhus(SEED_POSTS.filter(p => !deletedIds.includes(p.id)));
     }
   },
 
@@ -1005,43 +1066,59 @@ export const StorageService = {
     if (!targetPost) return { action: 'none', count: 0, hasGiven: false };
 
     targetPost.sadhuUsers = Array.isArray(targetPost.sadhuUsers) ? targetPost.sadhuUsers : [];
-    const alreadyGiven = targetPost.sadhuUsers.includes(userUid);
+    const alreadyGiven = targetPost.sadhuUsers.includes(userUid) || this.getUserSadhus(userUid).includes(postId);
 
     let action = 'added';
     if (alreadyGiven) {
       // Toggle off / remove Sadhu
       targetPost.sadhuUsers = targetPost.sadhuUsers.filter(uid => uid !== userUid);
       targetPost.sadhuCount = Math.max(0, (targetPost.sadhuCount || 1) - 1);
+      this.recordUserSadhu(postId, false, userUid);
       action = 'removed';
     } else {
       // Add Sadhu (first time)
-      targetPost.sadhuUsers.push(userUid);
+      if (!targetPost.sadhuUsers.includes(userUid)) {
+        targetPost.sadhuUsers.push(userUid);
+      }
       targetPost.sadhuCount = (targetPost.sadhuCount || 0) + 1;
+      this.recordUserSadhu(postId, true, userUid);
       action = 'added';
     }
+
+    // Keep memory and local cache immediately up-to-date
+    this._cachedPosts = allPosts;
+    this.cacheLocal(allPosts);
 
     if (isCloudReady && db) {
       try {
         const { doc, updateDoc, increment, arrayUnion, arrayRemove } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
         const postRef = doc(db, COLLECTIONS.POSTS, postId);
-        if (action === 'added') {
-          await updateDoc(postRef, {
-            sadhuCount: increment(1),
-            sadhuUsers: arrayUnion(userUid)
-          });
-        } else {
-          await updateDoc(postRef, {
-            sadhuCount: increment(-1),
-            sadhuUsers: arrayRemove(userUid)
-          });
+        try {
+          if (action === 'added') {
+            await updateDoc(postRef, {
+              sadhuCount: increment(1),
+              sadhuUsers: arrayUnion(userUid)
+            });
+          } else {
+            await updateDoc(postRef, {
+              sadhuCount: increment(-1),
+              sadhuUsers: arrayRemove(userUid)
+            });
+          }
+        } catch (cloudErr) {
+          console.warn('[Sadhu Cloud] Full update blocked, falling back to sadhuCount only:', cloudErr);
+          try {
+            await updateDoc(postRef, {
+              sadhuCount: action === 'added' ? increment(1) : increment(-1)
+            });
+          } catch (countErr) {
+            console.warn('[Sadhu Cloud] Fallback sadhuCount write also failed:', countErr);
+          }
         }
       } catch (err) {
-        console.warn('[Sadhu Cloud] Fallback to local:', err);
+        console.warn('[Sadhu Cloud] Firestore service error:', err);
       }
     }
-
-    this.cacheLocal(allPosts);
-    this.notifyListeners(allPosts);
 
     // Trigger Notification for the author (only if someone else gave Sadhu)
     if (action === 'added' && targetPost.uid && targetPost.uid !== userUid) {

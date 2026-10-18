@@ -4,7 +4,7 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=33';
+import { StorageService } from './storage.js?v=36';
 import { Security } from './security.js?v=32';
 import { uploadToImgBB } from './imgbb-service.js?v=32';
 import { SoundService, triggerHaptic } from './sound.js?v=32';
@@ -741,7 +741,7 @@ function renderPostCardHTML(post, user) {
   const orig = post.originalPost;
   const currentUserUid = user && user.uid ? user.uid : 'anonymous';
   const sadhuUsers = Array.isArray(post.sadhuUsers) ? post.sadhuUsers : [];
-  const hasGivenSadhu = sadhuUsers.includes(currentUserUid);
+  const hasGivenSadhu = sadhuUsers.includes(currentUserUid) || StorageService.hasUserGivenSadhu(post, currentUserUid);
 
   return `
     <article class="post-card ${isNeed ? 'need-card' : ''} ${isRepost ? 'repost-card' : ''} ${post.isOfficial ? 'official-card' : ''}" id="post-elem-${post.id}">
@@ -1098,22 +1098,38 @@ function renderSideNeeds() {
 }
 
 // Global floating animation for Sadhu clicks attached to document.body
-function triggerSadhuFloatingAnimation(btnElement) {
+function triggerSadhuFloatingAnimation(target, posY) {
   let x = window.innerWidth / 2;
   let y = window.innerHeight / 2;
 
-  if (btnElement) {
-    const rect = btnElement.getBoundingClientRect();
-    x = rect.left + rect.width / 2;
-    y = rect.top;
+  if (typeof target === 'number' && typeof posY === 'number') {
+    x = target;
+    y = posY;
+  } else if (target && target.getBoundingClientRect) {
+    const rect = target.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      x = rect.left + rect.width / 2;
+      y = rect.top;
+    }
   }
 
-  // Floating Badge attached to document.body (safe against feed re-rendering)
+  // Never allow top-left corner (0, 0)
+  if (typeof x !== 'number' || typeof y !== 'number' || isNaN(x) || isNaN(y) || (x < 15 && y < 15)) {
+    x = window.innerWidth / 2;
+    y = window.innerHeight / 2;
+  }
+
+  // Clamp within viewport bounds so badge is never cut off
+  const badgeWidthEstimate = 160;
+  const clampedX = Math.max(badgeWidthEstimate / 2 + 12, Math.min(window.innerWidth - badgeWidthEstimate / 2 - 12, x));
+  const clampedY = Math.max(45, y);
+
+  // Floating Badge attached to document.body
   const badge = document.createElement('div');
   badge.className = 'sadhu-floating-badge';
   badge.innerHTML = '<span>🙏</span><span>සාදු! සාදු! සාදු!</span>';
-  badge.style.left = `${x}px`;
-  badge.style.top = `${y}px`;
+  badge.style.left = `${Math.round(clampedX)}px`;
+  badge.style.top = `${Math.round(clampedY)}px`;
   document.body.appendChild(badge);
 
   // Sparkling blessing particles
@@ -1124,8 +1140,8 @@ function triggerSadhuFloatingAnimation(btnElement) {
     p.innerText = icon;
     const tx = (idx - 1.5) * 32;
     p.style.setProperty('--tx', `calc(-50% + ${tx}px)`);
-    p.style.left = `${x}px`;
-    p.style.top = `${y}px`;
+    p.style.left = `${Math.round(clampedX)}px`;
+    p.style.top = `${Math.round(clampedY)}px`;
     p.style.animationDelay = `${idx * 65}ms`;
     document.body.appendChild(p);
 
@@ -1146,42 +1162,121 @@ window.handleSadhuClick = async function(postId, btnElement) {
     return;
   }
 
+  // Prevent double taps
+  if (!window._sadhuClickBusy) window._sadhuClickBusy = {};
+  if (window._sadhuClickBusy[postId]) return;
+  window._sadhuClickBusy[postId] = true;
+
+  // 1. Resolve button element and calculate coordinates immediately from DOM or event
+  let btn = (btnElement && btnElement.isConnected) ? btnElement : document.getElementById(`sadhu-btn-${postId}`);
+  let posX = window.innerWidth / 2;
+  let posY = window.innerHeight / 2;
+
+  if (btn && btn.isConnected) {
+    const rect = btn.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      posX = rect.left + rect.width / 2;
+      posY = rect.top;
+    }
+  } else if (window.event && typeof window.event.clientX === 'number' && (window.event.clientX > 10 || window.event.clientY > 10)) {
+    posX = window.event.clientX;
+    posY = window.event.clientY;
+  }
+
+  // Guard against top-left (0, 0)
+  if (posX < 15 && posY < 15) {
+    posX = window.innerWidth / 2;
+    posY = window.innerHeight / 2;
+  }
+
+  // 2. Read current UI state
+  const isCurrentlyLiked = btn ? btn.classList.contains('liked') : false;
+  const countEl = document.getElementById(`count-${postId}`);
+  const btnCountEl = document.getElementById(`count-btn-${postId}`);
+  const currentCount = parseInt(btnCountEl?.innerText || countEl?.innerText || '0', 10) || 0;
+
+  // 3. Immediate Optimistic UI Feedback
+  if (!isCurrentlyLiked) {
+    // Giving Sadhu
+    SoundService.playSadhu();
+    triggerHaptic([15, 30, 20]);
+
+    if (btn) {
+      btn.classList.add('liked');
+      btn.title = 'සාදුකාරය ඉවත් කරන්න';
+      btn.style.transform = 'scale(1.12)';
+      setTimeout(() => {
+        if (btn) btn.style.transform = '';
+      }, 180);
+    }
+    const newCount = currentCount + 1;
+    if (countEl) countEl.innerText = newCount;
+    if (btnCountEl) btnCountEl.innerText = newCount;
+
+    // Show floating blessing animation directly above the button
+    triggerSadhuFloatingAnimation(posX, posY);
+  } else {
+    // Withdrawing Sadhu
+    triggerHaptic(15);
+    if (btn) {
+      btn.classList.remove('liked');
+      btn.title = 'සාදුකාරයක් ලබා දෙන්න';
+    }
+    const newCount = Math.max(0, currentCount - 1);
+    if (countEl) countEl.innerText = newCount;
+    if (btnCountEl) btnCountEl.innerText = newCount;
+  }
+
+  // Update in-memory post object
+  if (Array.isArray(currentPostsData)) {
+    const mPost = currentPostsData.find(p => p.id === postId);
+    if (mPost) {
+      const uUid = StorageService.currentUser?.uid || 'anonymous';
+      if (!Array.isArray(mPost.sadhuUsers)) mPost.sadhuUsers = [];
+      if (!isCurrentlyLiked) {
+        if (!mPost.sadhuUsers.includes(uUid)) mPost.sadhuUsers.push(uUid);
+        mPost.sadhuCount = currentCount + 1;
+      } else {
+        mPost.sadhuUsers = mPost.sadhuUsers.filter(u => u !== uUid);
+        mPost.sadhuCount = Math.max(0, currentCount - 1);
+      }
+    }
+  }
+
+  // 4. Atomic cloud & local persistence
   try {
     const res = await StorageService.giveSadhu(postId);
 
-    const countEl = document.getElementById(`count-${postId}`);
-    const btnCountEl = document.getElementById(`count-btn-${postId}`);
+    // Reconcile UI with confirmed storage response
+    const freshBtn = document.getElementById(`sadhu-btn-${postId}`) || btn;
+    const freshCountEl = document.getElementById(`count-${postId}`);
+    const freshBtnCountEl = document.getElementById(`count-btn-${postId}`);
 
-    if (countEl) countEl.innerText = res.count;
-    if (btnCountEl) btnCountEl.innerText = res.count;
+    if (freshCountEl) freshCountEl.innerText = res.count;
+    if (freshBtnCountEl) freshBtnCountEl.innerText = res.count;
 
-    if (res.action === 'added') {
-      // Play sacred temple bell sound & haptic vibration
-      SoundService.playSadhu();
-      triggerHaptic([15, 30, 20]);
-
-      // Button bounce & liked state
-      if (btnElement) {
-        btnElement.classList.add('liked');
-        btnElement.title = 'සාදුකාරය ඉවත් කරන්න';
-        btnElement.style.transform = 'scale(1.12)';
-        setTimeout(() => {
-          if (btnElement) btnElement.style.transform = '';
-        }, 180);
-      }
-
-      // Trigger robust floating animation on document.body
-      triggerSadhuFloatingAnimation(btnElement);
-    } else if (res.action === 'removed') {
-      // Withdrew Sadhu
-      triggerHaptic(15);
-      if (btnElement) {
-        btnElement.classList.remove('liked');
-        btnElement.title = 'සාදුකාරයක් ලබා දෙන්න';
+    if (freshBtn) {
+      if (res.action === 'added') {
+        freshBtn.classList.add('liked');
+        freshBtn.title = 'සාදුකාරය ඉවත් කරන්න';
+      } else if (res.action === 'removed') {
+        freshBtn.classList.remove('liked');
+        freshBtn.title = 'සාදුකාරයක් ලබා දෙන්න';
       }
     }
   } catch (err) {
     console.warn('[Sadhu] Toggle error:', err);
+    // Revert optimistic update on hard error
+    const rollbackBtn = document.getElementById(`sadhu-btn-${postId}`) || btn;
+    if (rollbackBtn) {
+      rollbackBtn.classList.toggle('liked', isCurrentlyLiked);
+    }
+    if (countEl) countEl.innerText = currentCount;
+    if (btnCountEl) btnCountEl.innerText = currentCount;
+  } finally {
+    setTimeout(() => {
+      delete window._sadhuClickBusy[postId];
+    }, 350);
   }
 };
 
