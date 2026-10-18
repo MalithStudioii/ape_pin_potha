@@ -1364,11 +1364,6 @@ let currentGeneratedStatusCardBlob = null;
 let currentGeneratedStatusCardFileName = null;
 
 window.handleShare = function(postId) {
-  if (isGuestUser()) {
-    showAuthRequiredModal('පින්කම් පිටතට බෙදා ගැනීමට (Share)');
-    return;
-  }
-
   SoundService.playShare();
   triggerHaptic(25);
   currentShareTargetPostId = postId;
@@ -3753,7 +3748,14 @@ window.openRepostModal = function(postId) {
   const commentInput = document.getElementById('repostCommentInput');
   if (!modal) return;
 
-  const post = currentPostsData.find(p => p.id === postId);
+  let post = currentPostsData.find(p => p.id === postId);
+  if (!post) {
+    const allPosts = StorageService.getLocalPosts() || [];
+    post = allPosts.find(p => p.id === postId);
+  }
+  if (!post && StorageService._cachedPosts) {
+    post = StorageService._cachedPosts.find(p => p.id === postId);
+  }
   if (!post) {
     alert("පින්කම සොයාගත නොහැකි විය.");
     return;

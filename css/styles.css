@@ -3735,8 +3735,8 @@ html, body {
   }
 
   /* 3. Main Feed Layout on Mobile - Pure Block Flow Never Blows Out */
-  .main-layout,
-  #mainFeedLayout {
+  .main-layout:not(.hidden),
+  #mainFeedLayout:not(.hidden) {
     display: block !important;
     padding: 10px 12px 84px 12px !important;
     width: 100% !important;
@@ -3748,7 +3748,8 @@ html, body {
     gap: 0 !important;
   }
 
-  .main-layout.hidden {
+  .main-layout.hidden,
+  #mainFeedLayout.hidden {
     display: none !important;
   }
 
@@ -4054,8 +4055,9 @@ html, body {
   }
 
   /* 9. Profile View on Mobile - Never Overflow & Clean Alignment */
-  .profile-page-container {
-    display: block;
+  .profile-page-container:not(.hidden),
+  #profilePageContainer:not(.hidden) {
+    display: block !important;
     padding: 0 8px 80px 8px !important;
     width: 100% !important;
     max-width: 100% !important;
@@ -4064,7 +4066,8 @@ html, body {
     overflow-x: hidden !important;
   }
 
-  .profile-page-container.hidden {
+  .profile-page-container.hidden,
+  #profilePageContainer.hidden {
     display: none !important;
   }
 
