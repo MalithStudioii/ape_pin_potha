@@ -8,8 +8,7 @@ service cloud.firestore {
       allow read: if true;
       
       // 2. අකුරු සීමා සහ වලංගු වර්ගීකරණයන් සහිත නියම දත්ත පමණක් Database එකට භාර ගනී
-      allow create: if request.resource.data.title.size() >= 3 
-                    && request.resource.data.title.size() <= 150
+      allow create: if (request.resource.data.type in ['repost', 'general'] || (request.resource.data.title.size() >= 3 && request.resource.data.title.size() <= 150))
                     && (request.resource.data.type == 'repost' || (request.resource.data.description.size() >= 3 && request.resource.data.description.size() <= 3000))
                     && request.resource.data.category in ['දානමය', 'සීලමය', 'භාවනාමය', 'සමාජ සත්කාර', 'යළි බෙදාගැනීම්', 'සුබපැතුම්', 'සිතුවිලි', 'සාමාන්‍ය', 'ධර්ම දානමය']
                     && request.resource.data.type in ['merit', 'need', 'repost', 'general'];

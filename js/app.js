@@ -4,7 +4,7 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=42';
+import { StorageService } from './storage.js?v=43';
 import { Security } from './security.js?v=32';
 import { uploadToImgBB } from './imgbb-service.js?v=32';
 import { SoundService, triggerHaptic } from './sound.js?v=32';
@@ -319,6 +319,10 @@ function updateUserStats() {
 window.viewUserProfile = async function(uid, authorName) {
   triggerHaptic(15);
   SoundService.playClick();
+
+  if (uid === 'official_pin_potha' || authorName === 'අපේ පිං පොත' || authorName === 'පිං පොත පරිපාලනය' || authorName === 'පිං පොත නිල නිවේදනය') {
+    return;
+  }
 
   if (isGuestUser()) {
     showAuthRequiredModal('සාමාජිකයින්ගේ Profile බැලීමට');
@@ -778,7 +782,7 @@ function renderPostCardHTML(post, user) {
               <i class="fa-solid fa-repeat"></i>
             </div>
             <div>
-              <span class="repost-actor-name author-click-link" onclick="viewUserProfile('${post.uid}', '${Security.escapeHTML(post.author || '')}')" title="${Security.escapeHTML(post.author || 'කල්‍යාණ මිත්‍ර')} ගේ Profile එක බලන්න"><strong>${Security.escapeHTML(post.author || 'කල්‍යාණ මිත්‍ර')}</strong> විසින් යළි බෙදාගන්නා ලදී</span>
+              <span class="repost-actor-name ${post.isOfficial ? '' : 'author-click-link'}" ${post.isOfficial ? '' : `onclick="viewUserProfile('${post.uid}', '${Security.escapeHTML(post.author || '')}')" title="${Security.escapeHTML(post.author || 'කල්‍යාණ මිත්‍ර')} ගේ Profile එක බලන්න"`}><strong>${Security.escapeHTML(post.isOfficial ? 'අපේ පිං පොත' : (post.author || 'කල්‍යාණ මිත්‍ර'))}</strong> විසින් යළි බෙදාගන්නා ලදී</span>
               <span class="repost-time">${Security.escapeHTML(formatRelativeTimeSinhala(post.timestamp, post.date || 'දැන්'))}</span>
             </div>
           </div>
@@ -832,27 +836,47 @@ function renderPostCardHTML(post, user) {
         <!-- Standard Post Header -->
         <div class="post-header">
           <div class="post-author-info">
-            <div class="post-avatar ${isNeed ? 'need' : ''}" onclick="viewUserProfile('${post.uid}', '${Security.escapeHTML(post.author || '')}')" style="cursor: pointer;" title="${Security.escapeHTML(post.author || 'කල්‍යාණ මිත්‍ර')} ගේ Profile එක බලන්න">
-              ${post.authorPhoto ? `<img src="${Security.sanitizeUrl(post.authorPhoto)}" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover;">` : Security.escapeHTML((post.author || 'ක').charAt(0))}
-            </div>
-            <div>
-              <div class="post-badges-wrap">
-                <span class="post-author-name author-click-link" onclick="viewUserProfile('${post.uid}', '${Security.escapeHTML(post.author || '')}')" style="cursor: pointer;" title="${Security.escapeHTML(post.author || 'කල්‍යාණ මිත්‍ර')} ගේ Profile එක බලන්න">${Security.escapeHTML(post.author || 'කල්‍යාණ මිත්‍ර')}</span>
-                ${(post.authorRole === 'admin' || post.isOfficial || (post.authorEmail && post.authorEmail.toLowerCase() === 'silvadilan9@gmail.com')) ? `
-                  <span class="official-author-badge" title="Verified Master Admin"><i class="fa-solid fa-crown"></i> Master Admin</span>
-                ` : ''}
-                ${!isGeneral ? `<span class="post-badge category">${Security.escapeHTML(post.category)}</span>` : ''}
-                ${isNeed ? '<span class="post-badge need">🤝 සත්කාර ඉල්ලීමක්</span>' : ''}
-                ${isGeneral ? '<span class="post-badge" style="background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd;"><i class="fa-solid fa-mug-hot"></i> සාමාන්‍ය සටහනක්</span>' : ''}
-                ${isNeed && post.isVerifiedNeed ? '<span class="verified-need-badge" title="පරිපාලනය විසින් සත්‍යාපනය කරන ලද සත්කාරයකි"><i class="fa-solid fa-circle-check"></i> සත්‍යාපිත සත්කාරයකි</span>' : ''}
-                ${post.visibility === 'private' ? '<span class="post-badge private"><i class="fa-solid fa-lock" style="font-size: 9px;"></i> Private</span>' : ''}
+            ${post.isOfficial ? `
+              <div class="post-avatar official-avatar-circle" title="අපේ පිං පොත නිල නිවේදනය">
+                <i class="fa-solid fa-dharmachakra" style="font-size: 1.35rem; color: #fef3c7; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));"></i>
               </div>
-              <div class="post-meta-sub">
-                <span>${Security.escapeHTML(formatRelativeTimeSinhala(post.timestamp, post.date || 'දැන්'))}</span>
-                ${post.location ? `<span>• <i class="fa-solid fa-location-dot" style="color: #d97706;"></i> ${Security.escapeHTML(post.location)}</span>` : ''}
-                <span>• <i class="fa-solid ${post.visibility === 'private' ? 'fa-lock' : 'fa-earth-asia'}" style="font-size: 10px;"></i></span>
+              <div>
+                <div class="post-badges-wrap" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                  <span class="post-author-name official-author-name">අපේ පිං පොත</span>
+                  <span class="official-author-badge" style="background: linear-gradient(135deg, #d97706, #b45309); color: #ffffff; border: none; font-size: 0.68rem; font-weight: 800; padding: 2px 8px; border-radius: 9999px; box-shadow: 0 2px 6px rgba(217,119,6,0.25);">
+                    <i class="fa-solid fa-crown" style="color: #fde68a;"></i> නිල නිවේදනය
+                  </span>
+                  ${post.visibility === 'private' ? '<span class="post-badge private"><i class="fa-solid fa-lock" style="font-size: 9px;"></i> Private</span>' : ''}
+                </div>
+                <div class="post-meta-sub">
+                  <span>${Security.escapeHTML(formatRelativeTimeSinhala(post.timestamp, post.date || 'දැන්'))}</span>
+                  ${post.location ? `<span>• <i class="fa-solid fa-location-dot" style="color: #d97706;"></i> ${Security.escapeHTML(post.location)}</span>` : ''}
+                  <span>• <i class="fa-solid fa-earth-asia" style="font-size: 10px;"></i></span>
+                </div>
               </div>
-            </div>
+            ` : `
+              <div class="post-avatar ${isNeed ? 'need' : ''}" onclick="viewUserProfile('${post.uid}', '${Security.escapeHTML(post.author || '')}')" style="cursor: pointer;" title="${Security.escapeHTML(post.author || 'කල්‍යාණ මිත්‍ර')} ගේ Profile එක බලන්න">
+                ${post.authorPhoto ? `<img src="${Security.sanitizeUrl(post.authorPhoto)}" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover;">` : Security.escapeHTML((post.author || 'ක').charAt(0))}
+              </div>
+              <div>
+                <div class="post-badges-wrap">
+                  <span class="post-author-name author-click-link" onclick="viewUserProfile('${post.uid}', '${Security.escapeHTML(post.author || '')}')" style="cursor: pointer;" title="${Security.escapeHTML(post.author || 'කල්‍යාණ මිත්‍ර')} ගේ Profile එක බලන්න">${Security.escapeHTML(post.author || 'කල්‍යාණ මිත්‍ර')}</span>
+                  ${(post.authorRole === 'admin' || (post.authorEmail && post.authorEmail.toLowerCase() === 'silvadilan9@gmail.com')) ? `
+                    <span class="official-author-badge" title="Verified Master Admin"><i class="fa-solid fa-crown"></i> Master Admin</span>
+                  ` : ''}
+                  ${!isGeneral ? `<span class="post-badge category">${Security.escapeHTML(post.category)}</span>` : ''}
+                  ${isNeed ? '<span class="post-badge need">🤝 සත්කාර ඉල්ලීමක්</span>' : ''}
+                  ${isGeneral ? '<span class="post-badge" style="background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd;"><i class="fa-solid fa-mug-hot"></i> සාමාන්‍ය සටහනක්</span>' : ''}
+                  ${isNeed && post.isVerifiedNeed ? '<span class="verified-need-badge" title="පරිපාලනය විසින් සත්‍යාපනය කරන ලද සත්කාරයකි"><i class="fa-solid fa-circle-check"></i> සත්‍යාපිත සත්කාරයකි</span>' : ''}
+                  ${post.visibility === 'private' ? '<span class="post-badge private"><i class="fa-solid fa-lock" style="font-size: 9px;"></i> Private</span>' : ''}
+                </div>
+                <div class="post-meta-sub">
+                  <span>${Security.escapeHTML(formatRelativeTimeSinhala(post.timestamp, post.date || 'දැන්'))}</span>
+                  ${post.location ? `<span>• <i class="fa-solid fa-location-dot" style="color: #d97706;"></i> ${Security.escapeHTML(post.location)}</span>` : ''}
+                  <span>• <i class="fa-solid ${post.visibility === 'private' ? 'fa-lock' : 'fa-earth-asia'}" style="font-size: 10px;"></i></span>
+                </div>
+              </div>
+            `}
           </div>
 
           <div style="display: flex; align-items: center; gap: 6px;">
@@ -876,7 +900,7 @@ function renderPostCardHTML(post, user) {
 
         <!-- Post Content Body -->
         <div class="post-content-body">
-          ${(post.title && post.title.trim()) ? `<h3 class="post-title">${Security.escapeHTML(post.title)}</h3>` : ''}
+          ${(post.title && post.title.trim() && post.title !== 'පුණ්‍ය සිතුවිලි' && (!post.isOfficial || post.title !== 'පිං පොත නිල නිවේදනය')) ? `<h3 class="post-title">${Security.escapeHTML(post.title)}</h3>` : ''}
           <p class="post-desc">${Security.escapeHTML(post.description)}</p>
         </div>
 
@@ -1426,7 +1450,7 @@ window.openPostDetailModal = function(post) {
   if (!modal || !body) return;
 
   if (title) {
-    title.innerText = `${post.author || 'කල්‍යාණ මිත්‍ර'} ගේ සටහන`;
+    title.innerText = post.isOfficial ? 'පිං පොත නිල නිවේදනය' : `${post.author || 'කල්‍යාණ මිත්‍ර'} ගේ සටහන`;
   }
 
   const currentUser = StorageService.currentUser;
@@ -1580,7 +1604,7 @@ window.generateWhatsAppStatusCardFromModal = async function() {
     const isRepost = post.isRepost || !!post.originalPost;
     const orig = post.originalPost || null;
 
-    const realAuthor = (isRepost && orig && orig.author) ? orig.author : (post.author || 'කල්‍යාණ මිත්‍ර');
+    const realAuthor = post.isOfficial ? 'අපේ පිං පොත' : ((isRepost && orig && orig.author) ? orig.author : (post.author || 'කල්‍යාණ මිත්‍ර'));
     const realTitle = (isRepost && orig && orig.title) ? orig.title : (post.title || 'පින්කම');
     const realDesc = (isRepost && orig && orig.description) ? orig.description : (post.description || '');
     const realImage = (isRepost && orig ? (orig.image || (orig.images && orig.images[0])) : (post.image || (post.images && post.images[0]))) || null;
@@ -1590,9 +1614,11 @@ window.generateWhatsAppStatusCardFromModal = async function() {
     const authorAvatar = (isRepost && orig && orig.authorAvatar) ? orig.authorAvatar : (post.authorAvatar || null);
 
     const authorInitial = realAuthor ? realAuthor.charAt(0) : 'ම';
-    const avatarInner = authorAvatar 
-      ? `<img src="${authorAvatar}" style="width: 100%; height: 100%; object-fit: cover; display: block;" crossorigin="anonymous">`
-      : `<span style="font-family: serif; font-size: 1.3rem; font-weight: 700; color: #ffffff;">${authorInitial}</span>`;
+    const avatarInner = post.isOfficial
+      ? `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #d97706, #92400e);"><i class="fa-solid fa-dharmachakra" style="font-size: 1.4rem; color: #fef3c7;"></i></div>`
+      : (authorAvatar 
+        ? `<img src="${authorAvatar}" style="width: 100%; height: 100%; object-fit: cover; display: block;" crossorigin="anonymous">`
+        : `<span style="font-family: serif; font-size: 1.3rem; font-weight: 700; color: #ffffff;">${authorInitial}</span>`);
 
     const origin = window.location.origin;
     const pathname = window.location.pathname;
@@ -1782,7 +1808,10 @@ window.openWhatsAppForStatusShare = function() {
   const origin = window.location.origin;
   const pathname = window.location.pathname;
   const postUrl = `${origin}${pathname}?post=${encodeURIComponent(postId || '')}`;
-  const shareText = `🌸 "${post.author || 'කල්‍යාණ මිත්‍ර'}" ගේ උතුම් පින්කම: ${post.title || ''}\n🙏 දැකබලා සතුටු සිතින් අනුමෝදන් වන්න:\n${postUrl}`;
+  const isOfficial = !!post.isOfficial;
+  const shareText = isOfficial
+    ? `📢 අපේ පිං පොත නිල නිවේදනය: ${post.title || ''}\n🙏 කියවා අන් අයටද දැනුම් දෙන්න:\n${postUrl}`
+    : `🌸 "${post.author || 'කල්‍යාණ මිත්‍ර'}" ගේ උතුම් පින්කම: ${post.title || ''}\n🙏 දැකබලා සතුටු සිතින් අනුමෝදන් වන්න:\n${postUrl}`;
   const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
   window.open(waUrl, '_blank');
 };
@@ -1806,7 +1835,8 @@ window.executeNativeOrWhatsAppShare = async function() {
 
   const isRepost = post.isRepost || !!post.originalPost;
   const orig = post.originalPost || null;
-  const realAuthor = (isRepost && orig && orig.author) ? orig.author : (post.author || 'කල්‍යාණ මිත්‍ර');
+  const isOfficial = !!post.isOfficial;
+  const realAuthor = isOfficial ? 'අපේ පිං පොත' : ((isRepost && orig && orig.author) ? orig.author : (post.author || 'කල්‍යාණ මිත්‍ර'));
   const realTitle = (isRepost && orig && orig.title) ? orig.title : (post.title || 'පින්කම');
   const realDesc = (isRepost && orig && orig.description) ? orig.description : (post.description || '');
   const realImage = (isRepost && orig ? (orig.image || (orig.images && orig.images[0])) : (post.image || (post.images && post.images[0]))) || null;
@@ -1826,8 +1856,10 @@ window.executeNativeOrWhatsAppShare = async function() {
     if (shareStatEl) shareStatEl.innerText = post.shareCount;
   } catch (e) {}
 
-  let shareBody = `🌸 "${realAuthor}" ගේ උතුම් පින්කම:\n✨ ${realTitle}`;
-  if (isRepost && post.author && post.author !== realAuthor) {
+  let shareBody = isOfficial 
+    ? `📢 අපේ පිං පොත නිල නිවේදනය:\n✨ ${realTitle}`
+    : `🌸 "${realAuthor}" ගේ උතුම් පින්කම:\n✨ ${realTitle}`;
+  if (!isOfficial && isRepost && post.author && post.author !== realAuthor) {
     shareBody += `\n🔄 (යළි බෙදාගත්තේ: ${post.author})`;
   }
   if (realDesc) {
@@ -2543,16 +2575,24 @@ function setupEventListeners() {
     const submitBtn = document.getElementById('submitPostBtn') || e.target.querySelector('button[type="submit"]');
     const originalBtnHTML = submitBtn ? submitBtn.innerHTML : '';
 
-    const title = selectedPostType === 'general' ? '' : (document.getElementById('postTitle')?.value || '').trim();
-    const category = selectedPostType === 'general' ? (document.getElementById('postCategory')?.value || 'සාමාන්‍ය') : (document.getElementById('postCategory')?.value || 'දානමය');
-    const visibility = selectedPostType === 'need' ? 'public' : (document.getElementById('postVisibility')?.value || 'public');
-    const location = selectedPostType === 'general' ? '' : (document.getElementById('postLocation')?.value || '').trim();
-    const contact = selectedPostType === 'need' ? (document.getElementById('postContact')?.value || '').trim() : '';
-    const description = (document.getElementById('postDesc')?.value || '').trim();
-
     const isMaster = StorageService.isMasterAdmin();
     const isOfficial = isMaster && (!!document.getElementById('adminIsOfficial')?.checked || !!document.getElementById('postIsOfficial')?.checked);
     const isPinned = isMaster && (!!document.getElementById('adminIsPinned')?.checked || !!document.getElementById('postIsPinned')?.checked);
+
+    let title = (document.getElementById('postTitle')?.value || '').trim();
+    if (selectedPostType === 'general') {
+      title = isOfficial ? 'පිං පොත නිල නිවේදනය' : (title || 'පුණ්‍ය සිතුවිලි');
+    } else if (isOfficial && !title) {
+      title = 'පිං පොත නිල නිවේදනය';
+    } else if (!title) {
+      title = 'පින්කම් සටහන';
+    }
+
+    const category = selectedPostType === 'general' ? (document.getElementById('postCategory')?.value || 'සාමාන්‍ය') : (document.getElementById('postCategory')?.value || 'දානමය');
+    const visibility = selectedPostType === 'need' ? 'public' : (document.getElementById('postVisibility')?.value || 'public');
+    const location = (selectedPostType === 'general' || isOfficial) ? '' : (document.getElementById('postLocation')?.value || '').trim();
+    const contact = selectedPostType === 'need' ? (document.getElementById('postContact')?.value || '').trim() : '';
+    const description = (document.getElementById('postDesc')?.value || '').trim();
 
     try {
       isSubmittingPost = true;
@@ -4223,7 +4263,7 @@ window.renderAdminDashboard = async function() {
                 <span style="font-size: 0.65rem; color: #64748b;">(${Security.escapeHTML(p.category || 'පින්කම')})</span>
               </div>
               <div style="font-size: 0.68rem; color: #94a3b8; margin-top: 2px;">
-                <span>${Security.escapeHTML(p.author || 'නොදන්නා')}</span> • <span>${Security.escapeHTML(p.date || 'දැන්')}</span>
+                <span>${isOfficial ? 'අපේ පිං පොත (නිල)' : Security.escapeHTML(p.author || 'නොදන්නා')}</span> • <span>${Security.escapeHTML(p.date || 'දැන්')}</span>
               </div>
             </div>
             <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">

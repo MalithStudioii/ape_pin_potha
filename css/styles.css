@@ -3296,6 +3296,29 @@ body {
   margin-left: 4px;
 }
 
+.official-avatar-circle {
+  background: linear-gradient(135deg, #d97706, #92400e) !important;
+  color: #ffffff !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 4px 14px rgba(217, 119, 6, 0.35) !important;
+  border: 2px solid #fef3c7 !important;
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 9999px !important;
+  flex-shrink: 0 !important;
+  cursor: default !important;
+}
+
+.official-author-name {
+  font-weight: 800 !important;
+  color: #78350f !important;
+  font-size: 0.95rem !important;
+  cursor: default !important;
+  letter-spacing: 0.2px;
+}
+
 .post-pin-btn {
   background: transparent;
   border: none;

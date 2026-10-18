@@ -878,10 +878,29 @@ export const StorageService = {
    * Save a new post (Firestore with atomic security or LocalStorage)
    */
   async createPost(rawPost) {
+    // 0. Auto-default title and institutional naming for official posts & general posts
+    const postToProcess = { ...rawPost };
+    const isMaster = this.isMasterAdmin();
+    const isOfficial = isMaster && !!postToProcess.isOfficial;
+
+    let safeTitle = (postToProcess.title || '').trim();
+    if (!safeTitle || safeTitle.length < 3) {
+      if (isOfficial) {
+        safeTitle = 'පිං පොත නිල නිවේදනය';
+      } else if (postToProcess.type === 'general') {
+        safeTitle = 'පුණ්‍ය සිතුවිලි';
+      } else if (postToProcess.type === 'repost') {
+        safeTitle = 'යළි බෙදාගැනීමක්';
+      } else {
+        safeTitle = 'පින්කම් සටහන';
+      }
+    }
+    postToProcess.title = safeTitle;
+
     // 1. Strict Security Validation & Sanitization with Banned Words Filter
     const bannedConfig = this.getBannedWords();
     const activeBannedWords = (bannedConfig && bannedConfig.active) ? (bannedConfig.words || []) : [];
-    const validation = Security.validatePost(rawPost, activeBannedWords);
+    const validation = Security.validatePost(postToProcess, activeBannedWords);
     if (!validation.isValid) {
       throw new Error(validation.errors.join(' '));
     }
@@ -893,23 +912,27 @@ export const StorageService = {
     }
 
     const cleanData = validation.sanitized;
+    const authorName = isOfficial ? 'අපේ පිං පොත' : this.currentUser.name;
+    const authorPhoto = isOfficial ? null : (this.currentUser.photo || null);
+
     const postPayload = {
       uid: this.currentUser.uid,
-      author: this.currentUser.name,
+      author: authorName,
+      authorPhoto: authorPhoto,
       type: cleanData.type,
       visibility: cleanData.visibility,
-      title: cleanData.title,
-      category: cleanData.category,
-      location: cleanData.location,
-      contact: cleanData.contact,
+      title: cleanData.title || safeTitle,
+      category: cleanData.category || (cleanData.type === 'general' ? 'සාමාන්‍ය' : 'දානමය'),
+      location: isOfficial ? '' : cleanData.location,
+      contact: isOfficial ? '' : cleanData.contact,
       description: cleanData.description,
       image: cleanData.image || (cleanData.images && cleanData.images[0]) || null,
       images: cleanData.images || (cleanData.image ? [cleanData.image] : []),
-      isOfficial: this.isMasterAdmin() && !!cleanData.isOfficial,
-      isPinned: this.isMasterAdmin() && !!cleanData.isPinned,
-      isVerifiedNeed: this.isMasterAdmin() && !!cleanData.isVerifiedNeed,
-      authorRole: this.isMasterAdmin() ? 'admin' : 'member',
-      authorEmail: this.currentUser.email || null,
+      isOfficial: isOfficial,
+      isPinned: isMaster && !!cleanData.isPinned,
+      isVerifiedNeed: isMaster && !!cleanData.isVerifiedNeed,
+      authorRole: isOfficial ? 'official' : (isMaster ? 'admin' : 'member'),
+      authorEmail: isOfficial ? null : (this.currentUser.email || null),
       timestamp: Date.now(),
       date: "දැන්",
       sadhuCount: 0,
