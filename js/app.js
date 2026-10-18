@@ -4,7 +4,7 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=41';
+import { StorageService } from './storage.js?v=42';
 import { Security } from './security.js?v=32';
 import { uploadToImgBB } from './imgbb-service.js?v=32';
 import { SoundService, triggerHaptic } from './sound.js?v=32';
@@ -1254,33 +1254,32 @@ window.handleSadhuClick = async function(postId, btnElement) {
     if (btnCountEl) btnCountEl.innerText = newCount;
   }
 
-  // Update in-memory post object
-  if (Array.isArray(currentPostsData)) {
-    const mPost = currentPostsData.find(p => p.id === postId);
-    if (mPost) {
-      const uUid = StorageService.currentUser?.uid || 'anonymous';
-      if (!Array.isArray(mPost.sadhuUsers)) mPost.sadhuUsers = [];
-      if (!isCurrentlyLiked) {
-        if (!mPost.sadhuUsers.includes(uUid)) mPost.sadhuUsers.push(uUid);
-        mPost.sadhuCount = currentCount + 1;
-      } else {
-        mPost.sadhuUsers = mPost.sadhuUsers.filter(u => u !== uUid);
-        mPost.sadhuCount = Math.max(0, currentCount - 1);
-      }
-    }
-  }
-
   // 4. Atomic cloud & local persistence
   try {
     const desiredAction = isCurrentlyLiked ? 'removed' : 'added';
     const res = await StorageService.giveSadhu(postId, desiredAction);
 
-    // Reconcile UI with confirmed storage response
+    // Reconcile UI and in-memory post with confirmed storage response
+    const confirmedCount = Math.max(0, parseInt(res.count, 10) || 0);
+
+    if (Array.isArray(currentPostsData)) {
+      const mPost = currentPostsData.find(p => p.id === postId);
+      if (mPost) {
+        const uUid = StorageService.currentUser?.uid || 'anonymous';
+        if (!Array.isArray(mPost.sadhuUsers)) mPost.sadhuUsers = [];
+        mPost.sadhuCount = confirmedCount;
+        if (res.action === 'added') {
+          if (!mPost.sadhuUsers.includes(uUid)) mPost.sadhuUsers.push(uUid);
+        } else {
+          mPost.sadhuUsers = mPost.sadhuUsers.filter(u => u !== uUid);
+        }
+      }
+    }
+
     const freshBtn = document.getElementById(`sadhu-btn-${postId}`) || btn;
     const freshCountEl = document.getElementById(`count-${postId}`);
     const freshBtnCountEl = document.getElementById(`count-btn-${postId}`);
 
-    const confirmedCount = Math.max(0, parseInt(res.count, 10) || 0);
     if (freshCountEl) freshCountEl.innerText = confirmedCount;
     if (freshBtnCountEl) freshBtnCountEl.innerText = confirmedCount;
 
