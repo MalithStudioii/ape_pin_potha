@@ -4,11 +4,13 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=43';
+import { StorageService } from './storage.js?v=44';
 import { Security } from './security.js?v=32';
 import { uploadToImgBB } from './imgbb-service.js?v=32';
 import { SoundService, triggerHaptic } from './sound.js?v=32';
+import { FeedAlgorithm } from './algorithm.js?v=44';
 
+window.FeedAlgorithm = FeedAlgorithm;
 window.SoundService = SoundService;
 window.triggerHaptic = triggerHaptic;
 window.toggleSoundPreference = function(e) {
@@ -78,6 +80,23 @@ let currentPostsData = [];
 let activeProfileSubTab = 'timeline';
 let currentNotifications = [];
 let activeNotifFilter = 'all';
+let currentFeedSort = 'trending';
+
+window.setFeedSort = function(sortMode) {
+  triggerHaptic(15);
+  SoundService.playClick();
+  currentFeedSort = sortMode;
+
+  ['trending', 'latest', 'top_sadhu'].forEach(m => {
+    const pill = document.getElementById(`sort-pill-${m}`);
+    if (pill) {
+      if (m === sortMode) pill.classList.add('active');
+      else pill.classList.remove('active');
+    }
+  });
+
+  renderFeed();
+};
 
 const COVER_PRESETS = [
   {
@@ -556,6 +575,16 @@ window.switchTab = function(tab, pushHistory = true) {
     }
   }
 
+  // Manage Feed Sort Bar visibility
+  const sortBar = document.getElementById('feedSortBar');
+  if (sortBar) {
+    if (tab === 'feed' || tab === 'needs') {
+      sortBar.style.display = 'flex';
+    } else {
+      sortBar.style.display = 'none';
+    }
+  }
+
   renderFeed();
 };
 
@@ -755,6 +784,8 @@ function renderPostCardHTML(post, user) {
   const sadhuUsers = Array.isArray(post.sadhuUsers) ? post.sadhuUsers : [];
   const hasGivenSadhu = sadhuUsers.includes(currentUserUid) || StorageService.hasUserGivenSadhu(post, currentUserUid);
 
+  const isTrending = (currentFeedSort === 'trending' && FeedAlgorithm.isTrendingPost(post, currentPostsData));
+
   return `
     <article class="post-card ${isNeed ? 'need-card' : ''} ${isRepost ? 'repost-card' : ''} ${post.isOfficial ? 'official-card' : ''}" id="post-elem-${post.id}">
       
@@ -864,6 +895,7 @@ function renderPostCardHTML(post, user) {
                   ${(post.authorRole === 'admin' || (post.authorEmail && post.authorEmail.toLowerCase() === 'silvadilan9@gmail.com')) ? `
                     <span class="official-author-badge" title="Verified Master Admin"><i class="fa-solid fa-crown"></i> Master Admin</span>
                   ` : ''}
+                  ${isTrending ? '<span class="post-badge trending-badge" title="පින්වතුන් බොහෝදෙනෙකුගේ සාදුකාර ලැබූ ප්‍රමුඛ සටහනක්"><i class="fa-solid fa-fire-flame-curved"></i> ප්‍රමුඛ</span>' : ''}
                   ${!isGeneral ? `<span class="post-badge category">${Security.escapeHTML(post.category)}</span>` : ''}
                   ${isNeed ? '<span class="post-badge need">🤝 සත්කාර ඉල්ලීමක්</span>' : ''}
                   ${isGeneral ? '<span class="post-badge" style="background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd;"><i class="fa-solid fa-mug-hot"></i> සාමාන්‍ය සටහනක්</span>' : ''}
@@ -1065,19 +1097,12 @@ function renderFeed() {
     return true;
   });
 
-  // Prioritize pinned posts to the top, then sort by timestamp descending
-  filtered.sort((a, b) => {
-    const aPin = a.isPinned ? 1 : 0;
-    const bPin = b.isPinned ? 1 : 0;
-    if (bPin !== aPin) {
-      return bPin - aPin;
-    }
-    const aTime = a.timestamp || 0;
-    const bTime = b.timestamp || 0;
-    return bTime - aTime;
-  });
+  // Rank using the intelligent FeedAlgorithm (Trending / Latest / Top Sadhu)
+  const ranked = (activeTab === 'mybook')
+    ? filtered.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+    : FeedAlgorithm.rankPosts(filtered, currentFeedSort);
 
-  if (filtered.length === 0) {
+  if (ranked.length === 0) {
     if (activeTab === 'mybook') {
       container.innerHTML = `
         <div class="card" style="padding: 48px 20px; text-align: center; border: 1.5px dashed rgba(217, 119, 6, 0.35); border-radius: 20px; background: linear-gradient(180deg, #fffdf8, #fff8ea);">
@@ -1127,7 +1152,7 @@ function renderFeed() {
     return;
   }
 
-  container.innerHTML = filtered.map(post => renderPostCardHTML(post, user)).join('');
+  container.innerHTML = ranked.map(post => renderPostCardHTML(post, user)).join('');
 }
 
 // Side Needs Widget

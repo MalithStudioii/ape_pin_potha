@@ -36,7 +36,7 @@
     <meta name="twitter:image" content="assets/banner.jpg">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=43">
+    <link rel="stylesheet" href="css/styles.css?v=44">
 </head>
 <body>
 
@@ -268,6 +268,28 @@
                 <button onclick="setCategory('සමාජ සත්කාර')" data-cat="සමාජ සත්කාර" class="category-pill">සමාජ සත්කාර</button>
                 <button onclick="setCategory('ධර්ම දානමය')" data-cat="ධර්ම දානමය" class="category-pill">ධර්ම දානමය</button>
                 <button onclick="setCategory('සුබපැතුම්')" data-cat="සුබපැතුම්" class="category-pill">සුබපැතුම්</button>
+            </div>
+
+            <!-- Feed Sort Switcher Bar (Algorithm / Latest / Top Sadhu) -->
+            <div class="feed-sort-bar" id="feedSortBar">
+                <div class="feed-sort-label">
+                    <i class="fa-solid fa-arrow-down-wide-short"></i>
+                    <span>පෙළගැස්ම:</span>
+                </div>
+                <div class="feed-sort-pills">
+                    <button type="button" class="feed-sort-pill active" id="sort-pill-trending" onclick="setFeedSort('trending')" title="සාදුකාර, අනුමෝදනා සහ ප්‍රතිචාර මත පදනම් වූ බුද්ධිමත් ශ්‍රේණිගත කිරීම">
+                        <i class="fa-solid fa-fire-flame-curved" style="color: #ea580c;"></i>
+                        <span>ප්‍රමුඛ (Smart)</span>
+                    </button>
+                    <button type="button" class="feed-sort-pill" id="sort-pill-latest" onclick="setFeedSort('latest')" title="මෑතකදී පළවූ අලුත්ම සටහන් පෙළගැස්ම">
+                        <i class="fa-solid fa-clock" style="color: #0284c7;"></i>
+                        <span>අලුත්ම</span>
+                    </button>
+                    <button type="button" class="feed-sort-pill" id="sort-pill-top_sadhu" onclick="setFeedSort('top_sadhu')" title="වැඩිම සාදුකාර සංඛ්‍යාවක් ලබාගත් සටහන්">
+                        <i class="fa-solid fa-hands-praying" style="color: #d97706;"></i>
+                        <span>වැඩිම සාදුකාර</span>
+                    </button>
+                </div>
             </div>
 
             <!-- Tab Header Banner -->
@@ -1787,6 +1809,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=43"></script>
+    <script type="module" src="js/app.js?v=44"></script>
 </body>
 </html>
