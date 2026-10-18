@@ -370,7 +370,13 @@ export const StorageService = {
   hasUserGivenSadhu(post, uid = null) {
     if (!post) return false;
     const userUid = uid || this.currentUser?.uid || 'anonymous';
+    const mySadhus = this.getUserSadhus(userUid);
+    if (mySadhus.includes(post.id)) return true;
     const sadhuUsers = Array.isArray(post.sadhuUsers) ? post.sadhuUsers : [];
+    // Only check sadhuUsers if userUid is not the post author (avoids legacy auto-liked author bug)
+    if (post.uid && post.uid === userUid) {
+      return mySadhus.includes(post.id);
+    }
     return sadhuUsers.includes(userUid);
   },
 
@@ -384,9 +390,13 @@ export const StorageService = {
       }
       post.sadhuCount = Math.max(0, parseInt(post.sadhuCount, 10) || 0);
 
-      if (mySadhus.includes(post.id) && !post.sadhuUsers.includes(userUid)) {
-        post.sadhuUsers.push(userUid);
-        if (post.sadhuCount === 0) post.sadhuCount = 1;
+      if (mySadhus.includes(post.id)) {
+        if (!post.sadhuUsers.includes(userUid)) {
+          post.sadhuUsers.push(userUid);
+        }
+      } else if (post.uid === userUid) {
+        // Author has not locally liked their own post, remove pre-populated author UID
+        post.sadhuUsers = post.sadhuUsers.filter(u => u !== userUid);
       }
     });
 
@@ -1092,33 +1102,29 @@ export const StorageService = {
   /**
    * Atomic Sadhu Toggle (Strictly 1 Sadhu per user) & Notification Trigger
    */
-  async giveSadhu(postId) {
+  async giveSadhu(postId, forceAction = null) {
     const allPosts = this.getLocalPosts();
     const targetPost = allPosts.find(p => p.id === postId);
-    const userUid = this.currentUser.uid || 'anonymous';
+    const userUid = this.currentUser?.uid || 'anonymous';
 
     if (!targetPost) return { action: 'none', count: 0, hasGiven: false };
 
     targetPost.sadhuUsers = Array.isArray(targetPost.sadhuUsers) ? targetPost.sadhuUsers : [];
     targetPost.sadhuCount = Math.max(0, parseInt(targetPost.sadhuCount, 10) || 0);
 
-    const alreadyGiven = targetPost.sadhuUsers.includes(userUid);
+    const alreadyGiven = this.hasUserGivenSadhu(targetPost, userUid);
+    const action = forceAction ? forceAction : (alreadyGiven ? 'removed' : 'added');
 
-    let action = 'added';
-    if (alreadyGiven) {
-      // Toggle off / remove Sadhu
-      targetPost.sadhuUsers = targetPost.sadhuUsers.filter(uid => uid !== userUid);
-      targetPost.sadhuCount = Math.max(0, targetPost.sadhuCount - 1);
-      this.recordUserSadhu(postId, false, userUid);
-      action = 'removed';
-    } else {
-      // Add Sadhu (first time)
+    if (action === 'added') {
+      targetPost.sadhuCount = targetPost.sadhuCount + 1;
       if (!targetPost.sadhuUsers.includes(userUid)) {
         targetPost.sadhuUsers.push(userUid);
       }
-      targetPost.sadhuCount = targetPost.sadhuCount + 1;
       this.recordUserSadhu(postId, true, userUid);
-      action = 'added';
+    } else {
+      targetPost.sadhuCount = Math.max(0, targetPost.sadhuCount - 1);
+      targetPost.sadhuUsers = targetPost.sadhuUsers.filter(uid => uid !== userUid);
+      this.recordUserSadhu(postId, false, userUid);
     }
 
     // Keep memory and local cache immediately up-to-date

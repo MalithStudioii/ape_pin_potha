@@ -4,7 +4,7 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=39';
+import { StorageService } from './storage.js?v=40';
 import { Security } from './security.js?v=32';
 import { uploadToImgBB } from './imgbb-service.js?v=32';
 import { SoundService, triggerHaptic } from './sound.js?v=32';
@@ -1245,7 +1245,8 @@ window.handleSadhuClick = async function(postId, btnElement) {
 
   // 4. Atomic cloud & local persistence
   try {
-    const res = await StorageService.giveSadhu(postId);
+    const desiredAction = isCurrentlyLiked ? 'removed' : 'added';
+    const res = await StorageService.giveSadhu(postId, desiredAction);
 
     // Reconcile UI with confirmed storage response
     const freshBtn = document.getElementById(`sadhu-btn-${postId}`) || btn;
