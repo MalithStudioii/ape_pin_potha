@@ -1232,9 +1232,13 @@ export const StorageService = {
     this.markPostAsDeletedLocally(postId);
 
     // 2. Immediately remove from local cache and notify UI listeners for instant feedback
-    const posts = this.getLocalPosts().filter(p => p.id !== postId);
-    this.cacheLocal(posts);
-    this.notifyListeners(posts);
+    const deletedIds = this.getDeletedPostIds();
+    if (this._cachedPosts && Array.isArray(this._cachedPosts)) {
+      this._cachedPosts = this._cachedPosts.filter(p => p.id !== postId && !deletedIds.includes(p.id));
+    }
+    const clean = (this._cachedPosts || []).filter(p => p.id !== postId && !deletedIds.includes(p.id));
+    this.cacheLocal(clean);
+    this.notifyListeners(clean);
 
     // 3. Clean up any related notifications locally
     const notifs = this.getLocalNotifications().filter(n => n.postId !== postId);

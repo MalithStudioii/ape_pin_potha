@@ -4,7 +4,7 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=40';
+import { StorageService } from './storage.js?v=41';
 import { Security } from './security.js?v=32';
 import { uploadToImgBB } from './imgbb-service.js?v=32';
 import { SoundService, triggerHaptic } from './sound.js?v=32';
@@ -120,8 +120,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Subscribe to real-time database updates
   StorageService.onPostsUpdate((posts) => {
-    currentPostsData = posts;
-    renderFeed();
+    const prevIds = (currentPostsData || []).map(p => p.id).join(',');
+    const newIds = (posts || []).map(p => p.id).join(',');
+    currentPostsData = posts || [];
+
+    if (prevIds === newIds && prevIds.length > 0) {
+      // In-place updates to prevent feed DOM teardown, scroll jump, and image flicker
+      updateFeedInPlace(currentPostsData);
+    } else {
+      renderFeed();
+    }
     renderSideNeeds();
     updateUserStats();
     if (activeTab === 'profile') {
@@ -986,6 +994,29 @@ function renderPostCardHTML(post, user) {
   `;
 }
 
+// In-place feed card updater (preserves scroll position and prevents jump/jitter during Sadhu clicks)
+function updateFeedInPlace(posts) {
+  const user = StorageService.currentUser;
+  (posts || []).forEach(post => {
+    const confirmedCount = Math.max(0, parseInt(post.sadhuCount, 10) || 0);
+    const countEl = document.getElementById(`count-${post.id}`);
+    const btnCountEl = document.getElementById(`count-btn-${post.id}`);
+    const sadhuBtn = document.getElementById(`sadhu-btn-${post.id}`);
+
+    if (countEl && countEl.innerText !== String(confirmedCount)) {
+      countEl.innerText = confirmedCount;
+    }
+    if (btnCountEl && btnCountEl.innerText !== String(confirmedCount)) {
+      btnCountEl.innerText = confirmedCount;
+    }
+    if (sadhuBtn) {
+      const hasGiven = StorageService.hasUserGivenSadhu(post, user?.uid);
+      sadhuBtn.classList.toggle('liked', hasGiven);
+      sadhuBtn.title = hasGiven ? 'සාදුකාරය ඉවත් කරන්න' : 'සාදුකාරයක් ලබා දෙන්න';
+    }
+  });
+}
+
 // Render Newsfeed
 function renderFeed() {
   const container = document.getElementById('postsContainer');
@@ -1204,10 +1235,6 @@ window.handleSadhuClick = async function(postId, btnElement) {
     if (btn) {
       btn.classList.add('liked');
       btn.title = 'සාදුකාරය ඉවත් කරන්න';
-      btn.style.transform = 'scale(1.12)';
-      setTimeout(() => {
-        if (btn) btn.style.transform = '';
-      }, 180);
     }
     const newCount = currentCount + 1;
     if (countEl) countEl.innerText = newCount;
@@ -1435,9 +1462,21 @@ window.deletePostPrompt = async function(postId) {
   if (confirm(confirmMsg)) {
     const cardEl = document.getElementById(`post-elem-${postId}`);
     if (cardEl) {
-      cardEl.classList.add('post-card-deleting');
+      cardEl.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+      cardEl.style.opacity = '0';
+      cardEl.style.transform = 'scale(0.95) translateY(-10px)';
+      cardEl.style.maxHeight = '0';
+      cardEl.style.overflow = 'hidden';
+      cardEl.style.margin = '0';
+      cardEl.style.padding = '0';
+      setTimeout(() => {
+        if (cardEl && cardEl.parentNode) {
+          cardEl.parentNode.removeChild(cardEl);
+        }
+      }, 320);
     }
 
+    currentPostsData = (currentPostsData || []).filter(p => p.id !== postId);
     try {
       await StorageService.deletePost(postId);
       triggerHaptic(20);
@@ -1452,7 +1491,6 @@ window.deletePostPrompt = async function(postId) {
       }
     } catch (err) {
       console.error('[Delete] Failed to delete post:', err);
-      if (cardEl) cardEl.classList.remove('post-card-deleting');
       alert("සටහන ඉවත් කිරීමේදී දෝෂයක් සිදු විය: " + (err.message || 'නැවත උත්සාහ කරන්න.'));
     }
   }
