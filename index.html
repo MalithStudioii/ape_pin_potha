@@ -36,7 +36,7 @@
     <meta name="twitter:image" content="assets/banner.jpg">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=38">
+    <link rel="stylesheet" href="css/styles.css?v=39">
 </head>
 <body>
 
@@ -1085,6 +1085,19 @@
                             </label>
                         </div>
 
+                        <!-- Data Sync & Hidden Posts Reset -->
+                        <div class="form-group" style="background: #fdfaf2; padding: 12px 14px; border-radius: 10px; border: 1px solid #fde68a; margin-top: 10px;">
+                            <label class="form-label" style="margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
+                                <span><i class="fa-solid fa-arrows-rotate" style="color: #d97706;"></i> දත්ත සමමුහුර්තකරණය (Sync & Cache)</span>
+                            </label>
+                            <p style="font-size: 0.74rem; color: #78350f; margin-bottom: 8px; line-height: 1.5;">
+                                ඔබ මීට පෙර මෙම දුරකථනයෙන් මකා දැමූ (Delete කළ) හෝ සැඟවුණු සටහන් නැවත ගෙන්වා ගැනීමට අවශ්‍ය නම් පහත බොත්තම ඔබන්න.
+                            </p>
+                            <button type="button" class="btn-profile-secondary" onclick="resetHiddenPostsCache()" style="width: 100%; justify-content: center; font-size: 0.8rem; padding: 8px 12px; border-radius: 8px; font-weight: 700;">
+                                <i class="fa-solid fa-rotate-left"></i> <span>සැඟවුණු සටහන් නැවත පෙන්වන්න (Restore All Posts)</span>
+                            </button>
+                        </div>
+
                         <div style="margin-top: 16px; display: flex; justify-content: flex-end;">
                             <button type="submit" class="btn-submit-merit" style="margin: 0; min-width: 140px;">
                                 <i class="fa-solid fa-check"></i>
@@ -1774,6 +1787,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=38"></script>
+    <script type="module" src="js/app.js?v=39"></script>
 </body>
 </html>

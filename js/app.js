@@ -4,7 +4,7 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=38';
+import { StorageService } from './storage.js?v=39';
 import { Security } from './security.js?v=32';
 import { uploadToImgBB } from './imgbb-service.js?v=32';
 import { SoundService, triggerHaptic } from './sound.js?v=32';
@@ -3826,6 +3826,17 @@ window.saveSettingsProfile = function(e) {
   if (activeTab === 'profile') renderProfileView();
   closeSettingsModal();
   alert("ඔබගේ ප්‍රොෆයිල් තොරතුරු සාර්ථකව යාවත්කාලීන විය! 🙏");
+};
+
+window.resetHiddenPostsCache = function() {
+  if (confirm("ඔබ මීට පෙර මෙම දුරකථනයෙන් මකා දැමූ (Delete කළ) හෝ සැඟවුණු සියලු සටහන් නැවත ගෙන්වා ගැනීමට අවශ්‍යද?")) {
+    StorageService.restoreDeletedPostsLocally();
+    currentPostsData = StorageService.getLocalPosts();
+    renderFeed();
+    if (activeTab === 'profile') renderProfileView();
+    closeSettingsModal();
+    alert("සියලුම සටහන් සාර්ථකව නැවත සමමුහුර්ත විය! 🙏");
+  }
 };
 
 // ============================================================================

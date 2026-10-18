@@ -317,6 +317,12 @@ export const StorageService = {
     }
   },
 
+  restoreDeletedPostsLocally() {
+    localStorage.removeItem('pinPotha_deleted_ids');
+    this._cachedPosts = null;
+    return this.getLocalPosts();
+  },
+
   syncCloudDeletedIds(cloudDeletedIds) {
     if (!Array.isArray(cloudDeletedIds) || cloudDeletedIds.length === 0) return;
     const localDeleted = this.getDeletedPostIds();
