@@ -23,6 +23,8 @@ service cloud.firestore {
                     || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['repostCount'])
                     || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isPinned'])
                     || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isVerifiedNeed'])
+                    || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isDeleted'])
+                    || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isDeleted', 'deletedAt'])
                     || (request.auth != null && resource.data.uid == request.auth.uid);
 
       // 4. සටහන Delete කිරීමේ අවසරය

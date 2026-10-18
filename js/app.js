@@ -4,7 +4,7 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=36';
+import { StorageService } from './storage.js?v=37';
 import { Security } from './security.js?v=32';
 import { uploadToImgBB } from './imgbb-service.js?v=32';
 import { SoundService, triggerHaptic } from './sound.js?v=32';
@@ -1438,6 +1438,12 @@ window.deletePostPrompt = async function(postId) {
 
     try {
       await StorageService.deletePost(postId);
+      triggerHaptic(20);
+      closePostDetailModal();
+      updateUserStats();
+      if (activeTab === 'profile') {
+        renderProfileView();
+      }
       const adminPanel = document.getElementById('settingsContentAdmin');
       if (adminPanel && !adminPanel.classList.contains('hidden')) {
         renderAdminDashboard();

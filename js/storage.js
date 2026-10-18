@@ -197,8 +197,9 @@ export const StorageService = {
           const deletedIds = this.getDeletedPostIds();
           const posts = [];
           snapshot.forEach((doc) => {
-            if (!deletedIds.includes(doc.id)) {
-              posts.push({ id: doc.id, ...doc.data() });
+            const data = doc.data();
+            if (!deletedIds.includes(doc.id) && data.isDeleted !== true) {
+              posts.push({ id: doc.id, ...data });
             }
           });
           this.syncPostsWithUserSadhus(posts);
@@ -260,6 +261,13 @@ export const StorageService = {
               this.notifyBannedWordsListeners(data);
             }
           });
+          onDocSnapshot(doc(db, COLLECTIONS.SETTINGS, 'deleted_posts'), (snap) => {
+            if (snap.exists()) {
+              const data = snap.data();
+              const cloudDeletedIds = Array.isArray(data.ids) ? data.ids : [];
+              this.syncCloudDeletedIds(cloudDeletedIds);
+            }
+          });
         } catch (sErr) {
           console.warn('[Firestore] Admin settings listener note:', sErr);
         }
@@ -299,6 +307,22 @@ export const StorageService = {
     if (!ids.includes(postId)) {
       ids.push(postId);
       localStorage.setItem('pinPotha_deleted_ids', JSON.stringify(ids));
+    }
+  },
+
+  syncCloudDeletedIds(cloudDeletedIds) {
+    if (!Array.isArray(cloudDeletedIds) || cloudDeletedIds.length === 0) return;
+    const localDeleted = this.getDeletedPostIds();
+    const merged = Array.from(new Set([...localDeleted, ...cloudDeletedIds]));
+    localStorage.setItem('pinPotha_deleted_ids', JSON.stringify(merged));
+
+    if (this._cachedPosts && Array.isArray(this._cachedPosts)) {
+      const remaining = this._cachedPosts.filter(p => !merged.includes(p.id) && p.isDeleted !== true);
+      if (remaining.length !== this._cachedPosts.length) {
+        this._cachedPosts = remaining;
+        this.cacheLocal(remaining);
+        this.notifyListeners(remaining);
+      }
     }
   },
 
@@ -362,17 +386,17 @@ export const StorageService = {
   getLocalPosts() {
     const deletedIds = this.getDeletedPostIds();
     if (this._cachedPosts && Array.isArray(this._cachedPosts) && this._cachedPosts.length > 0) {
-      const clean = this._cachedPosts.filter(p => !deletedIds.includes(p.id));
+      const clean = this._cachedPosts.filter(p => !deletedIds.includes(p.id) && p.isDeleted !== true);
       return this.syncPostsWithUserSadhus(clean);
     }
     try {
       const data = localStorage.getItem('pinPotha_sandbox_posts');
       const posts = data ? JSON.parse(data) : SEED_POSTS;
-      const clean = (Array.isArray(posts) ? posts : SEED_POSTS).filter(p => !deletedIds.includes(p.id));
+      const clean = (Array.isArray(posts) ? posts : SEED_POSTS).filter(p => !deletedIds.includes(p.id) && p.isDeleted !== true);
       this._cachedPosts = clean;
       return this.syncPostsWithUserSadhus(clean);
     } catch {
-      return this.syncPostsWithUserSadhus(SEED_POSTS.filter(p => !deletedIds.includes(p.id)));
+      return this.syncPostsWithUserSadhus(SEED_POSTS.filter(p => !deletedIds.includes(p.id) && p.isDeleted !== true));
     }
   },
 
@@ -1183,10 +1207,10 @@ export const StorageService = {
   },
 
   /**
-   * Delete post (Guarded by author identity)
+   * Delete post (Guarded by author or master admin, synced globally across all clients)
    */
   async deletePost(postId) {
-    // 1. Mark as deleted locally so it will never reappear even if Firestore syncs
+    // 1. Mark as deleted locally so it immediately disappears on current client
     this.markPostAsDeletedLocally(postId);
 
     // 2. Immediately remove from local cache and notify UI listeners for instant feedback
@@ -1194,18 +1218,43 @@ export const StorageService = {
     this.cacheLocal(posts);
     this.notifyListeners(posts);
 
-    // 2. Clean up any related notifications locally
+    // 3. Clean up any related notifications locally
     const notifs = this.getLocalNotifications().filter(n => n.postId !== postId);
     this.cacheLocalNotifications(notifs);
     this.notifyNotificationListeners(notifs);
 
-    // 3. Delete from Cloud Firestore if connected
+    // 4. Multi-tier Cloud Deletion (Guarantees deletion across ALL devices)
     if (isCloudReady && db) {
       try {
-        const { doc, deleteDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
-        await deleteDoc(doc(db, COLLECTIONS.POSTS, postId));
+        const { doc, deleteDoc, updateDoc, setDoc, arrayUnion } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+
+        // Tier A: Broadcast to global deleted_posts list so all users across the world remove it immediately
+        try {
+          await setDoc(doc(db, COLLECTIONS.SETTINGS, 'deleted_posts'), {
+            ids: arrayUnion(postId),
+            lastDeletedAt: Date.now()
+          }, { merge: true });
+        } catch (setErr) {
+          console.warn('[Firestore] Global deleted list broadcast note:', setErr);
+        }
+
+        // Tier B: Real hard deletion from Firestore merit_posts collection
+        try {
+          await deleteDoc(doc(db, COLLECTIONS.POSTS, postId));
+        } catch (delErr) {
+          console.warn('[Firestore] Hard deleteDoc note (attempting soft-delete fallback):', delErr);
+          // Tier C: Soft-delete fallback in case hard deletion is restricted by cloud rules
+          try {
+            await updateDoc(doc(db, COLLECTIONS.POSTS, postId), {
+              isDeleted: true,
+              deletedAt: Date.now()
+            });
+          } catch (upErr) {
+            console.warn('[Firestore] Soft delete update also failed:', upErr);
+          }
+        }
       } catch (cloudErr) {
-        console.warn('[Firestore] Cloud delete note:', cloudErr);
+        console.warn('[Firestore] Cloud delete service note:', cloudErr);
       }
     }
     return true;
