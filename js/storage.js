@@ -5,7 +5,7 @@
  */
 
 import { firebaseConfig, isFirebaseConfigured, COLLECTIONS } from './firebase-config.js?v=22';
-import { Security } from './security.js?v=22';
+import { Security } from './security.js?v=47';
 
 let db = null;
 let auth = null;
@@ -93,6 +93,30 @@ const SEED_POSTS = [
     sadhuCount: 1,
     image: null,
     comments: []
+  },
+  {
+    id: "post_204",
+    uid: "user_dharma",
+    author: "ශ්‍රද්ධා ධර්ම දානය",
+    type: "merit",
+    visibility: "public",
+    title: "සිත නිවන කෙටි ධර්ම කරුණක්",
+    category: "ධර්ම දානමය",
+    location: "කොළඹ",
+    description: "සිතේ සැනසීම උදාකරගන්නා අයුරු පැහැදිලි කරන වටිනා කෙටි ධර්ම දේශනාව. ශ්‍රවණය කර සිත පහදවා ගන්න! 🙏",
+    date: "පැය 1කට පෙර",
+    timestamp: Date.now() - 3600000,
+    sadhuCount: 45,
+    videoUrl: "https://www.youtube.com/shorts/5e_0P0c2E2A",
+    videoId: "5e_0P0c2E2A",
+    videoType: "youtube",
+    isShorts: true,
+    videoThumbnail: "https://img.youtube.com/vi/5e_0P0c2E2A/hqdefault.jpg",
+    image: "https://img.youtube.com/vi/5e_0P0c2E2A/hqdefault.jpg",
+    images: ["https://img.youtube.com/vi/5e_0P0c2E2A/hqdefault.jpg"],
+    comments: [
+      { author: "සුමනා පෙරේරා", text: "සාදු! ඉතාමත් පැහැදිලි කෙටි දේශනාවක්.", time: "විනාඩි 30කට පෙර" }
+    ]
   }
 ];
 
@@ -928,6 +952,11 @@ export const StorageService = {
       description: cleanData.description,
       image: cleanData.image || (cleanData.images && cleanData.images[0]) || null,
       images: cleanData.images || (cleanData.image ? [cleanData.image] : []),
+      videoUrl: cleanData.videoUrl || null,
+      videoId: cleanData.videoId || null,
+      videoType: cleanData.videoType || null,
+      isShorts: !!cleanData.isShorts,
+      videoThumbnail: cleanData.videoThumbnail || null,
       isOfficial: isOfficial,
       isPinned: isMaster && !!cleanData.isPinned,
       isVerifiedNeed: isMaster && !!cleanData.isVerifiedNeed,

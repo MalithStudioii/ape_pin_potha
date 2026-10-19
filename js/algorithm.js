@@ -63,7 +63,9 @@ export const FeedAlgorithm = {
     // 2. Media Richness Bonus
     const hasImages = (Array.isArray(post.images) && post.images.length > 1);
     const hasSingleImage = !hasImages && (post.image || (Array.isArray(post.images) && post.images.length === 1));
-    if (hasImages) {
+    if (post.videoId) {
+      engagement += post.isShorts ? 6.0 : 5.0;
+    } else if (hasImages) {
       engagement += this.WEIGHTS.MULTI_IMAGE;
     } else if (hasSingleImage) {
       engagement += this.WEIGHTS.SINGLE_IMAGE;

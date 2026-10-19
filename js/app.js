@@ -4,11 +4,11 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=46';
-import { Security } from './security.js?v=32';
+import { StorageService } from './storage.js?v=47';
+import { Security } from './security.js?v=47';
 import { uploadToImgBB } from './imgbb-service.js?v=32';
 import { SoundService, triggerHaptic } from './sound.js?v=32';
-import { FeedAlgorithm } from './algorithm.js?v=46';
+import { FeedAlgorithm } from './algorithm.js?v=47';
 
 window.FeedAlgorithm = FeedAlgorithm;
 window.SoundService = SoundService;
@@ -216,6 +216,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const lightbox = document.getElementById('photoLightboxModal');
     if (lightbox && !lightbox.classList.contains('hidden')) {
       closeLightbox();
+      return;
+    }
+
+    // 2.1. If Dharma Reels modal is open, close it
+    const reelsModal = document.getElementById('reelsModal');
+    if (reelsModal && !reelsModal.classList.contains('hidden')) {
+      closeReelsViewer();
       return;
     }
 
@@ -771,6 +778,123 @@ function renderPostImagesCollage(post) {
   `;
 }
 
+// ============================================================================
+// YouTube Shorts and Video URL Parser & Embed Engine
+// ============================================================================
+export function parseVideoUrl(inputUrl) {
+  if (!inputUrl || typeof inputUrl !== 'string') return null;
+  const url = inputUrl.trim();
+  
+  // YouTube regex covering shorts, watch?v=, youtu.be, embed, live
+  const ytRegex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts|live)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i;
+  const match = url.match(ytRegex);
+  
+  if (match && match[1]) {
+    const videoId = match[1];
+    const isShorts = url.toLowerCase().includes('/shorts/');
+    const videoThumbnail = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+    return {
+      type: 'youtube',
+      videoId,
+      isShorts,
+      videoUrl: url,
+      videoThumbnail
+    };
+  }
+
+  return null;
+}
+window.parseVideoUrl = parseVideoUrl;
+
+// Video Input Handlers in Post Composer
+window.handleVideoUrlInput = function(e) {
+  const url = (e.target?.value || '').trim();
+  const clearBtn = document.getElementById('clearVideoBtn');
+  const previewCard = document.getElementById('videoPreviewContainer');
+  const previewThumb = document.getElementById('videoPreviewThumb');
+  const previewBadge = document.getElementById('videoPreviewBadge');
+  const previewTitle = document.getElementById('videoPreviewTitle');
+
+  if (clearBtn) clearBtn.style.display = url ? 'flex' : 'none';
+
+  if (!url) {
+    if (previewCard) previewCard.style.display = 'none';
+    return;
+  }
+
+  const parsed = parseVideoUrl(url);
+  if (parsed && previewCard && previewThumb) {
+    previewThumb.src = parsed.videoThumbnail;
+    if (previewBadge) previewBadge.textContent = parsed.isShorts ? 'Shorts' : 'Video';
+    if (previewTitle) previewTitle.textContent = parsed.isShorts ? 'YouTube Shorts හඳුනාගැනිණි' : 'YouTube වීඩියෝව හඳුනාගැනිණි';
+    previewCard.style.display = 'flex';
+  } else if (previewCard) {
+    previewCard.style.display = 'none';
+  }
+};
+
+window.clearVideoUrlInput = function() {
+  const input = document.getElementById('postVideoUrl');
+  if (input) input.value = '';
+  const clearBtn = document.getElementById('clearVideoBtn');
+  if (clearBtn) clearBtn.style.display = 'none';
+  const previewCard = document.getElementById('videoPreviewContainer');
+  if (previewCard) previewCard.style.display = 'none';
+};
+
+// Video Facade Generator for Feed Cards
+function renderPostVideo(post) {
+  if (!post || !post.videoId) return '';
+
+  const isShorts = !!post.isShorts;
+  const thumbUrl = Security.sanitizeUrl(post.videoThumbnail) || `https://img.youtube.com/vi/${encodeURIComponent(post.videoId)}/hqdefault.jpg`;
+  const containerClass = isShorts ? 'shorts-container' : 'standard-container';
+
+  return `
+    <div class="post-video-container ${containerClass}" id="video-container-${post.id}">
+      <div class="video-facade" onclick="playPostVideo('${post.id}', '${post.videoId}', ${isShorts})">
+        <img src="${thumbUrl}" class="video-facade-thumb" alt="${Security.escapeHTML(post.title || 'Video')}" loading="lazy">
+        <div class="video-facade-overlay">
+          <div class="video-facade-top-badge">
+            <i class="fa-brands fa-youtube" style="color: #ef4444;"></i>
+            <span>${isShorts ? 'YouTube Shorts' : 'YouTube Video'}</span>
+          </div>
+
+          <div class="video-facade-play-center">
+            <div class="glowing-play-btn" title="වීඩියෝව වාදනය කරන්න">
+              <i class="fa-solid fa-play"></i>
+            </div>
+          </div>
+
+          <div class="video-facade-bottom-actions">
+            <button type="button" class="video-reels-btn" onclick="event.stopPropagation(); openReelsViewer('${post.id}')" title="පුණ්‍ය දැක්ම තුළ සම්පූර්ණ තිරයෙන් නරඹන්න">
+              <i class="fa-solid fa-expand"></i>
+              <span>පුණ්‍ය දැක්මෙන් බලන්න</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// Inline Video Player Trigger (swaps facade for iframe on demand)
+window.playPostVideo = function(postId, videoId, isShorts) {
+  const container = document.getElementById(`video-container-${postId}`);
+  if (!container) return;
+
+  const cleanVideoId = encodeURIComponent(videoId);
+  container.innerHTML = `
+    <iframe class="post-video-iframe"
+      src="https://www.youtube-nocookie.com/embed/${cleanVideoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1"
+      title="YouTube Video Player"
+      frameborder="0"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+      allowfullscreen>
+    </iframe>
+  `;
+};
+
 // Reusable Post Card HTML Generator
 function renderPostCardHTML(post, user) {
   const isMaster = StorageService.isMasterAdmin();
@@ -863,11 +987,18 @@ function renderPostCardHTML(post, user) {
             </div>
             <h4 class="quoted-merit-title">${Security.escapeHTML(orig.title)}</h4>
             <p class="quoted-merit-desc">${Security.escapeHTML(orig.description || '')}</p>
-            ${orig.image || (orig.images && orig.images.length > 0) ? `
+            ${orig.videoId ? `
+              <div class="quoted-merit-video-wrap" style="position: relative; border-radius: 10px; overflow: hidden; margin-top: 8px; max-width: 340px; cursor: pointer;" onclick="event.stopPropagation(); openReelsViewer('${orig.id}')" title="පුණ්‍ය දැක්ම තුළ නරඹන්න">
+                <img src="${Security.sanitizeUrl(orig.videoThumbnail || `https://img.youtube.com/vi/${orig.videoId}/hqdefault.jpg`)}" alt="${Security.escapeHTML(orig.title)}" loading="lazy" style="width: 100%; max-height: 200px; object-fit: cover;">
+                <div style="position: absolute; inset: 0; background: rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center;">
+                  <div class="glowing-play-btn" style="width: 44px; height: 44px; font-size: 1rem;"><i class="fa-solid fa-play"></i></div>
+                </div>
+              </div>
+            ` : (orig.image || (orig.images && orig.images.length > 0) ? `
               <div class="quoted-merit-image">
                 <img src="${Security.sanitizeUrl(orig.image || orig.images[0])}" alt="${Security.escapeHTML(orig.title)}" loading="lazy">
               </div>
-            ` : ''}
+            ` : '')}
           </div>
         ` : ''}
       ` : `
@@ -943,8 +1074,8 @@ function renderPostCardHTML(post, user) {
           <p class="post-desc">${Security.escapeHTML(post.description)}</p>
         </div>
 
-        <!-- Media Images Collage Grid -->
-        ${renderPostImagesCollage(post)}
+        <!-- Media Images or Video Player Facade Grid -->
+        ${post.videoId ? renderPostVideo(post) : renderPostImagesCollage(post)}
       `}
 
       <!-- Action Buttons Grid -->
@@ -1976,7 +2107,7 @@ function checkUrlDirectPost() {
 }
 
 // Modal & Form Handling
-window.openModal = function(type = 'merit', triggerPhoto = false) {
+window.openModal = function(type = 'merit', triggerPhoto = false, triggerVideo = false) {
   if (isGuestUser()) {
     showAuthRequiredModal('නව පින්කමක් හෝ සටහනක් පළ කිරීමට');
     return;
@@ -2009,6 +2140,14 @@ window.openModal = function(type = 'merit', triggerPhoto = false) {
 
   if (triggerPhoto) {
     setTimeout(() => document.getElementById('photoInput')?.click(), 200);
+  } else if (triggerVideo) {
+    setTimeout(() => {
+      const vInput = document.getElementById('postVideoUrl');
+      if (vInput) {
+        vInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        vInput.focus();
+      }
+    }, 200);
   }
 };
 
@@ -2048,6 +2187,7 @@ window.closeModal = function() {
   const modal = document.getElementById('postModal');
   if (modal) modal.classList.add('hidden');
   document.getElementById('postForm')?.reset();
+  window.clearVideoUrlInput();
   const chkOfficial = document.getElementById('adminIsOfficial') || document.getElementById('postIsOfficial');
   const chkPinned = document.getElementById('adminIsPinned') || document.getElementById('postIsPinned');
   if (chkOfficial) chkOfficial.checked = false;
@@ -2590,6 +2730,269 @@ function initLightboxTouchGestures() {
   }, { passive: false });
 }
 
+// ============================================================================
+// Fullscreen Dharma Reels / Shorts Vertical Swipe Viewer (පුණ්‍ය දැක්ම)
+// ============================================================================
+let currentReelsObserver = null;
+let activeReelPostId = null;
+
+window.openReelsViewer = function(initialPostId = null) {
+  const modal = document.getElementById('reelsModal');
+  const viewport = document.getElementById('reelsViewport');
+  if (!modal || !viewport) return;
+
+  // Filter all posts that have a valid videoId
+  const videoPosts = currentPostsData.filter(p => p.videoId && p.isDeleted !== true);
+
+  if (videoPosts.length === 0) {
+    alert("දැනට පුණ්‍ය දැක්මේ Shorts වීඩියෝ සටහන් නොමැත. ඔබේ ප්‍රථම ධර්ම Shorts සටහන දැන්ම එක් කරන්න!");
+    window.openModal('merit', false, true);
+    return;
+  }
+
+  try {
+    history.pushState({ type: 'modal', id: 'reelsModal' }, '');
+  } catch (e) {}
+
+  document.body.style.overflow = 'hidden';
+  modal.classList.remove('hidden');
+
+  // Determine starting index
+  let startIndex = 0;
+  if (initialPostId) {
+    const idx = videoPosts.findIndex(p => p.id === initialPostId);
+    if (idx !== -1) startIndex = idx;
+  }
+
+  // Render slides into reelsViewport
+  viewport.innerHTML = videoPosts.map((reel, index) => {
+    const authorName = reel.author || 'කල්‍යාණ මිත්‍රයෙක්';
+    const authorPhoto = reel.authorPhoto || null;
+    const sadhuCount = Math.max(0, parseInt(reel.sadhuCount, 10) || (Array.isArray(reel.sadhuUsers) ? reel.sadhuUsers.length : 0));
+    const commentsCount = Array.isArray(reel.comments) ? reel.comments.length : 0;
+    const hasGivenSadhu = StorageService.currentUser ? (Array.isArray(reel.sadhuUsers) && reel.sadhuUsers.includes(StorageService.currentUser.uid)) : false;
+    const thumbUrl = Security.sanitizeUrl(reel.videoThumbnail) || `https://img.youtube.com/vi/${encodeURIComponent(reel.videoId)}/hqdefault.jpg`;
+
+    return `
+      <div class="reels-slide" id="reel-slide-${reel.id}" data-post-id="${reel.id}" data-video-id="${reel.videoId}">
+        <div class="reels-media-wrap" id="reel-media-${reel.id}">
+          <div class="reels-slide-facade" id="reel-facade-${reel.id}" onclick="loadReelIframe('${reel.id}', '${reel.videoId}')">
+            <img src="${thumbUrl}" class="reels-slide-thumb" alt="${Security.escapeHTML(reel.title || 'Dharma Short')}" loading="lazy">
+            <div class="glowing-play-btn" style="position: absolute;"><i class="fa-solid fa-play"></i></div>
+          </div>
+        </div>
+
+        <!-- Floating Actions on Right -->
+        <div class="reels-actions-col">
+          <div style="display: flex; flex-direction: column; align-items: center;">
+            <button type="button" class="reels-action-circle ${hasGivenSadhu ? 'active-sadhu' : ''}" id="reel-sadhu-btn-${reel.id}" onclick="handleReelSadhu('${reel.id}', this)" title="සාදුකාර දෙන්න">
+              <span>🙏</span>
+            </button>
+            <span class="reels-action-count" id="reel-sadhu-count-${reel.id}">${sadhuCount}</span>
+          </div>
+
+          <div style="display: flex; flex-direction: column; align-items: center;">
+            <button type="button" class="reels-action-circle" onclick="openReelComments('${reel.id}')" title="අනුමෝදනා / ප්‍රාර්ථනා">
+              <i class="fa-regular fa-comment-dots" style="color: #fde68a;"></i>
+            </button>
+            <span class="reels-action-count">${commentsCount}</span>
+          </div>
+
+          <div style="display: flex; flex-direction: column; align-items: center;">
+            <button type="button" class="reels-action-circle" onclick="handleShare('${reel.id}')" title="බෙදාගන්න">
+              <i class="fa-solid fa-share-nodes" style="color: #ffffff;"></i>
+            </button>
+            <span class="reels-action-count">${reel.shareCount || 0}</span>
+          </div>
+        </div>
+
+        <!-- Bottom Post Information Overlay -->
+        <div class="reels-bottom-info">
+          <div class="reels-author-row">
+            <div class="reels-author-avatar" onclick="closeReelsViewer(); viewUserProfile('${reel.uid}', '${Security.escapeHTML(authorName)}')" style="cursor: pointer;">
+              ${authorPhoto ? `<img src="${Security.sanitizeUrl(authorPhoto)}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">` : Security.escapeHTML(authorName.charAt(0))}
+            </div>
+            <div>
+              <span class="reels-author-name" onclick="closeReelsViewer(); viewUserProfile('${reel.uid}', '${Security.escapeHTML(authorName)}')">${Security.escapeHTML(authorName)}</span>
+              ${reel.isOfficial ? `<span class="official-author-badge" style="margin-left: 6px;"><i class="fa-solid fa-crown"></i> නිල නිවේදනය</span>` : ''}
+            </div>
+            <span class="reels-category-tag">${Security.escapeHTML(reel.category || 'ධර්ම දානමය')}</span>
+          </div>
+
+          ${reel.title && reel.title !== 'පින්කම් සටහන' ? `<div class="reels-post-title">${Security.escapeHTML(reel.title)}</div>` : ''}
+          <div class="reels-post-desc" id="reel-desc-${reel.id}">
+            ${Security.escapeHTML(reel.description || '')}
+          </div>
+          ${(reel.description && reel.description.length > 80) ? `
+            <button type="button" class="reels-desc-more-btn" onclick="toggleReelDesc('${reel.id}')" id="reel-more-btn-${reel.id}">තවත්...</button>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Setup Intersection Observer for buttery smooth auto-play on scroll
+  if (currentReelsObserver) {
+    currentReelsObserver.disconnect();
+  }
+
+  currentReelsObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      const slide = entry.target;
+      const postId = slide.getAttribute('data-post-id');
+      const videoId = slide.getAttribute('data-video-id');
+
+      if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+        activeReelPostId = postId;
+        loadReelIframe(postId, videoId);
+      } else {
+        unloadReelIframe(postId, videoId);
+      }
+    });
+  }, {
+    root: viewport,
+    threshold: 0.6
+  });
+
+  const slides = viewport.querySelectorAll('.reels-slide');
+  slides.forEach(s => currentReelsObserver.observe(s));
+
+  // Scroll to starting slide if not 0
+  if (startIndex > 0 && slides[startIndex]) {
+    setTimeout(() => {
+      slides[startIndex].scrollIntoView({ behavior: 'auto' });
+    }, 50);
+  } else if (slides[0]) {
+    const firstPostId = slides[0].getAttribute('data-post-id');
+    const firstVideoId = slides[0].getAttribute('data-video-id');
+    loadReelIframe(firstPostId, firstVideoId);
+  }
+};
+
+window.loadReelIframe = function(postId, videoId) {
+  const mediaWrap = document.getElementById(`reel-media-${postId}`);
+  if (!mediaWrap) return;
+
+  const existingIframe = mediaWrap.querySelector('iframe');
+  if (existingIframe) return; // already loaded
+
+  const cleanVideoId = encodeURIComponent(videoId);
+  mediaWrap.innerHTML = `
+    <iframe class="reels-iframe"
+      src="https://www.youtube-nocookie.com/embed/${cleanVideoId}?autoplay=1&playsinline=1&modestbranding=1&rel=0&enablejsapi=1"
+      title="Dharma Short Player"
+      frameborder="0"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+      allowfullscreen>
+    </iframe>
+  `;
+};
+
+window.unloadReelIframe = function(postId, videoId) {
+  const mediaWrap = document.getElementById(`reel-media-${postId}`);
+  if (!mediaWrap) return;
+
+  const existingIframe = mediaWrap.querySelector('iframe');
+  if (!existingIframe) return;
+
+  const thumbUrl = `https://img.youtube.com/vi/${encodeURIComponent(videoId)}/hqdefault.jpg`;
+  mediaWrap.innerHTML = `
+    <div class="reels-slide-facade" id="reel-facade-${postId}" onclick="loadReelIframe('${postId}', '${videoId}')">
+      <img src="${thumbUrl}" class="reels-slide-thumb" alt="Dharma Short" loading="lazy">
+      <div class="glowing-play-btn" style="position: absolute;"><i class="fa-solid fa-play"></i></div>
+    </div>
+  `;
+};
+
+window.closeReelsViewer = function() {
+  const modal = document.getElementById('reelsModal');
+  const viewport = document.getElementById('reelsViewport');
+  if (modal) modal.classList.add('hidden');
+  if (currentReelsObserver) {
+    currentReelsObserver.disconnect();
+    currentReelsObserver = null;
+  }
+  if (viewport) {
+    viewport.innerHTML = ''; // completely unload all iframes and audio
+  }
+  document.body.style.overflow = '';
+};
+
+window.scrollReelNext = function() {
+  const viewport = document.getElementById('reelsViewport');
+  if (viewport) {
+    viewport.scrollBy({ top: window.innerHeight, behavior: 'smooth' });
+  }
+};
+
+window.scrollReelPrev = function() {
+  const viewport = document.getElementById('reelsViewport');
+  if (viewport) {
+    viewport.scrollBy({ top: -window.innerHeight, behavior: 'smooth' });
+  }
+};
+
+window.toggleReelDesc = function(postId) {
+  const desc = document.getElementById(`reel-desc-${postId}`);
+  const btn = document.getElementById(`reel-more-btn-${postId}`);
+  if (!desc) return;
+  desc.classList.toggle('expanded');
+  if (btn) {
+    btn.textContent = desc.classList.contains('expanded') ? 'අඩු කරන්න' : 'තවත්...';
+  }
+};
+
+window.handleReelSadhu = async function(postId, btnEl) {
+  const countEl = document.getElementById(`reel-sadhu-count-${postId}`);
+  try {
+    const res = await StorageService.toggleSadhu(postId);
+    if (res && res.hasGiven) {
+      SoundService.playSadhu();
+      triggerHaptic([30, 60]);
+      if (btnEl) btnEl.classList.add('active-sadhu');
+    } else {
+      if (btnEl) btnEl.classList.remove('active-sadhu');
+    }
+    if (countEl && res && typeof res.count === 'number') {
+      countEl.textContent = res.count;
+    }
+    // Also sync the post card in the main feed
+    const cardCountEl = document.getElementById(`count-btn-${postId}`);
+    if (cardCountEl && res && typeof res.count === 'number') {
+      cardCountEl.textContent = res.count;
+    }
+  } catch (err) {
+    console.warn('[Reel Sadhu Error]', err);
+  }
+};
+
+window.openReelComments = function(postId) {
+  window.closeReelsViewer();
+  setTimeout(() => {
+    const targetCard = document.getElementById(`post-${postId}`);
+    if (targetCard) {
+      targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      toggleCommentsSection(postId);
+    }
+  }, 250);
+};
+
+// Desktop Keyboard Navigation for Reels
+document.addEventListener('keydown', (e) => {
+  const reelsModal = document.getElementById('reelsModal');
+  if (reelsModal && !reelsModal.classList.contains('hidden')) {
+    if (e.key === 'Escape') {
+      window.closeReelsViewer();
+    } else if (e.key === 'ArrowDown' || e.key === 'PageDown') {
+      e.preventDefault();
+      window.scrollReelNext();
+    } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
+      e.preventDefault();
+      window.scrollReelPrev();
+    }
+  }
+});
+
 // Setup Listeners
 function setupEventListeners() {
   initLightboxTouchGestures();
@@ -2621,12 +3024,23 @@ function setupEventListeners() {
     const location = (selectedPostType === 'general' || isOfficial) ? '' : (document.getElementById('postLocation')?.value || '').trim();
     const contact = selectedPostType === 'need' ? (document.getElementById('postContact')?.value || '').trim() : '';
     const description = (document.getElementById('postDesc')?.value || '').trim();
+    const rawVideoUrl = (document.getElementById('postVideoUrl')?.value || '').trim();
+    const parsedVideo = parseVideoUrl(rawVideoUrl);
 
     try {
       isSubmittingPost = true;
       if (submitBtn) {
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> පළවෙමින් පවතී...';
+      }
+
+      const postImages = [...selectedImagesList];
+      let primaryImage = postImages[0] || null;
+      if (!primaryImage && parsedVideo && parsedVideo.videoThumbnail) {
+        primaryImage = parsedVideo.videoThumbnail;
+        if (postImages.length === 0) {
+          postImages.push(parsedVideo.videoThumbnail);
+        }
       }
 
       await StorageService.createPost({
@@ -2637,8 +3051,13 @@ function setupEventListeners() {
         location,
         contact,
         description,
-        image: selectedImagesList[0] || null,
-        images: [...selectedImagesList],
+        image: primaryImage,
+        images: postImages,
+        videoUrl: parsedVideo ? parsedVideo.videoUrl : null,
+        videoId: parsedVideo ? parsedVideo.videoId : null,
+        videoType: parsedVideo ? parsedVideo.type : null,
+        isShorts: parsedVideo ? parsedVideo.isShorts : false,
+        videoThumbnail: parsedVideo ? parsedVideo.videoThumbnail : null,
         isOfficial,
         isPinned
       });

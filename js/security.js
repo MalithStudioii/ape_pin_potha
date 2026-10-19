@@ -40,15 +40,18 @@ export const Security = {
     if (!url || typeof url !== 'string') return null;
     const cleanUrl = url.trim();
 
-    // Allow valid HTTPS/HTTP URLs
-    if (/^https?:\/\/[a-zA-Z0-9\-_.]+(:\d+)?(\/[a-zA-Z0-9\-_.%#?&=/+]*)?$/i.test(cleanUrl)) {
-      return cleanUrl;
-    }
-
     // Allow safely compressed Base64 images
     if (/^data:image\/(webp|jpeg|png|jpg);base64,[A-Za-z0-9+/=]+$/i.test(cleanUrl)) {
       return cleanUrl;
     }
+
+    // Allow valid HTTPS/HTTP URLs
+    try {
+      const parsed = new URL(cleanUrl);
+      if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+        return cleanUrl;
+      }
+    } catch (e) {}
 
     console.warn('[Security] Blocked potentially unsafe media URL:', cleanUrl.substring(0, 40));
     return null;
@@ -156,10 +159,15 @@ export const Security = {
         visibility: data.type === 'need' ? 'public' : data.visibility,
         location: this.escapeHTML(this.sanitizeText(data.location || '')),
         contact: this.sanitizePhone(data.contact || ''),
-        image: this.sanitizeUrl(data.image),
-        images: Array.isArray(data.images)
+        image: this.sanitizeUrl(data.image) || (data.videoThumbnail ? this.sanitizeUrl(data.videoThumbnail) : null),
+        images: Array.isArray(data.images) && data.images.length > 0
           ? data.images.map(img => this.sanitizeUrl(img)).filter(Boolean).slice(0, 8)
-          : (data.image ? [this.sanitizeUrl(data.image)].filter(Boolean) : []),
+          : (data.image ? [this.sanitizeUrl(data.image)].filter(Boolean) : (data.videoThumbnail ? [this.sanitizeUrl(data.videoThumbnail)].filter(Boolean) : [])),
+        videoUrl: this.sanitizeUrl(data.videoUrl),
+        videoId: data.videoId ? this.sanitizeText(data.videoId) : null,
+        videoType: data.videoType || (data.videoId ? 'youtube' : null),
+        isShorts: !!data.isShorts,
+        videoThumbnail: this.sanitizeUrl(data.videoThumbnail),
         isOfficial: !!data.isOfficial,
         isPinned: !!data.isPinned,
         isVerifiedNeed: !!data.isVerifiedNeed
