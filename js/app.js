@@ -3829,7 +3829,14 @@ function renderProfileView() {
     }
   }
 
-  // 10. Sub-tab Content
+  // 10. Sub-tab Content & Grid sync
+  const curSubTab = (typeof activeProfileSubTab !== 'undefined' && activeProfileSubTab) ? activeProfileSubTab : 'timeline';
+  const grid = document.getElementById('profileContentGrid') || document.querySelector('.profile-content-grid');
+  if (grid) {
+    grid.classList.remove('subtab-timeline', 'subtab-photos', 'subtab-stats', 'subtab-private');
+    grid.classList.add(`subtab-${curSubTab}`);
+    grid.setAttribute('data-active-subtab', curSubTab);
+  }
   renderProfileSubTabContent(user, myPosts, myPhotosPosts, myPrivatePosts, totalSadhu);
 }
 
@@ -3898,6 +3905,14 @@ window.setProfileSubTab = function(subTab) {
   const myPrivatePosts = currentPostsData.filter(p => p.uid && user.uid && p.uid === user.uid && p.visibility === 'private');
   const myPhotosPosts = currentPostsData.filter(p => p.uid && user.uid && p.uid === user.uid && p.image);
   const totalSadhu = myPosts.reduce((acc, p) => acc + (p.sadhuCount || 0), 0);
+
+  // Sync state class on profile-content-grid to toggle sidebar visibility
+  const grid = document.getElementById('profileContentGrid') || document.querySelector('.profile-content-grid');
+  if (grid) {
+    grid.classList.remove('subtab-timeline', 'subtab-photos', 'subtab-stats', 'subtab-private');
+    grid.classList.add(`subtab-${subTab}`);
+    grid.setAttribute('data-active-subtab', subTab);
+  }
 
   ['timeline', 'photos', 'stats', 'private'].forEach(t => {
     const btn = document.getElementById(`prof-sub-${t}`);

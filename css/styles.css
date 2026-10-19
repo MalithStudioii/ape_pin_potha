@@ -2265,6 +2265,13 @@ body {
   .profile-content-grid {
     grid-template-columns: 1fr;
   }
+
+  /* On mobile/tablets: when viewing Kushal Warthawa (stats) or Private Pin Potha (private),
+     hide the sidebar containing Intro/About and Merit Badges so the content displays right at the top */
+  .profile-content-grid.subtab-stats .profile-sidebar-col,
+  .profile-content-grid.subtab-private .profile-sidebar-col {
+    display: none !important;
+  }
 }
 
 .profile-widget-card {
@@ -4183,6 +4190,11 @@ html, body {
     max-width: 100% !important;
     box-sizing: border-box !important;
     min-width: 0 !important;
+  }
+
+  .profile-content-grid.subtab-stats .profile-sidebar-col,
+  .profile-content-grid.subtab-private .profile-sidebar-col {
+    display: none !important;
   }
 
   .profile-widget-card {
