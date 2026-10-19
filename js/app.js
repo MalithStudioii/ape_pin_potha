@@ -2859,11 +2859,12 @@ window.openReelsViewer = function(initialPostId = null) {
   if (!modal || !viewport) return;
 
   // Filter all posts that have a valid videoId
-  const videoPosts = currentPostsData.filter(p => p.videoId && p.isDeleted !== true);
+  const posts = (Array.isArray(currentPostsData) && currentPostsData.length > 0) ? currentPostsData : StorageService.getLocalPosts();
+  const videoPosts = posts.filter(p => p.videoId && p.isDeleted !== true);
 
   if (videoPosts.length === 0) {
     alert("දැනට පුණ්‍ය දැක්මේ Shorts වීඩියෝ සටහන් නොමැත. ඔබේ ප්‍රථම ධර්ම Shorts සටහන දැන්ම එක් කරන්න!");
-    window.openModal('merit', false, true);
+    window.openShortsUploadModal();
     return;
   }
 
@@ -5742,7 +5743,7 @@ function initPWAEngine() {
   // Register Service Worker
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=53', { updateViaCache: 'none' })
+      navigator.serviceWorker.register('./sw.js?v=54', { updateViaCache: 'none' })
         .then((registration) => {
           // Immediately check for service worker updates
           try { registration.update(); } catch (e) {}

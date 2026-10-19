@@ -46,7 +46,7 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=53">
+    <link rel="stylesheet" href="css/styles.css?v=54">
 </head>
 <body>
 
@@ -215,9 +215,9 @@
             <div class="card category-menu-card">
                 <h3 class="category-title">පින්කම් වර්ගීකරණය</h3>
                 <div style="display: flex; flex-direction: column; gap: 4px;">
-                    <button onclick="openReelsViewer()" class="category-item reels-sidebar-btn" style="background: linear-gradient(135deg, #fef2f2, #fff1f2); border: 1px solid #fecaca; color: #b91c1c; font-weight: 700; margin-bottom: 4px;">
-                        <span><i class="fa-solid fa-play cat-icon" style="color: #ef4444;"></i> පුණ්‍ය දැක්ම (Shorts)</span>
-                        <span class="badge-live" style="background: linear-gradient(135deg, #ef4444, #f59e0b); font-size: 0.65rem; padding: 2px 6px;">නව</span>
+                    <button onclick="openShortsUploadModal()" class="category-item reels-sidebar-btn" style="background: linear-gradient(135deg, #fef2f2, #fff1f2); border: 1px solid #fecaca; color: #b91c1c; font-weight: 700; margin-bottom: 4px;" title="නව Short වීඩියෝ සබැඳියක් (Link) එක් කරන්න">
+                        <span><i class="fa-solid fa-circle-plus cat-icon" style="color: #ef4444;"></i> පුණ්‍ය දැක්මක් එක් කරන්න</span>
+                        <span class="badge-live" style="background: linear-gradient(135deg, #ef4444, #f59e0b); font-size: 0.65rem; padding: 2px 6px;">+ Short</span>
                     </button>
                     <button onclick="setCategory('සියල්ල')" data-cat="සියල්ල" class="category-item active">
                         <span><i class="fa-solid fa-layer-group cat-icon" style="color: #b45309;"></i> සියලුම පින්කම්</span>
@@ -272,7 +272,7 @@
                         <span class="duo-btn-label">පින්කමක්</span>
                     </button>
                     <div class="composer-duo-divider" aria-hidden="true"></div>
-                    <button type="button" onclick="openShortsUploadModal()" class="composer-duo-btn duo-short-btn" title="නව Short Reel එකක් එක් කරන්න">
+                    <button type="button" onclick="openReelsViewer()" class="composer-duo-btn duo-short-btn" title="පුණ්‍ය දැක්ම Short Reels නරඹන්න">
                         <span class="duo-btn-icon short-icon">
                             <i class="fa-solid fa-play"></i>
                         </span>
@@ -283,8 +283,8 @@
 
             <!-- Mobile Category Pills -->
             <div class="mobile-categories" style="margin-bottom: 16px;">
-                <button onclick="openReelsViewer()" class="category-pill reels-pill" style="background: linear-gradient(135deg, #fef2f2, #fff1f2); border-color: #fecaca; color: #dc2626; font-weight: 700;">
-                    <i class="fa-solid fa-play" style="font-size: 0.7rem; margin-right: 4px;"></i> පුණ්‍ය දැක්ම
+                <button onclick="openShortsUploadModal()" class="category-pill reels-pill" style="background: linear-gradient(135deg, #fef2f2, #fff1f2); border-color: #fecaca; color: #dc2626; font-weight: 700;" title="නව Short වීඩියෝ සබැඳියක් (Link) එක් කරන්න">
+                    <i class="fa-solid fa-circle-plus" style="font-size: 0.72rem; margin-right: 4px;"></i> පුණ්‍ය දැක්ම
                 </button>
                 <button onclick="setCategory('සියල්ල')" data-cat="සියල්ල" class="category-pill active">සියල්ල</button>
                 <button onclick="setCategory('දානමය')" data-cat="දානමය" class="category-pill">දානමය</button>
@@ -2087,6 +2087,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=53"></script>
+    <script type="module" src="js/app.js?v=54"></script>
 </body>
 </html>

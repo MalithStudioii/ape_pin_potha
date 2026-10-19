@@ -1,11 +1,11 @@
-// Ape Pin Potha Service Worker (v53)
+// Ape Pin Potha Service Worker (v54)
 // Strategy: Network-First for HTML to guarantee instant updates, Stale-While-Revalidate for cached assets
-const CACHE_NAME = 'pin-potha-cache-v53';
+const CACHE_NAME = 'pin-potha-cache-v54';
 const STATIC_ASSETS = [
   './',
   './index.html',
-  './css/styles.css?v=53',
-  './js/app.js?v=53',
+  './css/styles.css?v=54',
+  './js/app.js?v=54',
   './js/storage.js',
   './js/security.js',
   './js/algorithm.js',
