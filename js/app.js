@@ -4,11 +4,11 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=48';
-import { Security } from './security.js?v=48';
-import { uploadToImgBB } from './imgbb-service.js?v=32';
-import { SoundService, triggerHaptic } from './sound.js?v=32';
-import { FeedAlgorithm } from './algorithm.js?v=48';
+import { StorageService } from './storage.js?v=55';
+import { Security } from './security.js?v=55';
+import { uploadToImgBB } from './imgbb-service.js?v=55';
+import { SoundService, triggerHaptic } from './sound.js?v=55';
+import { FeedAlgorithm } from './algorithm.js?v=55';
 
 window.FeedAlgorithm = FeedAlgorithm;
 window.SoundService = SoundService;
@@ -365,6 +365,23 @@ window.viewUserProfile = async function(uid, authorName) {
   await openMemberProfileModal(uid, authorName);
 };
 
+let currentViewingMember = null;
+
+window.viewMemberProfilePhoto = function(e) {
+  if (e) e.stopPropagation();
+  if (currentViewingMember && currentViewingMember.photo) {
+    window.openLightbox([currentViewingMember.photo], 0);
+  }
+};
+
+window.viewMemberCoverPhoto = function(e) {
+  if (e) e.stopPropagation();
+  const coverUrl = currentViewingMember?.coverImage || document.getElementById('memCoverImg')?.getAttribute('src') || 'assets/banner.jpg';
+  if (coverUrl && !coverUrl.includes('data:image/svg+xml')) {
+    window.openLightbox([coverUrl], 0);
+  }
+};
+
 window.openMemberProfileModal = async function(uid, authorName) {
   const modal = document.getElementById('memberProfileModal');
   if (!modal) return;
@@ -372,6 +389,7 @@ window.openMemberProfileModal = async function(uid, authorName) {
   try {
     history.pushState({ type: 'modal', id: 'memberProfileModal' }, '');
   } catch (e) {}
+  document.body.style.overflow = 'hidden';
   modal.classList.remove('hidden');
 
   // Load profile from StorageService
@@ -385,6 +403,8 @@ window.openMemberProfileModal = async function(uid, authorName) {
     occupation: '',
     joinedDate: '2026 ඔක්තෝබර්'
   };
+
+  currentViewingMember = member;
 
   const coverImg = document.getElementById('memCoverImg');
   if (coverImg) coverImg.src = member.coverImage || 'assets/banner.jpg';
@@ -482,6 +502,8 @@ window.openMemberProfileModal = async function(uid, authorName) {
 
 window.closeMemberProfileModal = function() {
   document.getElementById('memberProfileModal')?.classList.add('hidden');
+  document.body.style.overflow = '';
+  currentViewingMember = null;
 };
 
 window.closeMemberProfileOnBackdrop = function(e) {
@@ -5740,10 +5762,25 @@ function initPWAEngine() {
   // iOS Safari detection
   const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()) && !window.MSStream;
 
+  // Purge any stale caches from previous builds
+  const ACTIVE_BUILD = 'v55';
+  if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
+    localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
+    if ('caches' in window) {
+      caches.keys().then((names) => {
+        names.forEach((name) => {
+          if (name !== 'pin-potha-cache-' + ACTIVE_BUILD) {
+            caches.delete(name);
+          }
+        });
+      });
+    }
+  }
+
   // Register Service Worker
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=54', { updateViaCache: 'none' })
+      navigator.serviceWorker.register('./sw.js?v=55', { updateViaCache: 'none' })
         .then((registration) => {
           // Immediately check for service worker updates
           try { registration.update(); } catch (e) {}

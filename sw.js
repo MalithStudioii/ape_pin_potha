@@ -1,15 +1,15 @@
-// Ape Pin Potha Service Worker (v54)
-// Strategy: Network-First for HTML to guarantee instant updates, Stale-While-Revalidate for cached assets
-const CACHE_NAME = 'pin-potha-cache-v54';
+// Ape Pin Potha Service Worker (v55)
+// Strategy: Network-First for HTML, JS, CSS to guarantee instant updates; Stale-While-Revalidate for media assets
+const CACHE_NAME = 'pin-potha-cache-v55';
 const STATIC_ASSETS = [
   './',
   './index.html',
-  './css/styles.css?v=54',
-  './js/app.js?v=54',
-  './js/storage.js',
-  './js/security.js',
-  './js/algorithm.js',
-  './js/sound.js',
+  './css/styles.css?v=55',
+  './js/app.js?v=55',
+  './js/storage.js?v=55',
+  './js/security.js?v=55',
+  './js/algorithm.js?v=55',
+  './js/sound.js?v=55',
   './manifest.json',
   './assets/icon-192.png',
   './assets/icon-512.png',
@@ -55,9 +55,9 @@ self.addEventListener('activate', (event) => {
 });
 
 // Fetch Strategy:
-// 1. Navigation requests (HTML) -> Network-First (Ensures instant live updates without cache delay)
+// 1. App Shell (HTML, JS, CSS) -> Network-First (Ensures instant live updates without cache delay)
 // 2. Firebase / Google APIs / Media -> Direct Network (Never cache dynamic cloud databases)
-// 3. Static Assets -> Stale-While-Revalidate (Fast offline + fresh updates in background)
+// 3. Static Media Assets -> Stale-While-Revalidate (Fast offline + fresh updates in background)
 self.addEventListener('fetch', (event) => {
   const request = event.request;
   const url = new URL(request.url);
@@ -75,8 +75,18 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Navigation requests: Network-First to guarantee latest HTML and zero update delay
-  if (request.mode === 'navigate' || request.destination === 'document') {
+  // App Shell (HTML, JS, CSS): Network-First to guarantee latest code and zero update delay
+  const isAppShell =
+    request.mode === 'navigate' ||
+    request.destination === 'document' ||
+    request.destination === 'script' ||
+    request.destination === 'style' ||
+    url.pathname.endsWith('.js') ||
+    url.pathname.endsWith('.css') ||
+    url.pathname.endsWith('.html') ||
+    url.pathname === '/';
+
+  if (isAppShell) {
     event.respondWith(
       fetch(request, { cache: 'no-store' })
         .then((networkResponse) => {
@@ -87,13 +97,13 @@ self.addEventListener('fetch', (event) => {
           return networkResponse;
         })
         .catch(() => {
-          return caches.match(request).then((cached) => cached || caches.match('./index.html'));
+          return caches.match(request).then((cached) => cached || (request.mode === 'navigate' ? caches.match('./index.html') : null));
         })
     );
     return;
   }
 
-  // Static Assets: Stale-While-Revalidate
+  // Static Media Assets (Images, Icons, Fonts): Stale-While-Revalidate
   event.respondWith(
     caches.match(request).then((cachedResponse) => {
       const fetchPromise = fetch(request)

@@ -4502,7 +4502,10 @@ html, body {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.22);
-  overflow: hidden !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+  max-height: 90vh !important;
+  overscroll-behavior: contain;
 }
 
 .member-profile-header {
