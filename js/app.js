@@ -75,8 +75,8 @@ let selectedPostType = 'merit';
 let compressedBase64Image = null;
 let selectedImagesList = [];
 let currentLightboxImages = [];
-let currentLightboxIndex = 0;
 let currentPostsData = [];
+window.currentPostsData = currentPostsData;
 let activeProfileSubTab = 'timeline';
 let currentNotifications = [];
 let activeNotifFilter = 'all';
@@ -140,8 +140,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Subscribe to real-time database updates
   StorageService.onPostsUpdate((posts) => {
     const prevIds = (currentPostsData || []).map(p => p.id).join(',');
-    const newIds = (posts || []).map(p => p.id).join(',');
     currentPostsData = posts || [];
+    window.currentPostsData = currentPostsData;
 
     if (prevIds === newIds && prevIds.length > 0) {
       // In-place updates to prevent feed DOM teardown, scroll jump, and image flicker
@@ -5742,15 +5742,25 @@ function initPWAEngine() {
   // Register Service Worker
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js')
+      navigator.serviceWorker.register('./sw.js?v=53', { updateViaCache: 'none' })
         .then((registration) => {
+          // Immediately check for service worker updates
+          try { registration.update(); } catch (e) {}
+
+          // Also check for updates when window becomes visible
+          document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+              try { registration.update(); } catch (e) {}
+            }
+          });
+
           // Track updates
           registration.addEventListener('updatefound', () => {
             const installingWorker = registration.installing;
             if (!installingWorker) return;
 
             installingWorker.addEventListener('statechange', () => {
-              if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              if ((installingWorker.state === 'installed' || installingWorker.state === 'activated') && navigator.serviceWorker.controller) {
                 // New update is available!
                 newWorkerWaiting = installingWorker;
                 showPwaUpdateToast();

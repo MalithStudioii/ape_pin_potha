@@ -1,11 +1,11 @@
-// Ape Pin Potha Service Worker (v52)
+// Ape Pin Potha Service Worker (v53)
 // Strategy: Network-First for HTML to guarantee instant updates, Stale-While-Revalidate for cached assets
-const CACHE_NAME = 'pin-potha-cache-v52';
+const CACHE_NAME = 'pin-potha-cache-v53';
 const STATIC_ASSETS = [
   './',
   './index.html',
-  './css/styles.css?v=52',
-  './js/app.js?v=52',
+  './css/styles.css?v=53',
+  './js/app.js?v=53',
   './js/storage.js',
   './js/security.js',
   './js/algorithm.js',
@@ -78,7 +78,7 @@ self.addEventListener('fetch', (event) => {
   // Navigation requests: Network-First to guarantee latest HTML and zero update delay
   if (request.mode === 'navigate' || request.destination === 'document') {
     event.respondWith(
-      fetch(request)
+      fetch(request, { cache: 'no-store' })
         .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             const copy = networkResponse.clone();

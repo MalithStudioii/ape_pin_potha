@@ -1162,19 +1162,38 @@ export const StorageService = {
    * Atomic Sadhu Toggle (Strictly 1 Sadhu per user) & Notification Trigger
    */
   async giveSadhu(postId, forceAction = null) {
+    const sPostId = String(postId);
     const allPosts = this.getLocalPosts();
-    let targetPost = allPosts.find(p => p.id === postId);
+    let targetPost = allPosts.find(p => String(p.id) === sPostId);
     const userUid = this.currentUser?.uid || 'anonymous';
 
-    // Fallback: If not found in local posts, check in-memory currentPostsData
-    if (!targetPost && typeof window !== 'undefined' && Array.isArray(window.currentPostsData)) {
-      targetPost = window.currentPostsData.find(p => p.id === postId);
-      if (targetPost) {
-        allPosts.push(targetPost);
-      }
+    // Fallback 1: Check _cachedPosts
+    if (!targetPost && Array.isArray(this._cachedPosts)) {
+      targetPost = this._cachedPosts.find(p => String(p.id) === sPostId);
+      if (targetPost) allPosts.push(targetPost);
     }
 
-    if (!targetPost) return { action: 'none', count: 0, hasGiven: false };
+    // Fallback 2: Check window.currentPostsData
+    if (!targetPost && typeof window !== 'undefined' && Array.isArray(window.currentPostsData)) {
+      targetPost = window.currentPostsData.find(p => String(p.id) === sPostId);
+      if (targetPost) allPosts.push(targetPost);
+    }
+
+    // Fallback 3: Check SEED_POSTS
+    if (!targetPost && typeof SEED_POSTS !== 'undefined' && Array.isArray(SEED_POSTS)) {
+      targetPost = SEED_POSTS.find(p => String(p.id) === sPostId);
+      if (targetPost) allPosts.push(targetPost);
+    }
+
+    // Fallback 4: If still not found, instantiate a new targetPost so user interaction is never lost or zeroed
+    if (!targetPost) {
+      targetPost = {
+        id: postId,
+        sadhuCount: 0,
+        sadhuUsers: []
+      };
+      allPosts.push(targetPost);
+    }
 
     targetPost.sadhuUsers = Array.isArray(targetPost.sadhuUsers) ? targetPost.sadhuUsers : [];
     targetPost.sadhuCount = Math.max(0, parseInt(targetPost.sadhuCount, 10) || 0);
