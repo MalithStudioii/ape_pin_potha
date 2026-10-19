@@ -2887,7 +2887,7 @@ window.openReelsViewer = function(initialPostId = null) {
     const authorPhoto = reel.authorPhoto || null;
     const sadhuCount = Math.max(0, parseInt(reel.sadhuCount, 10) || (Array.isArray(reel.sadhuUsers) ? reel.sadhuUsers.length : 0));
     const commentsCount = Array.isArray(reel.comments) ? reel.comments.length : 0;
-    const hasGivenSadhu = StorageService.currentUser ? (Array.isArray(reel.sadhuUsers) && reel.sadhuUsers.includes(StorageService.currentUser.uid)) : false;
+    const hasGivenSadhu = StorageService.hasUserGivenSadhu ? StorageService.hasUserGivenSadhu(reel) : false;
     const thumbUrl = Security.sanitizeUrl(reel.videoThumbnail) || `https://img.youtube.com/vi/${encodeURIComponent(reel.videoId)}/hqdefault.jpg`;
 
     return `
@@ -3166,23 +3166,66 @@ window.handleReelSadhu = async function(postId, btnEl, event) {
   triggerHaptic([30, 60]);
 
   const countEl = document.getElementById(`reel-sadhu-count-${postId}`);
+  const currentCount = parseInt(countEl?.textContent || '0', 10);
+  const isCurrentlyLiked = btnEl ? btnEl.classList.contains('active-sadhu') : false;
+
+  // Immediate optimistic UI update
+  if (!isCurrentlyLiked) {
+    if (btnEl) btnEl.classList.add('active-sadhu');
+    if (countEl) countEl.textContent = currentCount + 1;
+  } else {
+    if (btnEl) btnEl.classList.remove('active-sadhu');
+    if (countEl) countEl.textContent = Math.max(0, currentCount - 1);
+  }
+
   try {
-    const res = await StorageService.toggleSadhu(postId);
+    const desiredAction = isCurrentlyLiked ? 'removed' : 'added';
+    const res = await StorageService.giveSadhu(postId, desiredAction);
+    const confirmedCount = (res && typeof res.count === 'number') ? res.count : (isCurrentlyLiked ? Math.max(0, currentCount - 1) : currentCount + 1);
+
     if (res && res.hasGiven) {
       if (btnEl) btnEl.classList.add('active-sadhu');
     } else {
       if (btnEl) btnEl.classList.remove('active-sadhu');
     }
-    if (countEl && res && typeof res.count === 'number') {
-      countEl.textContent = res.count;
+    if (countEl) {
+      countEl.textContent = confirmedCount;
     }
+
+    // Sync in-memory currentPostsData so subsequent views have the updated count
+    if (typeof currentPostsData !== 'undefined' && Array.isArray(currentPostsData)) {
+      const mPost = currentPostsData.find(p => p.id === postId);
+      if (mPost) {
+        const uUid = StorageService.currentUser?.uid || 'anonymous';
+        if (!Array.isArray(mPost.sadhuUsers)) mPost.sadhuUsers = [];
+        mPost.sadhuCount = confirmedCount;
+        if (res && res.action === 'added') {
+          if (!mPost.sadhuUsers.includes(uUid)) mPost.sadhuUsers.push(uUid);
+        } else {
+          mPost.sadhuUsers = mPost.sadhuUsers.filter(u => u !== uUid);
+        }
+      }
+    }
+
     // Also sync the post card in the main feed
     const cardCountEl = document.getElementById(`count-btn-${postId}`);
-    if (cardCountEl && res && typeof res.count === 'number') {
-      cardCountEl.textContent = res.count;
+    const cardMainCountEl = document.getElementById(`count-${postId}`);
+    const cardBtnEl = document.getElementById(`sadhu-btn-${postId}`);
+    if (cardCountEl) cardCountEl.textContent = confirmedCount;
+    if (cardMainCountEl) cardMainCountEl.textContent = confirmedCount;
+    if (cardBtnEl) {
+      if (res && res.hasGiven) cardBtnEl.classList.add('liked');
+      else cardBtnEl.classList.remove('liked');
     }
   } catch (err) {
     console.warn('[Reel Sadhu Error]', err);
+    // rollback optimistic count on failure
+    if (countEl) countEl.textContent = currentCount;
+    if (isCurrentlyLiked) {
+      if (btnEl) btnEl.classList.add('active-sadhu');
+    } else {
+      if (btnEl) btnEl.classList.remove('active-sadhu');
+    }
   }
 };
 

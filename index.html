@@ -46,7 +46,7 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=51">
+    <link rel="stylesheet" href="css/styles.css?v=52">
 </head>
 <body>
 
@@ -264,26 +264,19 @@
                         අද ඔබ සිදුකළ පින්කම කුමක්ද? සටහන් කරන්න...
                     </button>
                 </div>
-                <div class="composer-actions">
-                    <button onclick="openModal('merit')" class="composer-action-btn">
-                        <i class="fa-solid fa-dharmachakra" style="color: #d97706;"></i>
-                        <span>පින්කමක්</span>
+                <div class="composer-actions composer-duo-actions">
+                    <button type="button" onclick="openModal('merit')" class="composer-duo-btn duo-merit-btn" title="නව පින්කමක්, සටහනක්, ඡායාරූපයක් හෝ සත්කාරයක් සටහන් කරන්න">
+                        <span class="duo-btn-icon merit-icon">
+                            <i class="fa-solid fa-dharmachakra"></i>
+                        </span>
+                        <span class="duo-btn-label">පින්කමක්</span>
                     </button>
-                    <button onclick="openModal('general')" class="composer-action-btn">
-                        <i class="fa-solid fa-mug-hot" style="color: #0284c7;"></i>
-                        <span>සුබපැතුම්</span>
-                    </button>
-                    <button onclick="openModal('merit', true)" class="composer-action-btn">
-                        <i class="fa-solid fa-image" style="color: #059669;"></i>
-                        <span>ඡායාරූපයක්</span>
-                    </button>
-                    <button onclick="openShortsUploadModal()" class="composer-action-btn" title="නව Short Reel එකක් එක් කරන්න">
-                        <i class="fa-solid fa-play" style="color: #ef4444;"></i>
-                        <span>Shorts</span>
-                    </button>
-                    <button onclick="openModal('need')" class="composer-action-btn">
-                        <i class="fa-solid fa-hand-holding-heart" style="color: #e11d48;"></i>
-                        <span>සත්කාරයක්</span>
+                    <div class="composer-duo-divider" aria-hidden="true"></div>
+                    <button type="button" onclick="openShortsUploadModal()" class="composer-duo-btn duo-short-btn" title="නව Short Reel එකක් එක් කරන්න">
+                        <span class="duo-btn-icon short-icon">
+                            <i class="fa-solid fa-play"></i>
+                        </span>
+                        <span class="duo-btn-label">Short</span>
                     </button>
                 </div>
             </div>
@@ -2094,6 +2087,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=51"></script>
+    <script type="module" src="js/app.js?v=52"></script>
 </body>
 </html>

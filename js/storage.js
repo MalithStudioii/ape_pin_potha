@@ -1152,12 +1152,27 @@ export const StorageService = {
   },
 
   /**
+   * Alias for giveSadhu to toggle Sadhu atomically
+   */
+  async toggleSadhu(postId, forceAction = null) {
+    return this.giveSadhu(postId, forceAction);
+  },
+
+  /**
    * Atomic Sadhu Toggle (Strictly 1 Sadhu per user) & Notification Trigger
    */
   async giveSadhu(postId, forceAction = null) {
     const allPosts = this.getLocalPosts();
-    const targetPost = allPosts.find(p => p.id === postId);
+    let targetPost = allPosts.find(p => p.id === postId);
     const userUid = this.currentUser?.uid || 'anonymous';
+
+    // Fallback: If not found in local posts, check in-memory currentPostsData
+    if (!targetPost && typeof window !== 'undefined' && Array.isArray(window.currentPostsData)) {
+      targetPost = window.currentPostsData.find(p => p.id === postId);
+      if (targetPost) {
+        allPosts.push(targetPost);
+      }
+    }
 
     if (!targetPost) return { action: 'none', count: 0, hasGiven: false };
 

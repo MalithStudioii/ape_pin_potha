@@ -1016,6 +1016,109 @@ body {
   color: var(--color-primary-800);
 }
 
+/* Premium Duo Split ("පින්කමක් | Short") */
+.composer-duo-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 0 !important;
+  margin-top: 12px !important;
+  padding: 5px 6px !important;
+  border-top: 1px solid #f1f5f9 !important;
+  background: linear-gradient(135deg, rgba(254, 243, 199, 0.35) 0%, rgba(254, 226, 226, 0.25) 100%);
+  border-radius: 14px;
+  border: 1px solid rgba(245, 158, 11, 0.18);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.composer-duo-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 9px 16px;
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  color: #1e293b;
+  position: relative;
+}
+
+.composer-duo-btn:hover {
+  transform: translateY(-1px);
+}
+
+.composer-duo-btn:active {
+  transform: scale(0.98);
+}
+
+.duo-merit-btn {
+  color: #78350f;
+}
+
+.duo-merit-btn:hover {
+  background: rgba(254, 243, 199, 0.9);
+  box-shadow: 0 3px 10px rgba(217, 119, 6, 0.14);
+}
+
+.duo-short-btn {
+  color: #991b1b;
+}
+
+.duo-short-btn:hover {
+  background: rgba(254, 226, 226, 0.9);
+  box-shadow: 0 3px 10px rgba(220, 38, 38, 0.14);
+}
+
+.duo-btn-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.92rem;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.composer-duo-btn:hover .duo-btn-icon {
+  transform: scale(1.12);
+}
+
+.merit-icon {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  box-shadow: 0 2px 6px rgba(217, 119, 6, 0.16);
+}
+
+.short-icon {
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.16);
+}
+
+.composer-duo-divider {
+  width: 1.5px;
+  height: 28px;
+  background: linear-gradient(to bottom, transparent, rgba(203, 213, 225, 0.95), transparent);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.duo-btn-label {
+  letter-spacing: 0.2px;
+  font-size: 0.92rem;
+}
+
 /* Mobile Category Pills */
 .mobile-categories {
   display: flex;
@@ -3867,6 +3970,27 @@ html, body {
     gap: 4px !important;
     padding-top: 10px !important;
     margin-top: 10px !important;
+  }
+
+  .composer-duo-actions {
+    padding: 4px 6px !important;
+    border-radius: 12px !important;
+  }
+
+  .composer-duo-btn {
+    padding: 8px 10px !important;
+    gap: 8px !important;
+    font-size: 0.86rem !important;
+  }
+
+  .duo-btn-icon {
+    width: 28px !important;
+    height: 28px !important;
+    font-size: 0.85rem !important;
+  }
+
+  .composer-duo-divider {
+    height: 24px !important;
   }
 
   .composer-action-btn {
