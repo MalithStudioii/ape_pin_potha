@@ -35,8 +35,18 @@
     <meta name="twitter:description" content="දිනපතා ඔබ සිදුකරන පින්කම් සටහන් කරගන්න, මිතුරන්ගේ පින්කම් දැක සාදුකාර දෙමින් සිත පහදවා ගන්න. 🙏">
     <meta name="twitter:image" content="assets/banner.jpg">
 
+    <!-- PWA Settings & Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#d97706">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="පිං පොත">
+    <link rel="icon" type="image/png" href="assets/icon-192.png">
+    <link rel="apple-touch-icon" href="assets/icon-192.png">
+
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=50">
+    <link rel="stylesheet" href="css/styles.css?v=51">
 </head>
 <body>
 
@@ -81,6 +91,12 @@
 
             <!-- User Action Buttons -->
             <div class="header-actions">
+                <!-- PWA Install Button (Shown when installable or on iOS) -->
+                <button type="button" id="headerInstallBtn" class="header-pwa-install-btn hidden" onclick="triggerPWAInstall()" title="පිං පොත App එක Install කරගන්න">
+                    <i class="fa-solid fa-cloud-arrow-down"></i>
+                    <span>App එක ගන්න</span>
+                </button>
+
                 <button onclick="openModal('merit')" class="btn-post-action">
                     <i class="fa-solid fa-plus"></i>
                     <span>සටහන් කරන්න</span>
@@ -1994,6 +2010,83 @@
         </button>
     </nav>
 
+    <!-- ========================================================================= -->
+    <!-- PWA Install Prompt Banner & iOS Guide Modal                               -->
+    <!-- ========================================================================= -->
+    <div id="pwaInstallBanner" class="pwa-install-banner hidden">
+        <div class="pwa-banner-card">
+            <div class="pwa-icon-thumb">
+                <img src="assets/icon-192.png" alt="පිං පොත App Icon">
+            </div>
+            <div class="pwa-banner-info">
+                <div class="pwa-banner-title">
+                    <strong>පිං පොත App එක ස්ථාපනය කරන්න</strong>
+                    <span class="pwa-badge">නොමිලේ</span>
+                </div>
+                <p class="pwa-banner-desc">දුරකථනයට පහසුවෙන් Install කර ඉක්මනින් පින්කම් සටහන් කරගන්න.</p>
+            </div>
+            <div class="pwa-banner-actions">
+                <button type="button" class="btn-pwa-install" onclick="triggerPWAInstall()">
+                    <i class="fa-solid fa-cloud-arrow-down"></i>
+                    <span>Install</span>
+                </button>
+                <button type="button" class="btn-pwa-dismiss" onclick="dismissPWAInstallBanner()" title="පසුව">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- iOS Safari Add to Home Screen Instructions Modal -->
+    <div id="pwaIosModal" class="modal-overlay hidden" onclick="closePwaIosModalOnBackdrop(event)">
+        <div class="modal-box pwa-ios-box">
+            <div class="pwa-ios-header">
+                <img src="assets/icon-192.png" alt="පිං පොත" class="pwa-ios-icon">
+                <div>
+                    <h3 style="margin: 0; font-size: 1.05rem; font-family: var(--font-serif); color: #1e293b;">Apple iPhone / iPad වෙත ස්ථාපනය</h3>
+                    <span style="font-size: 0.72rem; color: #d97706; font-weight: 700;">පියවර 3කින් Home Screen එකට Add කරගන්න</span>
+                </div>
+                <button type="button" class="modal-close-btn" onclick="closePwaIosModal()" style="margin-left: auto;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="pwa-ios-steps">
+                <div class="pwa-ios-step">
+                    <div class="pwa-step-num">1</div>
+                    <div class="pwa-step-text">
+                        Safari බ්‍රවුසරයේ පහළ ඇති <strong>Share බොත්තම (<i class="fa-solid fa-arrow-up-from-bracket" style="color: #0284c7;"></i>)</strong> ඔබන්න.
+                    </div>
+                </div>
+                <div class="pwa-ios-step">
+                    <div class="pwa-step-num">2</div>
+                    <div class="pwa-step-text">
+                        මෙනුවෙන් පහළට ගොස් <strong>"Add to Home Screen" (මුල් තිරයට එක් කරන්න <i class="fa-regular fa-square-plus" style="color: #d97706;"></i>)</strong> තෝරන්න.
+                    </div>
+                </div>
+                <div class="pwa-ios-step">
+                    <div class="pwa-step-num">3</div>
+                    <div class="pwa-step-text">
+                        ඉහළ දකුණු කෙළවරේ ඇති <strong>"Add"</strong> ඔබන්න. එවිට ඔබගේ iPhone එකේ App එකක් ලෙස ස්ථාපනය වේ!
+                    </div>
+                </div>
+            </div>
+            <button type="button" class="btn-profile-primary" onclick="closePwaIosModal()" style="width: 100%; justify-content: center; margin-top: 16px;">
+                <i class="fa-solid fa-circle-check"></i> තේරුම් ගත්තා
+            </button>
+        </div>
+    </div>
+
+    <!-- Floating App Update Notification Toast -->
+    <div id="pwaUpdateToast" class="pwa-update-toast hidden">
+        <div class="pwa-update-content">
+            <i class="fa-solid fa-wand-magic-sparkles" style="color: #f59e0b; font-size: 1.1rem;"></i>
+            <span>නව සංස්කරණයක් (Update) සූදානම්!</span>
+        </div>
+        <button type="button" onclick="applyPwaUpdate()" class="pwa-reload-btn">
+            <i class="fa-solid fa-rotate-right"></i> Reload කරන්න
+        </button>
+    </div>
+
     <!-- Cropper.js Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 
@@ -2001,6 +2094,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=50"></script>
+    <script type="module" src="js/app.js?v=51"></script>
 </body>
 </html>

@@ -183,6 +183,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   setupEventListeners();
+  initPWAEngine();
 
   // Initialize browser history state for mobile back button navigation
   try {
@@ -5679,4 +5680,189 @@ window.checkInSpiritualChallenge = async function(challengeId) {
   localStorage.setItem('pinPotha_active_challenges', JSON.stringify(active));
   renderSpiritualChallenges();
   updateUserStats();
+};
+
+/* ==========================================================================
+   Progressive Web App (PWA) Engine & Lifecycle Management
+   ========================================================================== */
+let deferredPwaPrompt = null;
+let newWorkerWaiting = null;
+
+function initPWAEngine() {
+  // Check standalone mode
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+                       window.navigator.standalone === true;
+
+  // iOS Safari detection
+  const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()) && !window.MSStream;
+
+  // Register Service Worker
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then((registration) => {
+          // Track updates
+          registration.addEventListener('updatefound', () => {
+            const installingWorker = registration.installing;
+            if (!installingWorker) return;
+
+            installingWorker.addEventListener('statechange', () => {
+              if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // New update is available!
+                newWorkerWaiting = installingWorker;
+                showPwaUpdateToast();
+              }
+            });
+          });
+        })
+        .catch((error) => {
+          console.warn('[PWA] Service Worker registration failed:', error);
+        });
+    });
+
+    // Auto-reload when new service worker takes over
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!refreshing) {
+        refreshing = true;
+        window.location.reload();
+      }
+    });
+  }
+
+  // Handle Chrome / Android PWA Install Event
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPwaPrompt = e;
+
+    // Show header install button
+    const headerBtn = document.getElementById('headerInstallBtn');
+    if (headerBtn) {
+      headerBtn.classList.remove('hidden');
+    }
+
+    // Auto-display floating install prompt after 3.5 seconds if not dismissed
+    const isDismissed = sessionStorage.getItem('pinPotha_pwa_dismissed') === 'true';
+    if (!isStandalone && !isDismissed) {
+      setTimeout(() => {
+        showPWAInstallBanner();
+      }, 3500);
+    }
+  });
+
+  // iOS Safari setup: Show install button in header if not already installed
+  if (isIos && !isStandalone) {
+    const headerBtn = document.getElementById('headerInstallBtn');
+    if (headerBtn) {
+      headerBtn.classList.remove('hidden');
+    }
+
+    const isDismissed = sessionStorage.getItem('pinPotha_pwa_dismissed') === 'true';
+    if (!isDismissed) {
+      setTimeout(() => {
+        showPWAInstallBanner();
+      }, 4000);
+    }
+  }
+
+  // App installed listener
+  window.addEventListener('appinstalled', () => {
+    hidePWAInstallBanner();
+    const headerBtn = document.getElementById('headerInstallBtn');
+    if (headerBtn) headerBtn.classList.add('hidden');
+    deferredPwaPrompt = null;
+    triggerHaptic([40, 80, 40]);
+    console.log('[PWA] Pin Potha installed successfully!');
+  });
+}
+
+// Window-accessible functions
+window.triggerPWAInstall = async function () {
+  triggerHaptic(20);
+  SoundService?.playClick?.();
+
+  if (deferredPwaPrompt) {
+    deferredPwaPrompt.prompt();
+    const { outcome } = await deferredPwaPrompt.userChoice;
+    if (outcome === 'accepted') {
+      hidePWAInstallBanner();
+    }
+    deferredPwaPrompt = null;
+    return;
+  }
+
+  // If iOS Safari
+  const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()) && !window.MSStream;
+  if (isIos) {
+    hidePWAInstallBanner();
+    const modal = document.getElementById('pwaIosModal');
+    if (modal) modal.classList.remove('hidden');
+    return;
+  }
+
+  // If standalone / already installed
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  if (isStandalone) {
+    alert('ඔබ දැනටමත් "පිං පොත" App එක ඔබගේ දුරකථනයේ හෝ පරිගණකයේ ස්ථාපනය කරගෙන ඇත. සාදු! 🙏');
+  } else {
+    alert('ඔබගේ බ්‍රවුසරයේ ඉහළ ලිපින තීරුවේ (Address Bar) ඇති "Install" ලාංඡනයෙන් හෝ බ්‍රවුසර් මෙනුවේ "Install / Add to Home screen" තෝරා App එක පහසුවෙන්ම දමාගත හැක. 🙏');
+  }
+};
+
+window.showPWAInstallBanner = function () {
+  const banner = document.getElementById('pwaInstallBanner');
+  if (banner) {
+    banner.classList.remove('hidden');
+    requestAnimationFrame(() => {
+      banner.classList.add('visible');
+    });
+  }
+};
+
+window.hidePWAInstallBanner = function () {
+  const banner = document.getElementById('pwaInstallBanner');
+  if (banner) {
+    banner.classList.remove('visible');
+    setTimeout(() => {
+      banner.classList.add('hidden');
+    }, 400);
+  }
+};
+
+window.dismissPWAInstallBanner = function () {
+  triggerHaptic(15);
+  sessionStorage.setItem('pinPotha_pwa_dismissed', 'true');
+  hidePWAInstallBanner();
+};
+
+window.closePwaIosModal = function () {
+  triggerHaptic(15);
+  const modal = document.getElementById('pwaIosModal');
+  if (modal) modal.classList.add('hidden');
+};
+
+window.closePwaIosModalOnBackdrop = function (e) {
+  if (e && e.target && e.target.id === 'pwaIosModal') {
+    closePwaIosModal();
+  }
+};
+
+window.showPwaUpdateToast = function () {
+  const toast = document.getElementById('pwaUpdateToast');
+  if (toast) {
+    toast.classList.remove('hidden');
+    requestAnimationFrame(() => {
+      toast.classList.add('visible');
+    });
+  }
+};
+
+window.applyPwaUpdate = function () {
+  triggerHaptic(30);
+  SoundService?.playClick?.();
+  if (newWorkerWaiting) {
+    newWorkerWaiting.postMessage({ type: 'SKIP_WAITING' });
+  } else {
+    window.location.reload();
+  }
 };
