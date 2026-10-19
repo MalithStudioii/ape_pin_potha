@@ -91,9 +91,9 @@ export const Security = {
   validatePost(data, bannedWords = []) {
     const errors = [];
 
-    // Title validation (Optional for general posts)
+    // Title validation (Optional for general and reel posts)
     const title = this.sanitizeText(data.title || '');
-    if (data.type !== 'general') {
+    if (data.type !== 'general' && data.type !== 'reel') {
       if (!title || title.length < 3) {
         errors.push('මාතෘකාව අකුරු 3කට වඩා වැඩි විය යුතුය.');
       } else if (title.length > 150) {
@@ -107,10 +107,12 @@ export const Security = {
 
     // Description validation
     const desc = this.sanitizeText(data.description || '');
-    if (!desc || desc.length < 5) {
-      errors.push('විස්තරය අකුරු 5කට වඩා වැඩි විය යුතුය.');
-    } else if (desc.length > 3000) {
-      errors.push('විස්තරය අකුරු 3000කට වඩා අඩු විය යුතුය.');
+    if (data.type !== 'reel') {
+      if (!desc || desc.length < 3) {
+        errors.push('විස්තරය අකුරු 3කට වඩා වැඩි විය යුතුය.');
+      } else if (desc.length > 3000) {
+        errors.push('විස්තරය අකුරු 3000කට වඩා අඩු විය යුතුය.');
+      }
     }
 
     // Banned words check (anti-spam / anti-vulgarity)
@@ -129,7 +131,7 @@ export const Security = {
     }
 
     // Type whitelist
-    const allowedTypes = ['merit', 'need', 'repost', 'general'];
+    const allowedTypes = ['merit', 'need', 'repost', 'general', 'reel'];
     if (!allowedTypes.includes(data.type)) {
       errors.push('වලංගු සටහන් වර්ගයක් නොවේ.');
     }

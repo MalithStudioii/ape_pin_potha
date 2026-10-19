@@ -5,7 +5,7 @@
  */
 
 import { firebaseConfig, isFirebaseConfigured, COLLECTIONS } from './firebase-config.js?v=22';
-import { Security } from './security.js?v=47';
+import { Security } from './security.js?v=48';
 
 let db = null;
 let auth = null;

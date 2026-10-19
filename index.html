@@ -36,7 +36,7 @@
     <meta name="twitter:image" content="assets/banner.jpg">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=47">
+    <link rel="stylesheet" href="css/styles.css?v=48">
 </head>
 <body>
 
@@ -261,7 +261,7 @@
                         <i class="fa-solid fa-image" style="color: #059669;"></i>
                         <span>ඡායාරූපයක්</span>
                     </button>
-                    <button onclick="openModal('merit', false, true)" class="composer-action-btn" title="Shorts හෝ Video එක් කරන්න">
+                    <button onclick="openShortsUploadModal()" class="composer-action-btn" title="නව Short Reel එකක් එක් කරන්න">
                         <i class="fa-solid fa-play" style="color: #ef4444;"></i>
                         <span>Shorts</span>
                     </button>
@@ -755,39 +755,6 @@
                     </div>
                 </div>
 
-                <!-- Video / YouTube Shorts Embed Input Section -->
-                <div class="form-group video-input-group" id="videoInputWrapper">
-                    <label class="form-label" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-                        <span style="display: flex; align-items: center; gap: 6px;">
-                            <i class="fa-brands fa-youtube" style="color: #ef4444; font-size: 1.1rem;"></i>
-                            <span style="font-weight: 700; color: #78350f;">YouTube Shorts / Video සබැඳිය (විකල්ප)</span>
-                        </span>
-                        <span class="video-tag-pill">Shorts & Videos</span>
-                    </label>
-                    <div class="video-input-box">
-                        <i class="fa-solid fa-link video-input-icon"></i>
-                        <input type="url" id="postVideoUrl" class="form-input video-input-field" placeholder="YouTube Shorts හෝ Video Link එක මෙතැනට Past කරන්න..." oninput="handleVideoUrlInput(event)">
-                        <button type="button" id="clearVideoBtn" class="video-clear-btn" onclick="clearVideoUrlInput()" title="ඉවත් කරන්න" style="display: none;">
-                            <i class="fa-solid fa-xmark"></i>
-                        </button>
-                    </div>
-                    <!-- Live Video Preview Thumbnail / Status -->
-                    <div id="videoPreviewContainer" class="video-preview-card" style="display: none;">
-                        <div class="video-preview-thumb-wrap">
-                            <img id="videoPreviewThumb" src="" alt="Video Preview" class="video-preview-img">
-                            <span class="video-preview-badge" id="videoPreviewBadge">Shorts</span>
-                            <div class="video-preview-play-icon"><i class="fa-solid fa-play"></i></div>
-                        </div>
-                        <div class="video-preview-info">
-                            <div class="video-preview-title" id="videoPreviewTitle">YouTube වීඩියෝව හඳුනාගැනිණි</div>
-                            <div class="video-preview-subtitle" id="videoPreviewSubtitle">පුණ්‍ය පවුරේ සහ පුණ්‍ය දැක්මේ සුමටව ධාවනය වේ</div>
-                        </div>
-                        <button type="button" class="video-preview-remove-btn" onclick="clearVideoUrlInput()" title="ඉවත් කරන්න">
-                            <i class="fa-solid fa-trash-can"></i>
-                        </button>
-                    </div>
-                </div>
-
                 <!-- Multiple WebP Image Compression Uploader -->
                 <div class="form-group">
                     <div class="image-drop-area" onclick="document.getElementById('photoInput').click()">
@@ -809,6 +776,70 @@
 
                 <button type="submit" class="btn-submit-merit" id="submitPostBtn">
                     <span id="submitMeritBtnText">පුණ්‍ය පවුරට එක් කරන්න</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- Dedicated Short Reel Upload Modal (පුණ්‍ය දැක්ම - කෙටි වීඩියෝ)           -->
+    <!-- ========================================================================= -->
+    <div id="shortsUploadModal" class="modal-overlay hidden">
+        <div class="modal-box" style="max-width: 480px;">
+            <div class="modal-header" style="border-bottom: 1px solid #fee2e2; background: linear-gradient(135deg, #fff5f5, #fffdfa); padding: 14px 18px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #ef4444, #dc2626); color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 1rem; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);">
+                        <i class="fa-solid fa-play"></i>
+                    </div>
+                    <div>
+                        <h3 class="modal-title" style="color: #991b1b; font-size: 1.05rem; font-weight: 800;">නව Short Reel එකක් එක් කරන්න</h3>
+                        <div style="font-size: 0.72rem; color: #b91c1c; font-weight: 500;">පුණ්‍ය දැක්ම තුළ සැමටම නැරඹිය හැකි පරිදි පළ වේ</div>
+                    </div>
+                </div>
+                <button onclick="closeShortsModal()" class="modal-close-btn" type="button" title="වසන්න">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="shortsUploadForm" onsubmit="handleShortsUploadSubmit(event)" style="padding: 16px 18px 18px 18px;">
+                <!-- YouTube Shorts URL Input -->
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label class="form-label" style="display: flex; align-items: center; justify-content: space-between; font-weight: 700; color: #78350f; margin-bottom: 6px;">
+                        <span>YouTube Shorts හෝ Video Link එක *</span>
+                        <span class="video-tag-pill" style="font-size: 0.62rem;">Shorts / Video</span>
+                    </label>
+                    <div class="video-input-box">
+                        <i class="fa-solid fa-link video-input-icon"></i>
+                        <input type="url" id="standaloneShortsUrl" class="form-input video-input-field" placeholder="https://www.youtube.com/shorts/... හෝ youtu.be/..." required oninput="handleStandaloneShortsInput(event)">
+                        <button type="button" id="clearStandaloneShortsBtn" class="video-clear-btn" onclick="clearStandaloneShortsInput()" title="ඉවත් කරන්න" style="display: none;">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Live 9:16 Shorts Preview -->
+                <div id="standaloneShortsPreview" class="standalone-shorts-preview-card" style="display: none; margin-bottom: 14px;">
+                    <div class="standalone-shorts-thumb-wrap">
+                        <img id="standaloneShortsThumb" src="" alt="Shorts Preview" class="standalone-shorts-thumb">
+                        <div class="standalone-shorts-badge"><i class="fa-solid fa-play"></i> <span id="standaloneShortsBadgeText">Shorts</span></div>
+                    </div>
+                    <div class="standalone-shorts-info">
+                        <div class="standalone-shorts-title" id="standaloneShortsTitle">වීඩියෝව හඳුනාගැනිණි</div>
+                        <div class="standalone-shorts-hint">පුණ්‍ය දැක්ම තුළ සිරස්ව (Vertical Reel) සුමටව ධාවනය වේ</div>
+                    </div>
+                </div>
+
+                <!-- Optional Short Caption -->
+                <div class="form-group" style="margin-bottom: 18px;">
+                    <label class="form-label" style="font-weight: 700; color: #78350f; margin-bottom: 6px;">කෙටි හැඳින්වීමක් / Caption (විකල්ප)</label>
+                    <textarea id="standaloneShortsCaption" class="form-textarea" rows="2" maxlength="300" placeholder="උදා: සිත නිවන කෙටි ධර්ම දේශනාව | පූජ්‍ය ස්වාමීන් වහන්සේ..."></textarea>
+                    <div style="font-size: 0.68rem; color: #94a3b8; text-align: right; margin-top: 4px;">උපරිම අකුරු 300ක් දක්වා</div>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" class="btn-submit-merit" id="submitShortsBtn" style="background: linear-gradient(135deg, #ef4444, #dc2626); box-shadow: 0 4px 16px rgba(239, 68, 68, 0.35);">
+                    <i class="fa-solid fa-play" style="margin-right: 6px;"></i>
+                    <span id="submitShortsBtnText">පුණ්‍ය දැක්මට එක් කරන්න</span>
                 </button>
             </form>
         </div>
@@ -1826,7 +1857,7 @@
                 <span class="reels-live-tag">Shorts</span>
             </div>
             <div class="reels-header-actions">
-                <button type="button" class="reels-action-header-btn" onclick="openModal('merit', false, true)" title="නව Shorts වීඩියෝවක් එක් කරන්න">
+                <button type="button" class="reels-action-header-btn" onclick="openShortsUploadModal()" title="නව Short Reel එකක් එක් කරන්න">
                     <i class="fa-solid fa-plus"></i>
                     <span>Shorts එක් කරන්න</span>
                 </button>
@@ -1895,6 +1926,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=47"></script>
+    <script type="module" src="js/app.js?v=48"></script>
 </body>
 </html>

@@ -8,10 +8,10 @@ service cloud.firestore {
       allow read: if true;
       
       // 2. අකුරු සීමා සහ වලංගු වර්ගීකරණයන් සහිත නියම දත්ත පමණක් Database එකට භාර ගනී
-      allow create: if (request.resource.data.type in ['repost', 'general'] || (request.resource.data.title.size() >= 3 && request.resource.data.title.size() <= 150))
-                    && (request.resource.data.type == 'repost' || (request.resource.data.description.size() >= 3 && request.resource.data.description.size() <= 3000))
+      allow create: if (request.resource.data.type in ['repost', 'general', 'reel'] || (request.resource.data.title.size() >= 3 && request.resource.data.title.size() <= 150))
+                    && (request.resource.data.type in ['repost', 'reel'] || (request.resource.data.description.size() >= 3 && request.resource.data.description.size() <= 3000))
                     && request.resource.data.category in ['දානමය', 'සීලමය', 'භාවනාමය', 'සමාජ සත්කාර', 'යළි බෙදාගැනීම්', 'සුබපැතුම්', 'සිතුවිලි', 'සාමාන්‍ය', 'ධර්ම දානමය']
-                    && request.resource.data.type in ['merit', 'need', 'repost', 'general'];
+                    && request.resource.data.type in ['merit', 'need', 'repost', 'general', 'reel'];
       
       // 3. සාදුකාර දීම (sadhuCount, sadhuUsers), බෙදාගැනීම් (shareCount), අදහස් (comments), reposts (repostCount), Pin කිරීම සහ සත්කාර සත්‍යාපනය (isVerifiedNeed) සඳහා අවසරය
       allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sadhuCount'])

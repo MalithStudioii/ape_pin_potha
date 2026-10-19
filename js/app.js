@@ -4,11 +4,11 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=47';
-import { Security } from './security.js?v=47';
+import { StorageService } from './storage.js?v=48';
+import { Security } from './security.js?v=48';
 import { uploadToImgBB } from './imgbb-service.js?v=32';
 import { SoundService, triggerHaptic } from './sound.js?v=32';
-import { FeedAlgorithm } from './algorithm.js?v=47';
+import { FeedAlgorithm } from './algorithm.js?v=48';
 
 window.FeedAlgorithm = FeedAlgorithm;
 window.SoundService = SoundService;
@@ -840,6 +840,134 @@ window.clearVideoUrlInput = function() {
   if (clearBtn) clearBtn.style.display = 'none';
   const previewCard = document.getElementById('videoPreviewContainer');
   if (previewCard) previewCard.style.display = 'none';
+};
+
+// ============================================================================
+// Dedicated Standalone Shorts / Reel Upload Handlers
+// ============================================================================
+window.openShortsUploadModal = function() {
+  if (isGuestUser()) {
+    showAuthRequiredModal('නව Short Reel එකක් පළ කිරීමට');
+    return;
+  }
+
+  try {
+    history.pushState({ type: 'modal', id: 'shortsUploadModal' }, '');
+  } catch (e) {}
+
+  const modal = document.getElementById('shortsUploadModal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    clearStandaloneShortsInput();
+    const captionEl = document.getElementById('standaloneShortsCaption');
+    if (captionEl) captionEl.value = '';
+    const input = document.getElementById('standaloneShortsUrl');
+    if (input) {
+      setTimeout(() => input.focus(), 250);
+    }
+  }
+};
+
+window.closeShortsModal = function() {
+  const modal = document.getElementById('shortsUploadModal');
+  if (modal) modal.classList.add('hidden');
+  clearStandaloneShortsInput();
+  const captionEl = document.getElementById('standaloneShortsCaption');
+  if (captionEl) captionEl.value = '';
+};
+
+window.handleStandaloneShortsInput = function(e) {
+  const url = (e.target?.value || '').trim();
+  const clearBtn = document.getElementById('clearStandaloneShortsBtn');
+  const previewCard = document.getElementById('standaloneShortsPreview');
+  const previewThumb = document.getElementById('standaloneShortsThumb');
+  const previewBadge = document.getElementById('standaloneShortsBadgeText');
+  const previewTitle = document.getElementById('standaloneShortsTitle');
+
+  if (clearBtn) clearBtn.style.display = url ? 'flex' : 'none';
+
+  if (!url) {
+    if (previewCard) previewCard.style.display = 'none';
+    return;
+  }
+
+  const parsed = parseVideoUrl(url);
+  if (parsed && previewCard && previewThumb) {
+    previewThumb.src = parsed.videoThumbnail;
+    if (previewBadge) previewBadge.textContent = parsed.isShorts ? 'Shorts' : 'Video';
+    if (previewTitle) previewTitle.textContent = parsed.isShorts ? 'YouTube Shorts හඳුනාගැනිණි' : 'YouTube වීඩියෝව හඳුනාගැනිණි';
+    previewCard.style.display = 'flex';
+  } else if (previewCard) {
+    previewCard.style.display = 'none';
+  }
+};
+
+window.clearStandaloneShortsInput = function() {
+  const input = document.getElementById('standaloneShortsUrl');
+  if (input) input.value = '';
+  const clearBtn = document.getElementById('clearStandaloneShortsBtn');
+  if (clearBtn) clearBtn.style.display = 'none';
+  const previewCard = document.getElementById('standaloneShortsPreview');
+  if (previewCard) previewCard.style.display = 'none';
+};
+
+window.handleShortsUploadSubmit = async function(e) {
+  e.preventDefault();
+  const input = document.getElementById('standaloneShortsUrl');
+  const url = (input?.value || '').trim();
+  const parsed = parseVideoUrl(url);
+
+  if (!parsed || !parsed.videoId) {
+    alert("කරුණාකර වලංගු YouTube Shorts හෝ Video සබැඳියක් (Link) ඇතුළත් කරන්න.");
+    if (input) input.focus();
+    return;
+  }
+
+  const caption = (document.getElementById('standaloneShortsCaption')?.value || '').trim();
+  const submitBtn = document.getElementById('submitShortsBtn');
+  const submitBtnText = document.getElementById('submitShortsBtnText');
+
+  const safeTitle = caption ? (caption.length > 50 ? caption.substring(0, 50) + '...' : caption) : 'ධර්ම Shorts';
+  const safeDesc = caption || 'ධර්ම Shorts කෙටි වීඩියෝවක්';
+
+  try {
+    if (submitBtn) submitBtn.disabled = true;
+    if (submitBtnText) submitBtnText.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> පළවෙමින් පවතී...';
+
+    await StorageService.createPost({
+      type: 'general',
+      title: safeTitle,
+      description: safeDesc,
+      category: 'ධර්ම දානමය',
+      visibility: 'public',
+      location: '',
+      contact: '',
+      image: parsed.videoThumbnail,
+      images: [parsed.videoThumbnail],
+      videoUrl: parsed.videoUrl,
+      videoId: parsed.videoId,
+      videoType: 'youtube',
+      isShorts: true,
+      videoThumbnail: parsed.videoThumbnail,
+      isOfficial: false,
+      isPinned: false
+    });
+
+    SoundService.playPublish();
+    triggerHaptic([30, 60, 30]);
+    closeShortsModal();
+
+    // If reels modal was open or closed, reload reels viewer so the new Short appears immediately
+    setTimeout(() => {
+      openReelsViewer();
+    }, 400);
+
+  } catch (err) {
+    alert("දෝෂයකි: " + err.message);
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+    if (submitBtnText) submitBtnText.innerHTML = 'පුණ්‍ය දැක්මට එක් කරන්න';
+  }
 };
 
 // Video Facade Generator for Feed Cards
