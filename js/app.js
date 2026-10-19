@@ -4,11 +4,11 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=55';
-import { Security } from './security.js?v=55';
-import { uploadToImgBB } from './imgbb-service.js?v=55';
-import { SoundService, triggerHaptic } from './sound.js?v=55';
-import { FeedAlgorithm } from './algorithm.js?v=55';
+import { StorageService } from './storage.js?v=56';
+import { Security } from './security.js?v=56';
+import { uploadToImgBB } from './imgbb-service.js?v=56';
+import { SoundService, triggerHaptic } from './sound.js?v=56';
+import { FeedAlgorithm } from './algorithm.js?v=56';
 
 window.FeedAlgorithm = FeedAlgorithm;
 window.SoundService = SoundService;
@@ -5763,7 +5763,7 @@ function initPWAEngine() {
   const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()) && !window.MSStream;
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v55';
+  const ACTIVE_BUILD = 'v56';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
@@ -5780,7 +5780,7 @@ function initPWAEngine() {
   // Register Service Worker
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=55', { updateViaCache: 'none' })
+      navigator.serviceWorker.register('./sw.js?v=56', { updateViaCache: 'none' })
         .then((registration) => {
           // Immediately check for service worker updates
           try { registration.update(); } catch (e) {}
