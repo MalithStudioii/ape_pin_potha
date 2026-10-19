@@ -36,7 +36,7 @@
     <meta name="twitter:image" content="assets/banner.jpg">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=48">
+    <link rel="stylesheet" href="css/styles.css?v=49">
 </head>
 <body>
 
@@ -1881,6 +1881,81 @@
                 <i class="fa-solid fa-chevron-down"></i>
             </button>
         </div>
+
+        <!-- Animated Swipe Guidance Hint for Newcomers -->
+        <div id="reelsSwipeHint" class="reels-swipe-hint hidden" onclick="dismissReelsSwipeHint(event)">
+            <div class="reels-swipe-hint-content">
+                <div class="reels-swipe-icon-box">
+                    <i class="fa-solid fa-angles-up swipe-arrow-anim"></i>
+                </div>
+                <div class="reels-swipe-text-box">
+                    <span class="reels-swipe-title">ඊළඟ වීඩියෝව සඳහා</span>
+                    <span class="reels-swipe-subtitle">ඉහළට හෝ පහළට Swipe කරන්න</span>
+                </div>
+            </div>
+            <button type="button" class="reels-swipe-hint-close" onclick="dismissReelsSwipeHint(event)" title="හරි">
+                <i class="fa-solid fa-check"></i>
+            </button>
+        </div>
+
+        <!-- In-Place TikTok-Style Comments Bottom Sheet Drawer -->
+        <div id="reelsCommentsDrawer" class="reels-comments-drawer hidden" role="dialog" aria-modal="true" aria-label="පුණ්‍යානුමෝදනා">
+            <div class="reels-comments-backdrop" onclick="closeReelCommentsDrawer()"></div>
+            <div class="reels-comments-panel">
+                <!-- Top Handle Bar -->
+                <div class="reels-drawer-handle-bar" onclick="closeReelCommentsDrawer()">
+                    <div class="reels-drawer-handle"></div>
+                </div>
+
+                <!-- Header -->
+                <div class="reels-comments-header">
+                    <div class="reels-comments-title-wrap">
+                        <span class="reels-comments-title">පුණ්‍යානුමෝදනා හා ප්‍රාර්ථනා</span>
+                        <span class="reels-comments-count-badge" id="reelsDrawerCount">0</span>
+                    </div>
+                    <button type="button" class="reels-comments-close-btn" onclick="closeReelCommentsDrawer()" title="වසන්න">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <!-- Quick Blessing Chips -->
+                <div class="reels-quick-blessings" id="reelsQuickBlessings">
+                    <button type="button" class="reels-blessing-chip" onclick="submitReelQuickBlessing('සාදු! සාදු! සාදු! 🙏')">
+                        🙏 සාදු! සාදු! සාදු!
+                    </button>
+                    <button type="button" class="reels-blessing-chip" onclick="submitReelQuickBlessing('මේ පිනෙන් නිදුක් නීරෝගී වේවා! 🪷')">
+                        🪷 නිදුක් නීරෝගී වේවා!
+                    </button>
+                    <button type="button" class="reels-blessing-chip" onclick="submitReelQuickBlessing('උතුම් ධර්මාවබෝධය පිණිසම හේතු වේවා! ✨')">
+                        ✨ ධර්මාවබෝධය වේවා!
+                    </button>
+                </div>
+
+                <!-- Scrollable Comments List -->
+                <div class="reels-comments-body" id="reelsCommentsBody">
+                    <!-- Dynamic comment bubbles or empty state inserted via JS -->
+                </div>
+
+                <!-- Bottom Input Form -->
+                <form class="reels-comments-footer" id="reelsCommentForm" onsubmit="submitReelComment(event)">
+                    <div class="reels-comment-user-avatar" id="reelsDrawerUserAvatar">
+                        <!-- Current user's avatar image or letter -->
+                    </div>
+                    <div class="reels-comment-input-wrap">
+                        <input type="text" id="reelsCommentInput" class="reels-comment-input" placeholder="පුණ්‍යානුමෝදනාවක් හෝ ප්‍රාර්ථනාවක් ලියන්න..." maxlength="300" autocomplete="off" required>
+                    </div>
+                    <button type="submit" class="reels-comment-send-btn" id="reelsCommentSubmitBtn" title="එක් කරන්න">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Floating In-Reel Toast for Feedback (e.g. Share link copied) -->
+        <div id="reelsToast" class="reels-toast hidden">
+            <i class="fa-solid fa-circle-check"></i>
+            <span id="reelsToastText">සබැඳිය පිටපත් කරගන්නා ලදී!</span>
+        </div>
     </div>
 
     <!-- ========================================================================= -->
@@ -1926,6 +2001,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=48"></script>
+    <script type="module" src="js/app.js?v=49"></script>
 </body>
 </html>

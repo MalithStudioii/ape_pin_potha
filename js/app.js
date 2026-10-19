@@ -970,7 +970,7 @@ window.handleShortsUploadSubmit = async function(e) {
   }
 };
 
-// Video Facade Generator for Feed Cards
+// Video Facade Generator for Feed Cards (Directly opens in Fullscreen Dharma Reels)
 function renderPostVideo(post) {
   if (!post || !post.videoId) return '';
 
@@ -980,16 +980,16 @@ function renderPostVideo(post) {
 
   return `
     <div class="post-video-container ${containerClass}" id="video-container-${post.id}">
-      <div class="video-facade" onclick="playPostVideo('${post.id}', '${post.videoId}', ${isShorts})">
+      <div class="video-facade" onclick="openReelsViewer('${post.id}')" style="cursor: pointer;" title="පුණ්‍ය දැක්ම තුළ නරඹන්න">
         <img src="${thumbUrl}" class="video-facade-thumb" alt="${Security.escapeHTML(post.title || 'Video')}" loading="lazy">
         <div class="video-facade-overlay">
           <div class="video-facade-top-badge">
             <i class="fa-brands fa-youtube" style="color: #ef4444;"></i>
-            <span>${isShorts ? 'YouTube Shorts' : 'YouTube Video'}</span>
+            <span>${isShorts ? 'ධර්ම Shorts' : 'ධර්ම වීඩියෝව'}</span>
           </div>
 
           <div class="video-facade-play-center">
-            <div class="glowing-play-btn" title="වීඩියෝව වාදනය කරන්න">
+            <div class="glowing-play-btn" title="පුණ්‍ය දැක්මෙන් නරඹන්න">
               <i class="fa-solid fa-play"></i>
             </div>
           </div>
@@ -1006,21 +1006,9 @@ function renderPostVideo(post) {
   `;
 }
 
-// Inline Video Player Trigger (swaps facade for iframe on demand)
+// Inline Video Player Trigger (Redirects seamlessly to Fullscreen Reels)
 window.playPostVideo = function(postId, videoId, isShorts) {
-  const container = document.getElementById(`video-container-${postId}`);
-  if (!container) return;
-
-  const cleanVideoId = encodeURIComponent(videoId);
-  container.innerHTML = `
-    <iframe class="post-video-iframe"
-      src="https://www.youtube-nocookie.com/embed/${cleanVideoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1"
-      title="YouTube Video Player"
-      frameborder="0"
-      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-      allowfullscreen>
-    </iframe>
-  `;
+  window.openReelsViewer(postId);
 };
 
 // Reusable Post Card HTML Generator
@@ -2913,24 +2901,24 @@ window.openReelsViewer = function(initialPostId = null) {
         <!-- Floating Actions on Right -->
         <div class="reels-actions-col">
           <div style="display: flex; flex-direction: column; align-items: center;">
-            <button type="button" class="reels-action-circle ${hasGivenSadhu ? 'active-sadhu' : ''}" id="reel-sadhu-btn-${reel.id}" onclick="handleReelSadhu('${reel.id}', this)" title="සාදුකාර දෙන්න">
+            <button type="button" class="reels-action-circle ${hasGivenSadhu ? 'active-sadhu' : ''}" id="reel-sadhu-btn-${reel.id}" onclick="handleReelSadhu('${reel.id}', this, event)" title="සාදුකාර දෙන්න">
               <span>🙏</span>
             </button>
             <span class="reels-action-count" id="reel-sadhu-count-${reel.id}">${sadhuCount}</span>
           </div>
 
           <div style="display: flex; flex-direction: column; align-items: center;">
-            <button type="button" class="reels-action-circle" onclick="openReelComments('${reel.id}')" title="අනුමෝදනා / ප්‍රාර්ථනා">
+            <button type="button" class="reels-action-circle" id="reel-comment-btn-${reel.id}" onclick="openReelCommentsDrawer('${reel.id}')" title="පුණ්‍යානුමෝදනා හා ප්‍රාර්ථනා">
               <i class="fa-regular fa-comment-dots" style="color: #fde68a;"></i>
             </button>
-            <span class="reels-action-count">${commentsCount}</span>
+            <span class="reels-action-count" id="reel-comment-count-${reel.id}">${commentsCount}</span>
           </div>
 
           <div style="display: flex; flex-direction: column; align-items: center;">
-            <button type="button" class="reels-action-circle" onclick="handleShare('${reel.id}')" title="බෙදාගන්න">
+            <button type="button" class="reels-action-circle" id="reel-share-btn-${reel.id}" onclick="handleReelShare('${reel.id}', this)" title="බෙදාගන්න">
               <i class="fa-solid fa-share-nodes" style="color: #ffffff;"></i>
             </button>
-            <span class="reels-action-count">${reel.shareCount || 0}</span>
+            <span class="reels-action-count" id="reel-share-count-${reel.id}">${reel.shareCount || 0}</span>
           </div>
         </div>
 
@@ -2995,6 +2983,9 @@ window.openReelsViewer = function(initialPostId = null) {
     const firstVideoId = slides[0].getAttribute('data-video-id');
     loadReelIframe(firstPostId, firstVideoId);
   }
+
+  // Show Animated Swipe Guidance Hint for Newcomers
+  showReelsSwipeHint();
 };
 
 window.loadReelIframe = function(postId, videoId) {
@@ -3036,6 +3027,8 @@ window.closeReelsViewer = function() {
   const modal = document.getElementById('reelsModal');
   const viewport = document.getElementById('reelsViewport');
   if (modal) modal.classList.add('hidden');
+  closeReelCommentsDrawer();
+  dismissReelsSwipeHint();
   if (currentReelsObserver) {
     currentReelsObserver.disconnect();
     currentReelsObserver = null;
@@ -3070,13 +3063,111 @@ window.toggleReelDesc = function(postId) {
   }
 };
 
-window.handleReelSadhu = async function(postId, btnEl) {
+// ============================================================================
+// Swipe Guidance Hint Controller
+// ============================================================================
+let reelsSwipeHintTimeout = null;
+
+window.showReelsSwipeHint = function() {
+  const hint = document.getElementById('reelsSwipeHint');
+  const viewport = document.getElementById('reelsViewport');
+  if (!hint) return;
+
+  hint.classList.remove('hidden');
+  hint.classList.remove('visible');
+  void hint.offsetWidth; // trigger reflow
+  hint.classList.add('visible');
+
+  clearTimeout(reelsSwipeHintTimeout);
+  reelsSwipeHintTimeout = setTimeout(() => {
+    dismissReelsSwipeHint();
+  }, 4200);
+
+  if (viewport) {
+    const dismissOnAction = () => {
+      dismissReelsSwipeHint();
+      viewport.removeEventListener('scroll', dismissOnAction);
+      viewport.removeEventListener('touchmove', dismissOnAction);
+    };
+    viewport.addEventListener('scroll', dismissOnAction, { passive: true, once: true });
+    viewport.addEventListener('touchmove', dismissOnAction, { passive: true, once: true });
+  }
+};
+
+window.dismissReelsSwipeHint = function(e) {
+  if (e && e.stopPropagation) e.stopPropagation();
+  const hint = document.getElementById('reelsSwipeHint');
+  if (!hint) return;
+  hint.classList.remove('visible');
+  clearTimeout(reelsSwipeHintTimeout);
+  setTimeout(() => {
+    hint.classList.add('hidden');
+  }, 350);
+};
+
+// ============================================================================
+// Floating Sadhu Reactions Animation & Sadhu Toggle
+// ============================================================================
+window.spawnFloatingSadhu = function(sourceEl, event) {
+  const modal = document.getElementById('reelsModal') || document.body;
+  let startX = window.innerWidth - 45;
+  let startY = window.innerHeight - 200;
+
+  if (sourceEl && sourceEl.getBoundingClientRect) {
+    const rect = sourceEl.getBoundingClientRect();
+    startX = rect.left + rect.width / 2;
+    startY = rect.top + rect.height / 2;
+  } else if (event && event.clientX) {
+    startX = event.clientX;
+    startY = event.clientY;
+  }
+
+  const icons = ['🙏', '✨', '🪷', '🌸', '🙏', '✨'];
+  const count = 5;
+
+  for (let i = 0; i < count; i++) {
+    const particle = document.createElement('div');
+    particle.className = 'floating-sadhu-particle';
+    particle.textContent = icons[i % icons.length];
+
+    const offsetX = (Math.random() - 0.5) * 36;
+    const driftX1 = `${(Math.random() - 0.5) * 60}px`;
+    const driftX2 = `${(Math.random() - 0.5) * 90}px`;
+    const driftX3 = `${(Math.random() - 0.5) * 120}px`;
+    const rot1 = `${(Math.random() - 0.5) * 30}deg`;
+    const rot2 = `${(Math.random() - 0.5) * 45}deg`;
+    const rot3 = `${(Math.random() - 0.5) * 30}deg`;
+
+    particle.style.left = `${startX + offsetX}px`;
+    particle.style.top = `${startY}px`;
+    particle.style.setProperty('--drift-x1', driftX1);
+    particle.style.setProperty('--drift-x2', driftX2);
+    particle.style.setProperty('--drift-x3', driftX3);
+    particle.style.setProperty('--rot1', rot1);
+    particle.style.setProperty('--rot2', rot2);
+    particle.style.setProperty('--rot3', rot3);
+    particle.style.animationDelay = `${i * 80}ms`;
+
+    modal.appendChild(particle);
+
+    setTimeout(() => {
+      particle.remove();
+    }, 1450);
+  }
+};
+
+window.handleReelSadhu = async function(postId, btnEl, event) {
+  if (event && event.stopPropagation) event.stopPropagation();
+
+  // Spawns immediate floating reaction particles
+  spawnFloatingSadhu(btnEl, event);
+  SoundService.playSadhu();
+  triggerHaptic([30, 60]);
+
   const countEl = document.getElementById(`reel-sadhu-count-${postId}`);
   try {
     const res = await StorageService.toggleSadhu(postId);
     if (res && res.hasGiven) {
-      SoundService.playSadhu();
-      triggerHaptic([30, 60]);
       if (btnEl) btnEl.classList.add('active-sadhu');
     } else {
       if (btnEl) btnEl.classList.remove('active-sadhu');
@@ -3094,15 +3185,254 @@ window.handleReelSadhu = async function(postId, btnEl) {
   }
 };
 
-window.openReelComments = function(postId) {
-  window.closeReelsViewer();
-  setTimeout(() => {
-    const targetCard = document.getElementById(`post-${postId}`);
-    if (targetCard) {
-      targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      toggleCommentsSection(postId);
+// ============================================================================
+// Reels Share & In-Reel Feedback Toast
+// ============================================================================
+window.showReelsToast = function(msg) {
+  const toast = document.getElementById('reelsToast');
+  const toastText = document.getElementById('reelsToastText');
+  if (!toast) return;
+  if (toastText) toastText.textContent = msg;
+  toast.classList.remove('hidden');
+  toast.classList.remove('visible');
+  void toast.offsetWidth;
+  toast.classList.add('visible');
+  clearTimeout(window._reelsToastTimeout);
+  window._reelsToastTimeout = setTimeout(() => {
+    toast.classList.remove('visible');
+    setTimeout(() => toast.classList.add('hidden'), 350);
+  }, 2800);
+};
+
+window.handleReelShare = async function(postId, btnEl) {
+  SoundService.playShare();
+  triggerHaptic(25);
+
+  const reel = (typeof currentPostsData !== 'undefined' && currentPostsData.find(p => p.id === postId)) ||
+               (StorageService.getLocalPosts() || []).find(p => p.id === postId);
+
+  const shareTitle = reel?.title || 'අපේ පින් පොත - පුණ්‍ය දැක්ම';
+  const shareText = `ධර්ම කරුණක් / පින්කමක් නරඹන්න: ${reel?.title || 'පුණ්‍ය දැක්ම Shorts'}`;
+  const shareUrl = `${window.location.origin}${window.location.pathname}?post=${encodeURIComponent(postId)}`;
+
+  // Increment share count atomically
+  try {
+    await StorageService.incrementShare(postId);
+  } catch (e) {
+    console.warn('Increment share error', e);
+  }
+
+  // Update UI count in reel and post card
+  const countEl = document.getElementById(`reel-share-count-${postId}`);
+  const cardShareCount = document.getElementById(`shares-btn-${postId}`);
+  if (countEl) {
+    const currentVal = parseInt(countEl.textContent || '0', 10);
+    countEl.textContent = currentVal + 1;
+  }
+  if (cardShareCount) {
+    const currentVal = parseInt(cardShareCount.textContent || '0', 10);
+    cardShareCount.textContent = currentVal + 1;
+  }
+
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: shareTitle,
+        text: shareText,
+        url: shareUrl
+      });
+      showReelsToast('සාර්ථකව බෙදාගන්නා ලදී!');
+      return;
+    } catch (err) {
+      if (err.name === 'AbortError') return;
     }
-  }, 250);
+  }
+
+  // Fallback: Copy link to clipboard
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(shareUrl);
+    } else {
+      const tempInput = document.createElement('textarea');
+      tempInput.value = shareUrl;
+      tempInput.style.position = 'fixed';
+      tempInput.style.opacity = '0';
+      document.body.appendChild(tempInput);
+      tempInput.select();
+      document.execCommand('copy');
+      document.body.removeChild(tempInput);
+    }
+    showReelsToast('සබැඳිය පිටපත් කරගන්නා ලදී! (Link Copied)');
+  } catch (err) {
+    showReelsToast('සබැඳිය පිටපත් කළ නොහැකි විය.');
+  }
+};
+
+// ============================================================================
+// TikTok-Style In-Place Comments Drawer Controller
+// ============================================================================
+let activeReelsCommentPostId = null;
+
+window.openReelCommentsDrawer = function(postId) {
+  activeReelsCommentPostId = postId;
+  const drawer = document.getElementById('reelsCommentsDrawer');
+  if (!drawer) return;
+
+  const post = (typeof currentPostsData !== 'undefined' && currentPostsData.find(p => p.id === postId)) ||
+               (StorageService.getLocalPosts() || []).find(p => p.id === postId);
+
+  const curUser = StorageService.currentUser;
+  const userPhoto = curUser?.photoURL || curUser?.photo;
+  const userName = curUser?.name || 'ඔබ';
+  const avatarBox = document.getElementById('reelsDrawerUserAvatar');
+  if (avatarBox) {
+    avatarBox.innerHTML = userPhoto
+      ? `<img src="${Security.sanitizeUrl(userPhoto)}" alt="${Security.escapeHTML(userName)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`
+      : Security.escapeHTML(userName.charAt(0) || '👤');
+  }
+
+  renderReelCommentsList(post);
+  drawer.classList.remove('hidden');
+
+  setTimeout(() => {
+    const input = document.getElementById('reelsCommentInput');
+    if (input && window.innerWidth > 768) input.focus();
+  }, 200);
+};
+
+window.closeReelCommentsDrawer = function() {
+  const drawer = document.getElementById('reelsCommentsDrawer');
+  if (drawer) drawer.classList.add('hidden');
+  activeReelsCommentPostId = null;
+};
+
+window.renderReelCommentsList = function(post) {
+  const body = document.getElementById('reelsCommentsBody');
+  const countBadge = document.getElementById('reelsDrawerCount');
+  if (!body) return;
+
+  const comments = (post && Array.isArray(post.comments)) ? post.comments : [];
+  if (countBadge) countBadge.textContent = comments.length;
+
+  if (comments.length === 0) {
+    body.innerHTML = `
+      <div class="reels-comments-empty">
+        <div class="reels-empty-icon">🪷</div>
+        <h4>පළමු පුණ්‍යානුමෝදනාව දක්වන්න</h4>
+        <p>මෙම උතුම් ධර්ම සටහනට ඔබගේ ප්‍රාර්ථනාව හෝ අනුමෝදනාව පහතින් සටහන් කරන්න.</p>
+      </div>
+    `;
+    return;
+  }
+
+  body.innerHTML = comments.map(c => {
+    const cAuthorName = StorageService.resolveAuthorName(c);
+    const cAuthorPhoto = StorageService.resolveAuthorPhoto(c);
+    return `
+      <div class="reels-comment-item">
+        <div class="reels-comment-avatar" onclick="closeReelsViewer(); viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(cAuthorName)}')" style="cursor: pointer;" title="${Security.escapeHTML(cAuthorName)} ගේ Profile එක බලන්න">
+          ${cAuthorPhoto ? `<img src="${Security.sanitizeUrl(cAuthorPhoto)}" alt="${Security.escapeHTML(cAuthorName)}">` : Security.escapeHTML(cAuthorName.charAt(0) || '👤')}
+        </div>
+        <div class="reels-comment-content">
+          <div class="reels-comment-author-line">
+            <span class="reels-comment-author" onclick="closeReelsViewer(); viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(cAuthorName)}')">${Security.escapeHTML(cAuthorName)}</span>
+            <span class="reels-comment-time">${Security.escapeHTML(formatRelativeTimeSinhala(c.timestamp, c.time || 'දැන්'))}</span>
+          </div>
+          <div class="reels-comment-text">${Security.escapeHTML(c.text)}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  body.scrollTop = body.scrollHeight;
+};
+
+window.submitReelComment = async function(event) {
+  if (event && event.preventDefault) event.preventDefault();
+  if (!activeReelsCommentPostId) return;
+
+  if (isGuestUser()) {
+    showAuthRequiredModal('පුණ්‍යානුමෝදනා හෝ ප්‍රාර්ථනා සටහන් කිරීමට');
+    return;
+  }
+
+  const input = document.getElementById('reelsCommentInput');
+  if (!input) return;
+  const commentText = input.value.trim();
+  if (!commentText) return;
+
+  const submitBtn = document.getElementById('reelsCommentSubmitBtn');
+  if (submitBtn) submitBtn.disabled = true;
+
+  try {
+    const postId = activeReelsCommentPostId;
+    await StorageService.addComment(postId, commentText);
+    SoundService.playSadhu();
+    triggerHaptic(20);
+    input.value = '';
+
+    const allPosts = StorageService.getLocalPosts() || [];
+    const updatedPost = allPosts.find(p => p.id === postId);
+    if (updatedPost && typeof currentPostsData !== 'undefined') {
+      const idx = currentPostsData.findIndex(p => p.id === postId);
+      if (idx !== -1) currentPostsData[idx] = updatedPost;
+    }
+
+    renderReelCommentsList(updatedPost);
+
+    const countEl = document.getElementById(`reel-comment-count-${postId}`);
+    const commentsLen = updatedPost && Array.isArray(updatedPost.comments) ? updatedPost.comments.length : 0;
+    if (countEl) countEl.textContent = commentsLen;
+
+    const cardBtnC = document.getElementById(`comments-btn-${postId}`);
+    const cardStatC = document.getElementById(`stat-comments-${postId}`);
+    if (cardBtnC) cardBtnC.innerText = commentsLen;
+    if (cardStatC) cardStatC.innerText = commentsLen;
+  } catch (err) {
+    alert(err.message || 'පුණ්‍යානුමෝදනාව එක් කිරීමට නොහැකි විය.');
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
+};
+
+window.submitReelQuickBlessing = async function(text) {
+  if (!activeReelsCommentPostId) return;
+  if (isGuestUser()) {
+    showAuthRequiredModal('පුණ්‍යානුමෝදනා හෝ ප්‍රාර්ථනා සටහන් කිරීමට');
+    return;
+  }
+
+  try {
+    const postId = activeReelsCommentPostId;
+    await StorageService.addComment(postId, text);
+    SoundService.playSadhu();
+    triggerHaptic(20);
+
+    const allPosts = StorageService.getLocalPosts() || [];
+    const updatedPost = allPosts.find(p => p.id === postId);
+    if (updatedPost && typeof currentPostsData !== 'undefined') {
+      const idx = currentPostsData.findIndex(p => p.id === postId);
+      if (idx !== -1) currentPostsData[idx] = updatedPost;
+    }
+
+    renderReelCommentsList(updatedPost);
+
+    const countEl = document.getElementById(`reel-comment-count-${postId}`);
+    const commentsLen = updatedPost && Array.isArray(updatedPost.comments) ? updatedPost.comments.length : 0;
+    if (countEl) countEl.textContent = commentsLen;
+
+    const cardBtnC = document.getElementById(`comments-btn-${postId}`);
+    const cardStatC = document.getElementById(`stat-comments-${postId}`);
+    if (cardBtnC) cardBtnC.innerText = commentsLen;
+    if (cardStatC) cardStatC.innerText = commentsLen;
+  } catch (err) {
+    alert(err.message || 'පුණ්‍යානුමෝදනාව එක් කිරීමට නොහැකි විය.');
+  }
+};
+
+// Backward-compatibility alias
+window.openReelComments = function(postId) {
+  openReelCommentsDrawer(postId);
 };
 
 // Desktop Keyboard Navigation for Reels
@@ -3110,6 +3440,11 @@ document.addEventListener('keydown', (e) => {
   const reelsModal = document.getElementById('reelsModal');
   if (reelsModal && !reelsModal.classList.contains('hidden')) {
     if (e.key === 'Escape') {
+      const drawer = document.getElementById('reelsCommentsDrawer');
+      if (drawer && !drawer.classList.contains('hidden')) {
+        closeReelCommentsDrawer();
+        return;
+      }
       window.closeReelsViewer();
     } else if (e.key === 'ArrowDown' || e.key === 'PageDown') {
       e.preventDefault();
