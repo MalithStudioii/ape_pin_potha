@@ -2,50 +2,85 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // පින්කම් සටහන් (Merit Posts) සඳහා වන ආරක්ෂක රීති
+    // Helper: Checks if the user is authenticated via Firebase Auth
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper: Checks if the authenticated user is the designated Master Admin
+    function isMasterAdmin() {
+      return isAuthenticated() && request.auth.token.email.lower() == 'silvadilan9@gmail.com';
+    }
+
+    // =========================================================================
+    // 1. පින්කම් සටහන් (Merit Posts) සඳහා වන Production Security Rules
+    // =========================================================================
     match /merit_posts/{postId} {
-      // 1. පුණ්‍ය පවුරේ ඇති සියලුම පින්කම් ඕනෑම අයෙකුට සජීවීව නැරඹිය හැක
+      // 1.1. පුණ්‍ය පවුරේ ඇති පින්කම් කියවීම (Read):
+      // ප්‍රජා පින්කම් ජාලයේ පොදු සටහන් සියලු දෙනාට නැරඹිය හැක
       allow read: if true;
       
-      // 2. අකුරු සීමා සහ වලංගු වර්ගීකරණයන් සහිත නියම දත්ත පමණක් Database එකට භාර ගනී
-      allow create: if (request.resource.data.type in ['repost', 'general', 'reel'] || (request.resource.data.title.size() >= 3 && request.resource.data.title.size() <= 150))
+      // 1.2. සටහන් නිර්මාණය කිරීම (Create):
+      // සටහනක් පළ කිරීමට අනිවාර්යයෙන්ම Log වී සිටිය යුතුය, තම UID එක පමණක් භාවිතා කළ යුතුය.
+      // අනවසරයෙන් Admin බලතල, නිල සලකුණු (isOfficial), Pin කිරීම් තමන් විසින්ම ලබාගැනීම අවහිර කෙරේ.
+      allow create: if isAuthenticated()
+                    && request.resource.data.uid == request.auth.uid
+                    && (request.resource.data.type in ['repost', 'general', 'reel'] || (request.resource.data.title.size() >= 3 && request.resource.data.title.size() <= 150))
                     && (request.resource.data.type in ['repost', 'reel'] || (request.resource.data.description.size() >= 3 && request.resource.data.description.size() <= 3000))
                     && request.resource.data.category in ['දානමය', 'සීලමය', 'භාවනාමය', 'සමාජ සත්කාර', 'යළි බෙදාගැනීම්', 'සුබපැතුම්', 'සිතුවිලි', 'සාමාන්‍ය', 'ධර්ම දානමය']
-                    && request.resource.data.type in ['merit', 'need', 'repost', 'general', 'reel'];
+                    && request.resource.data.type in ['merit', 'need', 'repost', 'general', 'reel']
+                    // Admin-only fields cannot be self-granted by non-admin users
+                    && (request.resource.data.isPinned != true || isMasterAdmin())
+                    && (request.resource.data.isVerifiedNeed != true || isMasterAdmin())
+                    && (request.resource.data.isOfficial != true || isMasterAdmin())
+                    && (request.resource.data.authorRole != 'admin' && request.resource.data.authorRole != 'official' || isMasterAdmin());
       
-      // 3. සාදුකාර දීම (sadhuCount, sadhuUsers), බෙදාගැනීම් (shareCount), අදහස් (comments), reposts (repostCount), Pin කිරීම සහ සත්කාර සත්‍යාපනය (isVerifiedNeed) සඳහා අවසරය
-      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sadhuCount'])
+      // 1.3. සටහන් යාවත්කාලීන කිරීම (Update):
+      // සාදුකාර, ප්‍රතිචාර (comments), බෙදාගැනීම් (shares, reposts) සඳහා හෝ මුල් හිමිකරුගේ සංස්කරණයන්ට පමණක් ඉඩ දේ.
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sadhuCount', 'sadhuUsers'])
+                    || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sadhuCount'])
                     || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sadhuUsers'])
-                    || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sadhuCount', 'sadhuUsers'])
-                    || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['shareCount'])
                     || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['comments'])
+                    || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['shareCount'])
                     || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['repostCount'])
-                    || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isPinned'])
-                    || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isVerifiedNeed'])
-                    || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isDeleted'])
-                    || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isDeleted', 'deletedAt'])
-                    || (request.auth != null && resource.data.uid == request.auth.uid);
+                    // Soft-delete by author
+                    || (isAuthenticated() && resource.data.uid == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isDeleted', 'deletedAt']))
+                    // Full post edit by author (cannot change ownership or self-pin)
+                    || (isAuthenticated() && resource.data.uid == request.auth.uid 
+                        && request.resource.data.uid == resource.data.uid
+                        && (request.resource.data.isPinned == resource.data.isPinned || isMasterAdmin())
+                        && (request.resource.data.isVerifiedNeed == resource.data.isVerifiedNeed || isMasterAdmin()))
+                    // Full update rights for Master Admin
+                    || isMasterAdmin();
 
-      // 4. සටහන Delete කිරීමේ අවසරය
-      allow delete: if true;
+      // 1.4. සටහන Delete කිරීමේ දැඩි ආරක්ෂාව:
+      // මැකිය හැක්කේ සටහන පළකළ සැබෑ හිමිකරුට (Author) හෝ Master Admin ට පමණි!
+      allow delete: if isAuthenticated() && (resource.data.uid == request.auth.uid || isMasterAdmin());
     }
     
-    // User Profile දත්ත සඳහා
+    // =========================================================================
+    // 2. පරිශීලක පැතිකඩ (User Profiles)
+    // =========================================================================
     match /users/{userId} {
       allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow write: if isAuthenticated() && (request.auth.uid == userId || isMasterAdmin());
     }
 
-    // දැනුම්දීම් (Notifications) සඳහා වන නීති
+    // =========================================================================
+    // 3. දැනුම්දීම් (Notifications)
+    // =========================================================================
     match /notifications/{notifId} {
-      allow read, create, update, delete: if true;
+      allow read: if isAuthenticated() && (resource.data.recipientUid == request.auth.uid || resource.data.recipientUid == 'all' || isMasterAdmin());
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && (resource.data.recipientUid == request.auth.uid || isMasterAdmin());
     }
 
-    // පද්ධති නිවේදන සහ සැකසුම් (Admin Settings)
+    // =========================================================================
+    // 4. පද්ධති සැකසුම් (Admin Settings) - Master Admin ට පමණයි!
+    // =========================================================================
     match /admin_settings/{settingId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if isMasterAdmin();
     }
   }
 }
-

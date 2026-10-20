@@ -46,7 +46,7 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=58">
+    <link rel="stylesheet" href="css/styles.css?v=59">
 </head>
 <body>
 
@@ -694,6 +694,12 @@
             </div>
 
             <form id="postForm">
+                <!-- Anti-Bot Honeypot Field (Traps automated spam bots) -->
+                <div style="position: absolute; left: -9999px; top: -9999px; opacity: 0; pointer-events: none;" aria-hidden="true">
+                    <label for="meritHoneypot">Leave this empty</label>
+                    <input type="text" name="hp_website" id="meritHoneypot" tabindex="-1" autocomplete="off">
+                </div>
+
                 <!-- Post Type Switcher -->
                 <div class="type-toggle-grid">
                     <button type="button" onclick="setPostType('merit')" id="typeMeritBtn" class="type-toggle-btn active">
@@ -816,6 +822,12 @@
             </div>
 
             <form id="shortsUploadForm" onsubmit="handleShortsUploadSubmit(event)" style="padding: 16px 18px 18px 18px;">
+                <!-- Anti-Bot Honeypot Field (Traps automated spam bots) -->
+                <div style="position: absolute; left: -9999px; top: -9999px; opacity: 0; pointer-events: none;" aria-hidden="true">
+                    <label for="shortsHoneypot">Leave this empty</label>
+                    <input type="text" name="hp_reel_check" id="shortsHoneypot" tabindex="-1" autocomplete="off">
+                </div>
+
                 <!-- YouTube Shorts URL Input -->
                 <div class="form-group" style="margin-bottom: 14px;">
                     <label class="form-label" style="display: flex; align-items: center; justify-content: space-between; font-weight: 700; color: #78350f; margin-bottom: 6px;">
@@ -1565,19 +1577,6 @@
                         </div>
                     </div>
 
-                    <!-- 4. Developer Test Mode Switcher -->
-                    <div class="admin-section-box" style="background: #f8fafc; border-color: #cbd5e1;">
-                        <div class="admin-section-title" style="color: #334155;">
-                            <i class="fa-solid fa-flask" style="color: #64748b;"></i>
-                            <span>පරීක්ෂණ පහසුකම (Local Testing Switcher)</span>
-                        </div>
-                        <p style="font-size: 0.72rem; color: #64748b; margin-bottom: 8px;">
-                            Google Sign-in නොමැතිව Local Sandbox පරිසරයේදී Master Admin අත්දැකීම පරීක්ෂා කිරීමට භාවිතා කළ හැක.
-                        </p>
-                        <button type="button" class="composer-input-btn" onclick="toggleSimulateMasterAdmin()" style="font-size: 0.75rem; font-weight: 700; background: #ffffff; border: 1px solid #94a3b8; color: #1e293b; padding: 6px 12px;">
-                            <i class="fa-solid fa-repeat"></i> <span id="adminSimulateBtnText">Admin Mode ක්‍රියාත්මක / අක්‍රීය කරන්න</span>
-                        </button>
-                    </div>
                 </div>
 
             </div>
@@ -2158,6 +2157,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=58"></script>
+    <script type="module" src="js/app.js?v=59"></script>
 </body>
 </html>

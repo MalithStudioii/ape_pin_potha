@@ -4,11 +4,11 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=58';
-import { Security } from './security.js?v=58';
-import { uploadToImgBB } from './imgbb-service.js?v=58';
-import { SoundService, triggerHaptic } from './sound.js?v=58';
-import { FeedAlgorithm } from './algorithm.js?v=58';
+import { StorageService } from './storage.js?v=59';
+import { Security } from './security.js?v=59';
+import { uploadToImgBB } from './imgbb-service.js?v=59';
+import { SoundService, triggerHaptic } from './sound.js?v=59';
+import { FeedAlgorithm } from './algorithm.js?v=59';
 
 /* ==========================================================================
    Sri Lanka Provinces & Districts Dataset & Dropdown Helper Functions
@@ -1078,6 +1078,21 @@ window.clearStandaloneShortsInput = function() {
 
 window.handleShortsUploadSubmit = async function(e) {
   e.preventDefault();
+
+  // Anti-Bot Honeypot Trap: Automated spam bots filling hidden fields are immediately discarded
+  const honeypotVal = (document.getElementById('shortsHoneypot')?.value || '').trim();
+  if (honeypotVal) {
+    console.warn('[Security] Automated bot submission rejected via shorts honeypot trap.');
+    closeShortsModal();
+    return;
+  }
+
+  // Authentication Guard: Guests must log in first
+  if (isGuestUser()) {
+    showAuthRequiredModal('නව Short Reel එකක් පළ කිරීමට');
+    return;
+  }
+
   const input = document.getElementById('standaloneShortsUrl');
   const url = (input?.value || '').trim();
   const parsed = parseVideoUrl(url);
@@ -3675,6 +3690,20 @@ function setupEventListeners() {
     e.preventDefault();
     if (isSubmittingPost) return;
 
+    // Anti-Bot Honeypot Trap: Automated spam bots filling hidden fields are immediately discarded
+    const honeypotVal = (document.getElementById('meritHoneypot')?.value || '').trim();
+    if (honeypotVal) {
+      console.warn('[Security] Automated bot submission rejected via post honeypot trap.');
+      closeModal();
+      return;
+    }
+
+    // Authentication Guard: Guests must log in first
+    if (isGuestUser()) {
+      showAuthRequiredModal('පින්කමක් හෝ සටහනක් පළ කිරීමට');
+      return;
+    }
+
     const submitBtn = document.getElementById('submitPostBtn') || e.target.querySelector('button[type="submit"]');
     const originalBtnHTML = submitBtn ? submitBtn.innerHTML : '';
 
@@ -5422,15 +5451,7 @@ window.renderAdminDashboard = async function() {
     bannedActive.checked = !!banned.active;
   }
 
-  // 4. Update simulate button text
-  const simBtnText = document.getElementById('adminSimulateBtnText');
-  if (simBtnText) {
-    simBtnText.innerText = StorageService.isMasterAdmin() 
-      ? 'Master Admin Mode සක්‍රීයයි (ක්ලික් කර අක්‍රීය කරන්න)' 
-      : 'Master Admin Mode අක්‍රීයයි (ක්ලික් කර සක්‍රීය කරන්න)';
-  }
-
-  // 5. Populate Moderation List (recent posts)
+  // 4. Populate Moderation List (recent posts)
   const modList = document.getElementById('adminModerationList');
   if (modList) {
     if (currentPostsData.length === 0) {
@@ -5519,15 +5540,7 @@ window.togglePinPrompt = async function(postId) {
 };
 
 window.toggleSimulateMasterAdmin = function() {
-  const current = StorageService.isMasterAdmin();
-  StorageService.simulateAdminLogin(!current);
-  updateUserInfoUI();
-  renderFeed();
-  if (activeTab === 'profile') renderProfileView();
-  renderAdminDashboard();
-  alert(!current 
-    ? "👑 Master Admin මාදිලිය සක්‍රීය විය! (silvadilan9@gmail.com)\nදැන් ඕනෑම post එකක් delete කිරීමට, official post දැමීමට, සහ Admin Settings වෙනස් කිරීමට ඔබට සම්පූර්ණ බලතල ඇත."
-    : "Master Admin මාදිලිය අක්‍රීය කර සාමාන්‍ය සාමාජිකයෙකු ලෙස මාරු විය.");
+  console.info('[Security] Developer simulation is permanently disabled in production release.');
 };
 
 window.savePoyaCalendar = async function(e) {
@@ -5971,7 +5984,7 @@ function initPWAEngine() {
   // Register Service Worker
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=58', { updateViaCache: 'none' })
+      navigator.serviceWorker.register('./sw.js?v=59', { updateViaCache: 'none' })
         .then((registration) => {
           // Immediately check for service worker updates
           try { registration.update(); } catch (e) {}

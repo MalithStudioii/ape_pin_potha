@@ -766,18 +766,8 @@ export const StorageService = {
     return newStatus;
   },
 
-  simulateAdminLogin(enable = true) {
-    if (enable) {
-      this.currentUser.email = MASTER_ADMIN_EMAIL;
-      this.currentUser.name = "ඩිලාන් සිල්වා (Admin)";
-      this.currentUser.isAdmin = true;
-    } else {
-      this.currentUser.email = null;
-      this.currentUser.name = "මලිත්";
-      this.currentUser.isAdmin = false;
-    }
-    localStorage.setItem('pinPotha_currentUser', JSON.stringify(this.currentUser));
-    this.notifyListeners();
+  simulateAdminLogin() {
+    console.info('[Security] Developer simulation mode is permanently disabled in production release.');
   },
 
   getLocalNotifications() {
@@ -1336,14 +1326,16 @@ export const StorageService = {
       try {
         const { doc, deleteDoc, updateDoc, setDoc, arrayUnion } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
 
-        // Tier A: Broadcast to global deleted_posts list so all users across the world remove it immediately
-        try {
-          await setDoc(doc(db, COLLECTIONS.SETTINGS, 'deleted_posts'), {
-            ids: arrayUnion(postId),
-            lastDeletedAt: Date.now()
-          }, { merge: true });
-        } catch (setErr) {
-          console.warn('[Firestore] Global deleted list broadcast note:', setErr);
+        // Tier A: Broadcast to global deleted_posts list so all users across the world remove it immediately (Master Admin only)
+        if (this.isMasterAdmin()) {
+          try {
+            await setDoc(doc(db, COLLECTIONS.SETTINGS, 'deleted_posts'), {
+              ids: arrayUnion(postId),
+              lastDeletedAt: Date.now()
+            }, { merge: true });
+          } catch (setErr) {
+            console.warn('[Firestore] Global deleted list broadcast note:', setErr);
+          }
         }
 
         // Tier B: Real hard deletion from Firestore merit_posts collection
