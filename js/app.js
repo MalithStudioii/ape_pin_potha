@@ -4,11 +4,11 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=61';
-import { Security } from './security.js?v=61';
-import { uploadToImgBB } from './imgbb-service.js?v=61';
-import { SoundService, triggerHaptic } from './sound.js?v=61';
-import { FeedAlgorithm } from './algorithm.js?v=61';
+import { StorageService } from './storage.js?v=62';
+import { Security } from './security.js?v=62';
+import { uploadToImgBB } from './imgbb-service.js?v=62';
+import { SoundService, triggerHaptic } from './sound.js?v=62';
+import { FeedAlgorithm } from './algorithm.js?v=62';
 
 /* ==========================================================================
    Sri Lanka Provinces & Districts Dataset & Dropdown Helper Functions
@@ -4359,6 +4359,9 @@ function renderProfileSubTabContent(user, myPosts, myPhotosPosts, myPrivatePosts
     const pendingIncoming = notifs.filter(n => 
       n.type === 'mithra_request' && 
       n.recipientUid === user.uid && 
+      !StorageService.isRequestAccepted(n.id, n.senderUid) &&
+      !StorageService.isRequestDeclined(n.id, n.senderUid) &&
+      (!user.mithrayan || !user.mithrayan.includes(n.senderUid)) &&
       (!n.status || n.status === 'pending')
     );
 
@@ -5069,6 +5072,8 @@ window.toggleNotificationDropdown = function(e) {
     if (btn) btn.classList.add('active');
     if (mobBtn) mobBtn.classList.add('active');
     renderNotificationsList();
+    // Mark notifications as read so badge clears and notifications do not reappear as unread
+    StorageService.markAllNotificationsAsRead();
   } else {
     dropdown.style.display = 'none';
     dropdown.classList.add('hidden');
@@ -6426,7 +6431,7 @@ function initPWAEngine() {
   const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()) && !window.MSStream;
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v61';
+  const ACTIVE_BUILD = 'v62';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
@@ -6443,7 +6448,7 @@ function initPWAEngine() {
   // Register Service Worker
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=61', { updateViaCache: 'none' })
+      navigator.serviceWorker.register('./sw.js?v=62', { updateViaCache: 'none' })
         .then((registration) => {
           // Immediately check for service worker updates
           try { registration.update(); } catch (e) {}

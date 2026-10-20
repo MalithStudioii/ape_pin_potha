@@ -238,6 +238,9 @@ export const StorageService = {
         // Listen for Auth changes
         onAuthStateChanged(auth, async (user) => {
           await this.restoreUserProfile(user);
+          if (user?.uid) {
+            this.initUserNotificationsSubscription(user.uid);
+          }
         });
 
         // Real-time Firestore Feed Subscription
@@ -268,23 +271,9 @@ export const StorageService = {
           this.notifyListeners(localPosts);
         });
 
-        // Real-time Firestore Notifications Subscription
-        try {
-          const nq = query(collection(db, COLLECTIONS.NOTIFICATIONS), orderBy("timestamp", "desc"));
-          onSnapshot(nq, (snapshot) => {
-            const notifs = [];
-            snapshot.forEach((doc) => {
-              const data = doc.data();
-              notifs.push({ ...data, id: doc.id });
-            });
-            this.cacheLocalNotifications(notifs);
-            this.notifyNotificationListeners(notifs);
-          }, (err) => {
-            console.warn('[Firestore] Realtime notifications fallback to local', err);
-            this.notifyNotificationListeners(this.getLocalNotifications());
-          });
-        } catch (nErr) {
-          console.warn('[Firestore] Realtime notifications subscription error', nErr);
+        // Real-time Firestore Notifications Subscription for authenticated user
+        if (this.currentUser && this.currentUser.uid && !this.currentUser.isAnonymous) {
+          this.initUserNotificationsSubscription(this.currentUser.uid);
         }
 
         // Real-time Firestore Admin Settings Subscription
@@ -800,9 +789,31 @@ export const StorageService = {
     try {
       const data = localStorage.getItem('pinKetha_notifications');
       let notifs = data ? JSON.parse(data) : SEED_NOTIFICATIONS;
-      // Auto-migrate wording "පැවසුවාය" to "ලබා දුන්නා"
+      const readIds = this.getReadNotificationIds();
+      const acceptedRequests = this.getAcceptedRequestIds();
+      const declinedRequests = this.getDeclinedRequestIds();
+
       let changed = false;
       notifs.forEach(n => {
+        if (readIds.includes(n.id) && !n.read) {
+          n.read = true;
+          changed = true;
+        }
+        if (n.type === 'mithra_request') {
+          if (acceptedRequests.includes(n.id) || acceptedRequests.includes(n.senderUid)) {
+            if (n.status !== 'accepted' || !n.read) {
+              n.status = 'accepted';
+              n.read = true;
+              changed = true;
+            }
+          } else if (declinedRequests.includes(n.id) || declinedRequests.includes(n.senderUid)) {
+            if (n.status !== 'declined' || !n.read) {
+              n.status = 'declined';
+              n.read = true;
+              changed = true;
+            }
+          }
+        }
         if (n.message && n.message.includes('පැවසුවා')) {
           n.message = n.message.replace(/පැවසුවාය?/g, 'ලබා දුන්නා');
           changed = true;
@@ -868,20 +879,57 @@ export const StorageService = {
     return false;
   },
 
+  getReadNotificationIds() {
+    try {
+      const raw = localStorage.getItem('pinPotha_read_notifications');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  },
+
+  recordReadNotification(notifId) {
+    if (!notifId) return;
+    const list = this.getReadNotificationIds();
+    if (!list.includes(notifId)) {
+      list.push(notifId);
+      try {
+        localStorage.setItem('pinPotha_read_notifications', JSON.stringify(list));
+      } catch (e) {}
+    }
+  },
+
+  recordAllReadNotifications(ids) {
+    if (!Array.isArray(ids)) return;
+    const list = this.getReadNotificationIds();
+    ids.forEach(id => {
+      if (id && !list.includes(id)) list.push(id);
+    });
+    try {
+      localStorage.setItem('pinPotha_read_notifications', JSON.stringify(list));
+    } catch (e) {}
+  },
+
   cacheLocalNotifications(notifs) {
     if (!Array.isArray(notifs)) return;
 
-    // Apply persistent status to all mithra_request notifications
+    // Apply persistent status to all notifications
     const acceptedRequests = this.getAcceptedRequestIds();
     const declinedRequests = this.getDeclinedRequestIds();
+    const readIds = this.getReadNotificationIds();
     const myMithrayan = Array.isArray(this.currentUser?.mithrayan) ? this.currentUser.mithrayan : [];
 
     notifs.forEach(n => {
+      if (readIds.includes(n.id)) {
+        n.read = true;
+      }
       if (n.type === 'mithra_request') {
         if (acceptedRequests.includes(n.id) || acceptedRequests.includes(n.senderUid) || myMithrayan.includes(n.senderUid)) {
           n.status = 'accepted';
+          n.read = true;
         } else if (declinedRequests.includes(n.id) || declinedRequests.includes(n.senderUid)) {
           n.status = 'declined';
+          n.read = true;
         }
       }
     });
@@ -915,6 +963,48 @@ export const StorageService = {
         localStorage.setItem('pinPotha_currentUser', JSON.stringify(this.currentUser));
         localStorage.setItem('pinPotha_profile_' + this.currentUser.uid, JSON.stringify(this.currentUser));
       }
+    }
+  },
+
+  initUserNotificationsSubscription(uid) {
+    if (this._notifUnsubscribe) {
+      try { this._notifUnsubscribe(); } catch (e) {}
+      this._notifUnsubscribe = null;
+    }
+
+    if (!isCloudReady || !db || !uid || uid.startsWith('user_guest_')) {
+      return;
+    }
+
+    try {
+      import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js').then(({ collection, query, where, onSnapshot }) => {
+        // Query only current authenticated user's notifications to satisfy Firestore security rules
+        const nq = query(
+          collection(db, COLLECTIONS.NOTIFICATIONS),
+          where("recipientUid", "==", uid)
+        );
+        this._notifUnsubscribe = onSnapshot(nq, (snapshot) => {
+          const cloudNotifs = [];
+          snapshot.forEach((doc) => {
+            const data = doc.data();
+            cloudNotifs.push({ ...data, id: doc.id });
+          });
+          cloudNotifs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+          const localAll = this.getLocalNotifications();
+          const otherNotifs = localAll.filter(n => n.recipientUid !== uid);
+          const merged = [...cloudNotifs, ...otherNotifs];
+
+          this.cacheLocalNotifications(merged);
+          this.notifyNotificationListeners(this.getNotifications());
+        }, (err) => {
+          console.warn('[Firestore] Realtime user notifications listener error:', err);
+        });
+      }).catch(err => {
+        console.warn('[Firestore] Notif import error:', err);
+      });
+    } catch (nErr) {
+      console.warn('[Firestore] Realtime notifications subscription error', nErr);
     }
   },
 
@@ -968,14 +1058,8 @@ export const StorageService = {
   },
 
   async markNotificationAsRead(notifId) {
-    if (isCloudReady && db) {
-      try {
-        const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
-        await updateDoc(doc(db, COLLECTIONS.NOTIFICATIONS, notifId), { read: true });
-      } catch (err) {
-        console.warn('[Firestore] Mark read failed:', err);
-      }
-    }
+    if (!notifId) return;
+    this.recordReadNotification(notifId);
 
     const currentList = this.getLocalNotifications();
     const target = currentList.find(n => n.id === notifId);
@@ -984,18 +1068,32 @@ export const StorageService = {
       this.cacheLocalNotifications(currentList);
       this.notifyNotificationListeners(currentList);
     }
+
+    if (isCloudReady && db) {
+      try {
+        const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        await updateDoc(doc(db, COLLECTIONS.NOTIFICATIONS, notifId), { read: true });
+      } catch (err) {
+        console.warn('[Firestore] Mark read failed:', err);
+      }
+    }
   },
 
   async markAllNotificationsAsRead() {
     const currentList = this.getLocalNotifications();
     currentList.forEach(n => { n.read = true; });
+    this.recordAllReadNotifications(currentList.map(n => n.id));
     this.cacheLocalNotifications(currentList);
     this.notifyNotificationListeners(currentList);
 
-    if (isCloudReady && db) {
+    if (isCloudReady && db && this.currentUser && this.currentUser.uid) {
       try {
         const { collection, getDocs, query, where, writeBatch, doc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
-        const q = query(collection(db, COLLECTIONS.NOTIFICATIONS), where("read", "==", false));
+        const q = query(
+          collection(db, COLLECTIONS.NOTIFICATIONS),
+          where("recipientUid", "==", this.currentUser.uid),
+          where("read", "==", false)
+        );
         const snap = await getDocs(q);
         const batch = writeBatch(db);
         snap.forEach(d => {
@@ -1665,7 +1763,123 @@ export const StorageService = {
     }
 
     // 1. Check local cache
-    tr  /**
+    try {
+      const raw = localStorage.getItem('pinPotha_profile_' + uid);
+      if (raw) return JSON.parse(raw);
+    } catch (e) {}
+
+    // 2. Check Firestore
+    if (isCloudReady && db) {
+      try {
+        const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const snap = await getDoc(doc(db, COLLECTIONS.USERS, uid));
+        if (snap.exists()) {
+          const data = snap.data();
+          localStorage.setItem('pinPotha_profile_' + uid, JSON.stringify(data));
+          return data;
+        }
+      } catch (e) {
+        console.warn('[Storage] Cloud getUserProfile warning:', e);
+      }
+    }
+
+    // 3. Fallback: derive from existing posts in memory
+    const allPosts = this.getLocalPosts();
+    const userPost = allPosts.find(p => p.uid === uid);
+    if (userPost) {
+      return {
+        uid: userPost.uid,
+        name: userPost.author || 'කල්‍යාණ මිත්‍ර',
+        photo: userPost.authorPhoto || null,
+        coverImage: userPost.authorCover || 'assets/banner.jpg',
+        bio: "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏",
+        location: userPost.location || '',
+        occupation: '',
+        joinedDate: '2026 ඔක්තෝබර්',
+        isAdmin: userPost.authorRole === 'admin'
+      };
+    }
+
+    return null;
+  },
+
+  /**
+   * Returns connection status with targetUid:
+   * 'self' | 'connected' | 'pending_sent' | 'pending_received' | 'none'
+   */
+  getMithraStatus(targetUid) {
+    if (!targetUid || !this.currentUser || !this.currentUser.uid) return 'none';
+    if (targetUid === this.currentUser.uid) return 'self';
+
+    const mithrayan = Array.isArray(this.currentUser.mithrayan) ? this.currentUser.mithrayan : [];
+    if (mithrayan.includes(targetUid)) return 'connected';
+
+    const pendingSent = Array.isArray(this.currentUser.pendingMithraSent) ? this.currentUser.pendingMithraSent : [];
+    if (pendingSent.includes(targetUid)) return 'pending_sent';
+
+    const notifs = this.getLocalNotifications();
+    const incoming = notifs.find(n => 
+      n.type === 'mithra_request' && 
+      n.senderUid === targetUid && 
+      n.recipientUid === this.currentUser.uid &&
+      !this.isRequestAccepted(n.id, n.senderUid) &&
+      !this.isRequestDeclined(n.id, n.senderUid) &&
+      (!n.status || n.status === 'pending')
+    );
+    if (incoming) return 'pending_received';
+
+    return 'none';
+  },
+
+  /**
+   * Sends a Kalyana Mithra invitation to targetUid
+   */
+  async sendKalyanaMithraRequest(targetUid, targetName) {
+    if (!this.currentUser || !this.currentUser.uid) {
+      throw new Error("කල්‍යාණ මිත්‍ර ඇරයුමක් යැවීමට කරුණාකර පළමුව Log වන්න.");
+    }
+    if (targetUid === this.currentUser.uid) return false;
+
+    // Add to pendingMithraSent
+    if (!Array.isArray(this.currentUser.pendingMithraSent)) {
+      this.currentUser.pendingMithraSent = [];
+    }
+    if (!this.currentUser.pendingMithraSent.includes(targetUid)) {
+      this.currentUser.pendingMithraSent.push(targetUid);
+    }
+    localStorage.setItem('pinPotha_currentUser', JSON.stringify(this.currentUser));
+    localStorage.setItem('pinPotha_profile_' + this.currentUser.uid, JSON.stringify(this.currentUser));
+
+    // Sync to cloud users/{uid}
+    if (isCloudReady && db) {
+      try {
+        const { doc, setDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        await setDoc(doc(db, COLLECTIONS.USERS, this.currentUser.uid), {
+          pendingMithraSent: this.currentUser.pendingMithraSent,
+          updatedAt: Date.now()
+        }, { merge: true });
+      } catch (err) {
+        console.warn('[Storage] Cloud send request sync warning:', err);
+      }
+    }
+
+    // Create Notification for the target user
+    await this.createNotification({
+      recipientUid: targetUid,
+      type: 'mithra_request',
+      status: 'pending',
+      senderUid: this.currentUser.uid,
+      senderName: this.currentUser.name || 'කල්‍යාණ මිත්‍ර',
+      senderPhoto: this.currentUser.photo || null,
+      message: 'ඔබව කල්‍යාණ මිත්‍රයෙකු ලෙස සම්බන්ධ කරගැනීමට ඇරයුම් කළාය. 🙏'
+    });
+
+    this.notifyListeners();
+    this.notifyNotificationListeners();
+    return true;
+  },
+
+  /**
    * Accepts a received Kalyana Mithra invitation
    */
   async acceptKalyanaMithraRequest(notifId, senderUid, senderName) {
