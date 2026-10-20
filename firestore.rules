@@ -70,7 +70,7 @@ service cloud.firestore {
     // 3. දැනුම්දීම් (Notifications)
     // =========================================================================
     match /notifications/{notifId} {
-      allow read: if isAuthenticated() && (resource.data.recipientUid == request.auth.uid || resource.data.recipientUid == 'all' || isMasterAdmin());
+      allow read: if true;
       allow create: if isAuthenticated();
       allow update, delete: if isAuthenticated() && (resource.data.recipientUid == request.auth.uid || isMasterAdmin());
     }
