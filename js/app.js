@@ -4,11 +4,11 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=56';
-import { Security } from './security.js?v=56';
-import { uploadToImgBB } from './imgbb-service.js?v=56';
-import { SoundService, triggerHaptic } from './sound.js?v=56';
-import { FeedAlgorithm } from './algorithm.js?v=56';
+import { StorageService } from './storage.js?v=57';
+import { Security } from './security.js?v=57';
+import { uploadToImgBB } from './imgbb-service.js?v=57';
+import { SoundService, triggerHaptic } from './sound.js?v=57';
+import { FeedAlgorithm } from './algorithm.js?v=57';
 
 window.FeedAlgorithm = FeedAlgorithm;
 window.SoundService = SoundService;
@@ -137,18 +137,30 @@ document.addEventListener('DOMContentLoaded', async () => {
   const initialPoya = StorageService.getPoyaEvent();
   if (initialPoya) renderPoyaUI(initialPoya);
 
+  // Pre-load local posts so feed is ready instantaneously on initial paint
+  currentPostsData = StorageService.getLocalPosts() || [];
+  window.currentPostsData = currentPostsData;
+  renderFeed();
+  renderSideNeeds();
+  updateUserStats();
+
   // Subscribe to real-time database updates
   StorageService.onPostsUpdate((posts) => {
     const prevIds = (currentPostsData || []).map(p => p.id).join(',');
+    const newIds = (posts || []).map(p => p.id).join(',');
     currentPostsData = posts || [];
     window.currentPostsData = currentPostsData;
 
-    if (prevIds === newIds && prevIds.length > 0) {
+    const container = document.getElementById('postsContainer');
+    const hasRenderedCards = container && container.children.length > 0 && !container.querySelector('.feed-loading-shimmer');
+
+    if (hasRenderedCards && prevIds === newIds && prevIds.length > 0) {
       // In-place updates to prevent feed DOM teardown, scroll jump, and image flicker
       updateFeedInPlace(currentPostsData);
     } else {
       renderFeed();
     }
+    updateUserInfoUI();
     renderSideNeeds();
     updateUserStats();
     if (activeTab === 'profile') {
@@ -3672,6 +3684,8 @@ function setupEventListeners() {
       closeProfileModal();
       closeAuthRequiredModal();
       updateUserInfoUI();
+      updateUserStats();
+      renderFeed();
       if (activeTab === 'profile') renderProfileView();
       checkAndPromptMandatoryName();
     } else if (res && !res.success && !res.cancelled && res.message && res.code !== 'auth/popup-closed-by-user') {
@@ -3708,6 +3722,8 @@ function setupEventListeners() {
       closeAuthRequiredModal();
       closeProfileModal();
       updateUserInfoUI();
+      updateUserStats();
+      renderFeed();
       if (activeTab === 'profile') renderProfileView();
       checkAndPromptMandatoryName();
     } else if (res && !res.success && !res.cancelled && res.message && res.code !== 'auth/popup-closed-by-user') {
@@ -3735,6 +3751,9 @@ function setupEventListeners() {
 
   document.getElementById('googleLogoutBtn')?.addEventListener('click', async () => {
     await StorageService.logout();
+    updateUserInfoUI();
+    updateUserStats();
+    renderFeed();
     openProfileModal();
   });
 
@@ -5763,7 +5782,7 @@ function initPWAEngine() {
   const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()) && !window.MSStream;
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v56';
+  const ACTIVE_BUILD = 'v57';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
@@ -5780,7 +5799,7 @@ function initPWAEngine() {
   // Register Service Worker
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=56', { updateViaCache: 'none' })
+      navigator.serviceWorker.register('./sw.js?v=57', { updateViaCache: 'none' })
         .then((registration) => {
           // Immediately check for service worker updates
           try { registration.update(); } catch (e) {}
