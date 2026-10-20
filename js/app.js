@@ -4,11 +4,11 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=59';
-import { Security } from './security.js?v=59';
-import { uploadToImgBB } from './imgbb-service.js?v=59';
-import { SoundService, triggerHaptic } from './sound.js?v=59';
-import { FeedAlgorithm } from './algorithm.js?v=59';
+import { StorageService } from './storage.js?v=60';
+import { Security } from './security.js?v=60';
+import { uploadToImgBB } from './imgbb-service.js?v=60';
+import { SoundService, triggerHaptic } from './sound.js?v=60';
+import { FeedAlgorithm } from './algorithm.js?v=60';
 
 /* ==========================================================================
    Sri Lanka Provinces & Districts Dataset & Dropdown Helper Functions
@@ -256,6 +256,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const initResult = await StorageService.init();
   updateCloudBanner(initResult.isCloud);
   updateUserInfoUI();
+  updateCommunityMemberCount();
 
   // Load initial global announcement, daily verse, and Poya calendar from storage
   const initialAnnounce = StorageService.getAdminAnnouncement();
@@ -470,6 +471,7 @@ function updateUserInfoUI() {
   applyAvatar(sideAvatarEl);
   applyAvatar(composerAvatarEl);
   applyAvatar(document.getElementById('mobNavAvatar'));
+  updateCommunityMemberCount();
 }
 
 function updateUserStats() {
@@ -619,9 +621,49 @@ window.openMemberProfileModal = async function(uid, authorName) {
   const statMerits = document.getElementById('memStatMerits');
   const statSadhu = document.getElementById('memStatSadhu');
   const statPhotos = document.getElementById('memStatPhotos');
+  const statMithrayan = document.getElementById('memStatMithrayan');
   if (statMerits) statMerits.innerText = memberPosts.length;
   if (statSadhu) statSadhu.innerText = totalSadhu;
   if (statPhotos) statPhotos.innerText = totalPhotos;
+  if (statMithrayan) statMithrayan.innerText = Array.isArray(member.mithrayan) ? member.mithrayan.length : 0;
+
+  // Kalyana Mithra Action Button in Member Profile Modal
+  const mithraStatus = StorageService.getMithraStatus(uid);
+  const mithraWrap = document.getElementById('memMithraActionWrapper');
+  if (mithraWrap) {
+    if (mithraStatus === 'self') {
+      mithraWrap.innerHTML = '';
+    } else if (mithraStatus === 'connected') {
+      mithraWrap.innerHTML = `
+        <button type="button" class="btn-connected-mithra" onclick="handleRemoveMithra('${uid}')" title="කල්‍යාණ මිත්‍ර සබඳතාව ඉවත් කරන්න">
+          <i class="fa-solid fa-heart-circle-check"></i> <span>කල්‍යාණ මිතුරෙකි</span>
+        </button>
+      `;
+    } else if (mithraStatus === 'pending_sent') {
+      mithraWrap.innerHTML = `
+        <button type="button" class="btn-pending-mithra" disabled title="ඔබ විසින් ඇරයුමක් යවා ඇත">
+          <i class="fa-solid fa-hourglass-half"></i> <span>ඇරයුම යවා ඇත</span>
+        </button>
+      `;
+    } else if (mithraStatus === 'pending_received') {
+      mithraWrap.innerHTML = `
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button type="button" class="btn-accept-mithra" onclick="handleAcceptMithra(null, '${uid}', '${Security.escapeHTML(member.name)}')">
+            <i class="fa-solid fa-circle-check"></i> <span>ඇරයුම පිළිගන්න (සාදු!)</span>
+          </button>
+          <button type="button" class="btn-notif-reject" onclick="handleRejectMithra(null, '${uid}')">
+            <i class="fa-solid fa-xmark"></i> ඉවත් කරන්න
+          </button>
+        </div>
+      `;
+    } else {
+      mithraWrap.innerHTML = `
+        <button type="button" class="btn-connect-mithra" onclick="handleSendMithra('${uid}', '${Security.escapeHTML(member.name)}')">
+          <i class="fa-solid fa-hands-praying"></i> <span>කල්‍යාණ මිත්‍රයෙකු කරගන්න</span>
+        </button>
+      `;
+    }
+  }
 
   const headingEl = document.getElementById('memTimelineHeading');
   if (headingEl) headingEl.innerText = `${member.name || 'මෙම කල්‍යාණ මිත්‍රයා'} විසින් සිදුකළ පින්කම් (${memberPosts.length})`;
@@ -3947,6 +3989,9 @@ function renderProfileView() {
   const myPhotosPosts = currentPostsData.filter(p => p.uid && user.uid && p.uid === user.uid && p.image);
   const totalSadhu = myPosts.reduce((acc, p) => acc + (p.sadhuCount || 0), 0);
 
+  // Update community member counter badge
+  updateCommunityMemberCount();
+
   // 1. Cover Photo
   const coverImg = document.getElementById('profileCoverImg');
   if (coverImg) {
@@ -4169,12 +4214,12 @@ window.setProfileSubTab = function(subTab) {
   // Sync state class on profile-content-grid to toggle sidebar visibility
   const grid = document.getElementById('profileContentGrid') || document.querySelector('.profile-content-grid');
   if (grid) {
-    grid.classList.remove('subtab-timeline', 'subtab-photos', 'subtab-stats', 'subtab-private');
+    grid.classList.remove('subtab-timeline', 'subtab-friends', 'subtab-photos', 'subtab-stats', 'subtab-private');
     grid.classList.add(`subtab-${subTab}`);
     grid.setAttribute('data-active-subtab', subTab);
   }
 
-  ['timeline', 'photos', 'stats', 'private'].forEach(t => {
+  ['timeline', 'friends', 'photos', 'stats', 'private'].forEach(t => {
     const btn = document.getElementById(`prof-sub-${t}`);
     const cap = t.charAt(0).toUpperCase() + t.slice(1);
     const view = document.getElementById(`subTab${cap}View`);
@@ -4220,7 +4265,103 @@ function renderProfileSubTabContent(user, myPosts, myPhotosPosts, myPrivatePosts
     }
   }
 
-  // 2. Photos Gallery
+  // 2. Kalyana Mithrayan (Spiritual Friends) Sub-tab
+  const friendsContainer = document.getElementById('profConnectedMithrayanList');
+  const pendingSection = document.getElementById('profPendingRequestsSection');
+  const pendingList = document.getElementById('profPendingRequestsList');
+  const pendingCountText = document.getElementById('pendingRequestsCountText');
+  const summaryText = document.getElementById('connectedMithrayanSummary');
+  const countMithrayan = document.getElementById('profCountMithrayan');
+
+  // Update tab counter whenever profile subtab content is rendered
+  const mithrayanUids = Array.isArray(user.mithrayan) ? user.mithrayan : [];
+  if (countMithrayan) countMithrayan.innerText = mithrayanUids.length;
+
+  if (activeProfileSubTab === 'friends' && friendsContainer) {
+    // Check pending incoming requests
+    const notifs = StorageService.getLocalNotifications();
+    const pendingIncoming = notifs.filter(n => 
+      n.type === 'mithra_request' && 
+      n.recipientUid === user.uid && 
+      (!n.status || n.status === 'pending')
+    );
+
+    if (pendingSection && pendingList) {
+      if (pendingIncoming.length > 0) {
+        pendingSection.style.display = 'block';
+        if (pendingCountText) pendingCountText.innerText = `(${pendingIncoming.length})`;
+        pendingList.innerHTML = pendingIncoming.map(req => `
+          <div class="mithra-card" style="border-color: #fde68a; background: #fffdf8;">
+            <div class="mithra-card-avatar" onclick="openMemberProfileModal('${req.senderUid}', '${Security.escapeHTML(req.senderName)}')" style="cursor: pointer;">
+              ${req.senderPhoto ? `<img src="${Security.sanitizeUrl(req.senderPhoto)}" alt="${Security.escapeHTML(req.senderName)}" onerror="this.parentElement.innerText = '${(req.senderName || 'ක').charAt(0)}';">` : (req.senderName || 'ක').charAt(0)}
+            </div>
+            <div class="mithra-card-name" onclick="openMemberProfileModal('${req.senderUid}', '${Security.escapeHTML(req.senderName)}')" style="cursor: pointer;">${Security.escapeHTML(req.senderName || 'කල්‍යාණ මිත්‍ර')}</div>
+            <div class="mithra-card-loc">
+              <i class="fa-solid fa-clock"></i> <span>ඇරයුමක් එවා ඇත</span>
+            </div>
+            <div class="mithra-card-actions">
+              <button type="button" class="btn-notif-accept" style="flex: 1; justify-content: center;" onclick="handleAcceptMithra('${req.id}', '${req.senderUid}', '${Security.escapeHTML(req.senderName)}')">
+                <i class="fa-solid fa-circle-check"></i> පිළිගන්න
+              </button>
+              <button type="button" class="btn-notif-reject" onclick="handleRejectMithra('${req.id}', '${req.senderUid}')">
+                <i class="fa-solid fa-xmark"></i> ඉවත් කරන්න
+              </button>
+            </div>
+          </div>
+        `).join('');
+      } else {
+        pendingSection.style.display = 'none';
+      }
+    }
+
+    if (summaryText) summaryText.innerText = `මිතුරන් ${mithrayanUids.length} දෙනෙක්`;
+
+    if (mithrayanUids.length === 0) {
+      friendsContainer.innerHTML = `
+        <div style="grid-column: 1 / -1; text-align: center; padding: 48px 20px; color: #94a3b8; background: #ffffff; border-radius: 16px; border: 1.5px dashed #e2e8f0;">
+          <i class="fa-solid fa-users" style="font-size: 2.4rem; color: #d97706; margin-bottom: 12px; opacity: 0.6;"></i>
+          <h3 style="font-size: 1rem; font-weight: 700; color: #334155;">තවමත් කල්‍යාණ මිතුරන් සම්බන්ධ වී නොමැත</h3>
+          <p style="font-size: 0.78rem; color: #64748b; margin-top: 4px; max-width: 440px; margin-left: auto; margin-right: auto; line-height: 1.6;">
+            පුණ්‍ය පවුරේ සිටින අනෙකුත් සාමාජිකයින්ගේ පැතිකඩ (Profile) වෙත ගොස් <strong>"කල්‍යාණ මිත්‍රයෙකු කරගන්න"</strong> බොත්තම ඔබා ඔබේ පින්කම් මිතුරු පවුර පුළුල් කරගන්න. 🙏
+          </p>
+        </div>
+      `;
+    } else {
+      friendsContainer.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; padding: 20px;"><i class="fa-solid fa-spinner fa-spin" style="color: #d97706;"></i> මිතුරන් ලැයිස්තුව සූදානම් වෙමින් පවතී...</div>`;
+      StorageService.getConnectedMithrayanList().then(profiles => {
+        if (!profiles || profiles.length === 0) {
+          friendsContainer.innerHTML = `
+            <div style="grid-column: 1 / -1; text-align: center; padding: 30px; color: #94a3b8;">
+              <p style="font-size: 0.8rem;">කල්‍යාණ මිතුරන් සොයාගත නොහැකි විය.</p>
+            </div>
+          `;
+          return;
+        }
+        friendsContainer.innerHTML = profiles.map(m => `
+          <div class="mithra-card">
+            <div class="mithra-card-avatar" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}')" style="cursor: pointer;">
+              ${m.photo ? `<img src="${Security.sanitizeUrl(m.photo)}" alt="${Security.escapeHTML(m.name)}" onerror="this.parentElement.innerText = '${(m.name || 'ක').charAt(0)}';">` : (m.name || 'ක').charAt(0)}
+            </div>
+            <div class="mithra-card-name" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}')" style="cursor: pointer;">${Security.escapeHTML(m.name || 'කල්‍යාණ මිත්‍ර')}</div>
+            <div class="mithra-card-loc">
+              <i class="fa-solid fa-location-dot" style="color: #ea580c;"></i>
+              <span>${Security.escapeHTML(m.district || m.location || 'ශ්‍රී ලංකා')}</span>
+            </div>
+            <div class="mithra-card-actions">
+              <button type="button" class="btn-mithra-view" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}')">
+                <i class="fa-solid fa-eye"></i> පැතිකඩ
+              </button>
+              <button type="button" class="btn-mithra-view" style="color: #ef4444; border-color: #fecaca; background: #fff1f2;" onclick="handleRemoveMithra('${m.uid}')" title="මිතුරු සබඳතාව ඉවත් කරන්න">
+                <i class="fa-solid fa-user-xmark"></i>
+              </button>
+            </div>
+          </div>
+        `).join('');
+      });
+    }
+  }
+
+  // 3. Photos Gallery
   const photosContainer = document.getElementById('profFullPhotosGrid');
   if (photosContainer && activeProfileSubTab === 'photos') {
     if (myPhotosPosts.length === 0) {
@@ -4951,16 +5092,40 @@ window.renderNotificationsList = function() {
     const timeAgo = formatTimeAgo(n.timestamp);
 
     let typeIconHtml = '';
+    let mithraActionHtml = '';
+
     if (n.type === 'sadhu') {
       typeIconHtml = '<span class="notif-type-icon sadhu" title="සාදුකාරයක්">🙏</span>';
     } else if (n.type === 'comment') {
       typeIconHtml = '<span class="notif-type-icon comment" title="පුණ්‍යානුමෝදනාවක්"><i class="fa-solid fa-comment" style="font-size: 8px;"></i></span>';
+    } else if (n.type === 'mithra_request') {
+      typeIconHtml = '<span class="notif-type-icon mithra" title="කල්‍යාණ මිත්‍ර ඇරයුම">🪷</span>';
+      if (!n.status || n.status === 'pending') {
+        mithraActionHtml = `
+          <div class="notif-mithra-actions" onclick="event.stopPropagation()">
+            <button type="button" class="btn-notif-accept" onclick="handleAcceptMithra('${n.id}', '${n.senderUid}', '${Security.escapeHTML(n.senderName)}')">
+              <i class="fa-solid fa-circle-check"></i> පිළිගන්න (සාදු!)
+            </button>
+            <button type="button" class="btn-notif-reject" onclick="handleRejectMithra('${n.id}', '${n.senderUid}')">
+              <i class="fa-solid fa-xmark"></i> ඉවත් කරන්න
+            </button>
+          </div>
+        `;
+      } else if (n.status === 'accepted') {
+        mithraActionHtml = `
+          <div style="font-size: 0.72rem; color: #059669; font-weight: 700; margin-top: 5px;">
+            <i class="fa-solid fa-circle-check"></i> ඇරයුම සාදරයෙන් පිළිගන්නා ලදී
+          </div>
+        `;
+      }
+    } else if (n.type === 'mithra_accepted') {
+      typeIconHtml = '<span class="notif-type-icon mithra" title="කල්‍යාණ මිත්‍ර සබඳතාව">✨</span>';
     } else {
       typeIconHtml = '<span class="notif-type-icon sathkara" title="සත්කාරයක්">🤝</span>';
     }
 
     return `
-      <div class="notif-item ${isUnread ? 'unread' : ''}" onclick="handleNotificationClick('${n.id}', '${n.postId || ''}', '${n.type || ''}')">
+      <div class="notif-item ${isUnread ? 'unread' : ''}" onclick="handleNotificationClick('${n.id}', '${n.senderUid || n.postId || ''}', '${n.type || ''}')">
         <div class="notif-avatar-wrap">
           <div class="notif-avatar">
             ${photo ? `<img src="${Security.sanitizeUrl(photo)}" alt="${Security.escapeHTML(n.senderName)}" onerror="this.parentElement.innerText = '${initial}';">` : initial}
@@ -4971,6 +5136,7 @@ window.renderNotificationsList = function() {
           <div class="notif-body-text">
             <strong>${Security.escapeHTML(n.senderName || 'කල්‍යාණ මිත්‍ර')}</strong> ${Security.escapeHTML(n.message || '')}
           </div>
+          ${mithraActionHtml}
           <div class="notif-time">
             <i class="fa-regular fa-clock" style="font-size: 0.65rem;"></i>
             <span>${timeAgo}</span>
@@ -4993,6 +5159,13 @@ window.handleNotificationClick = async function(notifId, postId, postType) {
 
   // Close dropdown
   closeNotificationDropdown();
+
+  if (postType === 'mithra_request' || postType === 'mithra_accepted') {
+    if (postId) {
+      openMemberProfileModal(postId);
+    }
+    return;
+  }
 
   if (!postId) return;
 
@@ -5030,6 +5203,147 @@ window.markAllNotificationsAsRead = async function(e) {
     console.warn('Error marking all notifications read:', err);
   }
 };
+
+// ============================================================================
+// Community Member Counter Controller
+// ============================================================================
+
+window.updateCommunityMemberCount = async function() {
+  try {
+    const counterPill = document.getElementById('headerMemberCounter');
+    const countText = document.getElementById('globalMemberCountText');
+    if (!countText) return;
+
+    const totalCount = await StorageService.getTotalMemberCount();
+    const formatted = Number(totalCount).toLocaleString('en-US');
+    countText.innerText = `කල්‍යාණ මිතුරන් ${formatted}+ ක්`;
+    if (counterPill) {
+      counterPill.setAttribute('title', `අපේ පිං පොත සමඟ මේ වන විට කල්‍යාණ මිතුරන් ${formatted} දෙනෙකු එක්ව සිටියි.`);
+    }
+  } catch (err) {
+    console.warn('[App] Update community member count warning:', err);
+  }
+};
+
+// ============================================================================
+// Kalyana Mithra (Buddhist Spiritual Friendship) Controller
+// ============================================================================
+
+window.handleSendMithra = async function(targetUid, targetName) {
+  if (isGuestUser()) {
+    showAuthRequiredModal('කල්‍යාණ මිත්‍ර ඇරයුමක් යැවීමට');
+    return;
+  }
+  if (!targetUid) return;
+
+  try {
+    triggerHaptic('light');
+    SoundService.play('button');
+  } catch (e) {}
+
+  try {
+    await StorageService.sendKalyanaMithraRequest(targetUid, targetName);
+    alert(`සාදු! ${targetName || 'මෙම කල්‍යාණ මිත්‍රයා'} වෙත ඔබගේ කල්‍යාණ මිත්‍ර ඇරයුම සාර්ථකව යවන ලදී. 🙏`);
+
+    // Refresh member modal if open
+    const memModal = document.getElementById('memberProfileModal');
+    if (memModal && !memModal.classList.contains('hidden')) {
+      await openMemberProfileModal(targetUid, targetName);
+    }
+    // Refresh profile if currently viewing
+    if (activeTab === 'profile') {
+      renderProfileView();
+    }
+  } catch (err) {
+    console.error('Failed to send Kalyana Mithra request:', err);
+    alert(err.message || 'ඇරයුම යැවීමට නොහැකි විය.');
+  }
+};
+window.sendKalyanaMithraRequest = window.handleSendMithra;
+
+window.handleAcceptMithra = async function(notifId, senderUid, senderName) {
+  if (isGuestUser()) {
+    showAuthRequiredModal('කල්‍යාණ මිත්‍ර ඇරයුමක් පිළිගැනීමට');
+    return;
+  }
+  if (!senderUid) return;
+
+  try {
+    triggerHaptic('success');
+    SoundService.play('sadhu');
+  } catch (e) {}
+
+  try {
+    await StorageService.acceptKalyanaMithraRequest(notifId, senderUid, senderName);
+    alert(`සාදු! සාදු! ${senderName || 'මෙම කල්‍යාණ මිත්‍රයාගේ'} ඇරයුම ඔබ සාදරයෙන් පිළිගත්තේය. දැන් ඔබ දෙපළ කල්‍යාණ මිතුරන් වේ! 🙏🪷`);
+
+    // Re-render notifications dropdown
+    if (window.renderNotificationsList) window.renderNotificationsList();
+
+    // Re-render member modal if open
+    const memModal = document.getElementById('memberProfileModal');
+    if (memModal && !memModal.classList.contains('hidden')) {
+      await openMemberProfileModal(senderUid, senderName);
+    }
+
+    // Re-render profile friends subtab if active
+    if (activeTab === 'profile') {
+      renderProfileView();
+    }
+  } catch (err) {
+    console.error('Failed to accept Kalyana Mithra request:', err);
+    alert(err.message || 'ඇරයුම පිළිගැනීමට නොහැකි විය.');
+  }
+};
+window.acceptKalyanaMithraRequest = window.handleAcceptMithra;
+
+window.handleRejectMithra = async function(notifId, senderUid) {
+  try {
+    await StorageService.rejectKalyanaMithraRequest(notifId, senderUid);
+    // Re-render notifications dropdown
+    if (window.renderNotificationsList) window.renderNotificationsList();
+
+    // Re-render member modal if open
+    const memModal = document.getElementById('memberProfileModal');
+    if (memModal && !memModal.classList.contains('hidden')) {
+      await openMemberProfileModal(senderUid);
+    }
+
+    // Re-render profile friends subtab if active
+    if (activeTab === 'profile') {
+      renderProfileView();
+    }
+  } catch (err) {
+    console.warn('Reject mithra note:', err);
+  }
+};
+window.rejectKalyanaMithraRequest = window.handleRejectMithra;
+
+window.handleRemoveMithra = async function(targetUid) {
+  if (!targetUid) return;
+  const isConfirm = confirm('මෙම කල්‍යාණ මිතුරු සබඳතාව ඉවත් කිරීමට ඔබට සහතිකද?');
+  if (!isConfirm) return;
+
+  try {
+    await StorageService.removeKalyanaMithra(targetUid);
+    alert('කල්‍යාණ මිතුරු සබඳතාව සාර්ථකව ඉවත් කරන ලදී.');
+
+    // Re-render member modal if open
+    const memModal = document.getElementById('memberProfileModal');
+    if (memModal && !memModal.classList.contains('hidden')) {
+      await openMemberProfileModal(targetUid);
+    }
+
+    // Re-render profile friends subtab if active
+    if (activeTab === 'profile') {
+      renderProfileView();
+    }
+  } catch (err) {
+    console.error('Remove mithra failed:', err);
+    alert('ඉවත් කිරීමට නොහැකි විය: ' + err.message);
+  }
+};
+window.removeKalyanaMithra = window.handleRemoveMithra;
 
 // ============================================================================
 // Settings & Policy System Controller
@@ -5967,7 +6281,7 @@ function initPWAEngine() {
   const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()) && !window.MSStream;
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v58';
+  const ACTIVE_BUILD = 'v60';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
@@ -5984,7 +6298,7 @@ function initPWAEngine() {
   // Register Service Worker
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=59', { updateViaCache: 'none' })
+      navigator.serviceWorker.register('./sw.js?v=60', { updateViaCache: 'none' })
         .then((registration) => {
           // Immediately check for service worker updates
           try { registration.update(); } catch (e) {}

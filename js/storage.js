@@ -184,6 +184,27 @@ export const StorageService = {
   },
 
   /**
+   * Returns total registered community members count (Cloud aggregation with baseline)
+   */
+  async getTotalMemberCount() {
+    if (isCloudReady && db) {
+      try {
+        const { collection, getCountFromServer } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const snap = await getCountFromServer(collection(db, COLLECTIONS.USERS));
+        const count = snap.data().count;
+        if (typeof count === 'number' && count > 0) {
+          return count + 115;
+        }
+      } catch (e) {
+        console.warn('[Storage] Member count fetch note:', e);
+      }
+    }
+    const allPosts = this.getLocalPosts();
+    const uniqueUids = new Set(allPosts.map(p => p.uid).filter(Boolean));
+    return Math.max(uniqueUids.size + 115, 128);
+  },
+
+  /**
    * Initializes the storage engine (Firestore or Sandbox)
    */
   async init() {
@@ -195,6 +216,10 @@ export const StorageService = {
       } catch (e) {
         console.error('Failed to parse saved user', e);
       }
+    }
+    if (this.currentUser) {
+      if (!Array.isArray(this.currentUser.mithrayan)) this.currentUser.mithrayan = [];
+      if (!Array.isArray(this.currentUser.pendingMithraSent)) this.currentUser.pendingMithraSent = [];
     }
     this.currentUser.isAdmin = this.isMasterAdmin();
 
@@ -796,6 +821,31 @@ export const StorageService = {
       localStorage.setItem('pinKetha_notifications', JSON.stringify(notifs));
     } catch (e) {
       console.warn('LocalStorage limit reached', e);
+    }
+
+    // Auto-sync accepted Kalyana Mithra invitations (bidirectional friendship)
+    if (this.currentUser && this.currentUser.uid && Array.isArray(notifs)) {
+      let changed = false;
+      if (!Array.isArray(this.currentUser.mithrayan)) this.currentUser.mithrayan = [];
+      if (!Array.isArray(this.currentUser.pendingMithraSent)) this.currentUser.pendingMithraSent = [];
+
+      notifs.forEach(n => {
+        if (n.type === 'mithra_accepted' && n.recipientUid === this.currentUser.uid && n.senderUid) {
+          if (!this.currentUser.mithrayan.includes(n.senderUid)) {
+            this.currentUser.mithrayan.push(n.senderUid);
+            changed = true;
+          }
+          if (this.currentUser.pendingMithraSent.includes(n.senderUid)) {
+            this.currentUser.pendingMithraSent = this.currentUser.pendingMithraSent.filter(id => id !== n.senderUid);
+            changed = true;
+          }
+        }
+      });
+
+      if (changed) {
+        localStorage.setItem('pinPotha_currentUser', JSON.stringify(this.currentUser));
+        localStorage.setItem('pinPotha_profile_' + this.currentUser.uid, JSON.stringify(this.currentUser));
+      }
     }
   },
 
@@ -1462,6 +1512,8 @@ export const StorageService = {
       occupation: savedProfile.occupation || "",
       coverImage: userCover,
       joinedDate: savedProfile.joinedDate || "2026 ඔක්තෝබර්",
+      mithrayan: Array.isArray(savedProfile.mithrayan) ? savedProfile.mithrayan : [],
+      pendingMithraSent: Array.isArray(savedProfile.pendingMithraSent) ? savedProfile.pendingMithraSent : [],
       isAnonymous: false,
       needsNameConfirmation: (!fullName || fullName === 'අමුත්තා' || fullName.length < 2)
     };
@@ -1497,6 +1549,8 @@ export const StorageService = {
           if (cloudData.city) this.currentUser.city = cloudData.city;
           if (cloudData.occupation) this.currentUser.occupation = cloudData.occupation;
           if (cloudData.joinedDate) this.currentUser.joinedDate = cloudData.joinedDate;
+          if (Array.isArray(cloudData.mithrayan)) this.currentUser.mithrayan = cloudData.mithrayan;
+          if (Array.isArray(cloudData.pendingMithraSent)) this.currentUser.pendingMithraSent = cloudData.pendingMithraSent;
 
           localStorage.setItem('pinPotha_currentUser', JSON.stringify(this.currentUser));
           localStorage.setItem('pinPotha_profile_' + user.uid, JSON.stringify(this.currentUser));
@@ -1578,6 +1632,218 @@ export const StorageService = {
     }
 
     return null;
+  },
+
+  /**
+   * Returns connection status with targetUid:
+   * 'self' | 'connected' | 'pending_sent' | 'pending_received' | 'none'
+   */
+  getMithraStatus(targetUid) {
+    if (!targetUid || !this.currentUser || !this.currentUser.uid) return 'none';
+    if (targetUid === this.currentUser.uid) return 'self';
+
+    const mithrayan = Array.isArray(this.currentUser.mithrayan) ? this.currentUser.mithrayan : [];
+    if (mithrayan.includes(targetUid)) return 'connected';
+
+    const pendingSent = Array.isArray(this.currentUser.pendingMithraSent) ? this.currentUser.pendingMithraSent : [];
+    if (pendingSent.includes(targetUid)) return 'pending_sent';
+
+    const notifs = this.getLocalNotifications();
+    const incoming = notifs.find(n => 
+      n.type === 'mithra_request' && 
+      n.senderUid === targetUid && 
+      n.recipientUid === this.currentUser.uid &&
+      (!n.status || n.status === 'pending')
+    );
+    if (incoming) return 'pending_received';
+
+    return 'none';
+  },
+
+  /**
+   * Sends a Kalyana Mithra invitation to targetUid
+   */
+  async sendKalyanaMithraRequest(targetUid, targetName) {
+    if (!this.currentUser || !this.currentUser.uid) {
+      throw new Error("කල්‍යාණ මිත්‍ර ඇරයුමක් යැවීමට කරුණාකර පළමුව Log වන්න.");
+    }
+    if (targetUid === this.currentUser.uid) return false;
+
+    // Add to pendingMithraSent
+    if (!Array.isArray(this.currentUser.pendingMithraSent)) {
+      this.currentUser.pendingMithraSent = [];
+    }
+    if (!this.currentUser.pendingMithraSent.includes(targetUid)) {
+      this.currentUser.pendingMithraSent.push(targetUid);
+    }
+    localStorage.setItem('pinPotha_currentUser', JSON.stringify(this.currentUser));
+    localStorage.setItem('pinPotha_profile_' + this.currentUser.uid, JSON.stringify(this.currentUser));
+
+    // Sync to cloud users/{uid}
+    if (isCloudReady && db) {
+      try {
+        const { doc, setDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        await setDoc(doc(db, COLLECTIONS.USERS, this.currentUser.uid), {
+          pendingMithraSent: this.currentUser.pendingMithraSent,
+          updatedAt: Date.now()
+        }, { merge: true });
+      } catch (err) {
+        console.warn('[Storage] Cloud send request sync warning:', err);
+      }
+    }
+
+    // Create Notification for the target user
+    await this.createNotification({
+      recipientUid: targetUid,
+      type: 'mithra_request',
+      status: 'pending',
+      senderUid: this.currentUser.uid,
+      senderName: this.currentUser.name || 'කල්‍යාණ මිත්‍ර',
+      senderPhoto: this.currentUser.photo || null,
+      message: 'ඔබව කල්‍යාණ මිත්‍රයෙකු ලෙස සම්බන්ධ කරගැනීමට ඇරයුම් කළාය. 🙏'
+    });
+
+    this.notifyListeners();
+    this.notifyNotificationListeners();
+    return true;
+  },
+
+  /**
+   * Accepts a received Kalyana Mithra invitation
+   */
+  async acceptKalyanaMithraRequest(notifId, senderUid, senderName) {
+    if (!this.currentUser || !this.currentUser.uid) return false;
+
+    // Add senderUid to current user's mithrayan
+    if (!Array.isArray(this.currentUser.mithrayan)) {
+      this.currentUser.mithrayan = [];
+    }
+    if (!this.currentUser.mithrayan.includes(senderUid)) {
+      this.currentUser.mithrayan.push(senderUid);
+    }
+
+    // Remove from pendingMithraSent if present
+    if (Array.isArray(this.currentUser.pendingMithraSent)) {
+      this.currentUser.pendingMithraSent = this.currentUser.pendingMithraSent.filter(id => id !== senderUid);
+    }
+
+    localStorage.setItem('pinPotha_currentUser', JSON.stringify(this.currentUser));
+    localStorage.setItem('pinPotha_profile_' + this.currentUser.uid, JSON.stringify(this.currentUser));
+
+    // Sync to cloud users/{uid}
+    if (isCloudReady && db) {
+      try {
+        const { doc, setDoc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        await setDoc(doc(db, COLLECTIONS.USERS, this.currentUser.uid), {
+          mithrayan: this.currentUser.mithrayan,
+          pendingMithraSent: this.currentUser.pendingMithraSent,
+          updatedAt: Date.now()
+        }, { merge: true });
+
+        if (notifId) {
+          try {
+            await updateDoc(doc(db, COLLECTIONS.NOTIFICATIONS, notifId), {
+              status: 'accepted',
+              read: true
+            });
+          } catch (e) {}
+        }
+      } catch (err) {
+        console.warn('[Storage] Cloud accept request sync warning:', err);
+      }
+    }
+
+    // Mark notification locally as accepted
+    const notifs = this.getLocalNotifications();
+    const targetNotif = notifs.find(n => n.id === notifId || (n.type === 'mithra_request' && n.senderUid === senderUid));
+    if (targetNotif) {
+      targetNotif.status = 'accepted';
+      targetNotif.read = true;
+      this.cacheLocalNotifications(notifs);
+    }
+
+    // Send celebration notification to senderUid
+    await this.createNotification({
+      recipientUid: senderUid,
+      type: 'mithra_accepted',
+      senderUid: this.currentUser.uid,
+      senderName: this.currentUser.name || 'කල්‍යාණ මිත්‍ර',
+      senderPhoto: this.currentUser.photo || null,
+      message: 'ඔබගේ කල්‍යාණ මිත්‍ර ඇරයුම සාදරයෙන් පිළිගත්තේය. දැන් ඔබ දෙපළ කල්‍යාණ මිත්‍රයන් වේ! සාදු! 🙏'
+    });
+
+    this.notifyListeners();
+    this.notifyNotificationListeners();
+    return true;
+  },
+
+  /**
+   * Rejects / Dismisses a Kalyana Mithra invitation
+   */
+  async rejectKalyanaMithraRequest(notifId, senderUid) {
+    if (!this.currentUser || !this.currentUser.uid) return false;
+
+    const notifs = this.getLocalNotifications();
+    const targetNotif = notifs.find(n => n.id === notifId || (n.type === 'mithra_request' && n.senderUid === senderUid));
+    if (targetNotif) {
+      targetNotif.status = 'declined';
+      targetNotif.read = true;
+      this.cacheLocalNotifications(notifs);
+    }
+
+    if (isCloudReady && db && notifId) {
+      try {
+        const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        await updateDoc(doc(db, COLLECTIONS.NOTIFICATIONS, notifId), {
+          status: 'declined',
+          read: true
+        });
+      } catch (e) {}
+    }
+
+    this.notifyNotificationListeners();
+    return true;
+  },
+
+  /**
+   * Removes a Kalyana Mithra connection (Unfriend)
+   */
+  async removeKalyanaMithra(targetUid) {
+    if (!this.currentUser || !this.currentUser.uid) return false;
+    if (Array.isArray(this.currentUser.mithrayan)) {
+      this.currentUser.mithrayan = this.currentUser.mithrayan.filter(id => id !== targetUid);
+      localStorage.setItem('pinPotha_currentUser', JSON.stringify(this.currentUser));
+      localStorage.setItem('pinPotha_profile_' + this.currentUser.uid, JSON.stringify(this.currentUser));
+
+      if (isCloudReady && db) {
+        try {
+          const { doc, setDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+          await setDoc(doc(db, COLLECTIONS.USERS, this.currentUser.uid), {
+            mithrayan: this.currentUser.mithrayan,
+            updatedAt: Date.now()
+          }, { merge: true });
+        } catch (e) {}
+      }
+    }
+    this.notifyListeners();
+    return true;
+  },
+
+  /**
+   * Fetches full profile objects for all connected Kalyana Mithrayan
+   */
+  async getConnectedMithrayanList() {
+    const list = Array.isArray(this.currentUser?.mithrayan) ? this.currentUser.mithrayan : [];
+    if (list.length === 0) return [];
+
+    const profiles = [];
+    for (const uid of list) {
+      const prof = await this.getUserProfile(uid);
+      if (prof) {
+        profiles.push(prof);
+      }
+    }
+    return profiles;
   },
 
   /**

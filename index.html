@@ -46,7 +46,7 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=59">
+    <link rel="stylesheet" href="css/styles.css?v=60">
 </head>
 <body>
 
@@ -91,6 +91,12 @@
 
             <!-- User Action Buttons -->
             <div class="header-actions">
+                <!-- Community Live Member Counter Badge -->
+                <div class="header-member-counter" id="headerMemberCounter" title="පුණ්‍ය ජාලයේ ලියාපදිංචි මුළු කල්‍යාණ මිතුරන් ප්‍රමාණය">
+                    <i class="fa-solid fa-users"></i>
+                    <span id="globalMemberCountText">කල්‍යාණ මිතුරන් 128+ ක්</span>
+                </div>
+
                 <!-- PWA Install Button (Shown when installable or on iOS) -->
                 <button type="button" id="headerInstallBtn" class="header-pwa-install-btn hidden" onclick="triggerPWAInstall()" title="පිං පොත App එක Install කරගන්න">
                     <i class="fa-solid fa-cloud-arrow-down"></i>
@@ -468,6 +474,11 @@
                     <span>පින්කම් සටහන්</span>
                     <span class="tab-counter" id="profCountTimeline">0</span>
                 </button>
+                <button onclick="setProfileSubTab('friends')" id="prof-sub-friends" class="prof-nav-btn">
+                    <i class="fa-solid fa-users"></i>
+                    <span>කල්‍යාණ මිතුරන්</span>
+                    <span class="tab-counter" id="profCountMithrayan">0</span>
+                </button>
                 <button onclick="setProfileSubTab('photos')" id="prof-sub-photos" class="prof-nav-btn">
                     <i class="fa-solid fa-images"></i>
                     <span>පිං ඡායාරූප</span>
@@ -557,6 +568,38 @@
                     <!-- User's Timeline Posts -->
                     <div id="profTimelinePosts">
                         <!-- Filtered posts rendered here -->
+                    </div>
+                </div>
+
+                <!-- Kalyana Mithrayan (Spiritual Friends) Sub-tab -->
+                <div id="subTabFriendsView" class="hidden">
+                    <div class="profile-widget-card" style="margin-bottom: 20px;">
+                        <!-- Pending Received Requests Section (If any) -->
+                        <div id="profPendingRequestsSection" style="display: none; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px dashed #e2e8f0;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span class="badge-pending" style="background: #fef3c7; color: #b45309; padding: 4px 10px; border-radius: 9999px; font-size: 0.74rem; font-weight: 700;">
+                                        <i class="fa-solid fa-clock"></i> ලැබුණු ඇරයුම්
+                                    </span>
+                                    <span id="pendingRequestsCountText" style="font-size: 0.78rem; color: #78350f; font-weight: 700;">(0)</span>
+                                </div>
+                            </div>
+                            <div id="profPendingRequestsList" class="mithra-grid">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+
+                        <!-- Connected Kalyana Mithrayan Section -->
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                            <h3 class="widget-head-title" style="margin: 0; font-size: 1rem;">
+                                <i class="fa-solid fa-heart-circle-check" style="color: #059669;"></i>
+                                <span>මගේ කල්‍යාණ මිතුරු පවුර</span>
+                            </h3>
+                            <span id="connectedMithrayanSummary" style="font-size: 0.78rem; color: #64748b; font-weight: 600;">මිතුරන් 0 දෙනෙක්</span>
+                        </div>
+                        <div id="profConnectedMithrayanList" class="mithra-grid">
+                            <!-- Populated dynamically -->
+                        </div>
                     </div>
                 </div>
 
@@ -1691,6 +1734,11 @@
                                 <span id="memJoinedText">2026 ඔක්තෝබර් සිට සාමාජික</span>
                             </span>
                         </div>
+
+                        <!-- Kalyana Mithra Connection Button Action Wrapper -->
+                        <div id="memMithraActionWrapper" style="margin-top: 10px;">
+                            <!-- Injected dynamically via app.js -->
+                        </div>
                     </div>
                 </div>
                 <!-- Stats Row -->
@@ -1706,6 +1754,10 @@
                     <div class="member-stat-box">
                         <span class="stat-num" style="color: #059669;" id="memStatPhotos">0</span>
                         <span class="stat-lbl">පිං ඡායාරූප</span>
+                    </div>
+                    <div class="member-stat-box">
+                        <span class="stat-num" style="color: #6366f1;" id="memStatMithrayan">0</span>
+                        <span class="stat-lbl">කල්‍යාණ මිතුරන්</span>
                     </div>
                 </div>
             </div>
@@ -2157,6 +2209,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=59"></script>
+    <script type="module" src="js/app.js?v=60"></script>
 </body>
 </html>
