@@ -4,11 +4,11 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=60';
-import { Security } from './security.js?v=60';
-import { uploadToImgBB } from './imgbb-service.js?v=60';
-import { SoundService, triggerHaptic } from './sound.js?v=60';
-import { FeedAlgorithm } from './algorithm.js?v=60';
+import { StorageService } from './storage.js?v=61';
+import { Security } from './security.js?v=61';
+import { uploadToImgBB } from './imgbb-service.js?v=61';
+import { SoundService, triggerHaptic } from './sound.js?v=61';
+import { FeedAlgorithm } from './algorithm.js?v=61';
 
 /* ==========================================================================
    Sri Lanka Provinces & Districts Dataset & Dropdown Helper Functions
@@ -472,6 +472,28 @@ function updateUserInfoUI() {
   applyAvatar(composerAvatarEl);
   applyAvatar(document.getElementById('mobNavAvatar'));
   updateCommunityMemberCount();
+
+  // Update Kalyana Mithra pending request badges
+  const notifs = StorageService.getLocalNotifications() || [];
+  const pendingMithraReqs = notifs.filter(n =>
+    n.type === 'mithra_request' &&
+    n.recipientUid === user.uid &&
+    !StorageService.isRequestAccepted(n.id, n.senderUid) &&
+    !StorageService.isRequestDeclined(n.id, n.senderUid) &&
+    (!user.mithrayan || !user.mithrayan.includes(n.senderUid)) &&
+    (!n.status || n.status === 'pending')
+  );
+  const pCount = pendingMithraReqs.length;
+  const mobFriendsBadge = document.getElementById('mobFriendsBadge');
+  const headerFriendsBadge = document.getElementById('headerFriendsBadge');
+  if (mobFriendsBadge) {
+    mobFriendsBadge.innerText = pCount;
+    mobFriendsBadge.style.display = pCount > 0 ? 'inline-flex' : 'none';
+  }
+  if (headerFriendsBadge) {
+    headerFriendsBadge.innerText = pCount;
+    headerFriendsBadge.style.display = pCount > 0 ? 'inline-flex' : 'none';
+  }
 }
 
 function updateUserStats() {
@@ -665,6 +687,54 @@ window.openMemberProfileModal = async function(uid, authorName) {
     }
   }
 
+  // Render Facebook-Style Friends Section in Member Profile
+  const memFriendsGrid = document.getElementById('memFriendsGrid');
+  const memFriendsCountLbl = document.getElementById('memFriendsSubCount');
+  const memberMithrayanUids = Array.isArray(member.mithrayan) ? member.mithrayan : [];
+  if (memFriendsCountLbl) {
+    memFriendsCountLbl.innerText = `මිතුරන් ${memberMithrayanUids.length} දෙනෙක්`;
+  }
+  if (memFriendsGrid) {
+    if (memberMithrayanUids.length === 0) {
+      memFriendsGrid.innerHTML = `
+        <div style="grid-column: 1 / -1; text-align: center; padding: 18px 10px; color: #94a3b8; font-size: 0.76rem; background: #f8fafc; border-radius: 12px; border: 1px dashed #e2e8f0;">
+          <i class="fa-solid fa-users" style="font-size: 1.4rem; color: #cbd5e1; margin-bottom: 6px; display: block;"></i>
+          තවමත් කල්‍යාණ මිතුරන් සම්බන්ධ වී නොමැත.
+        </div>
+      `;
+    } else {
+      memFriendsGrid.innerHTML = `
+        <div style="grid-column: 1 / -1; text-align: center; padding: 15px; font-size: 0.74rem; color: #64748b;">
+          <i class="fa-solid fa-spinner fa-spin" style="color: #d97706;"></i> මිතුරන් ලැයිස්තුව පූරණය වෙමින් පවතී...
+        </div>
+      `;
+      StorageService.getMemberMithrayanList(memberMithrayanUids).then(friends => {
+        if (!friends || friends.length === 0) {
+          memFriendsGrid.innerHTML = `
+            <div style="grid-column: 1 / -1; text-align: center; padding: 15px; color: #94a3b8; font-size: 0.76rem;">
+              මිතුරන් සොයාගත නොහැකි විය.
+            </div>
+          `;
+          return;
+        }
+        memFriendsGrid.innerHTML = friends.map(f => `
+          <div class="mem-fb-friend-card" onclick="openMemberProfileModal('${f.uid}', '${Security.escapeHTML(f.name)}')">
+            <div class="mem-fb-friend-thumb">
+              ${f.photo ? `<img src="${Security.sanitizeUrl(f.photo)}" alt="${Security.escapeHTML(f.name)}" onerror="this.parentElement.innerText = '${(f.name || 'ක').charAt(0)}';">` : (f.name || 'ක').charAt(0)}
+            </div>
+            <div class="mem-fb-friend-info">
+              <div class="mem-fb-friend-name" title="${Security.escapeHTML(f.name || 'කල්‍යාණ මිත්‍ර')}">${Security.escapeHTML(f.name || 'කල්‍යාණ මිත්‍ර')}</div>
+              <div class="mem-fb-friend-loc">
+                <i class="fa-solid fa-location-dot" style="color: #ea580c; font-size: 0.6rem;"></i>
+                <span>${Security.escapeHTML(f.district || f.location || 'ශ්‍රී ලංකා')}</span>
+              </div>
+            </div>
+          </div>
+        `).join('');
+      });
+    }
+  }
+
   const headingEl = document.getElementById('memTimelineHeading');
   if (headingEl) headingEl.innerText = `${member.name || 'මෙම කල්‍යාණ මිත්‍රයා'} විසින් සිදුකළ පින්කම් (${memberPosts.length})`;
 
@@ -714,7 +784,7 @@ window.switchTab = function(tab, pushHistory = true) {
   activeTab = tab;
 
   // Update navigation buttons (both desktop & mobile)
-  ['feed', 'profile', 'mybook', 'needs'].forEach(t => {
+  ['feed', 'profile', 'mybook', 'needs', 'friends'].forEach(t => {
     const dBtn = document.getElementById(`desk-tab-${t}`);
     const mBtn = document.getElementById(`mob-tab-${t}`);
     if (dBtn) {
@@ -4238,6 +4308,12 @@ window.setProfileSubTab = function(subTab) {
     }
   });
 
+  const mobFriendsBtn = document.getElementById('mob-tab-friends');
+  if (mobFriendsBtn) {
+    if (subTab === 'friends') mobFriendsBtn.classList.add('active');
+    else mobFriendsBtn.classList.remove('active');
+  }
+
   renderProfileSubTabContent(user, myPosts, myPhotosPosts, myPrivatePosts, totalSadhu);
 };
 
@@ -5098,30 +5174,58 @@ window.renderNotificationsList = function() {
       typeIconHtml = '<span class="notif-type-icon sadhu" title="සාදුකාරයක්">🙏</span>';
     } else if (n.type === 'comment') {
       typeIconHtml = '<span class="notif-type-icon comment" title="පුණ්‍යානුමෝදනාවක්"><i class="fa-solid fa-comment" style="font-size: 8px;"></i></span>';
+    const currUser = StorageService.currentUser;
+    const isFriendAlready = Array.isArray(currUser?.mithrayan) && currUser.mithrayan.includes(n.senderUid);
+    const isAccepted = n.status === 'accepted' || isFriendAlready || StorageService.isRequestAccepted(n.id, n.senderUid);
+    const isDeclined = n.status === 'declined' || n.status === 'rejected' || StorageService.isRequestDeclined(n.id, n.senderUid);
+
+    if (n.type === 'sadhu') {
+      typeIconHtml = '<span class="notif-type-icon sadhu" title="සාදුකාරයක්">🙏</span>';
+    } else if (n.type === 'comment') {
+      typeIconHtml = '<span class="notif-type-icon comment" title="පුණ්‍යානුමෝදනාවක්"><i class="fa-solid fa-comment" style="font-size: 8px;"></i></span>';
     } else if (n.type === 'mithra_request') {
       typeIconHtml = '<span class="notif-type-icon mithra" title="කල්‍යාණ මිත්‍ර ඇරයුම">🪷</span>';
-      if (!n.status || n.status === 'pending') {
+      if (!isAccepted && !isDeclined && (!n.status || n.status === 'pending')) {
         mithraActionHtml = `
           <div class="notif-mithra-actions" onclick="event.stopPropagation()">
             <button type="button" class="btn-notif-accept" onclick="handleAcceptMithra('${n.id}', '${n.senderUid}', '${Security.escapeHTML(n.senderName)}')">
               <i class="fa-solid fa-circle-check"></i> පිළිගන්න (සාදු!)
             </button>
-            <button type="button" class="btn-notif-reject" onclick="handleRejectMithra('${n.id}', '${n.senderUid}')">
+            <button type="button" class="btn-notif-reject" onclick="handleRejectMithra('${n.id}', '${n.senderUid}', '${Security.escapeHTML(n.senderName)}')">
               <i class="fa-solid fa-xmark"></i> ඉවත් කරන්න
             </button>
           </div>
         `;
-      } else if (n.status === 'accepted') {
+      } else if (isAccepted) {
         mithraActionHtml = `
           <div style="font-size: 0.72rem; color: #059669; font-weight: 700; margin-top: 5px;">
             <i class="fa-solid fa-circle-check"></i> ඇරයුම සාදරයෙන් පිළිගන්නා ලදී
           </div>
         `;
+      } else if (isDeclined) {
+        mithraActionHtml = `
+          <div style="font-size: 0.72rem; color: #94a3b8; font-weight: 600; margin-top: 5px;">
+            <i class="fa-solid fa-xmark"></i> ඇරයුම ඉවත් කරන ලදී
+          </div>
+        `;
       }
     } else if (n.type === 'mithra_accepted') {
       typeIconHtml = '<span class="notif-type-icon mithra" title="කල්‍යාණ මිත්‍ර සබඳතාව">✨</span>';
+    } else if (n.type === 'mithra_rejected') {
+      typeIconHtml = '<span class="notif-type-icon" style="background: #fee2e2; color: #ef4444;" title="කල්‍යාණ මිත්‍ර ඇරයුම"><i class="fa-solid fa-user-xmark" style="font-size: 8px;"></i></span>';
     } else {
       typeIconHtml = '<span class="notif-type-icon sathkara" title="සත්කාරයක්">🤝</span>';
+    }
+
+    let notifBodyText = '';
+    if (n.type === 'mithra_accepted') {
+      notifBodyText = `ඔබගේ කල්‍යාණ මිත්‍ර ඇරයුම <strong>${Security.escapeHTML(n.senderName || 'කල්‍යාණ මිත්‍රයා')}</strong> විසින් පිළිගන්නා ලදී. 🙏`;
+    } else if (n.type === 'mithra_rejected') {
+      notifBodyText = `ඔබගේ කල්‍යාණ මිත්‍ර ඇරයුම <strong>${Security.escapeHTML(n.senderName || 'කල්‍යාණ මිත්‍රයා')}</strong> විසින් පිළි නොගන්නා ලදී.`;
+    } else if (n.type === 'mithra_request') {
+      notifBodyText = `<strong>${Security.escapeHTML(n.senderName || 'කල්‍යාණ මිත්‍ර')}</strong> ඔබව කල්‍යාණ මිත්‍රයෙකු ලෙස සම්බන්ධ කරගැනීමට ඇරයුම් කළාය. 🙏`;
+    } else {
+      notifBodyText = `<strong>${Security.escapeHTML(n.senderName || 'කල්‍යාණ මිත්‍ර')}</strong> ${Security.escapeHTML(n.message || '')}`;
     }
 
     return `
@@ -5134,7 +5238,7 @@ window.renderNotificationsList = function() {
         </div>
         <div class="notif-body">
           <div class="notif-body-text">
-            <strong>${Security.escapeHTML(n.senderName || 'කල්‍යාණ මිත්‍ර')}</strong> ${Security.escapeHTML(n.message || '')}
+            ${notifBodyText}
           </div>
           ${mithraActionHtml}
           <div class="notif-time">
@@ -5160,7 +5264,7 @@ window.handleNotificationClick = async function(notifId, postId, postType) {
   // Close dropdown
   closeNotificationDropdown();
 
-  if (postType === 'mithra_request' || postType === 'mithra_accepted') {
+  if (postType === 'mithra_request' || postType === 'mithra_accepted' || postType === 'mithra_rejected') {
     if (postId) {
       openMemberProfileModal(postId);
     }
@@ -5212,17 +5316,32 @@ window.updateCommunityMemberCount = async function() {
   try {
     const counterPill = document.getElementById('headerMemberCounter');
     const countText = document.getElementById('globalMemberCountText');
-    if (!countText) return;
 
     const totalCount = await StorageService.getTotalMemberCount();
     const formatted = Number(totalCount).toLocaleString('en-US');
-    countText.innerText = `කල්‍යාණ මිතුරන් ${formatted}+ ක්`;
+    if (countText) {
+      countText.innerText = `කල්‍යාණ මිතුරන් ${formatted}+ ක්`;
+    }
     if (counterPill) {
-      counterPill.setAttribute('title', `අපේ පිං පොත සමඟ මේ වන විට කල්‍යාණ මිතුරන් ${formatted} දෙනෙකු එක්ව සිටියි.`);
+      counterPill.setAttribute('title', `කල්‍යාණ මිතුරු පවුර (${formatted} දෙනෙක්)`);
     }
   } catch (err) {
     console.warn('[App] Update community member count warning:', err);
   }
+};
+
+window.openFriendsView = function() {
+  if (isGuestUser()) {
+    showAuthRequiredModal('කල්‍යාණ මිතුරු පවුර නැරඹීමට');
+    return;
+  }
+  try {
+    closeMemberProfileModal();
+    closeNotificationDropdown();
+  } catch (e) {}
+  switchTab('profile');
+  setProfileSubTab('friends');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
 // ============================================================================
@@ -5254,6 +5373,7 @@ window.handleSendMithra = async function(targetUid, targetName) {
     if (activeTab === 'profile') {
       renderProfileView();
     }
+    updateUserInfoUI();
   } catch (err) {
     console.error('Failed to send Kalyana Mithra request:', err);
     alert(err.message || 'ඇරයුම යැවීමට නොහැකි විය.');
@@ -5273,9 +5393,22 @@ window.handleAcceptMithra = async function(notifId, senderUid, senderName) {
     SoundService.play('sadhu');
   } catch (e) {}
 
+  // Mark immediately in local state
+  StorageService.recordAcceptedRequest(notifId, senderUid);
+  if (StorageService.currentUser) {
+    if (!Array.isArray(StorageService.currentUser.mithrayan)) StorageService.currentUser.mithrayan = [];
+    if (!StorageService.currentUser.mithrayan.includes(senderUid)) {
+      StorageService.currentUser.mithrayan.push(senderUid);
+    }
+  }
+
+  // Instant re-render of notification list so buttons vanish with 0 latency
+  if (window.renderNotificationsList) window.renderNotificationsList();
+  updateUserInfoUI();
+
   try {
     await StorageService.acceptKalyanaMithraRequest(notifId, senderUid, senderName);
-    alert(`සාදු! සාදු! ${senderName || 'මෙම කල්‍යාණ මිත්‍රයාගේ'} ඇරයුම ඔබ සාදරයෙන් පිළිගත්තේය. දැන් ඔබ දෙපළ කල්‍යාණ මිතුරන් වේ! 🙏🪷`);
+    alert(`සාදු! සාදු! ඔබගේ කල්‍යාණ මිතුරු පවුරට ${senderName || 'මෙම කල්‍යාණ මිත්‍රයා'} සාදරයෙන් එක් විය! 🙏🪷`);
 
     // Re-render notifications dropdown
     if (window.renderNotificationsList) window.renderNotificationsList();
@@ -5290,6 +5423,7 @@ window.handleAcceptMithra = async function(notifId, senderUid, senderName) {
     if (activeTab === 'profile') {
       renderProfileView();
     }
+    updateUserInfoUI();
   } catch (err) {
     console.error('Failed to accept Kalyana Mithra request:', err);
     alert(err.message || 'ඇරයුම පිළිගැනීමට නොහැකි විය.');
@@ -5297,9 +5431,18 @@ window.handleAcceptMithra = async function(notifId, senderUid, senderName) {
 };
 window.acceptKalyanaMithraRequest = window.handleAcceptMithra;
 
-window.handleRejectMithra = async function(notifId, senderUid) {
+window.handleRejectMithra = async function(notifId, senderUid, senderName) {
+  // Mark immediately in local state
+  StorageService.recordDeclinedRequest(notifId, senderUid);
+
+  // Instant re-render so buttons vanish with 0 latency
+  if (window.renderNotificationsList) window.renderNotificationsList();
+  updateUserInfoUI();
+
   try {
     await StorageService.rejectKalyanaMithraRequest(notifId, senderUid);
+    alert('ඇරයුම ඉවත් කරන ලදී.');
+
     // Re-render notifications dropdown
     if (window.renderNotificationsList) window.renderNotificationsList();
 
@@ -5313,6 +5456,7 @@ window.handleRejectMithra = async function(notifId, senderUid) {
     if (activeTab === 'profile') {
       renderProfileView();
     }
+    updateUserInfoUI();
   } catch (err) {
     console.warn('Reject mithra note:', err);
   }
@@ -5338,6 +5482,7 @@ window.handleRemoveMithra = async function(targetUid) {
     if (activeTab === 'profile') {
       renderProfileView();
     }
+    updateUserInfoUI();
   } catch (err) {
     console.error('Remove mithra failed:', err);
     alert('ඉවත් කිරීමට නොහැකි විය: ' + err.message);
@@ -6281,7 +6426,7 @@ function initPWAEngine() {
   const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()) && !window.MSStream;
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v60';
+  const ACTIVE_BUILD = 'v61';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
@@ -6298,7 +6443,7 @@ function initPWAEngine() {
   // Register Service Worker
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=60', { updateViaCache: 'none' })
+      navigator.serviceWorker.register('./sw.js?v=61', { updateViaCache: 'none' })
         .then((registration) => {
           // Immediately check for service worker updates
           try { registration.update(); } catch (e) {}
