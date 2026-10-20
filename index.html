@@ -46,7 +46,7 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=57">
+    <link rel="stylesheet" href="css/styles.css?v=58">
 </head>
 <body>
 
@@ -938,8 +938,41 @@
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">ලිපිනය / ප්‍රදේශය (Address / Location - කැමතිනම් පමණක්)</label>
-                    <input type="text" id="editProfLocationInput" class="form-input" maxlength="80" placeholder="උදා: මහරගම, කොළඹ (කැමතිනම් පමණක් ඇතුළත් කරන්න)">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div>
+                            <label class="form-label" for="editProfProvinceSelect">
+                                <i class="fa-solid fa-map" style="color: #d97706; margin-right: 4px;"></i>
+                                පළාත (Province)
+                            </label>
+                            <select id="editProfProvinceSelect" class="form-select" onchange="handleProfileProvinceChange('editProf')">
+                                <option value="">-- පළාත තෝරන්න --</option>
+                                <option value="බස්නාහිර පළාත">බස්නාහිර පළාත</option>
+                                <option value="මධ්‍යම පළාත">මධ්‍යම පළාත</option>
+                                <option value="දකුණු පළාත">දකුණු පළාත</option>
+                                <option value="වයඹ පළාත">වයඹ පළාත</option>
+                                <option value="සබරගමුව පළාත">සබරගමුව පළාත</option>
+                                <option value="උතුරු මැද පළාත">උතුරු මැද පළාත</option>
+                                <option value="ඌව පළාත">ඌව පළාත</option>
+                                <option value="නැගෙනහිර පළාත">නැගෙනහිර පළාත</option>
+                                <option value="උතුරු පළාත">උතුරු පළාත</option>
+                                <option value="විදේශගත / වෙනත්">විදේශගත / වෙනත්</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="form-label" for="editProfDistrictSelect">
+                                <i class="fa-solid fa-location-dot" style="color: #d97706; margin-right: 4px;"></i>
+                                දිස්ත්‍රික්කය (District)
+                            </label>
+                            <select id="editProfDistrictSelect" class="form-select" onchange="handleProfileDistrictChange('editProf')">
+                                <option value="">-- දිස්ත්‍රික්කය තෝරන්න --</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">නගරය / ග්‍රාමය (City / Area - කැමතිනම් පමණක්)</label>
+                    <input type="text" id="editProfCityInput" class="form-input" maxlength="60" placeholder="උදා: මහරගම / නාවලපිටිය / මාතර නගරය...">
                 </div>
 
                 <div class="form-group">
@@ -1180,8 +1213,41 @@
                         </div>
 
                         <div class="form-group">
-                            <label class="form-label">ලිපිනය / ප්‍රදේශය (Address / Location)</label>
-                            <input type="text" id="setLocationInput" class="form-input" maxlength="80" placeholder="උදා: මහරගම, කොළඹ (කැමතිනම් පමණක්)">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <div>
+                                    <label class="form-label" for="setProvinceSelect">
+                                        <i class="fa-solid fa-map" style="color: #d97706; margin-right: 4px;"></i>
+                                        පළාත (Province)
+                                    </label>
+                                    <select id="setProvinceSelect" class="form-select" onchange="handleProfileProvinceChange('set')">
+                                        <option value="">-- පළාත තෝරන්න --</option>
+                                        <option value="බස්නාහිර පළාත">බස්නාහිර පළාත</option>
+                                        <option value="මධ්‍යම පළාත">මධ්‍යම පළාත</option>
+                                        <option value="දකුණු පළාත">දකුණු පළාත</option>
+                                        <option value="වයඹ පළාත">වයඹ පළාත</option>
+                                        <option value="සබරගමුව පළාත">සබරගමුව පළාත</option>
+                                        <option value="උතුරු මැද පළාත">උතුරු මැද පළාත</option>
+                                        <option value="ඌව පළාත">ඌව පළාත</option>
+                                        <option value="නැගෙනහිර පළාත">නැගෙනහිර පළාත</option>
+                                        <option value="උතුරු පළාත">උතුරු පළාත</option>
+                                        <option value="විදේශගත / වෙනත්">විදේශගත / වෙනත්</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="form-label" for="setDistrictSelect">
+                                        <i class="fa-solid fa-location-dot" style="color: #d97706; margin-right: 4px;"></i>
+                                        දිස්ත්‍රික්කය (District)
+                                    </label>
+                                    <select id="setDistrictSelect" class="form-select" onchange="handleProfileDistrictChange('set')">
+                                        <option value="">-- දිස්ත්‍රික්කය තෝරන්න --</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">නගරය / ග්‍රාමය (City / Area - කැමතිනම් පමණක්)</label>
+                            <input type="text" id="setCityInput" class="form-input" maxlength="60" placeholder="උදා: මහරගම / නාවලපිටිය / මාතර නගරය...">
                         </div>
 
                         <div class="form-group">
@@ -2092,6 +2158,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=57"></script>
+    <script type="module" src="js/app.js?v=58"></script>
 </body>
 </html>

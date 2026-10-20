@@ -1464,6 +1464,9 @@ export const StorageService = {
       photo: savedProfile.photo || user.photoURL || null,
       bio: savedProfile.bio || "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏",
       location: savedProfile.location || "",
+      district: savedProfile.district || "",
+      province: savedProfile.province || "",
+      city: savedProfile.city || "",
       occupation: savedProfile.occupation || "",
       coverImage: userCover,
       joinedDate: savedProfile.joinedDate || "2026 ඔක්තෝබර්",
@@ -1497,6 +1500,9 @@ export const StorageService = {
           if (cloudData.coverImage) this.currentUser.coverImage = cloudData.coverImage;
           if (cloudData.bio) this.currentUser.bio = cloudData.bio;
           if (cloudData.location) this.currentUser.location = cloudData.location;
+          if (cloudData.district) this.currentUser.district = cloudData.district;
+          if (cloudData.province) this.currentUser.province = cloudData.province;
+          if (cloudData.city) this.currentUser.city = cloudData.city;
           if (cloudData.occupation) this.currentUser.occupation = cloudData.occupation;
           if (cloudData.joinedDate) this.currentUser.joinedDate = cloudData.joinedDate;
 
@@ -1647,7 +1653,7 @@ export const StorageService = {
   /**
    * Update full user profile details (First & Last Name, Occupation, Location/Address, Bio, Photo, Cover Image)
    */
-  async updateProfile({ firstName, lastName, name, bio, location, occupation, coverImage, photo }) {
+  async updateProfile({ firstName, lastName, name, bio, location, district, province, city, occupation, coverImage, photo }) {
     if (firstName !== undefined || lastName !== undefined) {
       if (firstName !== undefined) {
         this.currentUser.firstName = Security.escapeHTML(Security.sanitizeText(firstName.trim()));
@@ -1668,6 +1674,15 @@ export const StorageService = {
     }
     if (location !== undefined) {
       this.currentUser.location = Security.escapeHTML(Security.sanitizeText(location.trim()));
+    }
+    if (district !== undefined) {
+      this.currentUser.district = Security.escapeHTML(Security.sanitizeText(district.trim()));
+    }
+    if (province !== undefined) {
+      this.currentUser.province = Security.escapeHTML(Security.sanitizeText(province.trim()));
+    }
+    if (city !== undefined) {
+      this.currentUser.city = Security.escapeHTML(Security.sanitizeText(city.trim()));
     }
     if (bio !== undefined) {
       this.currentUser.bio = Security.escapeHTML(Security.sanitizeText(bio.trim()));
@@ -1758,6 +1773,9 @@ export const StorageService = {
           coverImage: this.currentUser.coverImage || 'assets/banner.jpg',
           bio: this.currentUser.bio || '',
           location: this.currentUser.location || '',
+          district: this.currentUser.district || '',
+          province: this.currentUser.province || '',
+          city: this.currentUser.city || '',
           occupation: this.currentUser.occupation || '',
           joinedDate: this.currentUser.joinedDate || '2026 ඔක්තෝබර්',
           updatedAt: Date.now()

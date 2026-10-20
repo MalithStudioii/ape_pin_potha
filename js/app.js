@@ -4,11 +4,141 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=57';
-import { Security } from './security.js?v=57';
-import { uploadToImgBB } from './imgbb-service.js?v=57';
-import { SoundService, triggerHaptic } from './sound.js?v=57';
-import { FeedAlgorithm } from './algorithm.js?v=57';
+import { StorageService } from './storage.js?v=58';
+import { Security } from './security.js?v=58';
+import { uploadToImgBB } from './imgbb-service.js?v=58';
+import { SoundService, triggerHaptic } from './sound.js?v=58';
+import { FeedAlgorithm } from './algorithm.js?v=58';
+
+/* ==========================================================================
+   Sri Lanka Provinces & Districts Dataset & Dropdown Helper Functions
+   ========================================================================== */
+export const SRI_LANKA_DISTRICTS_BY_PROVINCE = {
+  "බස්නාහිර පළාත": ["කොළඹ", "ගම්පහ", "කළුතර"],
+  "මධ්‍යම පළාත": ["මහනුවර", "මාතලේ", "නුවරඑළිය"],
+  "දකුණු පළාත": ["ගාල්ල", "මාතර", "හම්බන්තොට"],
+  "වයඹ පළාත": ["කුරුණෑගල", "පුත්තලම"],
+  "සබරගමුව පළාත": ["රත්නපුර", "කෑගල්ල"],
+  "උතුරු මැද පළාත": ["අනුරාධපුරය", "පොළොන්නරුව"],
+  "ඌව පළාත": ["බදුල්ල", "මොණරාගල"],
+  "නැගෙනහිර පළාත": ["ත්‍රිකුණාමලය", "මඩකලපුව", "අම්පාර"],
+  "උතුරු පළාත": ["යාපනය", "කිලිනොච්චිය", "මන්නාරම", "වවුනියාව", "මුලතිව්"],
+  "විදේශගත / වෙනත්": ["විදේශගත (Overseas)", "වෙනත් (Other)"]
+};
+
+export const DISTRICT_TO_PROVINCE = {};
+Object.entries(SRI_LANKA_DISTRICTS_BY_PROVINCE).forEach(([prov, dists]) => {
+  dists.forEach(d => {
+    DISTRICT_TO_PROVINCE[d] = prov;
+  });
+});
+
+window.SRI_LANKA_DISTRICTS_BY_PROVINCE = SRI_LANKA_DISTRICTS_BY_PROVINCE;
+window.DISTRICT_TO_PROVINCE = DISTRICT_TO_PROVINCE;
+
+export function populateDistrictSelect(prefix, selectedDistrict = '', filterProvince = '') {
+  const distSelect = document.getElementById(`${prefix}DistrictSelect`);
+  if (!distSelect) return;
+
+  distSelect.innerHTML = '<option value="">-- දිස්ත්‍රික්කය තෝරන්න --</option>';
+
+  if (filterProvince && SRI_LANKA_DISTRICTS_BY_PROVINCE[filterProvince]) {
+    const group = document.createElement('optgroup');
+    group.label = filterProvince;
+    SRI_LANKA_DISTRICTS_BY_PROVINCE[filterProvince].forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d;
+      opt.innerText = d;
+      if (d === selectedDistrict) opt.selected = true;
+      group.appendChild(opt);
+    });
+    distSelect.appendChild(group);
+
+    const allOpt = document.createElement('option');
+    allOpt.value = "__show_all__";
+    allOpt.innerText = "🌐 සියලු දිස්ත්‍රික්ක පෙන්වන්න...";
+    distSelect.appendChild(allOpt);
+  } else {
+    Object.entries(SRI_LANKA_DISTRICTS_BY_PROVINCE).forEach(([prov, dists]) => {
+      const group = document.createElement('optgroup');
+      group.label = prov;
+      dists.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d;
+        opt.innerText = d;
+        if (d === selectedDistrict) opt.selected = true;
+        group.appendChild(opt);
+      });
+      distSelect.appendChild(group);
+    });
+  }
+
+  if (selectedDistrict && distSelect.value !== selectedDistrict) {
+    distSelect.value = selectedDistrict;
+  }
+}
+window.populateDistrictSelect = populateDistrictSelect;
+
+window.handleProfileProvinceChange = function(prefix) {
+  const provSelect = document.getElementById(`${prefix}ProvinceSelect`);
+  const distSelect = document.getElementById(`${prefix}DistrictSelect`);
+  if (!provSelect || !distSelect) return;
+
+  const selectedProv = provSelect.value;
+  const currentDist = distSelect.value;
+
+  populateDistrictSelect(prefix, currentDist, selectedProv);
+};
+
+window.handleProfileDistrictChange = function(prefix) {
+  const provSelect = document.getElementById(`${prefix}ProvinceSelect`);
+  const distSelect = document.getElementById(`${prefix}DistrictSelect`);
+  if (!distSelect) return;
+
+  if (distSelect.value === '__show_all__') {
+    populateDistrictSelect(prefix, '', '');
+    return;
+  }
+
+  const selectedDist = distSelect.value;
+  if (!selectedDist) return;
+
+  const matchedProv = DISTRICT_TO_PROVINCE[selectedDist];
+  if (matchedProv && provSelect) {
+    provSelect.value = matchedProv;
+    populateDistrictSelect(prefix, selectedDist, matchedProv);
+  }
+};
+
+function resolveUserLocationFields(user) {
+  let district = user.district || '';
+  let province = user.province || '';
+  let city = user.city || '';
+
+  if (!district && user.location) {
+    for (const d of Object.keys(DISTRICT_TO_PROVINCE)) {
+      if (user.location.includes(d)) {
+        district = d;
+        province = DISTRICT_TO_PROVINCE[d];
+        break;
+      }
+    }
+    if (!province) {
+      for (const p of Object.keys(SRI_LANKA_DISTRICTS_BY_PROVINCE)) {
+        if (user.location.includes(p)) {
+          province = p;
+          break;
+        }
+      }
+    }
+    if (district && user.location.includes(district)) {
+      const parts = user.location.split(district)[0].replace(/[, -]/g, '').trim();
+      if (parts) city = parts;
+    }
+  }
+
+  return { district, province, city };
+}
 
 window.FeedAlgorithm = FeedAlgorithm;
 window.SoundService = SoundService;
@@ -3639,11 +3769,26 @@ function setupEventListeners() {
     const firstName = document.getElementById('editProfFirstNameInput')?.value || '';
     const lastName = document.getElementById('editProfLastNameInput')?.value || '';
     const occupation = document.getElementById('editProfOccupationInput')?.value || '';
-    const location = document.getElementById('editProfLocationInput')?.value || '';
+    const province = document.getElementById('editProfProvinceSelect')?.value || '';
+    const district = document.getElementById('editProfDistrictSelect')?.value || '';
+    const city = (document.getElementById('editProfCityInput')?.value || '').trim();
     const bio = document.getElementById('editProfBioInput')?.value || '';
     const photo = document.getElementById('editProfPhotoInput')?.value || '';
 
-    await StorageService.updateProfile({ firstName, lastName, occupation, location, bio, photo });
+    let location = '';
+    if (city && district) {
+      location = `${city}, ${district}`;
+    } else if (district && province) {
+      location = `${district}, ${province}`;
+    } else if (district) {
+      location = district;
+    } else if (province) {
+      location = province;
+    } else if (city) {
+      location = city;
+    }
+
+    await StorageService.updateProfile({ firstName, lastName, occupation, location, district, province, city, bio, photo });
     closeEditProfileModal();
     updateUserInfoUI();
     renderProfileView();
@@ -4181,7 +4326,6 @@ window.openEditProfileModal = function() {
   const fNameInp = document.getElementById('editProfFirstNameInput');
   const lNameInp = document.getElementById('editProfLastNameInput');
   const occInp = document.getElementById('editProfOccupationInput');
-  const locInp = document.getElementById('editProfLocationInput');
   const bioInp = document.getElementById('editProfBioInput');
   const photoInp = document.getElementById('editProfPhotoInput');
 
@@ -4196,9 +4340,16 @@ window.openEditProfileModal = function() {
   if (fNameInp) fNameInp.value = fName;
   if (lNameInp) lNameInp.value = lName;
   if (occInp) occInp.value = user.occupation || '';
-  if (locInp) locInp.value = user.location || '';
   if (bioInp) bioInp.value = user.bio || '';
   if (photoInp) photoInp.value = user.photo || '';
+
+  // Populate Province and District dropdowns
+  const { district, province, city } = resolveUserLocationFields(user);
+  const provSelect = document.getElementById('editProfProvinceSelect');
+  const cityInp = document.getElementById('editProfCityInput');
+  if (provSelect) provSelect.value = province;
+  populateDistrictSelect('editProf', district, province);
+  if (cityInp) cityInp.value = city;
 
   const previewAvatar = document.getElementById('editProfPhotoPreview');
   if (previewAvatar) {
@@ -4867,14 +5018,20 @@ window.openSettingsModal = function(initialTab = 'profile') {
   const firstInput = document.getElementById('setFirstNameInput');
   const lastInput = document.getElementById('setLastNameInput');
   const occInput = document.getElementById('setOccupationInput');
-  const locInput = document.getElementById('setLocationInput');
   const bioInput = document.getElementById('setBioInput');
 
   if (firstInput) firstInput.value = user.firstName || '';
   if (lastInput) lastInput.value = user.lastName || '';
   if (occInput) occInput.value = user.occupation || '';
-  if (locInput) locInput.value = user.location || '';
   if (bioInput) bioInput.value = user.bio || '';
+
+  // Pre-fill Province and District dropdowns
+  const { district: setDist, province: setProv, city: setCity } = resolveUserLocationFields(user);
+  const setProvSelect = document.getElementById('setProvinceSelect');
+  const setCityInp = document.getElementById('setCityInput');
+  if (setProvSelect) setProvSelect.value = setProv;
+  populateDistrictSelect('set', setDist, setProv);
+  if (setCityInp) setCityInp.value = setCity;
 
   switchSettingsTab(initialTab);
   modal.classList.remove('hidden');
@@ -4909,10 +5066,25 @@ window.saveSettingsProfile = async function(e) {
   const firstName = document.getElementById('setFirstNameInput')?.value || '';
   const lastName = document.getElementById('setLastNameInput')?.value || '';
   const occupation = document.getElementById('setOccupationInput')?.value || '';
-  const location = document.getElementById('setLocationInput')?.value || '';
+  const province = document.getElementById('setProvinceSelect')?.value || '';
+  const district = document.getElementById('setDistrictSelect')?.value || '';
+  const city = (document.getElementById('setCityInput')?.value || '').trim();
   const bio = document.getElementById('setBioInput')?.value || '';
 
-  await StorageService.updateProfile({ firstName, lastName, occupation, location, bio });
+  let location = '';
+  if (city && district) {
+    location = `${city}, ${district}`;
+  } else if (district && province) {
+    location = `${district}, ${province}`;
+  } else if (district) {
+    location = district;
+  } else if (province) {
+    location = province;
+  } else if (city) {
+    location = city;
+  }
+
+  await StorageService.updateProfile({ firstName, lastName, occupation, location, district, province, city, bio });
   updateUserInfoUI();
   if (activeTab === 'profile') renderProfileView();
   renderFeed();
@@ -5782,7 +5954,7 @@ function initPWAEngine() {
   const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()) && !window.MSStream;
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v57';
+  const ACTIVE_BUILD = 'v58';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
@@ -5799,7 +5971,7 @@ function initPWAEngine() {
   // Register Service Worker
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=57', { updateViaCache: 'none' })
+      navigator.serviceWorker.register('./sw.js?v=58', { updateViaCache: 'none' })
         .then((registration) => {
           // Immediately check for service worker updates
           try { registration.update(); } catch (e) {}
