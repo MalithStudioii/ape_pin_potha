@@ -505,6 +505,18 @@ export const StorageService = {
       }
       post.sadhuCount = Math.max(0, parseInt(post.sadhuCount, 10) || 0);
 
+      // Normalise comments so every comment has a stable ID and reactions object
+      if (Array.isArray(post.comments)) {
+        post.comments.forEach((c, idx) => {
+          if (!c.id) {
+            c.id = 'c_' + post.id + '_' + idx;
+          }
+          if (!c.reactions || typeof c.reactions !== 'object') {
+            c.reactions = {};
+          }
+        });
+      }
+
       if (mySadhus.includes(post.id)) {
         if (!post.sadhuUsers.includes(userUid)) {
           post.sadhuUsers.push(userUid);
@@ -1612,8 +1624,14 @@ export const StorageService = {
    * Update post content (Guarded by author or master admin)
    */
   async updatePost(postId, { title, category, visibility, location, description, contact }) {
-    const allPosts = this.getLocalPosts();
-    const targetPost = allPosts.find(p => p.id === postId);
+    let allPosts = this.getLocalPosts();
+    let targetPost = allPosts.find(p => p.id === postId);
+    if (!targetPost && this._cachedPosts) {
+      targetPost = this._cachedPosts.find(p => p.id === postId);
+      if (targetPost) {
+        allPosts = this._cachedPosts;
+      }
+    }
     if (!targetPost) {
       throw new Error('පුණ්‍ය සටහන සොයාගත නොහැකි විය.');
     }
@@ -1672,20 +1690,46 @@ export const StorageService = {
       throw new Error(val.error);
     }
 
-    const allPosts = this.getLocalPosts();
-    const targetPost = allPosts.find(p => p.id === postId);
+    let allPosts = this.getLocalPosts();
+    let targetPost = allPosts.find(p => p.id === postId);
+    if (!targetPost && this._cachedPosts) {
+      targetPost = this._cachedPosts.find(p => p.id === postId);
+      if (targetPost) {
+        allPosts = this._cachedPosts;
+      }
+    }
     if (!targetPost || !Array.isArray(targetPost.comments)) {
       throw new Error('පුණ්‍ය සටහන හෝ ප්‍රාර්ථනාව සොයාගත නොහැකි විය.');
     }
 
-    const comment = targetPost.comments.find(c => (c.id && c.id === commentId) || (String(c.timestamp) === String(commentId)));
+    let comment = targetPost.comments.find(c => (c.id && c.id === commentId) || (String(c.timestamp) === String(commentId)));
+    if (!comment && commentId && commentId.startsWith('c_' + postId + '_')) {
+      const parts = commentId.split('_');
+      const idx = parseInt(parts[parts.length - 1], 10);
+      if (!isNaN(idx) && targetPost.comments[idx]) {
+        comment = targetPost.comments[idx];
+      }
+    }
+    if (!comment && targetPost.comments.length === 1) {
+      comment = targetPost.comments[0];
+    }
+    if (!comment) {
+      const currentName = (this.currentUser?.name || '').trim();
+      comment = targetPost.comments.find(c => {
+        const aName = (this.resolveAuthorName(c) || c.author || '').trim();
+        return aName && aName === currentName;
+      });
+    }
     if (!comment) {
       throw new Error('ප්‍රාර්ථනාව සොයාගත නොහැකි විය.');
     }
 
     const currentUid = this.currentUser?.uid;
-    const currentName = this.currentUser?.name;
-    const isOwner = (comment.uid && comment.uid === currentUid) || (comment.author && comment.author === currentName);
+    const currentName = (this.currentUser?.name || '').trim();
+    const cAuthorName = (this.resolveAuthorName(comment) || comment.author || '').trim();
+    const isOwner = (comment.uid && currentUid && comment.uid === currentUid) || 
+                    (comment.author && comment.author.trim() === currentName) ||
+                    (cAuthorName && cAuthorName === currentName);
     const isMaster = this.isMasterAdmin();
 
     if (!isOwner && !isMaster) {
@@ -1695,6 +1739,7 @@ export const StorageService = {
     comment.text = val.text;
     comment.isEdited = true;
     comment.editedAt = Date.now();
+    if (!comment.id) comment.id = commentId;
 
     this._cachedPosts = allPosts;
     this.cacheLocal(allPosts);
@@ -1725,16 +1770,41 @@ export const StorageService = {
     }
 
     const currentUid = this.currentUser?.uid || 'anon_' + (this.currentUser?.name || 'user');
-    const allPosts = this.getLocalPosts();
-    const targetPost = allPosts.find(p => p.id === postId);
+    let allPosts = this.getLocalPosts();
+    let targetPost = allPosts.find(p => p.id === postId);
+    if (!targetPost && this._cachedPosts) {
+      targetPost = this._cachedPosts.find(p => p.id === postId);
+      if (targetPost) {
+        allPosts = this._cachedPosts;
+      }
+    }
     if (!targetPost || !Array.isArray(targetPost.comments)) {
       throw new Error('පුණ්‍ය සටහන සොයාගත නොහැකි විය.');
     }
 
-    const comment = targetPost.comments.find(c => (c.id && c.id === commentId) || (String(c.timestamp) === String(commentId)));
+    let comment = targetPost.comments.find(c => (c.id && c.id === commentId) || (String(c.timestamp) === String(commentId)));
+    if (!comment && commentId && commentId.startsWith('c_' + postId + '_')) {
+      const parts = commentId.split('_');
+      const idx = parseInt(parts[parts.length - 1], 10);
+      if (!isNaN(idx) && targetPost.comments[idx]) {
+        comment = targetPost.comments[idx];
+      }
+    }
+    if (!comment && targetPost.comments.length === 1) {
+      comment = targetPost.comments[0];
+    }
+    if (!comment) {
+      const currentName = (this.currentUser?.name || '').trim();
+      comment = targetPost.comments.find(c => {
+        const aName = (this.resolveAuthorName(c) || c.author || '').trim();
+        return aName && aName === currentName;
+      });
+    }
     if (!comment) {
       throw new Error('ප්‍රාර්ථනාව සොයාගත නොහැකි විය.');
     }
+
+    if (!comment.id) comment.id = commentId;
 
     if (!comment.reactions || typeof comment.reactions !== 'object') {
       comment.reactions = {};

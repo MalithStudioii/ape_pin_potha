@@ -1304,7 +1304,7 @@ window.playPostVideo = function(postId, videoId, isShorts) {
 };
 
 // Render single comment / blessing HTML with author profile picture, edit controls & WhatsApp-style emoji reactions
-function renderSingleCommentHTML(c, postId, user) {
+function renderSingleCommentHTML(c, postId, user, index) {
   if (!c) return '';
   const currentUser = user || StorageService.currentUser || {};
   const currentUid = currentUser.uid || 'anonymous';
@@ -1312,17 +1312,18 @@ function renderSingleCommentHTML(c, postId, user) {
   const isMaster = StorageService.isMasterAdmin();
   const cAuthorName = StorageService.resolveAuthorName(c);
   const cAuthorPhoto = StorageService.resolveAuthorPhoto(c);
-  const commentKey = c.id || ('c_' + (c.timestamp || Date.now()));
+  
+  if (!c.id) {
+    c.id = 'c_' + postId + '_' + (index !== undefined ? index : '0');
+  }
+  const commentKey = c.id;
 
-  const isOwner = (c.uid && c.uid === currentUid) || (c.author && c.author.trim() === currentName);
+  const isOwner = (c.uid && c.uid === currentUid) || 
+                  (c.author && c.author.trim() === currentName) ||
+                  (cAuthorName && cAuthorName.trim() === currentName);
   const canEditComment = isOwner || isMaster;
 
   const reactions = (c.reactions && typeof c.reactions === 'object') ? c.reactions : {};
-  const reactionEntries = Object.entries(reactions).filter(([emoji, users]) => Array.isArray(users) && users.length > 0);
-
-  const myReactions = Object.entries(reactions)
-    .filter(([emoji, users]) => Array.isArray(users) && users.includes(currentUid))
-    .map(([emoji]) => emoji);
 
   return `
     <div class="comment-bubble" id="comment-bubble-${commentKey}">
@@ -1342,35 +1343,26 @@ function renderSingleCommentHTML(c, postId, user) {
                 <i class="fa-solid fa-pen"></i>
               </button>
             ` : ''}
-            <button type="button" class="btn-comment-action-mini btn-comment-react-btn" onclick="toggleCommentEmojiPicker(event, '${postId}', '${commentKey}')" title="Emoji ප්‍රතිචාරයක් දක්වන්න">
-              <i class="fa-regular fa-face-smile"></i>
-            </button>
           </div>
         </div>
 
         <div class="comment-body" id="comment-body-${commentKey}">${Security.escapeHTML(c.text)}</div>
 
-        <!-- WhatsApp-Style Reactions Display -->
-        ${reactionEntries.length > 0 ? `
-          <div class="comment-reactions-bar">
-            ${reactionEntries.map(([emoji, users]) => {
-              const hasReacted = users.includes(currentUid);
+        <!-- WhatsApp-Style Emoji Reactions Bar on the corner of the prayer -->
+        <div class="comment-reactions-footer">
+          <div class="comment-emoji-bar">
+            ${['🙏', '🪷', '❤️', '✨'].map(emoji => {
+              const userList = (reactions[emoji] && Array.isArray(reactions[emoji])) ? reactions[emoji] : [];
+              const count = userList.length;
+              const hasReacted = userList.includes(currentUid);
               return `
-                <button type="button" class="comment-reaction-pill ${hasReacted ? 'active' : ''}" onclick="handleCommentReaction('${postId}', '${commentKey}', '${emoji}')" title="${hasReacted ? 'ඔබගේ ප්‍රතිචාරය ඉවත් කරන්න' : 'ප්‍රතිචාරය එක් කරන්න'}">
-                  <span>${emoji}</span>
-                  <span>${users.length}</span>
+                <button type="button" class="comment-emoji-pill ${hasReacted ? 'active' : ''} ${count > 0 ? 'has-count' : ''}" onclick="handleCommentReaction('${postId}', '${commentKey}', '${emoji}')" title="${emoji} ප්‍රතිචාරය දක්වන්න">
+                  <span class="emoji-icon">${emoji}</span>
+                  ${count > 0 ? `<span class="emoji-count">${count}</span>` : ''}
                 </button>
               `;
             }).join('')}
           </div>
-        ` : ''}
-
-        <!-- Floating WhatsApp-Style Emoji Reaction Picker -->
-        <div class="comment-emoji-popup hidden" id="emoji-popup-${commentKey}" onclick="event.stopPropagation()">
-          <button type="button" class="emoji-pick-btn ${myReactions.includes('🙏') ? 'picked' : ''}" onclick="handleCommentReaction('${postId}', '${commentKey}', '🙏')" title="සාදු!">🙏</button>
-          <button type="button" class="emoji-pick-btn ${myReactions.includes('🪷') ? 'picked' : ''}" onclick="handleCommentReaction('${postId}', '${commentKey}', '🪷')" title="නිදුක් නීරෝගී වේවා / නිවන් සුව!">🪷</button>
-          <button type="button" class="emoji-pick-btn ${myReactions.includes('❤️') ? 'picked' : ''}" onclick="handleCommentReaction('${postId}', '${commentKey}', '❤️')" title="මෛත්‍රිය / පින් සිදුවේවා!">❤️</button>
-          <button type="button" class="emoji-pick-btn ${myReactions.includes('✨') ? 'picked' : ''}" onclick="handleCommentReaction('${postId}', '${commentKey}', '✨')" title="කුසලාලෝකය / ධර්මාවබෝධය වේවා!">✨</button>
         </div>
       </div>
     </div>
@@ -1381,17 +1373,18 @@ function renderCommentsListHTML(postId, comments, user) {
   if (!Array.isArray(comments) || comments.length === 0) {
     return '';
   }
-  return comments.map(c => renderSingleCommentHTML(c, postId, user)).join('');
+  return comments.map((c, idx) => renderSingleCommentHTML(c, postId, user, idx)).join('');
 }
 
 function appendCommentToDOM(postId, newComment) {
   const listEl = document.getElementById(`comments-list-${postId}`);
   if (!listEl) return;
   const user = StorageService.currentUser;
-  const commentHTML = renderSingleCommentHTML(newComment, postId, user);
+  const existingBubbles = listEl.querySelectorAll('.comment-bubble').length;
+  const commentHTML = renderSingleCommentHTML(newComment, postId, user, existingBubbles);
   listEl.insertAdjacentHTML('beforeend', commentHTML);
 
-  const commentKey = newComment.id || ('c_' + (newComment.timestamp || Date.now()));
+  const commentKey = newComment.id || ('c_' + postId + '_' + existingBubbles);
   const newEl = document.getElementById(`comment-bubble-${commentKey}`);
   if (newEl) {
     try {
@@ -2115,14 +2108,20 @@ window.handleCommentReaction = async function(postId, commentKey, emoji) {
     return;
   }
 
-  window.closeAllCommentEmojiPickers();
+  window.closeAllCommentEmojiPickers?.();
   SoundService.playTap?.() || SoundService.playSadhu?.();
   triggerHaptic(20);
 
   try {
     await StorageService.toggleCommentReaction(postId, commentKey, emoji);
     const allPosts = StorageService.getLocalPosts() || [];
-    const targetPost = allPosts.find(p => p.id === postId);
+    let targetPost = allPosts.find(p => p.id === postId);
+    if (!targetPost && typeof currentPostsData !== 'undefined' && Array.isArray(currentPostsData)) {
+      targetPost = currentPostsData.find(p => p.id === postId);
+    }
+    if (!targetPost && StorageService._cachedPosts) {
+      targetPost = StorageService._cachedPosts.find(p => p.id === postId);
+    }
     if (targetPost && Array.isArray(targetPost.comments)) {
       renderCommentsListContent(postId, targetPost.comments);
     }
@@ -2139,7 +2138,13 @@ window.openEditPostModal = function(postId) {
   }
 
   const allPosts = StorageService.getLocalPosts() || [];
-  const post = allPosts.find(p => p.id === postId);
+  let post = allPosts.find(p => p.id === postId);
+  if (!post && typeof currentPostsData !== 'undefined' && Array.isArray(currentPostsData)) {
+    post = currentPostsData.find(p => p.id === postId);
+  }
+  if (!post && StorageService._cachedPosts) {
+    post = StorageService._cachedPosts.find(p => p.id === postId);
+  }
   if (!post) {
     alert("පුණ්‍ය සටහන සොයාගත නොහැකි විය.");
     return;
@@ -2239,20 +2244,53 @@ window.openEditCommentModal = function(postId, commentKey) {
   }
 
   const allPosts = StorageService.getLocalPosts() || [];
-  const targetPost = allPosts.find(p => p.id === postId);
+  let targetPost = allPosts.find(p => p.id === postId);
+  if (!targetPost && typeof currentPostsData !== 'undefined' && Array.isArray(currentPostsData)) {
+    targetPost = currentPostsData.find(p => p.id === postId);
+  }
+  if (!targetPost && StorageService._cachedPosts) {
+    targetPost = StorageService._cachedPosts.find(p => p.id === postId);
+  }
   if (!targetPost || !Array.isArray(targetPost.comments)) {
     alert("ප්‍රාර්ථනාව සොයාගත නොහැකි විය.");
     return;
   }
 
-  const comment = targetPost.comments.find(c => (c.id && c.id === commentKey) || (String(c.timestamp) === String(commentKey)));
+  let comment = targetPost.comments.find(c => (c.id && c.id === commentKey) || (String(c.timestamp) === String(commentKey)));
+  if (!comment && commentKey && commentKey.startsWith('c_' + postId + '_')) {
+    const parts = commentKey.split('_');
+    const idx = parseInt(parts[parts.length - 1], 10);
+    if (!isNaN(idx) && targetPost.comments[idx]) {
+      comment = targetPost.comments[idx];
+    }
+  }
+  if (!comment && targetPost.comments.length === 1) {
+    comment = targetPost.comments[0];
+  }
+  if (!comment) {
+    const currentName = (StorageService.currentUser?.name || '').trim();
+    comment = targetPost.comments.find(c => {
+      const aName = (StorageService.resolveAuthorName(c) || c.author || '').trim();
+      return aName && aName === currentName;
+    });
+  }
   if (!comment) {
     alert("ප්‍රාර්ථනාව සොයාගත නොහැකි විය.");
     return;
   }
 
+  if (!comment.id) {
+    comment.id = commentKey;
+  }
+
   const isMaster = StorageService.isMasterAdmin();
-  const isOwner = (comment.uid && comment.uid === StorageService.currentUser?.uid) || (comment.author && comment.author === StorageService.currentUser?.name);
+  const currentUid = StorageService.currentUser?.uid;
+  const currentName = (StorageService.currentUser?.name || '').trim();
+  const cAuthorName = (StorageService.resolveAuthorName(comment) || comment.author || '').trim();
+  const isOwner = (comment.uid && currentUid && comment.uid === currentUid) || 
+                  (comment.author && comment.author.trim() === currentName) ||
+                  (cAuthorName && cAuthorName === currentName);
+
   if (!isOwner && !isMaster) {
     alert("මෙම ප්‍රාර්ථනාව සංස්කරණය කිරීමට ඔබට අවසර නැත.");
     return;
@@ -2266,7 +2304,7 @@ window.openEditCommentModal = function(postId, commentKey) {
   const textEl = document.getElementById('editCommentText');
 
   if (postIdEl) postIdEl.value = postId;
-  if (commentIdEl) commentIdEl.value = commentKey;
+  if (commentIdEl) commentIdEl.value = comment.id || commentKey;
   if (textEl) textEl.value = Security.unescapeHTML ? Security.unescapeHTML(comment.text) : comment.text;
 
   modal.classList.remove('hidden');
@@ -7067,7 +7105,7 @@ function initPWAEngine() {
   const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()) && !window.MSStream;
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v67';
+  const ACTIVE_BUILD = 'v68';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
@@ -7084,7 +7122,7 @@ function initPWAEngine() {
   // Register Service Worker
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=67', { updateViaCache: 'none' })
+      navigator.serviceWorker.register('./sw.js?v=68', { updateViaCache: 'none' })
         .then((registration) => {
           // Immediately check for service worker updates
           try { registration.update(); } catch (e) {}

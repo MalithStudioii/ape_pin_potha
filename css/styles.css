@@ -1637,86 +1637,84 @@ body {
   word-break: break-word;
 }
 
-.comment-reactions-bar {
+/* WhatsApp-Style Inline Corner Reactions Footer */
+.comment-reactions-footer {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+  align-items: center;
+  justify-content: flex-end;
   margin-top: 6px;
+  padding-top: 2px;
 }
 
-.comment-reaction-pill {
+.comment-emoji-bar {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  padding: 2px 7px;
+  padding: 2px 6px;
+  background: rgba(248, 250, 252, 0.95);
+  border: 1px solid rgba(226, 232, 240, 0.95);
   border-radius: 9999px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  font-size: 0.72rem;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  line-height: 1.2;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
-.comment-reaction-pill:hover {
+.comment-emoji-pill {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 9999px;
+  padding: 2px 5px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 0.88rem;
+  line-height: 1;
+  transition: all 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  user-select: none;
+  color: #334155;
+}
+
+.comment-emoji-pill:hover {
+  transform: scale(1.18);
   background: #fffbeb;
   border-color: #fde68a;
-  transform: scale(1.05);
 }
 
-.comment-reaction-pill.active {
+.comment-emoji-pill.has-count {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.comment-emoji-pill.active {
   background: #fef3c7;
   border-color: #f59e0b;
-  color: #92400e;
+  box-shadow: 0 1px 4px rgba(245, 158, 11, 0.25);
+}
+
+.comment-emoji-pill .emoji-icon {
+  font-size: 0.92rem;
+  line-height: 1;
+  display: inline-block;
+  transition: transform 0.15s ease;
+}
+
+.comment-emoji-pill:active .emoji-icon {
+  transform: scale(1.25);
+}
+
+.comment-emoji-pill .emoji-count {
+  font-size: 0.68rem;
   font-weight: 700;
-}
-
-/* Floating WhatsApp-Style Emoji Reaction Picker */
-.comment-emoji-popup {
-  position: absolute;
-  bottom: calc(100% + 4px);
-  right: 6px;
-  background: rgba(255, 255, 255, 0.98);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(217, 119, 6, 0.25);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06);
-  border-radius: 9999px;
-  padding: 4px 8px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  z-index: 60;
-  animation: emojiPopupIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-.comment-emoji-popup.hidden {
-  display: none !important;
-}
-
-@keyframes emojiPopupIn {
-  0% { opacity: 0; transform: translateY(6px) scale(0.9); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-.emoji-pick-btn {
-  background: transparent;
-  border: none;
-  font-size: 1.22rem;
-  cursor: pointer;
-  padding: 3px 5px;
-  border-radius: 9999px;
-  transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  color: #64748b;
   line-height: 1;
 }
 
-.emoji-pick-btn:hover {
-  transform: scale(1.35);
+.comment-emoji-pill.active .emoji-count {
+  color: #b45309;
+  font-weight: 800;
 }
 
-.emoji-pick-btn.picked {
-  background: #fef3c7;
-  box-shadow: 0 0 0 2px #f59e0b;
-}
 
 .comment-form {
   display: flex;
