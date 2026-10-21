@@ -4,11 +4,11 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=62';
-import { Security } from './security.js?v=62';
-import { uploadToImgBB } from './imgbb-service.js?v=62';
-import { SoundService, triggerHaptic } from './sound.js?v=62';
-import { FeedAlgorithm } from './algorithm.js?v=62';
+import { StorageService } from './storage.js?v=63';
+import { Security } from './security.js?v=63';
+import { uploadToImgBB } from './imgbb-service.js?v=63';
+import { SoundService, triggerHaptic } from './sound.js?v=63';
+import { FeedAlgorithm } from './algorithm.js?v=63';
 
 /* ==========================================================================
    Sri Lanka Provinces & Districts Dataset & Dropdown Helper Functions
@@ -5175,10 +5175,6 @@ window.renderNotificationsList = function() {
     let typeIconHtml = '';
     let mithraActionHtml = '';
 
-    if (n.type === 'sadhu') {
-      typeIconHtml = '<span class="notif-type-icon sadhu" title="සාදුකාරයක්">🙏</span>';
-    } else if (n.type === 'comment') {
-      typeIconHtml = '<span class="notif-type-icon comment" title="පුණ්‍යානුමෝදනාවක්"><i class="fa-solid fa-comment" style="font-size: 8px;"></i></span>';
     const currUser = StorageService.currentUser;
     const isFriendAlready = Array.isArray(currUser?.mithrayan) && currUser.mithrayan.includes(n.senderUid);
     const isAccepted = n.status === 'accepted' || isFriendAlready || StorageService.isRequestAccepted(n.id, n.senderUid);
@@ -6431,7 +6427,7 @@ function initPWAEngine() {
   const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()) && !window.MSStream;
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v62';
+  const ACTIVE_BUILD = 'v63';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
@@ -6448,7 +6444,7 @@ function initPWAEngine() {
   // Register Service Worker
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=62', { updateViaCache: 'none' })
+      navigator.serviceWorker.register('./sw.js?v=63', { updateViaCache: 'none' })
         .then((registration) => {
           // Immediately check for service worker updates
           try { registration.update(); } catch (e) {}

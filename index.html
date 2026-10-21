@@ -46,7 +46,31 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=62">
+    <link rel="stylesheet" href="css/styles.css?v=63">
+
+    <!-- Immediate Service Worker & Cache Invalidation Script -->
+    <script>
+      (function() {
+        var v = 'v63';
+        if (localStorage.getItem('pinPotha_active_build') !== v) {
+          localStorage.setItem('pinPotha_active_build', v);
+          if ('caches' in window) {
+            caches.keys().then(function(keys) {
+              keys.forEach(function(k) {
+                if (k !== 'pin-potha-cache-' + v) caches.delete(k);
+              });
+            });
+          }
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(regs) {
+              for (var reg of regs) {
+                reg.update();
+              }
+            });
+          }
+        }
+      })();
+    </script>
 </head>
 <body>
 
@@ -2234,6 +2258,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=62"></script>
+    <script type="module" src="js/app.js?v=63"></script>
 </body>
 </html>
