@@ -6756,6 +6756,357 @@ html, body {
   color: #78350f;
 }
 
+/* ==========================================================================
+   Community Members & Directory System (PC & Mobile)
+   ========================================================================== */
+
+/* PC Right Sidebar Member Directory Widget */
+.community-members-widget {
+  margin-top: 14px;
+  background: #ffffff;
+  border: 1px solid rgba(217, 119, 6, 0.18);
+  border-radius: 16px;
+  padding: 14px;
+  box-shadow: 0 4px 18px rgba(69, 26, 3, 0.04);
+}
+
+.sidebar-member-search-box {
+  position: relative;
+  margin-bottom: 10px;
+}
+
+.sidebar-member-search-box i {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  font-size: 0.75rem;
+  pointer-events: none;
+}
+
+.sidebar-member-search-box input {
+  width: 100%;
+  padding: 7px 10px 7px 28px;
+  border-radius: 9999px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  font-size: 0.74rem;
+  font-family: inherit;
+  color: #1e293b;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.sidebar-member-search-box input:focus {
+  background: #ffffff;
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+}
+
+.sidebar-member-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.sidebar-member-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-member-list::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.sidebar-member-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: #fffdf8;
+  border: 1px solid #fef3c7;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sidebar-member-item:hover {
+  background: #fffbeb;
+  border-color: #fde68a;
+  transform: translateX(2px);
+  box-shadow: 0 3px 10px rgba(217, 119, 6, 0.08);
+}
+
+.sidebar-member-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #92400e;
+  font-size: 0.95rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 1.5px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.sidebar-member-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sidebar-member-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar-member-name {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sidebar-member-meta {
+  font-size: 0.68rem;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
+.sidebar-member-action-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  border: none;
+  color: #d97706;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.sidebar-member-action-btn:hover {
+  background: #d97706;
+  color: #ffffff;
+  transform: scale(1.1);
+}
+
+.btn-sidebar-view-all {
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #b45309;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.btn-sidebar-view-all:hover {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #78350f;
+}
+
+/* Segment Tabs: My Friends vs All Community Members */
+.friends-segment-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  border-bottom: 1.5px solid #f1f5f9;
+  padding-bottom: 12px;
+  overflow-x: auto;
+}
+
+.friends-segment-btn {
+  padding: 8px 18px;
+  border-radius: 9999px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.friends-segment-btn:hover {
+  background: #fffbeb;
+  color: #b45309;
+  border-color: #fde68a;
+}
+
+.friends-segment-btn.active {
+  background: linear-gradient(135deg, #d97706, #b45309);
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: 0 4px 14px rgba(180, 83, 9, 0.25);
+}
+
+.friends-segment-badge {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 1px 7px;
+  border-radius: 9999px;
+}
+
+.friends-segment-btn:not(.active) .friends-segment-badge {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.friends-segment-badge.secondary {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* Directory Search & Filter */
+.directory-search-wrapper {
+  background: #fffdf8;
+  border: 1px solid #fde68a;
+  border-radius: 14px;
+  padding: 12px;
+  margin-bottom: 18px;
+}
+
+.directory-search-input-box {
+  position: relative;
+  margin-bottom: 10px;
+}
+
+.directory-search-input-box i {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+.directory-search-input-box input {
+  width: 100%;
+  padding: 9px 12px 9px 34px;
+  border-radius: 9999px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  font-size: 0.82rem;
+  font-family: inherit;
+  color: #1e293b;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.directory-search-input-box input:focus {
+  border-color: #d97706;
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15);
+}
+
+.directory-filter-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dir-chip {
+  padding: 4px 12px;
+  border-radius: 9999px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dir-chip:hover {
+  background: #f8fafc;
+  color: #1e293b;
+}
+
+.dir-chip.active {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #92400e;
+  font-weight: 700;
+}
+
+.directory-card-bio {
+  font-size: 0.72rem;
+  color: #64748b;
+  margin-bottom: 10px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.badge-connected-friend {
+  flex: 1;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.btn-mithra-pending {
+  flex: 1;
+  background: #fffbeb;
+  border: 1px dashed #fcd34d;
+  color: #b45309;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  cursor: default;
+}
+
 /* Notification Action Buttons */
 .notif-mithra-actions {
   display: flex;

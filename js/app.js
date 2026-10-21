@@ -4,11 +4,11 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=65';
-import { Security } from './security.js?v=65';
-import { uploadToImgBB } from './imgbb-service.js?v=65';
-import { SoundService, triggerHaptic } from './sound.js?v=65';
-import { FeedAlgorithm } from './algorithm.js?v=65';
+import { StorageService } from './storage.js?v=66';
+import { Security } from './security.js?v=66';
+import { uploadToImgBB } from './imgbb-service.js?v=66';
+import { SoundService, triggerHaptic } from './sound.js?v=66';
+import { FeedAlgorithm } from './algorithm.js?v=66';
 
 /* ==========================================================================
    Sri Lanka Provinces & Districts Dataset & Dropdown Helper Functions
@@ -273,6 +273,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.currentPostsData = currentPostsData;
   renderFeed();
   renderSideNeeds();
+  renderPcSidebarMembers();
   updateUserStats();
 
   // Subscribe to real-time database updates
@@ -4359,6 +4360,12 @@ function renderProfileSubTabContent(user, myPosts, myPhotosPosts, myPrivatePosts
   // Update tab counter whenever profile subtab content is rendered
   const mithrayanUids = Array.isArray(user.mithrayan) ? user.mithrayan : [];
   if (countMithrayan) countMithrayan.innerText = mithrayanUids.length;
+  const countBadge = document.getElementById('profCountMithrayanBadge');
+  if (countBadge) countBadge.innerText = mithrayanUids.length;
+
+  if (activeProfileSubTab === 'friends' && activeFriendsSegment === 'all') {
+    renderCommunityDirectory();
+  }
 
   if (activeProfileSubTab === 'friends' && friendsContainer) {
     // Check pending incoming requests
@@ -5317,8 +5324,13 @@ window.markAllNotificationsAsRead = async function(e) {
 };
 
 // ============================================================================
-// Community Member Counter Controller
+// Community Member Counter & Directory Controller (PC & Mobile)
 // ============================================================================
+
+let allCommunityMembersCache = [];
+let activeFriendsSegment = 'my';
+let currentDirectoryFilterType = 'all';
+let currentDirectorySearchQuery = '';
 
 window.updateCommunityMemberCount = async function() {
   try {
@@ -5333,12 +5345,15 @@ window.updateCommunityMemberCount = async function() {
     if (counterPill) {
       counterPill.setAttribute('title', `කල්‍යාණ මිතුරු පවුර (${formatted} දෙනෙක්)`);
     }
+
+    // Refresh PC right sidebar members preview
+    renderPcSidebarMembers();
   } catch (err) {
     console.warn('[App] Update community member count warning:', err);
   }
 };
 
-window.openFriendsView = function() {
+window.openFriendsView = function(segment = 'my') {
   if (isGuestUser()) {
     showAuthRequiredModal('කල්‍යාණ මිතුරු පවුර නැරඹීමට');
     return;
@@ -5349,7 +5364,268 @@ window.openFriendsView = function() {
   } catch (e) {}
   switchTab('profile');
   setProfileSubTab('friends');
+  switchFriendsSegment(segment);
   window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+window.openFriendsViewWithTab = function(segment) {
+  openFriendsView(segment);
+};
+
+window.switchFriendsSegment = function(seg) {
+  activeFriendsSegment = seg;
+  const myBtn = document.getElementById('friendsSegmentMyBtn');
+  const allBtn = document.getElementById('friendsSegmentAllBtn');
+  const myPanel = document.getElementById('friendsPanelMy');
+  const allPanel = document.getElementById('friendsPanelAll');
+
+  if (seg === 'all') {
+    if (myBtn) myBtn.classList.remove('active');
+    if (allBtn) allBtn.classList.add('active');
+    if (myPanel) myPanel.style.display = 'none';
+    if (allPanel) allPanel.style.display = 'block';
+    renderCommunityDirectory();
+  } else {
+    if (myBtn) myBtn.classList.add('active');
+    if (allBtn) allBtn.classList.remove('active');
+    if (myPanel) myPanel.style.display = 'block';
+    if (allPanel) allPanel.style.display = 'none';
+  }
+};
+
+function applyDirectoryFilters(members, filterType, query) {
+  let result = [...members];
+  const currentUser = StorageService.currentUser || {};
+  const currentMithrayan = Array.isArray(currentUser.mithrayan) ? currentUser.mithrayan : [];
+
+  if (query && query.trim()) {
+    const q = query.trim().toLowerCase();
+    result = result.filter(m =>
+      (m.name || '').toLowerCase().includes(q) ||
+      (m.location || '').toLowerCase().includes(q) ||
+      (m.bio || '').toLowerCase().includes(q)
+    );
+  }
+
+  if (filterType === 'recent') {
+    result.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  } else if (filterType === 'not_connected') {
+    result = result.filter(m => m.uid !== currentUser.uid && !currentMithrayan.includes(m.uid));
+  }
+
+  return result;
+}
+
+window.renderCommunityDirectory = async function(filtered = null) {
+  const container = document.getElementById('profDirectoryMembersList');
+  const countSummary = document.getElementById('directoryMembersCountSummary');
+  const allBadge = document.getElementById('profCountAllMembersBadge');
+  if (!container) return;
+
+  if (!filtered && allCommunityMembersCache.length === 0) {
+    container.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 32px 20px; color: #94a3b8;">
+        <i class="fa-solid fa-spinner fa-spin" style="font-size: 1.8rem; color: #d97706; margin-bottom: 8px;"></i>
+        <p style="font-size: 0.82rem; font-weight: 600;">පිං පොත සාමාජික එකමුතුව සූදානම් වෙමින් පවතී...</p>
+      </div>
+    `;
+    allCommunityMembersCache = await StorageService.getAllCommunityMembers();
+  }
+
+  let list = filtered || allCommunityMembersCache;
+  if (!filtered) {
+    list = applyDirectoryFilters(allCommunityMembersCache, currentDirectoryFilterType, currentDirectorySearchQuery);
+  }
+
+  const currentUser = StorageService.currentUser || {};
+  const currentMithrayan = Array.isArray(currentUser.mithrayan) ? currentUser.mithrayan : [];
+  const currentSent = Array.isArray(currentUser.pendingMithraSent) ? currentUser.pendingMithraSent : [];
+
+  if (allBadge) {
+    allBadge.innerText = allCommunityMembersCache.length;
+  }
+  if (countSummary) {
+    countSummary.innerText = `සාමාජිකයින් ${list.length} ක්`;
+  }
+
+  if (list.length === 0) {
+    container.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 48px 20px; color: #94a3b8; background: #ffffff; border-radius: 16px; border: 1.5px dashed #e2e8f0;">
+        <i class="fa-solid fa-user-slash" style="font-size: 2rem; color: #d97706; margin-bottom: 8px; opacity: 0.6;"></i>
+        <h4 style="font-size: 0.95rem; font-weight: 700; color: #334155;">කිසිදු සාමාජිකයෙකු හමු නොවීය</h4>
+        <p style="font-size: 0.76rem; color: #64748b; margin-top: 4px;">වෙනත් නමකින් හෝ නගරයකින් සොයා බලන්න.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = list.map(m => {
+    const isMe = m.uid === currentUser.uid;
+    const isFriend = currentMithrayan.includes(m.uid);
+    const isSent = currentSent.includes(m.uid);
+    const initial = (m.name || 'ක').charAt(0);
+
+    let actionBtnHtml = '';
+    if (isMe) {
+      actionBtnHtml = `<span class="badge-connected-friend" style="background: #fef3c7; border-color: #fde68a; color: #92400e;"><i class="fa-solid fa-circle-user"></i> ඔබගේ පැතිකඩ</span>`;
+    } else if (isFriend) {
+      actionBtnHtml = `<span class="badge-connected-friend"><i class="fa-solid fa-circle-check"></i> මිතුරෙකි</span>`;
+    } else if (isSent) {
+      actionBtnHtml = `<span class="btn-mithra-pending"><i class="fa-solid fa-clock"></i> ඇරයුමක් යවා ඇත</span>`;
+    } else {
+      actionBtnHtml = `
+        <button type="button" class="btn-profile-primary" style="flex: 1; padding: 6px 10px; font-size: 0.72rem; justify-content: center; gap: 4px;" onclick="event.stopPropagation(); handleSendMithraFromDirectory('${m.uid}', '${Security.escapeHTML(m.name)}')">
+          <i class="fa-solid fa-user-plus"></i> ඇරයුම් කරන්න
+        </button>
+      `;
+    }
+
+    return `
+      <div class="mithra-card directory-member-card" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}')">
+        <div class="mithra-card-avatar" style="cursor: pointer;">
+          ${m.photo ? `<img src="${Security.sanitizeUrl(m.photo)}" alt="${Security.escapeHTML(m.name)}" onerror="this.parentElement.innerText = '${initial}';">` : initial}
+        </div>
+        <div class="mithra-card-name" style="cursor: pointer;">
+          <span>${Security.escapeHTML(m.name || 'කල්‍යාණ මිත්‍ර')}</span>
+          ${m.isAdmin ? `<i class="fa-solid fa-crown" style="color: #f59e0b; font-size: 0.7rem; margin-left: 4px;" title="Master Admin"></i>` : ''}
+        </div>
+        <div class="mithra-card-loc">
+          ${m.location ? `<i class="fa-solid fa-location-dot" style="color: #ea580c;"></i> <span>${Security.escapeHTML(m.location)}</span>` : `<i class="fa-solid fa-calendar-check" style="color: #059669;"></i> <span>${Security.escapeHTML(m.joinedDate || '2026')}</span>`}
+        </div>
+        ${m.bio ? `<p class="directory-card-bio">${Security.escapeHTML(m.bio)}</p>` : ''}
+        <div class="mithra-card-actions" onclick="event.stopPropagation()">
+          ${actionBtnHtml}
+          <button type="button" class="btn-mithra-view" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}')" title="සම්පූර්ණ පැතිකඩ බලන්න">
+            <i class="fa-solid fa-eye"></i>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+};
+
+window.handleDirectoryMemberSearch = function(query) {
+  currentDirectorySearchQuery = query;
+  const list = applyDirectoryFilters(allCommunityMembersCache, currentDirectoryFilterType, currentDirectorySearchQuery);
+  renderCommunityDirectory(list);
+};
+
+window.filterDirectoryBy = function(type) {
+  currentDirectoryFilterType = type;
+  const chips = [
+    { type: 'all', id: 'dirChipAll' },
+    { type: 'recent', id: 'dirChipRecent' },
+    { type: 'not_connected', id: 'dirChipNotConnected' }
+  ];
+  chips.forEach(c => {
+    const el = document.getElementById(c.id);
+    if (el) {
+      if (c.type === type) el.classList.add('active');
+      else el.classList.remove('active');
+    }
+  });
+
+  const list = applyDirectoryFilters(allCommunityMembersCache, currentDirectoryFilterType, currentDirectorySearchQuery);
+  renderCommunityDirectory(list);
+};
+
+window.renderPcSidebarMembers = async function(filterQuery = '') {
+  const container = document.getElementById('pcSidebarMemberList');
+  const countPill = document.getElementById('pcCommunityCountPill');
+  if (!container) return;
+
+  if (allCommunityMembersCache.length === 0) {
+    allCommunityMembersCache = await StorageService.getAllCommunityMembers();
+  }
+
+  const currentUser = StorageService.currentUser || {};
+  const currentMithrayan = Array.isArray(currentUser.mithrayan) ? currentUser.mithrayan : [];
+  const currentSent = Array.isArray(currentUser.pendingMithraSent) ? currentUser.pendingMithraSent : [];
+
+  if (countPill) {
+    countPill.innerText = `${allCommunityMembersCache.length} දෙනෙක්`;
+  }
+
+  let list = allCommunityMembersCache;
+  if (filterQuery && filterQuery.trim()) {
+    const q = filterQuery.trim().toLowerCase();
+    list = list.filter(m =>
+      (m.name || '').toLowerCase().includes(q) ||
+      (m.location || '').toLowerCase().includes(q)
+    );
+  }
+
+  if (list.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 16px 8px; color: #94a3b8; font-size: 0.74rem;">
+        සාමාජිකයින් හමු නොවීය.
+      </div>
+    `;
+    return;
+  }
+
+  // Display top 6 in sidebar preview
+  const displayList = list.slice(0, 6);
+
+  container.innerHTML = displayList.map(m => {
+    const isMe = m.uid === currentUser.uid;
+    const isFriend = currentMithrayan.includes(m.uid);
+    const isSent = currentSent.includes(m.uid);
+    const initial = (m.name || 'ක').charAt(0);
+
+    let actionBtn = '';
+    if (isMe) {
+      actionBtn = `<span style="font-size: 0.65rem; color: #92400e; font-weight: 700;">(ඔබ)</span>`;
+    } else if (isFriend) {
+      actionBtn = `<i class="fa-solid fa-circle-check" style="color: #059669; font-size: 0.85rem;" title="කල්‍යාණ මිතුරෙකි"></i>`;
+    } else if (isSent) {
+      actionBtn = `<i class="fa-solid fa-clock" style="color: #d97706; font-size: 0.82rem;" title="ඇරයුමක් යවා ඇත"></i>`;
+    } else {
+      actionBtn = `
+        <button type="button" class="sidebar-member-action-btn" onclick="event.stopPropagation(); handleSidebarMemberAction('${m.uid}', '${Security.escapeHTML(m.name)}')" title="කල්‍යාණ මිත්‍ර ඇරයුමක් යවන්න">
+          <i class="fa-solid fa-user-plus"></i>
+        </button>
+      `;
+    }
+
+    return `
+      <div class="sidebar-member-item" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}')" title="${Security.escapeHTML(m.name)} ගේ පැතිකඩ බලන්න">
+        <div class="sidebar-member-avatar">
+          ${m.photo ? `<img src="${Security.sanitizeUrl(m.photo)}" alt="${Security.escapeHTML(m.name)}" onerror="this.parentElement.innerText = '${initial}';">` : initial}
+        </div>
+        <div class="sidebar-member-info">
+          <div class="sidebar-member-name">
+            <span>${Security.escapeHTML(m.name || 'කල්‍යාණ මිත්‍ර')}</span>
+            ${m.isAdmin ? `<i class="fa-solid fa-crown" style="color: #f59e0b; font-size: 0.65rem;" title="Master Admin"></i>` : ''}
+          </div>
+          <div class="sidebar-member-meta">
+            ${m.location ? `<i class="fa-solid fa-location-dot"></i> ${Security.escapeHTML(m.location)}` : (m.joinedDate ? `<i class="fa-solid fa-calendar-check"></i> ${Security.escapeHTML(m.joinedDate)}` : 'කල්‍යාණ මිත්‍ර')}
+          </div>
+        </div>
+        <div>
+          ${actionBtn}
+        </div>
+      </div>
+    `;
+  }).join('');
+};
+
+window.handlePcSidebarMemberSearch = function(query) {
+  renderPcSidebarMembers(query);
+};
+
+window.handleSidebarMemberAction = async function(targetUid, targetName) {
+  await handleSendMithra(targetUid, targetName);
+  renderPcSidebarMembers();
+  if (activeFriendsSegment === 'all') {
+    renderCommunityDirectory();
+  }
+};
+
+window.handleSendMithraFromDirectory = async function(targetUid, targetName) {
+  await handleSendMithra(targetUid, targetName);
+  renderCommunityDirectory();
+  renderPcSidebarMembers();
 };
 
 // ============================================================================
@@ -6434,7 +6710,7 @@ function initPWAEngine() {
   const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()) && !window.MSStream;
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v65';
+  const ACTIVE_BUILD = 'v66';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
@@ -6451,7 +6727,7 @@ function initPWAEngine() {
   // Register Service Worker
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=65', { updateViaCache: 'none' })
+      navigator.serviceWorker.register('./sw.js?v=66', { updateViaCache: 'none' })
         .then((registration) => {
           // Immediately check for service worker updates
           try { registration.update(); } catch (e) {}

@@ -204,6 +204,82 @@ export const StorageService = {
     return Math.max(uniqueUids.size + 115, 128);
   },
 
+  _cachedCommunityMembers: null,
+  _lastCommunityMembersFetchTime: 0,
+
+  /**
+   * Returns all registered community members from Firestore with caching & fallback
+   */
+  async getAllCommunityMembers(forceRefresh = false) {
+    const now = Date.now();
+    if (!forceRefresh && this._cachedCommunityMembers && (now - this._lastCommunityMembersFetchTime < 45000)) {
+      return this._cachedCommunityMembers;
+    }
+
+    let members = [];
+    if (isCloudReady && db) {
+      try {
+        const { collection, getDocs, query } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const q = query(collection(db, COLLECTIONS.USERS));
+        const snap = await getDocs(q);
+        snap.forEach(docSnap => {
+          const data = docSnap.data();
+          members.push({
+            uid: docSnap.id,
+            name: data.name || data.firstName || 'කල්‍යාණ මිත්‍ර',
+            photo: data.photo || '',
+            bio: data.bio || '',
+            location: data.location || data.district || '',
+            joinedDate: data.joinedDate || '',
+            updatedAt: data.updatedAt || 0,
+            isAdmin: (data.email || '').trim().toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase()
+          });
+        });
+      } catch (e) {
+        console.warn('[Storage] getAllCommunityMembers error:', e);
+      }
+    }
+
+    if (members.length === 0) {
+      const posts = this.getLocalPosts();
+      const map = new Map();
+      posts.forEach(p => {
+        if (p.uid && !map.has(p.uid)) {
+          map.set(p.uid, {
+            uid: p.uid,
+            name: p.author || 'කල්‍යාණ මිත්‍ර',
+            photo: p.authorPhoto || '',
+            bio: '',
+            location: p.location || '',
+            joinedDate: '2026',
+            updatedAt: p.timestamp || 0,
+            isAdmin: false
+          });
+        }
+      });
+      if (this.currentUser && this.currentUser.uid && !map.has(this.currentUser.uid)) {
+        map.set(this.currentUser.uid, {
+          uid: this.currentUser.uid,
+          name: this.currentUser.name || 'මලිත්',
+          photo: this.currentUser.photo || '',
+          bio: this.currentUser.bio || '',
+          location: this.currentUser.location || '',
+          joinedDate: this.currentUser.joinedDate || '2026',
+          updatedAt: Date.now(),
+          isAdmin: this.isMasterAdmin()
+        });
+      }
+      members = Array.from(map.values());
+    }
+
+    // Sort by latest update or creation
+    members.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+
+    this._cachedCommunityMembers = members;
+    this._lastCommunityMembersFetchTime = now;
+    return members;
+  },
+
   /**
    * Initializes the storage engine (Firestore or Sandbox)
    */
