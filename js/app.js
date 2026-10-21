@@ -1303,11 +1303,127 @@ window.playPostVideo = function(postId, videoId, isShorts) {
   window.openReelsViewer(postId);
 };
 
+// Render single comment / blessing HTML with author profile picture, edit controls & WhatsApp-style emoji reactions
+function renderSingleCommentHTML(c, postId, user) {
+  if (!c) return '';
+  const currentUser = user || StorageService.currentUser || {};
+  const currentUid = currentUser.uid || 'anonymous';
+  const currentName = (currentUser.name || '').trim();
+  const isMaster = StorageService.isMasterAdmin();
+  const cAuthorName = StorageService.resolveAuthorName(c);
+  const cAuthorPhoto = StorageService.resolveAuthorPhoto(c);
+  const commentKey = c.id || ('c_' + (c.timestamp || Date.now()));
+
+  const isOwner = (c.uid && c.uid === currentUid) || (c.author && c.author.trim() === currentName);
+  const canEditComment = isOwner || isMaster;
+
+  const reactions = (c.reactions && typeof c.reactions === 'object') ? c.reactions : {};
+  const reactionEntries = Object.entries(reactions).filter(([emoji, users]) => Array.isArray(users) && users.length > 0);
+
+  const myReactions = Object.entries(reactions)
+    .filter(([emoji, users]) => Array.isArray(users) && users.includes(currentUid))
+    .map(([emoji]) => emoji);
+
+  return `
+    <div class="comment-bubble" id="comment-bubble-${commentKey}">
+      <div class="comment-avatar" onclick="viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(cAuthorName)}')" style="cursor: pointer;" title="${Security.escapeHTML(cAuthorName)} ගේ Profile එක බලන්න">
+        ${cAuthorPhoto ? `<img src="${Security.sanitizeUrl(cAuthorPhoto)}" alt="${Security.escapeHTML(cAuthorName)}" loading="lazy">` : Security.escapeHTML(cAuthorName.charAt(0) || '👤')}
+      </div>
+      <div class="comment-text-box">
+        <div class="comment-author-row">
+          <div class="comment-meta-left">
+            <span class="author-click-link" onclick="viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(cAuthorName)}')" style="cursor: pointer; font-weight: 700; color: #1e293b;" title="${Security.escapeHTML(cAuthorName)} ගේ Profile එක බලන්න">${Security.escapeHTML(cAuthorName)}</span>
+            <span class="comment-time">${Security.escapeHTML(formatRelativeTimeSinhala(c.timestamp, c.time || 'දැන්'))}</span>
+            ${c.isEdited ? '<span class="comment-edited-tag" title="මෙම ප්‍රාර්ථනාව සංස්කරණය කරන ලදී">(සංස්කරණය කළ)</span>' : ''}
+          </div>
+          <div class="comment-actions-right">
+            ${canEditComment ? `
+              <button type="button" class="btn-comment-action-mini" onclick="openEditCommentModal('${postId}', '${commentKey}')" title="${isMaster && !isOwner ? 'Admin ලෙස ප්‍රාර්ථනාව සංස්කරණය කරන්න' : 'ප්‍රාර්ථනාව සංස්කරණය කරන්න'}">
+                <i class="fa-solid fa-pen"></i>
+              </button>
+            ` : ''}
+            <button type="button" class="btn-comment-action-mini btn-comment-react-btn" onclick="toggleCommentEmojiPicker(event, '${postId}', '${commentKey}')" title="Emoji ප්‍රතිචාරයක් දක්වන්න">
+              <i class="fa-regular fa-face-smile"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="comment-body" id="comment-body-${commentKey}">${Security.escapeHTML(c.text)}</div>
+
+        <!-- WhatsApp-Style Reactions Display -->
+        ${reactionEntries.length > 0 ? `
+          <div class="comment-reactions-bar">
+            ${reactionEntries.map(([emoji, users]) => {
+              const hasReacted = users.includes(currentUid);
+              return `
+                <button type="button" class="comment-reaction-pill ${hasReacted ? 'active' : ''}" onclick="handleCommentReaction('${postId}', '${commentKey}', '${emoji}')" title="${hasReacted ? 'ඔබගේ ප්‍රතිචාරය ඉවත් කරන්න' : 'ප්‍රතිචාරය එක් කරන්න'}">
+                  <span>${emoji}</span>
+                  <span>${users.length}</span>
+                </button>
+              `;
+            }).join('')}
+          </div>
+        ` : ''}
+
+        <!-- Floating WhatsApp-Style Emoji Reaction Picker -->
+        <div class="comment-emoji-popup hidden" id="emoji-popup-${commentKey}" onclick="event.stopPropagation()">
+          <button type="button" class="emoji-pick-btn ${myReactions.includes('🙏') ? 'picked' : ''}" onclick="handleCommentReaction('${postId}', '${commentKey}', '🙏')" title="සාදු!">🙏</button>
+          <button type="button" class="emoji-pick-btn ${myReactions.includes('🪷') ? 'picked' : ''}" onclick="handleCommentReaction('${postId}', '${commentKey}', '🪷')" title="නිදුක් නීරෝගී වේවා / නිවන් සුව!">🪷</button>
+          <button type="button" class="emoji-pick-btn ${myReactions.includes('❤️') ? 'picked' : ''}" onclick="handleCommentReaction('${postId}', '${commentKey}', '❤️')" title="මෛත්‍රිය / පින් සිදුවේවා!">❤️</button>
+          <button type="button" class="emoji-pick-btn ${myReactions.includes('✨') ? 'picked' : ''}" onclick="handleCommentReaction('${postId}', '${commentKey}', '✨')" title="කුසලාලෝකය / ධර්මාවබෝධය වේවා!">✨</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderCommentsListHTML(postId, comments, user) {
+  if (!Array.isArray(comments) || comments.length === 0) {
+    return '';
+  }
+  return comments.map(c => renderSingleCommentHTML(c, postId, user)).join('');
+}
+
+function appendCommentToDOM(postId, newComment) {
+  const listEl = document.getElementById(`comments-list-${postId}`);
+  if (!listEl) return;
+  const user = StorageService.currentUser;
+  const commentHTML = renderSingleCommentHTML(newComment, postId, user);
+  listEl.insertAdjacentHTML('beforeend', commentHTML);
+
+  const commentKey = newComment.id || ('c_' + (newComment.timestamp || Date.now()));
+  const newEl = document.getElementById(`comment-bubble-${commentKey}`);
+  if (newEl) {
+    try {
+      newEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } catch (e) {}
+  }
+}
+
+function renderCommentsListContent(postId, comments) {
+  const listEl = document.getElementById(`comments-list-${postId}`);
+  if (!listEl) return;
+  const user = StorageService.currentUser;
+  listEl.innerHTML = renderCommentsListHTML(postId, comments, user);
+}
+
+function updatePostCommentCountUI(postId) {
+  const allPosts = StorageService.getLocalPosts() || [];
+  const targetPost = allPosts.find(p => p.id === postId);
+  const count = (targetPost && Array.isArray(targetPost.comments)) ? targetPost.comments.length : 0;
+
+  const btnC = document.getElementById(`comments-btn-${postId}`);
+  const statC = document.getElementById(`stat-comments-${postId}`);
+  if (btnC) btnC.innerText = count;
+  if (statC) statC.innerText = count;
+}
+
 // Reusable Post Card HTML Generator
 function renderPostCardHTML(post, user) {
   const isMaster = StorageService.isMasterAdmin();
   const isOwner = post.uid === user.uid;
   const canDelete = isOwner || isMaster;
+  const canEditPost = isOwner || isMaster;
   const comments = post.comments || [];
   const isNeed = post.type === 'need';
   const isGeneral = post.type === 'general';
@@ -1450,6 +1566,7 @@ function renderPostCardHTML(post, user) {
                 </div>
                 <div class="post-meta-sub">
                   <span>${Security.escapeHTML(formatRelativeTimeSinhala(post.timestamp, post.date || 'දැන්'))}</span>
+                  ${post.isEdited ? `<span class="post-edited-tag" title="මෙම සටහන සංස්කරණය කරන ලදී">(සංස්කරණය කළ)</span>` : ''}
                   ${post.location ? `<span>• <i class="fa-solid fa-location-dot" style="color: #d97706;"></i> ${Security.escapeHTML(post.location)}</span>` : ''}
                   <span>• <i class="fa-solid ${post.visibility === 'private' ? 'fa-lock' : 'fa-earth-asia'}" style="font-size: 10px;"></i></span>
                 </div>
@@ -1466,6 +1583,11 @@ function renderPostCardHTML(post, user) {
             ${isMaster ? `
               <button class="post-pin-btn ${post.isPinned ? 'is-pinned' : ''}" onclick="togglePinPrompt('${post.id}')" title="${post.isPinned ? 'Pin ඉවත් කරන්න' : 'මුදුනටම Pin කරන්න'}">
                 <i class="fa-solid fa-thumbtack"></i>
+              </button>
+            ` : ''}
+            ${canEditPost ? `
+              <button class="post-edit-btn" onclick="openEditPostModal('${post.id}')" title="${isMaster && !isOwner ? 'Admin ලෙස සංස්කරණය කරන්න' : 'සටහන සංස්කරණය කරන්න'}">
+                <i class="fa-solid fa-pen-to-square"></i>
               </button>
             ` : ''}
             ${canDelete ? `
@@ -1558,22 +1680,7 @@ function renderPostCardHTML(post, user) {
         </div>
 
         <div class="comments-list" id="comments-list-${post.id}">
-          ${comments.map(c => {
-            const cAuthorName = StorageService.resolveAuthorName(c);
-            const cAuthorPhoto = StorageService.resolveAuthorPhoto(c);
-            return `
-            <div class="comment-bubble">
-              <div class="comment-avatar" onclick="viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(cAuthorName)}')" style="cursor: pointer;" title="${Security.escapeHTML(cAuthorName)} ගේ Profile එක බලන්න">${cAuthorPhoto ? `<img src="${Security.sanitizeUrl(cAuthorPhoto)}" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover;">` : Security.escapeHTML(cAuthorName.charAt(0))}</div>
-              <div class="comment-text-box">
-                <div class="comment-author-row">
-                  <span class="author-click-link" onclick="viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(cAuthorName)}')" style="cursor: pointer; font-weight: 700; color: #1e293b;" title="${Security.escapeHTML(cAuthorName)} ගේ Profile එක බලන්න">${Security.escapeHTML(cAuthorName)}</span>
-                  <span class="comment-time">${Security.escapeHTML(formatRelativeTimeSinhala(c.timestamp, c.time || 'දැන්'))}</span>
-                </div>
-                <div class="comment-body">${Security.escapeHTML(c.text)}</div>
-              </div>
-            </div>
-          `;
-          }).join('')}
+          ${renderCommentsListHTML(post.id, comments, user)}
         </div>
 
         <form class="comment-form" onsubmit="handleCommentSubmit(event, '${post.id}')">
@@ -1607,6 +1714,23 @@ function updateFeedInPlace(posts) {
       const hasGiven = StorageService.hasUserGivenSadhu(post, user?.uid);
       sadhuBtn.classList.toggle('liked', hasGiven);
       sadhuBtn.title = hasGiven ? 'සාදුකාරය ඉවත් කරන්න' : 'සාදුකාරයක් ලබා දෙන්න';
+    }
+
+    // Sync comments count in-place
+    const comments = Array.isArray(post.comments) ? post.comments : [];
+    const commentsBtn = document.getElementById(`comments-btn-${post.id}`);
+    const statComments = document.getElementById(`stat-comments-${post.id}`);
+    if (commentsBtn && commentsBtn.innerText !== String(comments.length)) {
+      commentsBtn.innerText = comments.length;
+    }
+    if (statComments && statComments.innerText !== String(comments.length)) {
+      statComments.innerText = comments.length;
+    }
+
+    // If comments list is currently open / visible, sync comments list in-place!
+    const commentsBox = document.getElementById(`comments-box-${post.id}`);
+    if (commentsBox && commentsBox.style.display !== 'none') {
+      renderCommentsListContent(post.id, comments);
     }
   });
 }
@@ -1922,12 +2046,11 @@ window.submitQuickBlessing = async function(postId, text) {
     SoundService.playSadhu();
     triggerHaptic(20);
 
-    const btnC = document.getElementById(`comments-btn-${postId}`);
-    const statC = document.getElementById(`stat-comments-${postId}`);
-    if (btnC) btnC.innerText = parseInt(btnC.innerText || '0', 10) + 1;
-    if (statC) statC.innerText = parseInt(statC.innerText || '0', 10) + 1;
-
-    await StorageService.addComment(postId, text);
+    const newComment = await StorageService.addComment(postId, text);
+    if (newComment) {
+      appendCommentToDOM(postId, newComment);
+    }
+    updatePostCommentCountUI(postId);
   } catch (err) {
     alert(err.message);
   }
@@ -1941,23 +2064,254 @@ window.handleCommentSubmit = async function(event, postId) {
   }
 
   const input = document.getElementById(`comment-input-${postId}`);
-  if (!input) return;
+  if (!input || !input.value.trim()) return;
 
+  const text = input.value.trim();
   try {
     const box = document.getElementById(`comments-box-${postId}`);
     if (box) box.style.display = 'block';
     SoundService.playSadhu();
     triggerHaptic(20);
 
-    const btnC = document.getElementById(`comments-btn-${postId}`);
-    const statC = document.getElementById(`stat-comments-${postId}`);
-    if (btnC) btnC.innerText = parseInt(btnC.innerText || '0', 10) + 1;
-    if (statC) statC.innerText = parseInt(statC.innerText || '0', 10) + 1;
-
-    await StorageService.addComment(postId, input.value);
     input.value = '';
+    const newComment = await StorageService.addComment(postId, text);
+    if (newComment) {
+      appendCommentToDOM(postId, newComment);
+    }
+    updatePostCommentCountUI(postId);
   } catch (err) {
     alert(err.message);
+  }
+};
+
+// WhatsApp-Style Emoji Reaction Controls
+window.toggleCommentEmojiPicker = function(event, postId, commentKey) {
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+  if (isGuestUser()) {
+    showAuthRequiredModal('Emoji ප්‍රතිචාරයක් දැක්වීමට');
+    return;
+  }
+  const popup = document.getElementById(`emoji-popup-${commentKey}`);
+  if (!popup) return;
+  const isHidden = popup.classList.contains('hidden');
+  window.closeAllCommentEmojiPickers();
+  if (isHidden) {
+    popup.classList.remove('hidden');
+  }
+};
+
+window.closeAllCommentEmojiPickers = function() {
+  document.querySelectorAll('.comment-emoji-popup:not(.hidden)').forEach(el => {
+    el.classList.add('hidden');
+  });
+};
+
+window.handleCommentReaction = async function(postId, commentKey, emoji) {
+  if (isGuestUser()) {
+    showAuthRequiredModal('Emoji ප්‍රතිචාරයක් දැක්වීමට');
+    return;
+  }
+
+  window.closeAllCommentEmojiPickers();
+  SoundService.playTap?.() || SoundService.playSadhu?.();
+  triggerHaptic(20);
+
+  try {
+    await StorageService.toggleCommentReaction(postId, commentKey, emoji);
+    const allPosts = StorageService.getLocalPosts() || [];
+    const targetPost = allPosts.find(p => p.id === postId);
+    if (targetPost && Array.isArray(targetPost.comments)) {
+      renderCommentsListContent(postId, targetPost.comments);
+    }
+  } catch (err) {
+    console.warn('[Comment Reaction] Error:', err);
+  }
+};
+
+// Edit Post Modal Handlers (Author & Master Admin)
+window.openEditPostModal = function(postId) {
+  if (isGuestUser()) {
+    showAuthRequiredModal('සටහන සංස්කරණය කිරීමට');
+    return;
+  }
+
+  const allPosts = StorageService.getLocalPosts() || [];
+  const post = allPosts.find(p => p.id === postId);
+  if (!post) {
+    alert("පුණ්‍ය සටහන සොයාගත නොහැකි විය.");
+    return;
+  }
+
+  const isMaster = StorageService.isMasterAdmin();
+  const isOwner = post.uid && post.uid === StorageService.currentUser?.uid;
+  if (!isOwner && !isMaster) {
+    alert("මෙම සටහන සංස්කරණය කිරීමට ඔබට අවසර නැත.");
+    return;
+  }
+
+  const modal = document.getElementById('editPostModal');
+  if (!modal) return;
+
+  const idEl = document.getElementById('editPostId');
+  const titleEl = document.getElementById('editPostTitle');
+  const catEl = document.getElementById('editPostCategory');
+  const visEl = document.getElementById('editPostVisibility');
+  const locEl = document.getElementById('editPostLocation');
+  const descEl = document.getElementById('editPostDesc');
+
+  if (idEl) idEl.value = post.id;
+  if (titleEl) titleEl.value = post.title || '';
+  if (catEl) catEl.value = post.category || 'දානමය';
+  if (visEl) visEl.value = post.visibility || 'public';
+  if (locEl) locEl.value = post.location || '';
+  if (descEl) descEl.value = Security.unescapeHTML ? Security.unescapeHTML(post.description || '') : (post.description || '');
+
+  const contactWrap = document.getElementById('editContactWrapper');
+  const contactInput = document.getElementById('editPostContact');
+  if (post.type === 'need') {
+    if (contactWrap) contactWrap.style.display = 'block';
+    if (contactInput) contactInput.value = post.contact || '';
+  } else {
+    if (contactWrap) contactWrap.style.display = 'none';
+  }
+
+  modal.classList.remove('hidden');
+};
+
+window.closeEditPostModal = function() {
+  const modal = document.getElementById('editPostModal');
+  if (modal) modal.classList.add('hidden');
+  document.getElementById('editPostForm')?.reset();
+};
+
+window.handleEditPostSubmit = async function(event) {
+  event.preventDefault();
+  const postId = document.getElementById('editPostId')?.value;
+  if (!postId) return;
+
+  const title = (document.getElementById('editPostTitle')?.value || '').trim();
+  const category = document.getElementById('editPostCategory')?.value || 'දානමය';
+  const visibility = document.getElementById('editPostVisibility')?.value || 'public';
+  const location = (document.getElementById('editPostLocation')?.value || '').trim();
+  const description = (document.getElementById('editPostDesc')?.value || '').trim();
+  const contact = (document.getElementById('editPostContact')?.value || '').trim();
+
+  const submitBtn = document.getElementById('editPostSubmitBtn');
+  const origBtnText = submitBtn ? submitBtn.innerHTML : '';
+
+  try {
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> සුරකිමින්...';
+    }
+
+    await StorageService.updatePost(postId, {
+      title,
+      category,
+      visibility,
+      location,
+      description,
+      contact
+    });
+
+    SoundService.playPublish?.();
+    triggerHaptic([25, 40]);
+    window.closeEditPostModal();
+    renderFeed();
+  } catch (err) {
+    alert("දෝෂයකි: " + err.message);
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = origBtnText;
+    }
+  }
+};
+
+// Edit Comment Modal Handlers (Author & Master Admin)
+window.openEditCommentModal = function(postId, commentKey) {
+  if (isGuestUser()) {
+    showAuthRequiredModal('ප්‍රාර්ථනාව සංස්කරණය කිරීමට');
+    return;
+  }
+
+  const allPosts = StorageService.getLocalPosts() || [];
+  const targetPost = allPosts.find(p => p.id === postId);
+  if (!targetPost || !Array.isArray(targetPost.comments)) {
+    alert("ප්‍රාර්ථනාව සොයාගත නොහැකි විය.");
+    return;
+  }
+
+  const comment = targetPost.comments.find(c => (c.id && c.id === commentKey) || (String(c.timestamp) === String(commentKey)));
+  if (!comment) {
+    alert("ප්‍රාර්ථනාව සොයාගත නොහැකි විය.");
+    return;
+  }
+
+  const isMaster = StorageService.isMasterAdmin();
+  const isOwner = (comment.uid && comment.uid === StorageService.currentUser?.uid) || (comment.author && comment.author === StorageService.currentUser?.name);
+  if (!isOwner && !isMaster) {
+    alert("මෙම ප්‍රාර්ථනාව සංස්කරණය කිරීමට ඔබට අවසර නැත.");
+    return;
+  }
+
+  const modal = document.getElementById('editCommentModal');
+  if (!modal) return;
+
+  const postIdEl = document.getElementById('editCommentPostId');
+  const commentIdEl = document.getElementById('editCommentId');
+  const textEl = document.getElementById('editCommentText');
+
+  if (postIdEl) postIdEl.value = postId;
+  if (commentIdEl) commentIdEl.value = commentKey;
+  if (textEl) textEl.value = Security.unescapeHTML ? Security.unescapeHTML(comment.text) : comment.text;
+
+  modal.classList.remove('hidden');
+};
+
+window.closeEditCommentModal = function() {
+  const modal = document.getElementById('editCommentModal');
+  if (modal) modal.classList.add('hidden');
+  document.getElementById('editCommentForm')?.reset();
+};
+
+window.handleEditCommentSubmit = async function(event) {
+  event.preventDefault();
+  const postId = document.getElementById('editCommentPostId')?.value;
+  const commentId = document.getElementById('editCommentId')?.value;
+  const newText = (document.getElementById('editCommentText')?.value || '').trim();
+
+  if (!postId || !commentId || !newText) return;
+
+  const submitBtn = document.getElementById('editCommentSubmitBtn');
+  const origBtnText = submitBtn ? submitBtn.innerHTML : '';
+
+  try {
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> සුරකිමින්...';
+    }
+
+    const updated = await StorageService.updateComment(postId, commentId, newText);
+    SoundService.playTap?.();
+    triggerHaptic(20);
+    window.closeEditCommentModal();
+
+    const allPosts = StorageService.getLocalPosts() || [];
+    const targetPost = allPosts.find(p => p.id === postId);
+    if (targetPost && Array.isArray(targetPost.comments)) {
+      renderCommentsListContent(postId, targetPost.comments);
+    }
+  } catch (err) {
+    alert("දෝෂයකි: " + err.message);
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = origBtnText;
+    }
   }
 };
 
@@ -3896,11 +4250,14 @@ function setupEventListeners() {
     switchTab('profile');
   });
 
-  // Close notifications dropdown on outside click
+  // Close notifications dropdown and emoji pickers on outside click
   document.addEventListener('click', (e) => {
     const notifWrapper = document.getElementById('notificationsWrapper');
     if (notifWrapper && !notifWrapper.contains(e.target)) {
       closeNotificationDropdown();
+    }
+    if (!e.target.closest('.comment-emoji-popup') && !e.target.closest('.btn-comment-react-btn')) {
+      window.closeAllCommentEmojiPickers?.();
     }
   });
 
@@ -6710,7 +7067,7 @@ function initPWAEngine() {
   const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()) && !window.MSStream;
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v66';
+  const ACTIVE_BUILD = 'v67';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
@@ -6727,7 +7084,7 @@ function initPWAEngine() {
   // Register Service Worker
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=66', { updateViaCache: 'none' })
+      navigator.serviceWorker.register('./sw.js?v=67', { updateViaCache: 'none' })
         .then((registration) => {
           // Immediately check for service worker updates
           try { registration.update(); } catch (e) {}

@@ -23,6 +23,20 @@ export const Security = {
   },
 
   /**
+   * HTML Entity Decoding for populating forms in edit mode.
+   */
+  unescapeHTML(str) {
+    if (typeof str !== 'string') return '';
+    return str
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&#x2F;/g, '/');
+  },
+
+  /**
    * Cleans text by trimming excess whitespace and stripping dangerous control chars.
    */
   sanitizeText(str) {

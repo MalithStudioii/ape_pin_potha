@@ -1501,6 +1501,7 @@ export const StorageService = {
     // Keep memory and local cache immediately up-to-date
     this._cachedPosts = allPosts;
     this.cacheLocal(allPosts);
+    this.notifyListeners(allPosts);
 
     if (isCloudReady && db) {
       try {
@@ -1548,7 +1549,7 @@ export const StorageService = {
   },
 
   /**
-   * Add comment / blessing & Notification Trigger
+   * Add comment / blessing & Notification Trigger (Live in-place with author photo & reactions support)
    */
   async addComment(postId, commentText) {
     const val = Security.validateComment(commentText);
@@ -1556,34 +1557,44 @@ export const StorageService = {
       throw new Error(val.error);
     }
 
+    const commentId = 'c_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
     const commentObj = {
-      author: this.currentUser.name,
+      id: commentId,
+      uid: this.currentUser?.uid || '',
+      author: this.currentUser?.name || 'සාමාජිකයෙක්',
+      authorPhoto: this.currentUser?.photo || '',
       text: val.text,
       time: "දැන්",
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      reactions: {},
+      isEdited: false
     };
 
     const allPosts = this.getLocalPosts();
     const targetPost = allPosts.find(p => p.id === postId);
 
+    if (targetPost) {
+      if (!Array.isArray(targetPost.comments)) targetPost.comments = [];
+      targetPost.comments.push(commentObj);
+      this._cachedPosts = allPosts;
+      this.cacheLocal(allPosts);
+      this.notifyListeners(allPosts);
+    }
+
     if (isCloudReady && db) {
-      const { doc, updateDoc, arrayUnion } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
-      const postRef = doc(db, COLLECTIONS.POSTS, postId);
-      await updateDoc(postRef, {
-        comments: arrayUnion(commentObj)
-      });
-    } else {
-      // Sandbox mode
-      if (targetPost) {
-        if (!targetPost.comments) targetPost.comments = [];
-        targetPost.comments.push(commentObj);
-        this.cacheLocal(allPosts);
-        this.notifyListeners(allPosts);
+      try {
+        const { doc, updateDoc, arrayUnion } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const postRef = doc(db, COLLECTIONS.POSTS, postId);
+        await updateDoc(postRef, {
+          comments: arrayUnion(commentObj)
+        });
+      } catch (err) {
+        console.warn('[Storage] Firestore addComment error:', err);
       }
     }
 
     // Trigger Notification for the author (only if someone else commented)
-    if (targetPost && targetPost.uid && targetPost.uid !== this.currentUser.uid) {
+    if (targetPost && targetPost.uid && targetPost.uid !== this.currentUser?.uid) {
       const snippet = val.text.length > 45 ? val.text.substring(0, 45) + '...' : val.text;
       this.createNotification({
         recipientUid: targetPost.uid,
@@ -1593,6 +1604,174 @@ export const StorageService = {
         message: `ඔබගේ සටහනට පුණ්‍යානුමෝදනාවක් එක් කළාය: "${snippet}"`
       });
     }
+
+    return commentObj;
+  },
+
+  /**
+   * Update post content (Guarded by author or master admin)
+   */
+  async updatePost(postId, { title, category, visibility, location, description, contact }) {
+    const allPosts = this.getLocalPosts();
+    const targetPost = allPosts.find(p => p.id === postId);
+    if (!targetPost) {
+      throw new Error('පුණ්‍ය සටහන සොයාගත නොහැකි විය.');
+    }
+
+    const currentUid = this.currentUser?.uid;
+    const isOwner = targetPost.uid && targetPost.uid === currentUid;
+    const isMaster = this.isMasterAdmin();
+
+    if (!isOwner && !isMaster) {
+      throw new Error('මෙම සටහන සංස්කරණය කිරීමට ඔබට අවසර නැත.');
+    }
+
+    if (title !== undefined) targetPost.title = title;
+    if (category !== undefined) targetPost.category = category;
+    if (visibility !== undefined) targetPost.visibility = visibility;
+    if (location !== undefined) targetPost.location = location;
+    if (description !== undefined) targetPost.description = description;
+    if (contact !== undefined) targetPost.contact = contact;
+    targetPost.isEdited = true;
+    targetPost.editedAt = Date.now();
+
+    this._cachedPosts = allPosts;
+    this.cacheLocal(allPosts);
+    this.notifyListeners(allPosts);
+
+    if (isCloudReady && db) {
+      try {
+        const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const postRef = doc(db, COLLECTIONS.POSTS, postId);
+        const updateData = {
+          isEdited: true,
+          editedAt: targetPost.editedAt
+        };
+        if (title !== undefined) updateData.title = title;
+        if (category !== undefined) updateData.category = category;
+        if (visibility !== undefined) updateData.visibility = visibility;
+        if (location !== undefined) updateData.location = location;
+        if (description !== undefined) updateData.description = description;
+        if (contact !== undefined) updateData.contact = contact;
+
+        await updateDoc(postRef, updateData);
+      } catch (err) {
+        console.warn('[Storage] Firestore updatePost error:', err);
+      }
+    }
+
+    return targetPost;
+  },
+
+  /**
+   * Update comment text (Guarded by author or master admin)
+   */
+  async updateComment(postId, commentId, newText) {
+    const val = Security.validateComment(newText);
+    if (!val.isValid) {
+      throw new Error(val.error);
+    }
+
+    const allPosts = this.getLocalPosts();
+    const targetPost = allPosts.find(p => p.id === postId);
+    if (!targetPost || !Array.isArray(targetPost.comments)) {
+      throw new Error('පුණ්‍ය සටහන හෝ ප්‍රාර්ථනාව සොයාගත නොහැකි විය.');
+    }
+
+    const comment = targetPost.comments.find(c => (c.id && c.id === commentId) || (String(c.timestamp) === String(commentId)));
+    if (!comment) {
+      throw new Error('ප්‍රාර්ථනාව සොයාගත නොහැකි විය.');
+    }
+
+    const currentUid = this.currentUser?.uid;
+    const currentName = this.currentUser?.name;
+    const isOwner = (comment.uid && comment.uid === currentUid) || (comment.author && comment.author === currentName);
+    const isMaster = this.isMasterAdmin();
+
+    if (!isOwner && !isMaster) {
+      throw new Error('මෙම ප්‍රාර්ථනාව සංස්කරණය කිරීමට ඔබට අවසර නැත.');
+    }
+
+    comment.text = val.text;
+    comment.isEdited = true;
+    comment.editedAt = Date.now();
+
+    this._cachedPosts = allPosts;
+    this.cacheLocal(allPosts);
+    this.notifyListeners(allPosts);
+
+    if (isCloudReady && db) {
+      try {
+        const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const postRef = doc(db, COLLECTIONS.POSTS, postId);
+        await updateDoc(postRef, {
+          comments: targetPost.comments
+        });
+      } catch (err) {
+        console.warn('[Storage] Firestore updateComment error:', err);
+      }
+    }
+
+    return comment;
+  },
+
+  /**
+   * Toggle emoji reaction on a comment (WhatsApp style)
+   */
+  async toggleCommentReaction(postId, commentId, emoji) {
+    const validEmojis = ['🙏', '🪷', '❤️', '✨'];
+    if (!validEmojis.includes(emoji)) {
+      throw new Error('අවලංගු Emoji ප්‍රතිචාරයකි.');
+    }
+
+    const currentUid = this.currentUser?.uid || 'anon_' + (this.currentUser?.name || 'user');
+    const allPosts = this.getLocalPosts();
+    const targetPost = allPosts.find(p => p.id === postId);
+    if (!targetPost || !Array.isArray(targetPost.comments)) {
+      throw new Error('පුණ්‍ය සටහන සොයාගත නොහැකි විය.');
+    }
+
+    const comment = targetPost.comments.find(c => (c.id && c.id === commentId) || (String(c.timestamp) === String(commentId)));
+    if (!comment) {
+      throw new Error('ප්‍රාර්ථනාව සොයාගත නොහැකි විය.');
+    }
+
+    if (!comment.reactions || typeof comment.reactions !== 'object') {
+      comment.reactions = {};
+    }
+    if (!Array.isArray(comment.reactions[emoji])) {
+      comment.reactions[emoji] = [];
+    }
+
+    const userList = comment.reactions[emoji];
+    const userIndex = userList.indexOf(currentUid);
+    let action = '';
+
+    if (userIndex >= 0) {
+      userList.splice(userIndex, 1);
+      action = 'removed';
+    } else {
+      userList.push(currentUid);
+      action = 'added';
+    }
+
+    this._cachedPosts = allPosts;
+    this.cacheLocal(allPosts);
+    this.notifyListeners(allPosts);
+
+    if (isCloudReady && db) {
+      try {
+        const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const postRef = doc(db, COLLECTIONS.POSTS, postId);
+        await updateDoc(postRef, {
+          comments: targetPost.comments
+        });
+      } catch (err) {
+        console.warn('[Storage] Firestore toggleCommentReaction error:', err);
+      }
+    }
+
+    return { action, reactions: comment.reactions, commentId };
   },
 
   /**
@@ -2165,27 +2344,56 @@ export const StorageService = {
     if (item.isOfficial) return null;
 
     const targetUid = item.uid;
+    const authorName = (item.author || '').trim();
 
-    // 1. Current user active session check
-    if (this.currentUser && this.currentUser.uid && targetUid && targetUid === this.currentUser.uid) {
-      return this.currentUser.photo || item.authorPhoto || null;
+    // 1. Current user active session check (by UID or name)
+    if (this.currentUser) {
+      if ((targetUid && this.currentUser.uid && targetUid === this.currentUser.uid) ||
+          (authorName && this.currentUser.name && authorName.toLowerCase() === this.currentUser.name.trim().toLowerCase())) {
+        if (this.currentUser.photo) return this.currentUser.photo;
+      }
     }
 
-    // 2. Cached profile check for other users
+    // 2. Direct photo stored on item
+    if (item.authorPhoto && typeof item.authorPhoto === 'string' && item.authorPhoto.trim().length > 0) {
+      return item.authorPhoto;
+    }
+
+    // 3. Cached community members check (by UID or by Author Name)
+    if (this._cachedCommunityMembers && Array.isArray(this._cachedCommunityMembers)) {
+      const member = this._cachedCommunityMembers.find(m => 
+        (targetUid && m.uid && m.uid === targetUid) || 
+        (authorName && m.name && m.name.trim().toLowerCase() === authorName.toLowerCase())
+      );
+      if (member && member.photo) {
+        return member.photo;
+      }
+    }
+
+    // 4. Cached profile check for other users by UID
     if (targetUid) {
       try {
         const cached = localStorage.getItem('pinPotha_profile_' + targetUid);
         if (cached) {
           const parsed = JSON.parse(cached);
-          if (parsed && parsed.photo !== undefined) {
+          if (parsed && parsed.photo) {
             return parsed.photo;
           }
         }
       } catch (e) {}
     }
 
-    // 3. Fallback to item stored author photo
-    return item.authorPhoto || null;
+    // 5. Look through local posts by this author to find their photo
+    if (this._cachedPosts && Array.isArray(this._cachedPosts) && authorName) {
+      const postMatch = this._cachedPosts.find(p => 
+        ((targetUid && p.uid && p.uid === targetUid) || (p.author && p.author.trim().toLowerCase() === authorName.toLowerCase())) && p.authorPhoto
+      );
+      if (postMatch && postMatch.authorPhoto) {
+        return postMatch.authorPhoto;
+      }
+    }
+
+    return null;
   },
 
   /**

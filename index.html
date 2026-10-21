@@ -46,12 +46,12 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=66">
+    <link rel="stylesheet" href="css/styles.css?v=67">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
       (function() {
-        var v = 'v66';
+        var v = 'v67';
         if (localStorage.getItem('pinPotha_active_build') !== v) {
           localStorage.setItem('pinPotha_active_build', v);
           if ('caches' in window) {
@@ -941,6 +941,112 @@
                 <button type="submit" class="btn-submit-merit" id="submitPostBtn">
                     <span id="submitMeritBtnText">පුණ්‍ය පවුරට එක් කරන්න</span>
                 </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- Edit Post Modal Dialog (පුණ්‍ය සටහන් සංස්කරණය)                           -->
+    <!-- ========================================================================= -->
+    <div id="editPostModal" class="modal-overlay hidden" onclick="if(event.target === this) closeEditPostModal()">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <i class="fa-solid fa-pen-to-square" style="color: #d97706;"></i>
+                    සටහන සංස්කරණය කරන්න
+                </h3>
+                <button type="button" onclick="closeEditPostModal()" class="modal-close-btn" title="වසන්න">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="editPostForm" onsubmit="handleEditPostSubmit(event)">
+                <input type="hidden" id="editPostId" value="">
+
+                <div class="form-group" id="editTitleWrapper">
+                    <label class="form-label" id="editTitleLabel">මාතෘකාව *</label>
+                    <input type="text" id="editPostTitle" class="form-input" required maxlength="150" placeholder="මාතෘකාව">
+                </div>
+
+                <div id="editCategoryVisibilityRow" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+                    <div id="editCategoryWrapper">
+                        <label class="form-label">වර්ගය *</label>
+                        <select id="editPostCategory" class="form-select">
+                            <option value="දානමය">දානමය</option>
+                            <option value="සීලමය">සීලමය</option>
+                            <option value="භාවනාමය">භාවනාමය</option>
+                            <option value="සමාජ සත්කාර">සමාජ සත්කාර</option>
+                            <option value="ධර්ම දානමය">ධර්ම දානමය</option>
+                            <option value="සුබපැතුම්">සුබපැතුම් (Good Morning / GM)</option>
+                            <option value="සිතුවිලි">දවසේ සිතුවිලි (Thoughts)</option>
+                            <option value="සාමාන්‍ය">සාමාන්‍ය (General)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label">පෙනෙන ආකාරය *</label>
+                        <select id="editPostVisibility" class="form-select">
+                            <option value="public">🌍 පොදු පවුරට (Public)</option>
+                            <option value="private">🔒 මට පමණක් (Private)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="editLocationContactRow" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+                    <div id="editLocationWrapper">
+                        <label class="form-label">ස්ථානය / ප්‍රදේශය</label>
+                        <input type="text" id="editPostLocation" class="form-input" maxlength="80" placeholder="උදා: අනුරාධපුරය">
+                    </div>
+                    <div id="editContactWrapper" style="display: none;">
+                        <label class="form-label" style="color: #065f46;">දුරකථන අංකය</label>
+                        <input type="text" id="editPostContact" class="form-input" placeholder="උදා: 077 123 4567">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" id="editDescLabel">විස්තරය *</label>
+                    <textarea id="editPostDesc" class="form-textarea" rows="4" required maxlength="3000" placeholder="විස්තරය මෙහි සටහන් කරන්න..."></textarea>
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 16px;">
+                    <button type="button" onclick="closeEditPostModal()" class="btn-crop-cancel" style="flex: 1;">අවලංගු කරන්න</button>
+                    <button type="submit" class="btn-submit-merit" id="editPostSubmitBtn" style="flex: 2;">
+                        <span>වෙනස්කම් සුරකින්න</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- Edit Comment Modal Dialog (ප්‍රාර්ථනා / ආශිර්වාද සංස්කරණය)               -->
+    <!-- ========================================================================= -->
+    <div id="editCommentModal" class="modal-overlay hidden" onclick="if(event.target === this) closeEditCommentModal()">
+        <div class="modal-box" style="max-width: 440px;">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <i class="fa-solid fa-pen" style="color: #d97706;"></i>
+                    ප්‍රාර්ථනාව සංස්කරණය කරන්න
+                </h3>
+                <button type="button" onclick="closeEditCommentModal()" class="modal-close-btn" title="වසන්න">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="editCommentForm" onsubmit="handleEditCommentSubmit(event)">
+                <input type="hidden" id="editCommentPostId" value="">
+                <input type="hidden" id="editCommentId" value="">
+
+                <div class="form-group">
+                    <label class="form-label">ඔබේ සංස්කරණය කළ ප්‍රාර්ථනා සටහන *</label>
+                    <textarea id="editCommentText" class="form-textarea" rows="4" required maxlength="500" placeholder="ප්‍රාර්ථනාව මෙහි ලියන්න..."></textarea>
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 16px;">
+                    <button type="button" onclick="closeEditCommentModal()" class="btn-crop-cancel" style="flex: 1;">අවලංගු කරන්න</button>
+                    <button type="submit" class="btn-submit-merit" id="editCommentSubmitBtn" style="flex: 2;">
+                        <span>සුරකින්න</span>
+                    </button>
+                </div>
             </form>
         </div>
     </div>
@@ -2326,6 +2432,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=66"></script>
+    <script type="module" src="js/app.js?v=67"></script>
 </body>
 </html>
