@@ -4,11 +4,11 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=64';
-import { Security } from './security.js?v=64';
-import { uploadToImgBB } from './imgbb-service.js?v=64';
-import { SoundService, triggerHaptic } from './sound.js?v=64';
-import { FeedAlgorithm } from './algorithm.js?v=64';
+import { StorageService } from './storage.js?v=65';
+import { Security } from './security.js?v=65';
+import { uploadToImgBB } from './imgbb-service.js?v=65';
+import { SoundService, triggerHaptic } from './sound.js?v=65';
+import { FeedAlgorithm } from './algorithm.js?v=65';
 
 /* ==========================================================================
    Sri Lanka Provinces & Districts Dataset & Dropdown Helper Functions
@@ -470,7 +470,6 @@ function updateUserInfoUI() {
   applyAvatar(navAvatarEl);
   applyAvatar(sideAvatarEl);
   applyAvatar(composerAvatarEl);
-  applyAvatar(document.getElementById('mobNavAvatar'));
   updateCommunityMemberCount();
 
   // Update Kalyana Mithra pending request badges
@@ -6435,7 +6434,7 @@ function initPWAEngine() {
   const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()) && !window.MSStream;
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v64';
+  const ACTIVE_BUILD = 'v65';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
@@ -6452,7 +6451,7 @@ function initPWAEngine() {
   // Register Service Worker
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=64', { updateViaCache: 'none' })
+      navigator.serviceWorker.register('./sw.js?v=65', { updateViaCache: 'none' })
         .then((registration) => {
           // Immediately check for service worker updates
           try { registration.update(); } catch (e) {}

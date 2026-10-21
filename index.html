@@ -46,12 +46,12 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=64">
+    <link rel="stylesheet" href="css/styles.css?v=65">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
       (function() {
-        var v = 'v64';
+        var v = 'v65';
         if (localStorage.getItem('pinPotha_active_build') !== v) {
           localStorage.setItem('pinPotha_active_build', v);
           if ('caches' in window) {
@@ -96,20 +96,21 @@
             </div>
 
             <!-- Center Navigation Tabs (Desktop) -->
-            <nav class="nav-tabs-desktop">
-                <button onclick="switchTab('feed')" id="desk-tab-feed" class="nav-tab-btn active">
+            <nav class="nav-tabs-desktop" aria-label="Desktop Primary Navigation">
+                <button onclick="switchTab('feed')" id="desk-tab-feed" class="nav-tab-btn active" title="පුණ්‍ය පවුර" aria-label="පුණ්‍ය පවුර">
                     <i class="fa-solid fa-house-chimney"></i>
-                    <span>පුණ්‍ය පවුර</span>
                 </button>
-                <button onclick="openReelsViewer()" id="desk-tab-reels" class="nav-tab-btn" title="Dharma Shorts වීඩියෝ නැරඹුම් මැදිරිය">
-                    <i class="fa-solid fa-play" style="color: #ef4444;"></i>
-                    <span>පුණ්‍ය දැක්ම</span>
-                    <span class="badge-live" style="background: linear-gradient(135deg, #ef4444, #f59e0b);">Shorts</span>
+                <button onclick="openReelsViewer()" id="desk-tab-reels" class="nav-tab-btn" title="පුණ්‍ය දැක්ම (Dharma Shorts)" aria-label="පුණ්‍ය දැක්ම (Dharma Shorts)">
+                    <div class="nav-tab-icon-wrap">
+                        <i class="fa-solid fa-play" style="color: #ef4444;"></i>
+                        <span class="badge-live-mini" style="background: linear-gradient(135deg, #ef4444, #f59e0b);">Shorts</span>
+                    </div>
                 </button>
-                <button onclick="switchTab('needs')" id="desk-tab-needs" class="nav-tab-btn">
-                    <i class="fa-solid fa-hand-holding-heart"></i>
-                    <span>සත්කාර හවුල</span>
-                    <span class="badge-live">Live</span>
+                <button onclick="switchTab('needs')" id="desk-tab-needs" class="nav-tab-btn" title="සත්කාර හවුල (සජීවී අවශ්‍යතා)" aria-label="සත්කාර හවුල (සජීවී අවශ්‍යතා)">
+                    <div class="nav-tab-icon-wrap">
+                        <i class="fa-solid fa-hand-holding-heart"></i>
+                        <span class="badge-live-mini">Live</span>
+                    </div>
                 </button>
             </nav>
 
@@ -2134,17 +2135,15 @@
     <!-- Native Mobile App Bottom Navigation Bar                                  -->
     <!-- ========================================================================= -->
     <nav class="mobile-bottom-bar" id="mobileBottomBar" aria-label="Mobile Navigation">
-        <button type="button" onclick="switchTab('feed')" id="mob-tab-feed" class="mob-nav-item active" aria-label="පුණ්‍ය පවුර">
+        <button type="button" onclick="switchTab('feed')" id="mob-tab-feed" class="mob-nav-item active" title="පුණ්‍ය පවුර" aria-label="පුණ්‍ය පවුර">
             <i class="fa-solid fa-house-chimney"></i>
-            <span>පවුර</span>
         </button>
 
-        <button type="button" onclick="openFriendsView()" id="mob-tab-friends" class="mob-nav-item" aria-label="කල්‍යාණ මිතුරන්">
+        <button type="button" onclick="openFriendsView()" id="mob-tab-friends" class="mob-nav-item" title="කල්‍යාණ මිතුරන්" aria-label="කල්‍යාණ මිතුරන්">
             <div style="position: relative; display: inline-flex;">
                 <i class="fa-solid fa-user-group"></i>
                 <span id="mobFriendsBadge" class="mob-badge-count" style="display: none;">0</span>
             </div>
-            <span>මිතුරන්</span>
         </button>
 
         <!-- Center Floating Action Button (FAB) for Creating Merit Post -->
@@ -2152,25 +2151,18 @@
             <i class="fa-solid fa-plus"></i>
         </button>
         
-        <button type="button" onclick="switchTab('needs')" id="mob-tab-needs" class="mob-nav-item" aria-label="සත්කාර හවුල">
+        <button type="button" onclick="switchTab('needs')" id="mob-tab-needs" class="mob-nav-item" title="සත්කාර හවුල" aria-label="සත්කාර හවුල">
             <div style="position: relative; display: inline-flex;">
                 <i class="fa-solid fa-hand-holding-heart"></i>
                 <span class="mob-badge-dot"></span>
             </div>
-            <span>සත්කාර</span>
         </button>
 
-        <button type="button" onclick="toggleNotificationDropdown(event)" id="mob-tab-notif" class="mob-nav-item" aria-label="දැනුම්දීම්">
+        <button type="button" onclick="toggleNotificationDropdown(event)" id="mob-tab-notif" class="mob-nav-item" title="දැනුම්දීම්" aria-label="දැනුම්දීම්">
             <div style="position: relative; display: inline-flex;">
                 <i class="fa-solid fa-bell"></i>
                 <span id="mobNotifBadge" class="mob-badge-count" style="display: none;">0</span>
             </div>
-            <span>දැනුම්දීම්</span>
-        </button>
-
-        <button type="button" onclick="switchTab('profile')" id="mob-tab-profile" class="mob-nav-item" aria-label="මගේ ගිණුම">
-            <div class="mob-nav-avatar" id="mobNavAvatar">ම</div>
-            <span>ගිණුම</span>
         </button>
     </nav>
 
@@ -2258,6 +2250,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=64"></script>
+    <script type="module" src="js/app.js?v=65"></script>
 </body>
 </html>
