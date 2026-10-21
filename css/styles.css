@@ -2348,6 +2348,24 @@ body {
   align-items: start;
 }
 
+/* Only Timeline ('පින්කම් සටහන්') tab displays the left sidebar (Intro, Badges, Mini Photos).
+   All other tabs (Friends, Photos, Stats, Private) hide the sidebar and expand full width */
+.profile-content-grid:not(.subtab-timeline) .profile-sidebar-col,
+.profile-content-grid.subtab-friends .profile-sidebar-col,
+.profile-content-grid.subtab-photos .profile-sidebar-col,
+.profile-content-grid.subtab-stats .profile-sidebar-col,
+.profile-content-grid.subtab-private .profile-sidebar-col {
+  display: none !important;
+}
+
+.profile-content-grid:not(.subtab-timeline),
+.profile-content-grid.subtab-friends,
+.profile-content-grid.subtab-photos,
+.profile-content-grid.subtab-stats,
+.profile-content-grid.subtab-private {
+  grid-template-columns: 1fr !important;
+}
+
 @media (max-width: 1024px) {
   .profile-intro-bar {
     flex-direction: column;
@@ -2369,8 +2387,10 @@ body {
     grid-template-columns: 1fr;
   }
 
-  /* On mobile/tablets: when viewing Kushal Warthawa (stats) or Private Pin Potha (private),
-     hide the sidebar containing Intro/About and Merit Badges so the content displays right at the top */
+  /* On mobile/tablets: show sidebar ONLY on timeline tab. Hide on all other sub-tabs so content opens right at top */
+  .profile-content-grid:not(.subtab-timeline) .profile-sidebar-col,
+  .profile-content-grid.subtab-friends .profile-sidebar-col,
+  .profile-content-grid.subtab-photos .profile-sidebar-col,
   .profile-content-grid.subtab-stats .profile-sidebar-col,
   .profile-content-grid.subtab-private .profile-sidebar-col {
     display: none !important;
@@ -4316,6 +4336,9 @@ html, body {
     min-width: 0 !important;
   }
 
+  .profile-content-grid:not(.subtab-timeline) .profile-sidebar-col,
+  .profile-content-grid.subtab-friends .profile-sidebar-col,
+  .profile-content-grid.subtab-photos .profile-sidebar-col,
   .profile-content-grid.subtab-stats .profile-sidebar-col,
   .profile-content-grid.subtab-private .profile-sidebar-col {
     display: none !important;
