@@ -311,15 +311,20 @@ export const StorageService = {
         // Firebase App Check (reCAPTCHA v3) Bot Mitigation
         if (firebaseConfig.recaptchaSiteKey && firebaseConfig.recaptchaSiteKey.trim()) {
           try {
-            const { initializeAppCheck, ReCaptchaV3Provider } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-app-check.js');
+            const { initializeAppCheck, ReCaptchaEnterpriseProvider, ReCaptchaV3Provider } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-app-check.js');
             if (typeof location !== 'undefined' && (location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
               self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
             }
+            const key = firebaseConfig.recaptchaSiteKey.trim();
+            const provider = typeof ReCaptchaEnterpriseProvider !== 'undefined'
+              ? new ReCaptchaEnterpriseProvider(key)
+              : new ReCaptchaV3Provider(key);
+
             initializeAppCheck(app, {
-              provider: new ReCaptchaV3Provider(firebaseConfig.recaptchaSiteKey.trim()),
+              provider: provider,
               isTokenAutoRefreshEnabled: true
             });
-            console.log('[Security] Firebase App Check (reCAPTCHA v3) active.');
+            console.log('[Security] Firebase App Check (Enterprise / Fraud Defense) active.');
           } catch (appCheckErr) {
             console.warn('[Security] Firebase App Check note:', appCheckErr);
           }
