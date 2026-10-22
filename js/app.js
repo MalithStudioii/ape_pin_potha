@@ -2599,7 +2599,7 @@ window.generateWhatsAppStatusCardFromModal = async function() {
             </div>
             <div>
               <div style="font-family: 'Noto Serif Sinhala', serif; font-size: 1.35rem; font-weight: 700; color: #fffbeb; letter-spacing: 0.5px;">පිං පොත</div>
-              <div style="font-size: 0.74rem; color: #fef3c7; opacity: 0.9;">කල්‍යාණ මිත්‍ර පුණ්‍ය ජාලය • www.pinpotha.org</div>
+              <div style="font-size: 0.74rem; color: #fef3c7; opacity: 0.9;">කල්‍යාණ මිත්‍ර පුණ්‍ය ජාලය • apepinpotha.lk</div>
             </div>
           </div>
           <div style="background: rgba(251, 191, 36, 0.25); border: 1px solid #fbbf24; color: #fef3c7; font-size: 0.74rem; font-weight: 700; padding: 4px 12px; border-radius: 9999px;">
@@ -2660,7 +2660,7 @@ window.generateWhatsAppStatusCardFromModal = async function() {
             </div>
           </div>
           <div style="background: #fbbf24; color: #451a03; font-weight: 800; font-size: 0.78rem; padding: 6px 14px; border-radius: 9999px; white-space: nowrap;">
-            🌐 pinpotha.org
+            🌐 apepinpotha.lk
           </div>
         </div>
       </div>
@@ -2827,9 +2827,6 @@ window.executeNativeOrWhatsAppShare = async function() {
       const snippet = cleanSnippet.length > 140 ? cleanSnippet.substring(0, 140) + '...' : cleanSnippet;
       shareBody += `\n\n"${snippet}"`;
     }
-  }
-  if (realImage) {
-    shareBody += `\n\n🖼️ ඡායාරූපය: ${realImage}`;
   }
   shareBody += `\n\n🙏 මේ උතුම් පින්කම දැකබලා ඔබත් සාදුකාර දී පින් අනුමෝදන් වන්න:`;
 
@@ -7105,7 +7102,7 @@ function initPWAEngine() {
   const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()) && !window.MSStream;
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v69';
+  const ACTIVE_BUILD = 'v70';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
