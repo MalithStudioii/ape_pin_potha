@@ -168,7 +168,7 @@ export const StorageService = {
   _cachedPosts: null,
   currentUser: {
     uid: "user_malith",
-    name: "මලිත්",
+    name: "මලිත් දුෂාන්ත හපුතන්ත්‍රි",
     email: null,
     isAdmin: false,
     isAnonymous: true
