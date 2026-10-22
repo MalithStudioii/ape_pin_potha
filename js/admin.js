@@ -472,6 +472,26 @@ window.toggleUserRole = async function(uid, newRole) {
             roleUpdatedAt: Date.now()
         });
 
+        // Dispatch celebratory notification to the user
+        if (newRole === 'admin') {
+            try {
+                const { collection, addDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+                await addDoc(collection(db, COLLECTIONS.NOTIFICATIONS), {
+                    recipientUid: uid,
+                    senderUid: currentAdminUser.uid,
+                    senderName: 'ප්‍රධාන පරිපාලක (Master Admin)',
+                    type: 'system_alert',
+                    title: '👑 සුබපැතුම්! ඔබව Admin මඩුල්ලට පත්කරන ලදී',
+                    message: 'ප්‍රධාන පරිපාලක විසින් ඔබව "අපේ පිං පොත" Sub-Admin / Moderator වරයෙකු ලෙස පත් කරන ලදී. දැන් ඔබට පරිපාලක පුවරුවට (Admin Portal) පිවිසිය හැක.',
+                    timestamp: Date.now(),
+                    read: false,
+                    link: 'admin.html'
+                });
+            } catch (notifErr) {
+                console.warn('[Admin] Notif dispatch note:', notifErr);
+            }
+        }
+
         // Audit Log
         await recordAuditLog(
             `User Role Update`,
