@@ -179,8 +179,8 @@
                     <i class="fa-solid fa-gear"></i>
                 </button>
 
-                <!-- Master Admin Crown Button (Visible only to Master Admin) -->
-                <button id="headerAdminCrownBtn" class="header-admin-crown-btn hidden" title="👑 පිං පොත Master Admin Panel" onclick="openSettingsModal('admin')" style="display: none;">
+                <!-- Admin Crown Button (Visible only to Master Admin & Admins) -->
+                <button id="headerAdminCrownBtn" class="header-admin-crown-btn hidden" title="👑 පිං පොත Admin Dashboard" onclick="window.location.href='admin.html'" style="display: none;">
                     <i class="fa-solid fa-crown"></i>
                     <span>Admin</span>
                 </button>
@@ -1658,7 +1658,7 @@
                     <!-- Admin Identity Banner -->
                     <div class="admin-panel-hero">
                         <div class="admin-hero-icon"><i class="fa-solid fa-crown"></i></div>
-                        <div>
+                        <div style="flex: 1;">
                             <h4 style="margin: 0; font-size: 0.96rem; color: #78350f; font-weight: 800;">
                                 ප්‍රධාන පරිපාලක පාලක පැනලය (Master Admin Panel)
                             </h4>
@@ -1666,6 +1666,9 @@
                                 <i class="fa-solid fa-shield-check"></i> සත්‍යාපිත Master Admin: මලිත් දුෂාන්ත හපුතන්ත්‍රි (NexiaProLanka)
                             </span>
                         </div>
+                        <a href="admin.html" style="background: linear-gradient(135deg, #d97706, #fbbf24); color: #451a03; font-weight: 800; font-size: 0.76rem; padding: 6px 12px; border-radius: 8px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(217, 119, 6, 0.3); white-space: nowrap;">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i> Dashboard
+                        </a>
                     </div>
 
                     <!-- Platform Live Stats Grid -->

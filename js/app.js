@@ -435,12 +435,14 @@ function updateUserInfoUI() {
   if (displayEl) displayEl.innerText = user.name || 'අමුත්තා';
   if (sideNameEl) sideNameEl.innerText = user.name || 'අමුත්තා';
 
-  // Toggle Header Crown Button for Master Admin
+  // Toggle Header Crown Button for Master Admin & Sub-Admins
   const crownBtn = document.getElementById('headerAdminCrownBtn');
+  const isAdminUser = isMaster || user.isAdmin || user.role === 'admin';
   if (crownBtn) {
-    if (isMaster) {
+    if (isAdminUser) {
       crownBtn.classList.remove('hidden');
       crownBtn.style.display = 'inline-flex';
+      crownBtn.onclick = () => { window.location.href = 'admin.html'; };
     } else {
       crownBtn.classList.add('hidden');
       crownBtn.style.display = 'none';

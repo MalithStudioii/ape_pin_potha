@@ -1,0 +1,1388 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>පරිපාලක පුවරුව (Admin Portal) | අපේ පිං පොත</title>
+    <link rel="icon" type="image/png" href="assets/icon-192.png">
+    <meta name="robots" content="noindex, nofollow">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Serif+Sinhala:wght@600;700;800&display=swap" rel="stylesheet">
+
+    <!-- FontAwesome 6 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Chart.js for Growth Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+    <style>
+        :root {
+            --bg-primary: #090d16;
+            --bg-secondary: #0f172a;
+            --bg-card: rgba(15, 23, 42, 0.78);
+            --bg-card-hover: rgba(30, 41, 59, 0.9);
+            --gold-primary: #f59e0b;
+            --gold-light: #fbbf24;
+            --gold-dark: #b45309;
+            --gold-gradient: linear-gradient(135deg, #d97706, #fbbf24, #f59e0b);
+            --teal-gradient: linear-gradient(135deg, #0d9488, #14b8a6);
+            --crimson-gradient: linear-gradient(135deg, #e11d48, #f43f5e);
+            --border-glass: rgba(245, 158, 11, 0.22);
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --radius-lg: 16px;
+            --radius-md: 12px;
+            --radius-sm: 8px;
+            --shadow-gold: 0 8px 32px rgba(217, 119, 6, 0.15);
+            --shadow-card: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+            --font-main: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-sinhala: 'Noto Serif Sinhala', serif;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            background-image: 
+                radial-gradient(circle at 15% 15%, rgba(217, 119, 6, 0.12) 0%, transparent 45%),
+                radial-gradient(circle at 85% 85%, rgba(13, 148, 136, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 50% 50%, rgba(15, 23, 42, 0.6) 0%, transparent 100%);
+            background-attachment: fixed;
+            color: var(--text-primary);
+            font-family: var(--font-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(245, 158, 11, 0.3);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(245, 158, 11, 0.5);
+        }
+
+        /* Top Executive Header */
+        header.admin-header {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-glass);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            padding: 12px 24px;
+        }
+
+        .header-container {
+            max-width: 1440px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .brand-cluster {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+        }
+
+        .brand-logo-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: var(--gold-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            color: #451a03;
+            box-shadow: 0 4px 16px rgba(245, 158, 11, 0.3);
+        }
+
+        .brand-titles h1 {
+            font-family: var(--font-sinhala);
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .admin-badge-pill {
+            background: rgba(245, 158, 11, 0.15);
+            border: 1px solid rgba(245, 158, 11, 0.4);
+            color: var(--gold-light);
+            font-size: 0.65rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.7px;
+            padding: 2px 8px;
+            border-radius: 9999px;
+        }
+
+        .brand-subtitle {
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-identity-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-subtle);
+            padding: 6px 14px;
+            border-radius: 9999px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .user-avatar-mini {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--gold-gradient);
+            color: #451a03;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            overflow: hidden;
+        }
+
+        .user-avatar-mini img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .user-info-text {
+            text-align: left;
+            line-height: 1.2;
+        }
+
+        .user-name {
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .user-role-label {
+            font-size: 0.65rem;
+            color: var(--gold-light);
+            font-weight: 600;
+        }
+
+        .btn-header {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            font-weight: 600;
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+
+        .btn-header:hover {
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-header-danger:hover {
+            background: rgba(225, 29, 72, 0.2);
+            color: #fca5a5;
+            border-color: rgba(225, 29, 72, 0.4);
+        }
+
+        /* Layout Container */
+        main.admin-main {
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 24px 20px;
+            width: 100%;
+            flex: 1;
+        }
+
+        /* Navigation Tab Pills */
+        .admin-nav-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            overflow-x: auto;
+            padding-bottom: 12px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .nav-pill-btn {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            font-weight: 600;
+            padding: 10px 18px;
+            border-radius: 9999px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+        }
+
+        .nav-pill-btn:hover {
+            background: rgba(245, 158, 11, 0.1);
+            color: #fff;
+            border-color: rgba(245, 158, 11, 0.3);
+        }
+
+        .nav-pill-btn.active {
+            background: var(--gold-gradient);
+            color: #451a03;
+            font-weight: 800;
+            border-color: transparent;
+            box-shadow: 0 4px 16px rgba(245, 158, 11, 0.25);
+        }
+
+        .nav-pill-btn .badge {
+            background: rgba(0, 0, 0, 0.25);
+            padding: 2px 7px;
+            border-radius: 9999px;
+            font-size: 0.72rem;
+            font-weight: 800;
+        }
+
+        /* Top Metric Cards Grid */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .metric-card {
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            padding: 18px 20px;
+            box-shadow: var(--shadow-card);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.25s ease, border-color 0.25s ease;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--border-glass);
+        }
+
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--card-accent, var(--gold-gradient));
+        }
+
+        .metric-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .metric-title {
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .metric-icon-wrap {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            background: rgba(245, 158, 11, 0.12);
+            color: var(--gold-light);
+        }
+
+        .metric-number {
+            font-size: 1.85rem;
+            font-weight: 800;
+            color: #fff;
+            letter-spacing: -0.5px;
+            line-height: 1.1;
+        }
+
+        .metric-subtext {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            margin-top: 6px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .metric-subtext.positive {
+            color: #34d399;
+        }
+
+        /* Section Layout Containers */
+        .admin-section {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .admin-section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Card Container Generic */
+        .glass-panel {
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            box-shadow: var(--shadow-card);
+            margin-bottom: 24px;
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .panel-title {
+            font-family: var(--font-sinhala);
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .panel-title i {
+            color: var(--gold-light);
+        }
+
+        /* Growth Chart Panel */
+        .chart-controls {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .chart-filter-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 5px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .chart-filter-btn:hover {
+            background: rgba(245, 158, 11, 0.15);
+            color: #fff;
+        }
+
+        .chart-filter-btn.active {
+            background: rgba(245, 158, 11, 0.25);
+            border-color: var(--gold-light);
+            color: var(--gold-light);
+            font-weight: 700;
+        }
+
+        .chart-canvas-wrap {
+            position: relative;
+            height: 320px;
+            width: 100%;
+        }
+
+        /* Filter & Search Bar */
+        .table-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .search-input-wrap {
+            position: relative;
+            flex: 1;
+            min-width: 260px;
+            max-width: 440px;
+        }
+
+        .search-input-wrap i {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        .search-input {
+            width: 100%;
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid var(--border-subtle);
+            color: #fff;
+            padding: 10px 14px 10px 38px;
+            border-radius: var(--radius-md);
+            font-size: 0.85rem;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+
+        .search-input:focus {
+            border-color: var(--gold-light);
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12);
+        }
+
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .filter-select {
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            padding: 9px 14px;
+            border-radius: var(--radius-md);
+            outline: none;
+            cursor: pointer;
+        }
+
+        .filter-select:focus {
+            border-color: var(--gold-light);
+        }
+
+        /* Users Table Styling */
+        .table-responsive {
+            overflow-x: auto;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-subtle);
+        }
+
+        table.admin-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.84rem;
+        }
+
+        table.admin-table th {
+            background: rgba(30, 41, 59, 0.7);
+            color: var(--text-secondary);
+            padding: 12px 16px;
+            font-weight: 700;
+            font-size: 0.74rem;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        table.admin-table td {
+            padding: 14px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            color: var(--text-primary);
+            vertical-align: middle;
+        }
+
+        table.admin-table tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .user-cell {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .table-avatar {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: #d97706;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.95rem;
+            flex-shrink: 0;
+            overflow: hidden;
+            border: 1.5px solid rgba(245, 158, 11, 0.4);
+        }
+
+        .table-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .table-user-name {
+            font-weight: 700;
+            color: #fff;
+            line-height: 1.25;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .table-user-email {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* Status & Role Badges */
+        .role-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 3px 9px;
+            border-radius: 9999px;
+        }
+
+        .role-master {
+            background: rgba(245, 158, 11, 0.2);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.4);
+        }
+
+        .role-admin {
+            background: rgba(14, 165, 233, 0.2);
+            color: #38bdf8;
+            border: 1px solid rgba(14, 165, 233, 0.4);
+        }
+
+        .role-member {
+            background: rgba(148, 163, 184, 0.12);
+            color: #cbd5e1;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.68rem;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 9999px;
+        }
+
+        .status-active {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .status-banned {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+        }
+
+        /* Action Buttons */
+        .actions-cell {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .btn-table-action {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 5px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-table-action:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.14);
+        }
+
+        .btn-table-promote {
+            background: rgba(14, 165, 233, 0.15);
+            border-color: rgba(14, 165, 233, 0.35);
+            color: #38bdf8;
+        }
+
+        .btn-table-promote:hover {
+            background: rgba(14, 165, 233, 0.3);
+            color: #fff;
+        }
+
+        .btn-table-demote {
+            background: rgba(245, 158, 11, 0.12);
+            border-color: rgba(245, 158, 11, 0.3);
+            color: #fbbf24;
+        }
+
+        .btn-table-demote:hover {
+            background: rgba(245, 158, 11, 0.25);
+            color: #fff;
+        }
+
+        .btn-table-ban {
+            background: rgba(239, 68, 68, 0.12);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: #f87171;
+        }
+
+        .btn-table-ban:hover {
+            background: rgba(239, 68, 68, 0.25);
+            color: #fff;
+        }
+
+        .btn-table-unban {
+            background: rgba(16, 185, 129, 0.15);
+            border-color: rgba(16, 185, 129, 0.3);
+            color: #34d399;
+        }
+
+        .btn-table-unban:hover {
+            background: rgba(16, 185, 129, 0.25);
+            color: #fff;
+        }
+
+        /* Moderation Feed Cards */
+        .moderation-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+            gap: 16px;
+        }
+
+        .mod-card {
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+            transition: all 0.2s ease;
+        }
+
+        .mod-card.has-warning {
+            border-color: rgba(239, 68, 68, 0.4);
+            background: rgba(239, 68, 68, 0.04);
+        }
+
+        .mod-card:hover {
+            border-color: var(--border-glass);
+        }
+
+        .mod-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .mod-author-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .mod-author-name {
+            font-weight: 700;
+            font-size: 0.85rem;
+            color: #fff;
+        }
+
+        .mod-meta-date {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+
+        .mod-title {
+            font-family: var(--font-sinhala);
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #fde68a;
+            line-height: 1.35;
+        }
+
+        .mod-desc-snippet {
+            font-size: 0.8rem;
+            color: #cbd5e1;
+            line-height: 1.55;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 8px 10px;
+            border-radius: 6px;
+            border-left: 3px solid rgba(245, 158, 11, 0.4);
+            max-height: 90px;
+            overflow-y: auto;
+        }
+
+        .mod-flag-alert {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 4px 8px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .mod-img-preview {
+            width: 100%;
+            height: 140px;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .mod-card-actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            margin-top: auto;
+        }
+
+        /* Gatekeeper Overlay (Login & Access Control) */
+        .gatekeeper-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(9, 13, 22, 0.96);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .gatekeeper-card {
+            background: rgba(15, 23, 42, 0.95);
+            border: 1.5px solid var(--border-glass);
+            border-radius: 20px;
+            padding: 36px 32px;
+            max-width: 440px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), var(--shadow-gold);
+            animation: fadeIn 0.4s ease;
+        }
+
+        .gatekeeper-icon {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            background: var(--gold-gradient);
+            color: #451a03;
+            font-size: 2.2rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 24px rgba(245, 158, 11, 0.35);
+        }
+
+        .gatekeeper-title {
+            font-family: var(--font-sinhala);
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+
+        .gatekeeper-desc {
+            font-size: 0.84rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+
+        .btn-google-admin {
+            width: 100%;
+            background: #ffffff;
+            color: #1e293b;
+            font-size: 0.9rem;
+            font-weight: 700;
+            padding: 12px 20px;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+            transition: all 0.2s ease;
+        }
+
+        .btn-google-admin:hover {
+            background: #f1f5f9;
+            transform: translateY(-1px);
+        }
+
+        .btn-back-home {
+            margin-top: 14px;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            text-decoration: underline;
+        }
+
+        .btn-back-home:hover {
+            color: var(--gold-light);
+        }
+
+        /* Access Denied Card */
+        .denied-icon {
+            background: var(--crimson-gradient) !important;
+            color: #fff !important;
+            box-shadow: 0 8px 24px rgba(225, 29, 72, 0.4) !important;
+        }
+
+        /* Forms in Tab 4 */
+        .admin-form-group {
+            margin-bottom: 18px;
+        }
+
+        .admin-form-label {
+            display: block;
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .admin-form-input, .admin-form-textarea {
+            width: 100%;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid var(--border-subtle);
+            color: #fff;
+            padding: 10px 14px;
+            border-radius: var(--radius-sm);
+            font-size: 0.88rem;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .admin-form-input:focus, .admin-form-textarea:focus {
+            border-color: var(--gold-light);
+        }
+
+        .btn-save-settings {
+            background: var(--gold-gradient);
+            color: #451a03;
+            font-weight: 800;
+            font-size: 0.85rem;
+            padding: 10px 22px;
+            border-radius: var(--radius-sm);
+            border: none;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 14px rgba(245, 158, 11, 0.25);
+            transition: all 0.2s ease;
+        }
+
+        .btn-save-settings:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+        }
+
+        /* Audit Timeline */
+        .audit-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .audit-item {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .audit-actor {
+            font-weight: 700;
+            color: var(--gold-light);
+            font-size: 0.82rem;
+        }
+
+        .audit-action-text {
+            font-size: 0.8rem;
+            color: #e2e8f0;
+            margin-top: 2px;
+        }
+
+        .audit-time {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        /* Responsive Breakpoints */
+        @media (max-width: 768px) {
+            header.admin-header {
+                padding: 10px 16px;
+            }
+            .brand-subtitle, .user-role-label {
+                display: none;
+            }
+            main.admin-main {
+                padding: 16px 12px;
+            }
+            .metrics-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .moderation-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Executive Portal Header -->
+    <header class="admin-header">
+        <div class="header-container">
+            <a href="admin.html" class="brand-cluster">
+                <div class="brand-logo-icon">
+                    <i class="fa-solid fa-dharmachakra"></i>
+                </div>
+                <div class="brand-titles">
+                    <h1>
+                        පිං පොත
+                        <span class="admin-badge-pill" id="headerRoleBadge">Admin Portal</span>
+                    </h1>
+                    <div class="brand-subtitle">කල්‍යාණ මිත්‍ර පුණ්‍ය ජාලය • විධායක පාලක පුවරුව</div>
+                </div>
+            </a>
+
+            <div class="header-actions">
+                <div class="user-identity-card" id="headerUserCard">
+                    <div class="user-avatar-mini" id="headerUserAvatar">👑</div>
+                    <div class="user-info-text">
+                        <div class="user-name" id="headerUserName">පරිපාලක</div>
+                        <div class="user-role-label" id="headerUserSubRole">සත්‍යාපනය වෙමින්...</div>
+                    </div>
+                </div>
+
+                <a href="index.html" class="btn-header" title="ප්‍රධාන පිං පොත වෙත යන්න">
+                    <i class="fa-solid fa-house"></i>
+                    <span>ප්‍රධාන අඩවිය</span>
+                </a>
+
+                <button class="btn-header btn-header-danger" onclick="adminSignOut()" title="පරිපාලක පුවරුවෙන් නික්මෙන්න">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="admin-main">
+
+        <!-- Top Navigation Pills -->
+        <nav class="admin-nav-bar">
+            <button class="nav-pill-btn active" onclick="switchAdminTab('overview')">
+                <i class="fa-solid fa-chart-line"></i>
+                <span>සාරාංශය සහ වර්ධනය</span>
+            </button>
+            <button class="nav-pill-btn" onclick="switchAdminTab('users')">
+                <i class="fa-solid fa-users"></i>
+                <span>සාමාජිකයින් සහ Admin පත්කිරීම්</span>
+                <span class="badge" id="tabBadgeUsers">0</span>
+            </button>
+            <button class="nav-pill-btn" onclick="switchAdminTab('moderation')">
+                <i class="fa-solid fa-shield-halved"></i>
+                <span>අන්තර්ගත පාලනය (Moderation)</span>
+                <span class="badge" id="tabBadgeMod">0</span>
+            </button>
+            <button class="nav-pill-btn master-only-tab" onclick="switchAdminTab('settings')">
+                <i class="fa-solid fa-sliders"></i>
+                <span>පද්ධති සැකසුම් (Master Only)</span>
+            </button>
+            <button class="nav-pill-btn" onclick="switchAdminTab('audit')">
+                <i class="fa-solid fa-list-check"></i>
+                <span>ක්‍රියාකාරකම් සටහන් (Audit Log)</span>
+            </button>
+        </nav>
+
+        <!-- Top Metrics Counters Grid -->
+        <div class="metrics-grid">
+            <div class="metric-card" style="--card-accent: var(--gold-gradient);">
+                <div class="metric-header">
+                    <span class="metric-title">මුළු සාමාජිකයින්</span>
+                    <div class="metric-icon-wrap"><i class="fa-solid fa-users"></i></div>
+                </div>
+                <div class="metric-number" id="metricTotalUsers">0</div>
+                <div class="metric-subtext positive" id="metricGrowthSubtext">
+                    <i class="fa-solid fa-arrow-trend-up"></i> සජීවීව ලියාපදිංචි වූ පිරිස
+                </div>
+            </div>
+
+            <div class="metric-card" style="--card-accent: var(--teal-gradient);">
+                <div class="metric-header">
+                    <span class="metric-title">මුළු පින්කම් සටහන්</span>
+                    <div class="metric-icon-wrap" style="color: #2dd4bf; background: rgba(13, 148, 136, 0.15);"><i class="fa-solid fa-book-open"></i></div>
+                </div>
+                <div class="metric-number" id="metricTotalPosts">0</div>
+                <div class="metric-subtext">
+                    <i class="fa-solid fa-circle-check"></i> ප්‍රජා පින්කම් ජාලය තුළ
+                </div>
+            </div>
+
+            <div class="metric-card" style="--card-accent: linear-gradient(135deg, #f59e0b, #ea580c);">
+                <div class="metric-header">
+                    <span class="metric-title">ලද මුළු සාදුකාර</span>
+                    <div class="metric-icon-wrap" style="color: #fb923c; background: rgba(234, 88, 12, 0.15);"><i class="fa-solid fa-hands-praying"></i></div>
+                </div>
+                <div class="metric-number" id="metricTotalSadhu">0</div>
+                <div class="metric-subtext">
+                    <i class="fa-solid fa-heart"></i> පිං අනුමෝදන්වීම්
+                </div>
+            </div>
+
+            <div class="metric-card" style="--card-accent: linear-gradient(135deg, #0284c7, #38bdf8);">
+                <div class="metric-header">
+                    <span class="metric-title">සක්‍රීය ඇඩ්මින් මඩුල්ල</span>
+                    <div class="metric-icon-wrap" style="color: #38bdf8; background: rgba(2, 132, 199, 0.15);"><i class="fa-solid fa-user-shield"></i></div>
+                </div>
+                <div class="metric-number" id="metricTotalAdmins">1</div>
+                <div class="metric-subtext">
+                    <i class="fa-solid fa-crown"></i> Master & Sub-Admins
+                </div>
+            </div>
+
+            <div class="metric-card" style="--card-accent: var(--crimson-gradient);">
+                <div class="metric-header">
+                    <span class="metric-title">නෙරපන ලද ගිණුම්</span>
+                    <div class="metric-icon-wrap" style="color: #f87171; background: rgba(225, 29, 72, 0.15);"><i class="fa-solid fa-user-slash"></i></div>
+                </div>
+                <div class="metric-number" id="metricBannedUsers">0</div>
+                <div class="metric-subtext" style="color: #f87171;">
+                    <i class="fa-solid fa-ban"></i> Banned / Restricted
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= TAB 1: OVERVIEW & GROWTH CHART ================= -->
+        <section id="sectionOverview" class="admin-section active">
+            <div class="glass-panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <i class="fa-solid fa-chart-line"></i>
+                        <span>දිනපතා සාමාජිකයින් එක්වීමේ වර්ධන ප්‍රස්ථාරය (Member Growth Analytics)</span>
+                    </div>
+                    <div class="chart-controls">
+                        <button class="chart-filter-btn" onclick="setChartRange(7)">දින 7</button>
+                        <button class="chart-filter-btn active" onclick="setChartRange(14)">දින 14</button>
+                        <button class="chart-filter-btn" onclick="setChartRange(30)">දින 30</button>
+                    </div>
+                </div>
+                <div class="chart-canvas-wrap">
+                    <canvas id="growthChartCanvas"></canvas>
+                </div>
+            </div>
+
+            <!-- Quick Moderation Highlights -->
+            <div class="glass-panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <i class="fa-solid fa-bell"></i>
+                        <span>දෛනිකව අවධානය යොමුකළ යුතු කරුණු (Security & Activity Alerts)</span>
+                    </div>
+                </div>
+                <div id="quickAlertsContainer">
+                    <div style="text-align: center; color: var(--text-muted); padding: 20px;">
+                        <i class="fa-solid fa-shield-check" style="font-size: 2rem; color: #10b981; margin-bottom: 8px;"></i>
+                        <p style="font-size: 0.85rem;">පද්ධතිය තුළ මේ මොහොතේ අනතුරු ඇඟවීම් නොමැත. සියලුම ක්‍රියාකාරකම් සාමකාමීව සිදුවේ.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= TAB 2: MEMBERS & ROLE MANAGEMENT ================= -->
+        <section id="sectionUsers" class="admin-section">
+            <div class="glass-panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <i class="fa-solid fa-users"></i>
+                        <span>අපේ පිං පොතේ සිටින සියලුම සාමාජිකයින් (Members Directory)</span>
+                    </div>
+                </div>
+
+                <!-- Table Toolbar -->
+                <div class="table-toolbar">
+                    <div class="search-input-wrap">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" id="userSearchInput" class="search-input" placeholder="සාමාජිකයාගේ නම හෝ ඊමේල් ලිපිනයෙන් සොයන්න..." oninput="filterUsersTable()">
+                    </div>
+                    <div class="filter-group">
+                        <select id="userRoleFilter" class="filter-select" onchange="filterUsersTable()">
+                            <option value="all">සියලුම කාණ්ඩ (All Roles)</option>
+                            <option value="master">👑 Master Admin පමණි</option>
+                            <option value="admin">🛡️ Sub-Admins පමණි</option>
+                            <option value="member">👤 සාමාන්‍ය සාමාජිකයින්</option>
+                            <option value="banned">🚫 නෙරපන ලද අය (Banned)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Users Table -->
+                <div class="table-responsive">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>සාමාජිකයා</th>
+                                <th>තනතුර (Role)</th>
+                                <th>තත්වය (Status)</th>
+                                <th>එක්වූ දිනය</th>
+                                <th>පින්කම් ගණන</th>
+                                <th>පාලන ක්‍රියාමාර්ග (Actions)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody">
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                                    <i class="fa-solid fa-spinner fa-spin" style="font-size: 1.5rem; margin-bottom: 8px; color: var(--gold-light);"></i>
+                                    <p>සාමාජික දත්ත පූරණය වෙමින් පවතී...</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= TAB 3: CONTENT MODERATION QUEUE ================= -->
+        <section id="sectionModeration" class="admin-section">
+            <div class="glass-panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        <span>දෛනිකව පළවන සටහන් සහ අන්තර්ගත පාලනය (Content Moderation Feed)</span>
+                    </div>
+                    <div class="search-input-wrap" style="max-width: 300px;">
+                        <i class="fa-solid fa-filter"></i>
+                        <input type="text" id="modSearchInput" class="search-input" placeholder="වචනයකින් හෝ කර්තෘගෙන් සොයන්න..." oninput="filterModerationFeed()">
+                    </div>
+                </div>
+
+                <div class="moderation-grid" id="moderationFeedGrid">
+                    <div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding: 40px;">
+                        <i class="fa-solid fa-spinner fa-spin" style="font-size: 1.5rem; margin-bottom: 8px; color: var(--gold-light);"></i>
+                        <p>සටහන් පූරණය වෙමින් පවතී...</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= TAB 4: SYSTEM SETTINGS (MASTER ADMIN ONLY) ================= -->
+        <section id="sectionSettings" class="admin-section">
+            <div class="glass-panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <i class="fa-solid fa-bullhorn"></i>
+                        <span>සමස්ත පද්ධති නිල නිවේදනය (Global Marquee Announcement)</span>
+                    </div>
+                </div>
+                <div class="admin-form-group">
+                    <label class="admin-form-label">නිවේදන පාඨය</label>
+                    <input type="text" id="settingAnnounceText" class="admin-form-input" placeholder="සියලු සාමාජිකයින්ට ඉහළින් පෙනෙන පණිවිඩය...">
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; color: #fff;">
+                        <input type="checkbox" id="settingAnnounceActive" style="accent-color: var(--gold-light); width: 18px; height: 18px;">
+                        <span>මෙම නිවේදනය සජීවීව පෙන්වන්න (Active Banner)</span>
+                    </label>
+                    <button class="btn-save-settings" onclick="saveGlobalAnnouncement()">
+                        <i class="fa-solid fa-floppy-disk"></i>
+                        <span>නිවේදනය සුරකින්න</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="glass-panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <i class="fa-solid fa-ban"></i>
+                        <span>තහනම් සහ අනවශ්‍ය වචන නාමාවලිය (Banned Keywords Filter)</span>
+                    </div>
+                </div>
+                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 14px;">
+                    මෙහි ඇතුළත් කරන වචන යම් සටහනක හෝ Comment එකක ඇත්නම්, පද්ධතිය මගින් එය ස්වයංක්‍රීයව අවහිර කරනු ලැබේ (හෝ Moderation Feed හි අනතුරු අඟවනු ලැබේ).
+                </p>
+                <div class="admin-form-group">
+                    <textarea id="settingBannedWordsInput" class="admin-form-textarea" rows="3" placeholder="වචන කොමා (,) වලින් වෙන්කර ලියන්න. උදා: casino, සූදු, porn, scam..."></textarea>
+                </div>
+                <button class="btn-save-settings" onclick="saveBannedKeywords()">
+                    <i class="fa-solid fa-floppy-disk"></i>
+                    <span>තහනම් වචන සුරකින්න</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- ================= TAB 5: AUDIT ACTIVITY LOG ================= -->
+        <section id="sectionAudit" class="admin-section">
+            <div class="glass-panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <i class="fa-solid fa-list-check"></i>
+                        <span>පරිපාලන ක්‍රියාකාරකම් සටහන (Administrative Audit Trail)</span>
+                    </div>
+                    <button class="btn-header" onclick="loadAuditLogs()">
+                        <i class="fa-solid fa-rotate"></i>
+                        <span>Refresh</span>
+                    </button>
+                </div>
+                <div class="audit-list" id="auditListContainer">
+                    <div style="text-align: center; color: var(--text-muted); padding: 30px;">
+                        <p>ක්‍රියාකාරකම් සටහන් පූරණය වෙමින් පවතී...</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Gatekeeper Overlay (Shown if unauthenticated or not an admin) -->
+    <div id="gatekeeperOverlay" class="gatekeeper-overlay">
+        <!-- State 1: Sign in prompt -->
+        <div id="gatekeeperLoginBox" class="gatekeeper-card">
+            <div class="gatekeeper-icon"><i class="fa-solid fa-crown"></i></div>
+            <h2 class="gatekeeper-title">විධායක පරිපාලක පිවිසුම</h2>
+            <p class="gatekeeper-desc">
+                අපේ පිං පොත පාලක පුවරුවට පිවිසීම සඳහා ඔබගේ සත්‍යාපිත <strong>Google ගිණුමෙන් (Admin Account)</strong> පිවිසෙන්න.
+            </p>
+            <button class="btn-google-admin" onclick="triggerAdminGoogleSignIn()">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="20" height="20" alt="Google">
+                <span>Google ගිණුමෙන් පිවිසෙන්න</span>
+            </button>
+            <br>
+            <button class="btn-back-home" onclick="window.location.href='index.html'">
+                <i class="fa-solid fa-arrow-left"></i> ප්‍රධාන පිං පොත වෙත ආපසු යන්න
+            </button>
+        </div>
+
+        <!-- State 2: Access Denied Prompt -->
+        <div id="gatekeeperDeniedBox" class="gatekeeper-card" style="display: none;">
+            <div class="gatekeeper-icon denied-icon"><i class="fa-solid fa-hand"></i></div>
+            <h2 class="gatekeeper-title" style="color: #fca5a5;">ප්‍රවේශය ප්‍රතික්ෂේප විය (403)</h2>
+            <p class="gatekeeper-desc" id="gatekeeperDeniedMsg">
+                ඔබ ඇතුළු වූ ගිණුමට මෙම පරිපාලක පුවරුව පරිහරණය කිරීමට අවසර නොමැත. කරුණාකර ප්‍රධාන පරිපාලක (Master Admin) ගිණුමෙන් පිවිසෙන්න.
+            </p>
+            <button class="btn-header" style="background: rgba(255,255,255,0.1); width: 100%; justify-content: center; padding: 12px;" onclick="adminSignOut()">
+                <i class="fa-solid fa-right-from-bracket"></i> වෙනත් ගිණුමකින් පිවිසෙන්න
+            </button>
+            <br><br>
+            <button class="btn-back-home" onclick="window.location.href='index.html'">
+                <i class="fa-solid fa-arrow-left"></i> ප්‍රධාන පිං පොත වෙත යන්න
+            </button>
+        </div>
+    </div>
+
+    <!-- ES Module Script for Admin Logic -->
+    <script type="module" src="js/admin.js?v=70"></script>
+</body>
+</html>
