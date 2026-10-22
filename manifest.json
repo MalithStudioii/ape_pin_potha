@@ -2,6 +2,7 @@
   "name": "අපේ පින් පොත - ධර්ම සටහන් හා කුසල් පිරික්සුම",
   "short_name": "පිං පොත",
   "description": "දිනපතා ඔබ සිදුකරන පින්කම් සටහන් කරගන්න, මිතුරන්ගේ පින්කම් දැක සාදුකාර දෙමින් සිත පහදවා ගන්න.",
+  "id": "/",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
@@ -15,13 +16,25 @@
       "src": "assets/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "assets/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "categories": [
