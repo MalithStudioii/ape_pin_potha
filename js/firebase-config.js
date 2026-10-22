@@ -13,8 +13,8 @@ export const firebaseConfig = {
   messagingSenderId: "628672023264",
   appId: "1:628672023264:web:4f0eea97e5e3f8b6d7de85",
   measurementId: "G-WMY697P4XC",
-  // Firebase App Check (reCAPTCHA v3) Site Key for Bot Mitigation:
-  recaptchaSiteKey: ""
+  // Firebase App Check (reCAPTCHA Enterprise / Fraud Defense) Site Key for Bot Mitigation:
+  recaptchaSiteKey: "6LfM4_otAAAAAGxrETpR_KkyLtOY6XODs7bsXJ6I"
 };
 
 /**
