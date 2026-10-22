@@ -12,7 +12,9 @@ export const firebaseConfig = {
   storageBucket: "pin-ketha-app.firebasestorage.app",
   messagingSenderId: "628672023264",
   appId: "1:628672023264:web:4f0eea97e5e3f8b6d7de85",
-  measurementId: "G-WMY697P4XC"
+  measurementId: "G-WMY697P4XC",
+  // Firebase App Check (reCAPTCHA v3) Site Key for Bot Mitigation:
+  recaptchaSiteKey: ""
 };
 
 /**

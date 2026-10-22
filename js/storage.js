@@ -307,6 +307,24 @@ export const StorageService = {
         const { getAuth, onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js');
 
         const app = initializeApp(firebaseConfig);
+
+        // Firebase App Check (reCAPTCHA v3) Bot Mitigation
+        if (firebaseConfig.recaptchaSiteKey && firebaseConfig.recaptchaSiteKey.trim()) {
+          try {
+            const { initializeAppCheck, ReCaptchaV3Provider } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-app-check.js');
+            if (typeof location !== 'undefined' && (location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+              self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+            }
+            initializeAppCheck(app, {
+              provider: new ReCaptchaV3Provider(firebaseConfig.recaptchaSiteKey.trim()),
+              isTokenAutoRefreshEnabled: true
+            });
+            console.log('[Security] Firebase App Check (reCAPTCHA v3) active.');
+          } catch (appCheckErr) {
+            console.warn('[Security] Firebase App Check note:', appCheckErr);
+          }
+        }
+
         db = getFirestore(app);
         auth = getAuth(app);
         isCloudReady = true;
