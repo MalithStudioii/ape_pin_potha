@@ -187,7 +187,7 @@ body {
   animation: pulseGlow 2s infinite ease-in-out;
 }
 
-/* Header & Top Bar - Facebook-Standard Directional Auto-Hide / Show on Scroll */
+/* Header & Top Bar */
 .app-header {
   background: linear-gradient(135deg, #451a03 0%, #78350f 50%, #92400e 100%);
   color: #ffffff;
@@ -196,22 +196,6 @@ body {
   z-index: 50;
   box-shadow: var(--shadow-md);
   border-bottom: 1px solid rgba(251, 191, 36, 0.2);
-  transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease;
-  will-change: transform;
-}
-
-/* Auto-hides smoothly when reading down */
-.app-header.header-hidden {
-  transform: translateY(-100%) !important;
-  box-shadow: none !important;
-}
-
-/* Also gracefully slide away sticky announcement bar if active */
-.app-header.header-hidden + #globalAnnouncementBanner,
-.app-header.header-hidden ~ #globalAnnouncementBanner {
-  transform: translateY(-200%);
-  opacity: 0;
-  pointer-events: none;
 }
 
 .header-container {
@@ -4031,9 +4015,16 @@ html, body {
     padding-bottom: 74px !important;
   }
 
-  /* 2. Top Application Bar (Header) - Ultra-Clean & Compact */
+  /* 2. Top Application Bar (Header) - Ultra-Clean & Compact with Smooth Mobile Auto-Hide */
   .app-header {
     height: 56px !important;
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease !important;
+    will-change: transform;
+  }
+
+  .app-header.header-hidden {
+    transform: translateY(-100%) !important;
+    box-shadow: none !important;
   }
 
   .header-container {
@@ -4171,28 +4162,12 @@ html, body {
     min-width: 0 !important;
   }
 
-  /* 4. Composer Card on Mobile - Smart Sticky with Header */
+  /* 4. Composer Card on Mobile */
   .composer-card {
-    position: sticky !important;
-    top: 56px !important;
-    z-index: 45 !important;
     padding: 12px 14px !important;
     border-radius: 18px !important;
     margin-bottom: 12px !important;
-    background: rgba(255, 255, 255, 0.98) !important;
-    backdrop-filter: blur(12px) !important;
-    -webkit-backdrop-filter: blur(12px) !important;
-    border: 1px solid rgba(251, 191, 36, 0.25) !important;
-    box-shadow: 0 4px 16px rgba(69, 26, 3, 0.08) !important;
-    transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s ease, box-shadow 0.25s ease !important;
-    will-change: transform;
-  }
-
-  /* Auto-hides when scrolling down along with top brown header */
-  .composer-card.composer-hidden {
-    transform: translateY(calc(-100% - 70px)) !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
+    box-shadow: 0 2px 8px rgba(69, 26, 3, 0.04) !important;
   }
 
   .composer-top {

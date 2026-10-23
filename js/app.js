@@ -7304,66 +7304,64 @@ window.applyPwaUpdate = function () {
 };
 
 // ============================================================================
-// Smart Sticky Header & Composer (Facebook-Standard Auto-Hide on Scroll Down, Show on Scroll Up)
+// Smart Sticky Header (Mobile-Only Facebook-Standard Auto-Hide on Scroll Down, Show on Scroll Up)
 // ============================================================================
 function initSmartHeaderScroll() {
   const header = document.querySelector('.app-header');
   if (!header) return;
 
-  const getScrollPos = () => {
-    return Math.max(
-      window.pageYOffset || 0,
-      window.scrollY || 0,
-      document.documentElement.scrollTop || 0,
-      document.body.scrollTop || 0
-    );
-  };
+  let lastScrollY = window.pageYOffset || window.scrollY || 0;
+  let ticking = false;
+  const scrollThreshold = 10; // Minimum 10px delta to prevent any micro-jitter
+  const topBuffer = 50; // Near top of page, always show header
 
-  let lastScrollY = getScrollPos();
-  let isHidden = false;
-
-  const handleScrollAction = () => {
-    const currentScrollY = getScrollPos();
-    const composer = document.querySelector('.composer-card');
-
-    // 1. Near the top of the feed (within 45px) -> Always reveal
-    if (currentScrollY <= 45) {
-      if (isHidden) {
+  const onScroll = () => {
+    // Strictly disable on desktop (768px+) to prevent any layout shifts
+    if (window.innerWidth > 768) {
+      if (header.classList.contains('header-hidden')) {
         header.classList.remove('header-hidden');
-        composer?.classList.remove('composer-hidden');
-        isHidden = false;
       }
-      lastScrollY = currentScrollY;
       return;
     }
 
-    const diff = currentScrollY - lastScrollY;
+    if (!ticking) {
+      window.requestAnimationFrame(() => {
+        const currentScrollY = window.pageYOffset || window.scrollY || 0;
+        const maxScrollY = document.documentElement.scrollHeight - window.innerHeight;
 
-    // 2. Scrolling DOWN -> Hide both header & composer (minimum 6px downward movement)
-    if (diff > 6 && currentScrollY > 60) {
-      const notifDropdown = document.getElementById('notificationsDropdown');
-      const isNotifOpen = notifDropdown && notifDropdown.style.display !== 'none';
-      const isModalOpen = document.body.classList.contains('modal-open');
+        // Ignore bounce/rubber-banding at the edges (iOS & Android Chrome)
+        if (currentScrollY < 0 || currentScrollY > maxScrollY) {
+          ticking = false;
+          return;
+        }
 
-      if (!isNotifOpen && !isModalOpen && !isHidden) {
-        header.classList.add('header-hidden');
-        composer?.classList.add('composer-hidden');
-        isHidden = true;
-      }
+        const scrollDiff = currentScrollY - lastScrollY;
+
+        // 1. If at/near top of page -> Always reveal header
+        if (currentScrollY <= topBuffer) {
+          header.classList.remove('header-hidden');
+        }
+        // 2. If scrolling DOWN past threshold and well past header -> Hide header
+        else if (scrollDiff > scrollThreshold && currentScrollY > 75) {
+          const notifDropdown = document.getElementById('notificationsDropdown');
+          const isNotifOpen = notifDropdown && notifDropdown.style.display !== 'none';
+          const isModalOpen = document.body.classList.contains('modal-open');
+
+          if (!isNotifOpen && !isModalOpen) {
+            header.classList.add('header-hidden');
+          }
+        }
+        // 3. If scrolling UP past threshold -> Reveal header instantly!
+        else if (scrollDiff < -scrollThreshold) {
+          header.classList.remove('header-hidden');
+        }
+
+        lastScrollY = currentScrollY;
+        ticking = false;
+      });
+      ticking = true;
     }
-    // 3. Scrolling UP -> Reveal both header & composer (minimum 6px upward swipe)
-    else if (diff < -6) {
-      if (isHidden) {
-        header.classList.remove('header-hidden');
-        composer?.classList.remove('composer-hidden');
-        isHidden = false;
-      }
-    }
-
-    lastScrollY = currentScrollY;
   };
 
-  window.addEventListener('scroll', handleScrollAction, { passive: true });
-  document.addEventListener('scroll', handleScrollAction, { passive: true });
-  window.addEventListener('touchmove', handleScrollAction, { passive: true });
+  window.addEventListener('scroll', onScroll, { passive: true });
 }
