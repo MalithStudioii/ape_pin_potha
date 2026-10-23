@@ -6940,6 +6940,117 @@ html, body {
   color: #78350f;
 }
 
+/* Details wrapper inside mithra-card */
+.mithra-card-details {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+/* ==========================================================================
+   Grid & List View Switcher for Friends and Community Directory
+   ========================================================================== */
+.view-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.view-toggle-btn {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  width: 32px;
+  height: 28px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.view-toggle-btn:hover {
+  color: #b45309;
+}
+
+.view-toggle-btn.active {
+  background: #ffffff;
+  color: #d97706;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(217, 119, 6, 0.25);
+  font-weight: 700;
+}
+
+/* List View Layout */
+.mithra-grid.list-view {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+}
+
+.mithra-grid.list-view .mithra-card {
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  text-align: left !important;
+  padding: 12px 16px !important;
+  gap: 14px !important;
+  border-radius: 14px !important;
+  width: 100% !important;
+}
+
+.mithra-grid.list-view .mithra-card:hover {
+  transform: translateX(4px) !important;
+}
+
+.mithra-grid.list-view .mithra-card-avatar {
+  width: 48px !important;
+  height: 48px !important;
+  min-width: 48px !important;
+  margin-bottom: 0 !important;
+  font-size: 1.15rem !important;
+}
+
+.mithra-grid.list-view .mithra-card-details {
+  align-items: flex-start !important;
+  flex: 1 !important;
+  min-width: 0 !important;
+  text-align: left !important;
+}
+
+.mithra-grid.list-view .mithra-card-name {
+  margin-bottom: 2px !important;
+  font-size: 0.92rem !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 100% !important;
+}
+
+.mithra-grid.list-view .mithra-card-loc {
+  margin-bottom: 0 !important;
+  font-size: 0.74rem !important;
+}
+
+.mithra-grid.list-view .directory-card-bio {
+  display: none !important;
+}
+
+.mithra-grid.list-view .mithra-card-actions {
+  margin-top: 0 !important;
+  width: auto !important;
+  flex-shrink: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
 /* ==========================================================================
    Community Members & Directory System (PC & Mobile)
    ========================================================================== */

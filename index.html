@@ -51,12 +51,12 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=76">
+    <link rel="stylesheet" href="css/styles.css?v=77">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
       (function() {
-        var v = 'v76';
+        var v = 'v77';
         if (localStorage.getItem('pinPotha_active_build') !== v) {
           localStorage.setItem('pinPotha_active_build', v);
           if ('caches' in window) {
@@ -660,12 +660,22 @@
                             </div>
 
                             <!-- Connected Kalyana Mithrayan Section -->
-                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
                                 <h3 class="widget-head-title" style="margin: 0; font-size: 1rem;">
                                     <i class="fa-solid fa-heart-circle-check" style="color: #059669;"></i>
                                     <span>මගේ කල්‍යාණ මිතුරු පවුර</span>
                                 </h3>
-                                <span id="connectedMithrayanSummary" style="font-size: 0.78rem; color: #64748b; font-weight: 600;">මිතුරන් 0 දෙනෙක්</span>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <div class="view-mode-toggle" id="friendsViewToggleMy">
+                                        <button type="button" class="view-toggle-btn active" id="viewBtnGridMy" onclick="setFriendsViewMode('grid')" title="ජාලක දසුන (Grid View)">
+                                            <i class="fa-solid fa-border-all"></i>
+                                        </button>
+                                        <button type="button" class="view-toggle-btn" id="viewBtnListMy" onclick="setFriendsViewMode('list')" title="ලැයිස්තු දසුන (List View)">
+                                            <i class="fa-solid fa-list-ul"></i>
+                                        </button>
+                                    </div>
+                                    <span id="connectedMithrayanSummary" style="font-size: 0.78rem; color: #64748b; font-weight: 600;">මිතුරන් 0 දෙනෙක්</span>
+                                </div>
                             </div>
                             <div id="profConnectedMithrayanList" class="mithra-grid">
                                 <!-- Populated dynamically -->
@@ -686,12 +696,22 @@
                                 </div>
                             </div>
 
-                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
                                 <h3 class="widget-head-title" style="margin: 0; font-size: 0.95rem;">
                                     <i class="fa-solid fa-users" style="color: #d97706;"></i>
                                     <span>පිං පොත සාමාජික එකමුතුව</span>
                                 </h3>
-                                <span id="directoryMembersCountSummary" style="font-size: 0.76rem; color: #64748b; font-weight: 600;">සාමාජිකයින් 0 ක්</span>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <div class="view-mode-toggle" id="friendsViewToggleAll">
+                                        <button type="button" class="view-toggle-btn active" id="viewBtnGridAll" onclick="setFriendsViewMode('grid')" title="ජාලක දසුන (Grid View)">
+                                            <i class="fa-solid fa-border-all"></i>
+                                        </button>
+                                        <button type="button" class="view-toggle-btn" id="viewBtnListAll" onclick="setFriendsViewMode('list')" title="ලැයිස්තු දසුන (List View)">
+                                            <i class="fa-solid fa-list-ul"></i>
+                                        </button>
+                                    </div>
+                                    <span id="directoryMembersCountSummary" style="font-size: 0.76rem; color: #64748b; font-weight: 600;">සාමාජිකයින් 0 ක්</span>
+                                </div>
                             </div>
 
                             <div id="profDirectoryMembersList" class="mithra-grid">
@@ -2438,6 +2458,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=76"></script>
+    <script type="module" src="js/app.js?v=77"></script>
 </body>
 </html>

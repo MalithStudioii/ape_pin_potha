@@ -4761,8 +4761,8 @@ function renderProfileSubTabContent(user, myPosts, myPhotosPosts, myPrivatePosts
   const countBadge = document.getElementById('profCountMithrayanBadge');
   if (countBadge) countBadge.innerText = mithrayanUids.length;
 
-  if (activeProfileSubTab === 'friends' && activeFriendsSegment === 'all') {
-    renderCommunityDirectory();
+  if (activeProfileSubTab === 'friends') {
+    applyFriendsViewModeUI();
   }
 
   if (activeProfileSubTab === 'friends' && friendsContainer) {
@@ -4786,9 +4786,11 @@ function renderProfileSubTabContent(user, myPosts, myPhotosPosts, myPrivatePosts
             <div class="mithra-card-avatar" onclick="openMemberProfileModal('${req.senderUid}', '${Security.escapeHTML(req.senderName)}')" style="cursor: pointer;">
               ${req.senderPhoto ? `<img src="${Security.sanitizeUrl(req.senderPhoto)}" alt="${Security.escapeHTML(req.senderName)}" onerror="this.parentElement.innerText = '${(req.senderName || 'ක').charAt(0)}';">` : (req.senderName || 'ක').charAt(0)}
             </div>
-            <div class="mithra-card-name" onclick="openMemberProfileModal('${req.senderUid}', '${Security.escapeHTML(req.senderName)}')" style="cursor: pointer;">${Security.escapeHTML(req.senderName || 'කල්‍යාණ මිත්‍ර')}</div>
-            <div class="mithra-card-loc">
-              <i class="fa-solid fa-clock"></i> <span>ඇරයුමක් එවා ඇත</span>
+            <div class="mithra-card-details" onclick="openMemberProfileModal('${req.senderUid}', '${Security.escapeHTML(req.senderName)}')" style="cursor: pointer;">
+              <div class="mithra-card-name">${Security.escapeHTML(req.senderName || 'කල්‍යාණ මිත්‍ර')}</div>
+              <div class="mithra-card-loc">
+                <i class="fa-solid fa-clock"></i> <span>ඇරයුමක් එවා ඇත</span>
+              </div>
             </div>
             <div class="mithra-card-actions">
               <button type="button" class="btn-notif-accept" style="flex: 1; justify-content: center;" onclick="handleAcceptMithra('${req.id}', '${req.senderUid}', '${Security.escapeHTML(req.senderName)}')">
@@ -4833,10 +4835,12 @@ function renderProfileSubTabContent(user, myPosts, myPhotosPosts, myPrivatePosts
             <div class="mithra-card-avatar" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}')" style="cursor: pointer;">
               ${m.photo ? `<img src="${Security.sanitizeUrl(m.photo)}" alt="${Security.escapeHTML(m.name)}" onerror="this.parentElement.innerText = '${(m.name || 'ක').charAt(0)}';">` : (m.name || 'ක').charAt(0)}
             </div>
-            <div class="mithra-card-name" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}')" style="cursor: pointer;">${Security.escapeHTML(m.name || 'කල්‍යාණ මිත්‍ර')}</div>
-            <div class="mithra-card-loc">
-              <i class="fa-solid fa-location-dot" style="color: #ea580c;"></i>
-              <span>${Security.escapeHTML(m.district || m.location || 'ශ්‍රී ලංකා')}</span>
+            <div class="mithra-card-details" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}')" style="cursor: pointer;">
+              <div class="mithra-card-name">${Security.escapeHTML(m.name || 'කල්‍යාණ මිත්‍ර')}</div>
+              <div class="mithra-card-loc">
+                <i class="fa-solid fa-location-dot" style="color: #ea580c;"></i>
+                <span>${Security.escapeHTML(m.district || m.location || 'ශ්‍රී ලංකා')}</span>
+              </div>
             </div>
             <div class="mithra-card-actions">
               <button type="button" class="btn-mithra-view" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}')">
@@ -4848,6 +4852,7 @@ function renderProfileSubTabContent(user, myPosts, myPhotosPosts, myPrivatePosts
             </div>
           </div>
         `).join('');
+        applyFriendsViewModeUI();
       });
     }
   }
@@ -5751,6 +5756,54 @@ window.updateCommunityMemberCount = async function() {
   }
 };
 
+// ============================================================================
+// Friends & Directory View Mode (Grid vs List)
+// ============================================================================
+let currentFriendsViewMode = localStorage.getItem('pinPotha_friends_view_mode') || 'grid';
+
+window.setFriendsViewMode = function (mode) {
+  triggerHaptic(15);
+  SoundService?.playClick?.();
+  currentFriendsViewMode = mode;
+  localStorage.setItem('pinPotha_friends_view_mode', mode);
+  applyFriendsViewModeUI();
+};
+
+function applyFriendsViewModeUI() {
+  const mode = currentFriendsViewMode || 'grid';
+  
+  // Containers
+  const myFriendsList = document.getElementById('profConnectedMithrayanList');
+  const dirMembersList = document.getElementById('profDirectoryMembersList');
+  const pendingList = document.getElementById('profPendingRequestsList');
+
+  [myFriendsList, dirMembersList, pendingList].forEach(el => {
+    if (el) {
+      if (mode === 'list') {
+        el.classList.add('list-view');
+      } else {
+        el.classList.remove('list-view');
+      }
+    }
+  });
+
+  // Buttons in Panel 1 (My Friends)
+  const btnGridMy = document.getElementById('viewBtnGridMy');
+  const btnListMy = document.getElementById('viewBtnListMy');
+  if (btnGridMy && btnListMy) {
+    btnGridMy.classList.toggle('active', mode === 'grid');
+    btnListMy.classList.toggle('active', mode === 'list');
+  }
+
+  // Buttons in Panel 2 (All Members)
+  const btnGridAll = document.getElementById('viewBtnGridAll');
+  const btnListAll = document.getElementById('viewBtnListAll');
+  if (btnGridAll && btnListAll) {
+    btnGridAll.classList.toggle('active', mode === 'grid');
+    btnListAll.classList.toggle('active', mode === 'list');
+  }
+}
+
 window.openFriendsView = function(segment = 'my') {
   if (isGuestUser()) {
     showAuthRequiredModal('කල්‍යාණ මිතුරු පවුර නැරඹීමට');
@@ -5789,6 +5842,7 @@ window.switchFriendsSegment = function(seg) {
     if (myPanel) myPanel.style.display = 'block';
     if (allPanel) allPanel.style.display = 'none';
   }
+  applyFriendsViewModeUI();
 };
 
 function applyDirectoryFilters(members, filterType, query) {
@@ -5883,14 +5937,16 @@ window.renderCommunityDirectory = async function(filtered = null) {
         <div class="mithra-card-avatar" style="cursor: pointer;">
           ${m.photo ? `<img src="${Security.sanitizeUrl(m.photo)}" alt="${Security.escapeHTML(m.name)}" onerror="this.parentElement.innerText = '${initial}';">` : initial}
         </div>
-        <div class="mithra-card-name" style="cursor: pointer;">
-          <span>${Security.escapeHTML(m.name || 'කල්‍යාණ මිත්‍ර')}</span>
-          ${m.isAdmin ? `<i class="fa-solid fa-crown" style="color: #f59e0b; font-size: 0.7rem; margin-left: 4px;" title="Master Admin"></i>` : ''}
+        <div class="mithra-card-details">
+          <div class="mithra-card-name" style="cursor: pointer;">
+            <span>${Security.escapeHTML(m.name || 'කල්‍යාණ මිත්‍ර')}</span>
+            ${m.isAdmin ? `<i class="fa-solid fa-crown" style="color: #f59e0b; font-size: 0.7rem; margin-left: 4px;" title="Master Admin"></i>` : ''}
+          </div>
+          <div class="mithra-card-loc">
+            ${m.location ? `<i class="fa-solid fa-location-dot" style="color: #ea580c;"></i> <span>${Security.escapeHTML(m.location)}</span>` : `<i class="fa-solid fa-calendar-check" style="color: #059669;"></i> <span>${Security.escapeHTML(m.joinedDate || '2026')}</span>`}
+          </div>
+          ${m.bio ? `<p class="directory-card-bio">${Security.escapeHTML(m.bio)}</p>` : ''}
         </div>
-        <div class="mithra-card-loc">
-          ${m.location ? `<i class="fa-solid fa-location-dot" style="color: #ea580c;"></i> <span>${Security.escapeHTML(m.location)}</span>` : `<i class="fa-solid fa-calendar-check" style="color: #059669;"></i> <span>${Security.escapeHTML(m.joinedDate || '2026')}</span>`}
-        </div>
-        ${m.bio ? `<p class="directory-card-bio">${Security.escapeHTML(m.bio)}</p>` : ''}
         <div class="mithra-card-actions" onclick="event.stopPropagation()">
           ${actionBtnHtml}
           <button type="button" class="btn-mithra-view" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}')" title="සම්පූර්ණ පැතිකඩ බලන්න">
@@ -5900,6 +5956,7 @@ window.renderCommunityDirectory = async function(filtered = null) {
       </div>
     `;
   }).join('');
+  applyFriendsViewModeUI();
 };
 
 window.handleDirectoryMemberSearch = function(query) {
