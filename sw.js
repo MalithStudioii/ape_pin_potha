@@ -66,6 +66,7 @@ self.addEventListener('fetch', (event) => {
   // Bypass non-GET requests and cloud services (Firebase, YouTube, etc.)
   if (request.method !== 'GET') return;
   if (
+    url.pathname.includes('google') ||
     url.pathname.includes('admin.html') ||
     url.pathname.includes('admin.js') ||
     url.hostname.includes('firebase') ||
