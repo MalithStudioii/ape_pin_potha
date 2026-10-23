@@ -7156,13 +7156,9 @@ function initPWAEngine() {
         });
     });
 
-    // Auto-reload when new service worker takes over
-    let refreshing = false;
+    // Log when new service worker takes over (no auto-reload loop)
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (!refreshing) {
-        refreshing = true;
-        window.location.reload();
-      }
+      console.log('[PWA] Service Worker controller updated');
     });
   }
 
