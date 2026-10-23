@@ -253,11 +253,11 @@ const COVER_PRESETS = [
 
 // Initialize Application
 document.addEventListener('DOMContentLoaded', async () => {
+  initSmartHeaderScroll();
   const initResult = await StorageService.init();
   updateCloudBanner(initResult.isCloud);
   updateUserInfoUI();
   updateCommunityMemberCount();
-  initSmartHeaderScroll();
 
   // Load initial global announcement, daily verse, and Poya calendar from storage
   const initialAnnounce = StorageService.getAdminAnnouncement();
@@ -7310,52 +7310,60 @@ function initSmartHeaderScroll() {
   const header = document.querySelector('.app-header');
   if (!header) return;
 
-  let lastScrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
-  let ticking = false;
-  const scrollThreshold = 7; // Minimum delta (px) to prevent tiny touch jitter from triggering
-  const topBuffer = 40; // Near top of page, always show header & composer
+  const getScrollPos = () => {
+    return Math.max(
+      window.pageYOffset || 0,
+      window.scrollY || 0,
+      document.documentElement.scrollTop || 0,
+      document.body.scrollTop || 0
+    );
+  };
 
-  window.addEventListener('scroll', () => {
-    if (!ticking) {
-      window.requestAnimationFrame(() => {
-        const composer = document.querySelector('.composer-card');
-        const currentScrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
-        const maxScrollY = document.documentElement.scrollHeight - window.innerHeight;
+  let lastScrollY = getScrollPos();
+  let isHidden = false;
 
-        // Ignore bounce/rubber-banding at the edges (iOS & Android Chrome)
-        if (currentScrollY < 0 || currentScrollY > maxScrollY) {
-          ticking = false;
-          return;
-        }
+  const handleScrollAction = () => {
+    const currentScrollY = getScrollPos();
+    const composer = document.querySelector('.composer-card');
 
-        const scrollDiff = currentScrollY - lastScrollY;
-
-        // 1. If at/near top of page -> Always reveal header & composer
-        if (currentScrollY <= topBuffer) {
-          header.classList.remove('header-hidden');
-          composer?.classList.remove('composer-hidden');
-        }
-        // 2. If scrolling DOWN past threshold and not at top -> Hide header & composer
-        else if (scrollDiff > scrollThreshold && currentScrollY > 65) {
-          // Do not hide if dropdown or modal is currently open
-          const notifDropdown = document.getElementById('notificationsDropdown');
-          const isNotifOpen = notifDropdown && notifDropdown.style.display !== 'none';
-          const isModalOpen = document.body.classList.contains('modal-open') || !!document.querySelector('.modal.active, .modal-backdrop:not(.hidden)');
-          if (!isNotifOpen && !isModalOpen) {
-            header.classList.add('header-hidden');
-            composer?.classList.add('composer-hidden');
-          }
-        }
-        // 3. If scrolling UP past threshold -> Reveal header & composer instantly!
-        else if (scrollDiff < -scrollThreshold) {
-          header.classList.remove('header-hidden');
-          composer?.classList.remove('composer-hidden');
-        }
-
-        lastScrollY = currentScrollY;
-        ticking = false;
-      });
-      ticking = true;
+    // 1. Near the top of the feed (within 45px) -> Always reveal
+    if (currentScrollY <= 45) {
+      if (isHidden) {
+        header.classList.remove('header-hidden');
+        composer?.classList.remove('composer-hidden');
+        isHidden = false;
+      }
+      lastScrollY = currentScrollY;
+      return;
     }
-  }, { passive: true });
+
+    const diff = currentScrollY - lastScrollY;
+
+    // 2. Scrolling DOWN -> Hide both header & composer (minimum 6px downward movement)
+    if (diff > 6 && currentScrollY > 60) {
+      const notifDropdown = document.getElementById('notificationsDropdown');
+      const isNotifOpen = notifDropdown && notifDropdown.style.display !== 'none';
+      const isModalOpen = document.body.classList.contains('modal-open');
+
+      if (!isNotifOpen && !isModalOpen && !isHidden) {
+        header.classList.add('header-hidden');
+        composer?.classList.add('composer-hidden');
+        isHidden = true;
+      }
+    }
+    // 3. Scrolling UP -> Reveal both header & composer (minimum 6px upward swipe)
+    else if (diff < -6) {
+      if (isHidden) {
+        header.classList.remove('header-hidden');
+        composer?.classList.remove('composer-hidden');
+        isHidden = false;
+      }
+    }
+
+    lastScrollY = currentScrollY;
+  };
+
+  window.addEventListener('scroll', handleScrollAction, { passive: true });
+  document.addEventListener('scroll', handleScrollAction, { passive: true });
+  window.addEventListener('touchmove', handleScrollAction, { passive: true });
 }
