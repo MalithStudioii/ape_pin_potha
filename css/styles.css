@@ -3588,9 +3588,9 @@ body {
 
 /* Official Post Card Styling */
 .post-card.official-card {
-  border: 2px solid #f59e0b !important;
-  background: linear-gradient(to bottom, #fffdfa, #ffffff);
-  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.12) !important;
+  border: 1.5px solid rgba(217, 119, 6, 0.35) !important;
+  background: #ffffff;
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.08) !important;
   position: relative;
 }
 

@@ -1456,21 +1456,13 @@ function renderPostCardHTML(post, user) {
   return `
     <article class="post-card ${isNeed ? 'need-card' : ''} ${isRepost ? 'repost-card' : ''} ${post.isOfficial ? 'official-card' : ''}" id="post-elem-${post.id}">
       
-      <!-- Official Post or Pinned Banner -->
-      ${post.isOfficial ? `
-        <div class="official-post-banner">
-          <div style="display: flex; align-items: center; gap: 6px;">
-            <i class="fa-solid fa-certificate"></i>
-            <span>නිල නිවේදනයයි (Official Announcement)</span>
-          </div>
-          ${post.isPinned ? '<span class="pinned-tag"><i class="fa-solid fa-thumbtack"></i> Pinned</span>' : ''}
-        </div>
-      ` : (post.isPinned ? `
+      <!-- Pinned Banner (For non-official pinned posts) -->
+      ${(!post.isOfficial && post.isPinned) ? `
         <div style="background: rgba(217, 119, 6, 0.08); color: #b45309; padding: 6px 14px; font-size: 0.74rem; font-weight: 700; display: flex; align-items: center; gap: 6px; border-bottom: 1px dashed rgba(217,119,6,0.25);">
           <i class="fa-solid fa-thumbtack" style="transform: rotate(45deg); color: #d97706;"></i>
           <span>පවුරේ මුදුනටම අමුණා ඇත (Pinned to Top)</span>
         </div>
-      ` : '')}
+      ` : ''}
 
       <!-- Repost Header (If Reposted) -->
       ${isRepost ? `
@@ -1542,15 +1534,12 @@ function renderPostCardHTML(post, user) {
         <div class="post-header">
           <div class="post-author-info">
             ${post.isOfficial ? `
-              <div class="post-avatar official-avatar-circle" title="අපේ පිං පොත නිල නිවේදනය">
+              <div class="post-avatar official-avatar-circle" title="අපේ පිං පොත">
                 <i class="fa-solid fa-dharmachakra" style="font-size: 1.35rem; color: #fef3c7; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));"></i>
               </div>
               <div>
                 <div class="post-badges-wrap" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                   <span class="post-author-name official-author-name">අපේ පිං පොත</span>
-                  <span class="official-author-badge" style="background: linear-gradient(135deg, #d97706, #b45309); color: #ffffff; border: none; font-size: 0.68rem; font-weight: 800; padding: 2px 8px; border-radius: 9999px; box-shadow: 0 2px 6px rgba(217,119,6,0.25);">
-                    <i class="fa-solid fa-crown" style="color: #fde68a;"></i> නිල නිවේදනය
-                  </span>
                   ${post.visibility === 'private' ? '<span class="post-badge private"><i class="fa-solid fa-lock" style="font-size: 9px;"></i> Private</span>' : ''}
                 </div>
                 <div class="post-meta-sub">
@@ -3649,7 +3638,6 @@ window.openReelsViewer = function(initialPostId = null) {
             </div>
             <div>
               <span class="reels-author-name" onclick="closeReelsViewer(); viewUserProfile('${reel.uid}', '${Security.escapeHTML(authorName)}')">${Security.escapeHTML(authorName)}</span>
-              ${reel.isOfficial ? `<span class="official-author-badge" style="margin-left: 6px;"><i class="fa-solid fa-crown"></i> නිල නිවේදනය</span>` : ''}
             </div>
             <span class="reels-category-tag">${Security.escapeHTML(reel.category || 'ධර්ම දානමය')}</span>
           </div>
