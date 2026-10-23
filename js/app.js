@@ -1385,13 +1385,26 @@ function renderCommentsListHTML(postId, comments, user) {
 function appendCommentToDOM(postId, newComment) {
   const listEl = document.getElementById(`comments-list-${postId}`);
   if (!listEl) return;
+
+  const commentKey = newComment.id;
+  // If the comment was already rendered by reactive in-place sync, don't duplicate it!
+  if (commentKey) {
+    const existingEl = document.getElementById(`comment-bubble-${commentKey}`);
+    if (existingEl) {
+      try {
+        existingEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } catch (e) {}
+      return;
+    }
+  }
+
   const user = StorageService.currentUser;
   const existingBubbles = listEl.querySelectorAll('.comment-bubble').length;
   const commentHTML = renderSingleCommentHTML(newComment, postId, user, existingBubbles);
   listEl.insertAdjacentHTML('beforeend', commentHTML);
 
-  const commentKey = newComment.id || ('c_' + postId + '_' + existingBubbles);
-  const newEl = document.getElementById(`comment-bubble-${commentKey}`);
+  const finalKey = commentKey || ('c_' + postId + '_' + existingBubbles);
+  const newEl = document.getElementById(`comment-bubble-${finalKey}`);
   if (newEl) {
     try {
       newEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -2039,6 +2052,10 @@ window.submitQuickBlessing = async function(postId, text) {
     return;
   }
 
+  window._commentSubmitting = window._commentSubmitting || {};
+  if (window._commentSubmitting[postId]) return;
+  window._commentSubmitting[postId] = true;
+
   try {
     const box = document.getElementById(`comments-box-${postId}`);
     if (box) box.style.display = 'block';
@@ -2052,6 +2069,10 @@ window.submitQuickBlessing = async function(postId, text) {
     updatePostCommentCountUI(postId);
   } catch (err) {
     alert(err.message);
+  } finally {
+    setTimeout(() => {
+      delete window._commentSubmitting[postId];
+    }, 450);
   }
 };
 
@@ -2065,14 +2086,19 @@ window.handleCommentSubmit = async function(event, postId) {
   const input = document.getElementById(`comment-input-${postId}`);
   if (!input || !input.value.trim()) return;
 
+  window._commentSubmitting = window._commentSubmitting || {};
+  if (window._commentSubmitting[postId]) return;
+  window._commentSubmitting[postId] = true;
+
   const text = input.value.trim();
+  input.value = '';
+
   try {
     const box = document.getElementById(`comments-box-${postId}`);
     if (box) box.style.display = 'block';
     SoundService.playSadhu();
     triggerHaptic(20);
 
-    input.value = '';
     const newComment = await StorageService.addComment(postId, text);
     if (newComment) {
       appendCommentToDOM(postId, newComment);
@@ -2080,6 +2106,11 @@ window.handleCommentSubmit = async function(event, postId) {
     updatePostCommentCountUI(postId);
   } catch (err) {
     alert(err.message);
+    if (input) input.value = text;
+  } finally {
+    setTimeout(() => {
+      delete window._commentSubmitting[postId];
+    }, 450);
   }
 };
 
