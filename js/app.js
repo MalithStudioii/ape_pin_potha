@@ -7289,14 +7289,33 @@ window.showPwaUpdateToast = function () {
   }
 };
 
+window.dismissPwaUpdateToast = function () {
+  triggerHaptic(15);
+  const toast = document.getElementById('pwaUpdateToast');
+  if (toast) {
+    toast.classList.remove('visible');
+    setTimeout(() => {
+      toast.classList.add('hidden');
+    }, 250);
+  }
+};
+
 window.applyPwaUpdate = function () {
   triggerHaptic(30);
   SoundService?.playClick?.();
-  if (newWorkerWaiting) {
-    newWorkerWaiting.postMessage({ type: 'SKIP_WAITING' });
-  } else {
-    window.location.reload();
+  const toast = document.getElementById('pwaUpdateToast');
+  if (toast) {
+    toast.classList.remove('visible');
+    toast.classList.add('hidden');
   }
+  if (newWorkerWaiting) {
+    try {
+      newWorkerWaiting.postMessage({ type: 'SKIP_WAITING' });
+    } catch (e) {}
+  }
+  setTimeout(() => {
+    window.location.reload();
+  }, 150);
 };
 
 // ============================================================================

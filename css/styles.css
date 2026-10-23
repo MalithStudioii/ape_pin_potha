@@ -847,7 +847,27 @@ body {
   .sidebar {
     display: block;
     position: sticky;
-    top: 84px;
+    top: 76px;
+    max-height: calc(100vh - 86px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-bottom: 24px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(217, 119, 6, 0.3) transparent;
+  }
+
+  .sidebar::-webkit-scrollbar {
+    width: 5px;
+  }
+  .sidebar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .sidebar::-webkit-scrollbar-thumb {
+    background: rgba(217, 119, 6, 0.25);
+    border-radius: 9999px;
+  }
+  .sidebar::-webkit-scrollbar-thumb:hover {
+    background: rgba(217, 119, 6, 0.5);
   }
 }
 
