@@ -257,6 +257,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateCloudBanner(initResult.isCloud);
   updateUserInfoUI();
   updateCommunityMemberCount();
+  initSmartHeaderScroll();
 
   // Load initial global announcement, daily verse, and Poya calendar from storage
   const initialAnnounce = StorageService.getAdminAnnouncement();
@@ -784,6 +785,9 @@ window.switchTab = function(tab, pushHistory = true) {
     } catch (e) {}
   }
   activeTab = tab;
+
+  // Always reveal header when navigating between tabs
+  document.querySelector('.app-header')?.classList.remove('header-hidden');
 
   // Update navigation buttons (both desktop & mobile)
   ['feed', 'profile', 'mybook', 'needs', 'friends'].forEach(t => {
@@ -7298,3 +7302,56 @@ window.applyPwaUpdate = function () {
     window.location.reload();
   }
 };
+
+// ============================================================================
+// Smart Sticky Header (Facebook-Standard Auto-Hide on Scroll Down, Show on Scroll Up)
+// ============================================================================
+function initSmartHeaderScroll() {
+  const header = document.querySelector('.app-header');
+  if (!header) return;
+
+  let lastScrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+  let ticking = false;
+  const scrollThreshold = 7; // Minimum delta (px) to prevent tiny touch jitter from triggering
+  const topBuffer = 40; // Near top of page, always show header
+
+  window.addEventListener('scroll', () => {
+    if (!ticking) {
+      window.requestAnimationFrame(() => {
+        const currentScrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+        const maxScrollY = document.documentElement.scrollHeight - window.innerHeight;
+
+        // Ignore bounce/rubber-banding at the edges (iOS & Android Chrome)
+        if (currentScrollY < 0 || currentScrollY > maxScrollY) {
+          ticking = false;
+          return;
+        }
+
+        const scrollDiff = currentScrollY - lastScrollY;
+
+        // 1. If at/near top of page -> Always reveal header
+        if (currentScrollY <= topBuffer) {
+          header.classList.remove('header-hidden');
+        }
+        // 2. If scrolling DOWN past threshold and not at top -> Hide header
+        else if (scrollDiff > scrollThreshold && currentScrollY > 65) {
+          // Do not hide if dropdown or modal is currently open
+          const notifDropdown = document.getElementById('notificationsDropdown');
+          const isNotifOpen = notifDropdown && notifDropdown.style.display !== 'none';
+          const isModalOpen = document.body.classList.contains('modal-open') || !!document.querySelector('.modal.active, .modal-backdrop:not(.hidden)');
+          if (!isNotifOpen && !isModalOpen) {
+            header.classList.add('header-hidden');
+          }
+        }
+        // 3. If scrolling UP past threshold -> Reveal header instantly!
+        else if (scrollDiff < -scrollThreshold) {
+          header.classList.remove('header-hidden');
+        }
+
+        lastScrollY = currentScrollY;
+        ticking = false;
+      });
+      ticking = true;
+    }
+  }, { passive: true });
+}
