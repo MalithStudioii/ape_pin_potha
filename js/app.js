@@ -7304,7 +7304,7 @@ window.applyPwaUpdate = function () {
 };
 
 // ============================================================================
-// Smart Sticky Header (Facebook-Standard Auto-Hide on Scroll Down, Show on Scroll Up)
+// Smart Sticky Header & Composer (Facebook-Standard Auto-Hide on Scroll Down, Show on Scroll Up)
 // ============================================================================
 function initSmartHeaderScroll() {
   const header = document.querySelector('.app-header');
@@ -7313,11 +7313,12 @@ function initSmartHeaderScroll() {
   let lastScrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
   let ticking = false;
   const scrollThreshold = 7; // Minimum delta (px) to prevent tiny touch jitter from triggering
-  const topBuffer = 40; // Near top of page, always show header
+  const topBuffer = 40; // Near top of page, always show header & composer
 
   window.addEventListener('scroll', () => {
     if (!ticking) {
       window.requestAnimationFrame(() => {
+        const composer = document.querySelector('.composer-card');
         const currentScrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
         const maxScrollY = document.documentElement.scrollHeight - window.innerHeight;
 
@@ -7329,11 +7330,12 @@ function initSmartHeaderScroll() {
 
         const scrollDiff = currentScrollY - lastScrollY;
 
-        // 1. If at/near top of page -> Always reveal header
+        // 1. If at/near top of page -> Always reveal header & composer
         if (currentScrollY <= topBuffer) {
           header.classList.remove('header-hidden');
+          composer?.classList.remove('composer-hidden');
         }
-        // 2. If scrolling DOWN past threshold and not at top -> Hide header
+        // 2. If scrolling DOWN past threshold and not at top -> Hide header & composer
         else if (scrollDiff > scrollThreshold && currentScrollY > 65) {
           // Do not hide if dropdown or modal is currently open
           const notifDropdown = document.getElementById('notificationsDropdown');
@@ -7341,11 +7343,13 @@ function initSmartHeaderScroll() {
           const isModalOpen = document.body.classList.contains('modal-open') || !!document.querySelector('.modal.active, .modal-backdrop:not(.hidden)');
           if (!isNotifOpen && !isModalOpen) {
             header.classList.add('header-hidden');
+            composer?.classList.add('composer-hidden');
           }
         }
-        // 3. If scrolling UP past threshold -> Reveal header instantly!
+        // 3. If scrolling UP past threshold -> Reveal header & composer instantly!
         else if (scrollDiff < -scrollThreshold) {
           header.classList.remove('header-hidden');
+          composer?.classList.remove('composer-hidden');
         }
 
         lastScrollY = currentScrollY;
