@@ -1309,6 +1309,35 @@ window.playPostVideo = function(postId, videoId, isShorts) {
   window.openReelsViewer(postId);
 };
 
+function escapeRegex(str) {
+  return (str || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function formatCommentTextWithMentions(rawText) {
+  if (!rawText) return '';
+  let escaped = Security.escapeHTML(rawText);
+
+  // 1. If we have cached community members, match specific member names first
+  const members = window.allCommunityMembersCache || [];
+  if (Array.isArray(members) && members.length > 0) {
+    const sorted = [...members].sort((a, b) => ((b.name || '').length - (a.name || '').length));
+    sorted.forEach(m => {
+      if (!m.name || !m.name.trim()) return;
+      const escName = Security.escapeHTML(m.name.trim());
+      const pattern = new RegExp(`@${escapeRegex(escName)}(?=[\\s.,!?;:)]|$)`, 'g');
+      escaped = escaped.replace(pattern, `<span class="comment-mention-tag" onclick="event.stopPropagation(); viewUserProfile('${m.uid}', '${escName.replace(/'/g, "\\'")}')" title="${escName} ගේ Profile එක බලන්න">@${escName}</span>`);
+    });
+  }
+
+  // 2. Generic fallback for any other @name pattern
+  escaped = escaped.replace(/(^|\s)@([a-zA-Z0-9\u0D80-\u0DFF_.-]+)/g, (match, prefix, name) => {
+    if (match.includes('comment-mention-tag')) return match;
+    return `${prefix}<span class="comment-mention-tag" title="@${name}">@${name}</span>`;
+  });
+
+  return escaped;
+}
+
 // Render single comment / blessing HTML with author profile picture, edit controls & WhatsApp-style emoji reactions
 function renderSingleCommentHTML(c, postId, user, index) {
   if (!c) return '';
@@ -1352,7 +1381,7 @@ function renderSingleCommentHTML(c, postId, user, index) {
           </div>
         </div>
 
-        <div class="comment-body" id="comment-body-${commentKey}">${Security.escapeHTML(c.text)}</div>
+        <div class="comment-body" id="comment-body-${commentKey}">${formatCommentTextWithMentions(c.text)}</div>
 
         <!-- WhatsApp-Style Emoji Reactions Bar on the corner of the prayer -->
         <div class="comment-reactions-footer">
@@ -1684,8 +1713,9 @@ function renderPostCardHTML(post, user) {
           ${renderCommentsListHTML(post.id, comments, user)}
         </div>
 
-        <form class="comment-form" onsubmit="handleCommentSubmit(event, '${post.id}')">
-          <input type="text" id="comment-input-${post.id}" class="comment-input" required placeholder="${isGeneral ? 'සුබපැතුමක් හෝ සටහනක් එක් කරන්න...' : 'පුණ්‍යානුමෝදනා සටහනක් එක් කරන්න...'}">
+        <form class="comment-form" onsubmit="handleCommentSubmit(event, '${post.id}')" style="position: relative;">
+          <input type="text" id="comment-input-${post.id}" class="comment-input" required placeholder="${isGeneral ? 'සුබපැතුමක් හෝ සටහනක් එක් කරන්න...' : 'පුණ්‍යානුමෝදනා සටහනක් එක් කරන්න...'}" oninput="handleCommentInputMention(this, '${post.id}')" onkeydown="handleCommentInputKeydown(event, '${post.id}')" autocomplete="off">
+          <div id="mention-dropdown-${post.id}" class="mention-autocomplete-dropdown hidden"></div>
           <button type="submit" class="comment-send-btn">
             <i class="fa-solid fa-paper-plane"></i>
           </button>
@@ -2102,6 +2132,169 @@ window.handleCommentSubmit = async function(event, postId) {
     }, 450);
   }
 };
+
+// ============================================================================
+// @Mention Autocomplete & Handling System in Prayers / Comments
+// ============================================================================
+let activeMentionContext = null;
+
+async function getMembersForMention() {
+  if (window.allCommunityMembersCache && window.allCommunityMembersCache.length > 0) {
+    return window.allCommunityMembersCache;
+  }
+  try {
+    const members = await StorageService.getAllCommunityMembers();
+    window.allCommunityMembersCache = members;
+    return members;
+  } catch (e) {
+    return [];
+  }
+}
+
+window.handleCommentInputMention = async function (input, postId) {
+  if (!input) return;
+  const cursorPos = input.selectionStart || 0;
+  const val = input.value || '';
+  const textBeforeCursor = val.slice(0, cursorPos);
+
+  const match = textBeforeCursor.match(/(?:^|\s)@([a-zA-Z0-9\u0D80-\u0DFF_.\s-]*)$/);
+  const dropdown = document.getElementById(`mention-dropdown-${postId}`);
+
+  if (!match) {
+    if (dropdown) dropdown.classList.add('hidden');
+    activeMentionContext = null;
+    return;
+  }
+
+  const query = match[1].toLowerCase();
+  const atIndex = textBeforeCursor.lastIndexOf('@');
+
+  const allMembers = await getMembersForMention();
+  const curUser = StorageService.currentUser || {};
+  const friends = Array.isArray(curUser.mithrayan) ? curUser.mithrayan : [];
+
+  let filtered = allMembers.filter(m => {
+    if (m.uid && curUser.uid && m.uid === curUser.uid) return false;
+    if (!query) return true;
+    const name = (m.name || '').toLowerCase();
+    const loc = (m.location || '').toLowerCase();
+    return name.includes(query) || loc.includes(query);
+  });
+
+  filtered.sort((a, b) => {
+    const aFriend = friends.includes(a.uid);
+    const bFriend = friends.includes(b.uid);
+    if (aFriend && !bFriend) return -1;
+    if (!aFriend && bFriend) return 1;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+
+  const results = filtered.slice(0, 6);
+
+  if (results.length === 0 || !dropdown) {
+    if (dropdown) dropdown.classList.add('hidden');
+    activeMentionContext = null;
+    return;
+  }
+
+  activeMentionContext = {
+    postId,
+    input,
+    atIndex,
+    results,
+    selectedIndex: 0
+  };
+
+  renderMentionDropdown(dropdown, results, 0, postId);
+};
+
+function renderMentionDropdown(dropdown, results, selectedIndex, postId) {
+  const curUser = StorageService.currentUser || {};
+  const friends = Array.isArray(curUser.mithrayan) ? curUser.mithrayan : [];
+
+  dropdown.innerHTML = results.map((m, idx) => {
+    const isFriend = friends.includes(m.uid);
+    const initial = (m.name || 'ක').charAt(0);
+    const isSelected = idx === selectedIndex;
+    const safeName = Security.escapeHTML(m.name || 'කල්‍යාණ මිත්‍ර');
+    const jsName = safeName.replace(/'/g, "\\'");
+    return `
+      <div class="mention-item ${isSelected ? 'selected' : ''}" 
+           onmousedown="event.preventDefault(); selectMentionMember('${postId}', '${m.uid}', '${jsName}')" 
+           data-idx="${idx}">
+        <div class="mention-avatar">
+          ${m.photo ? `<img src="${Security.sanitizeUrl(m.photo)}" alt="${safeName}" onerror="this.parentElement.innerText='${initial}'">` : initial}
+        </div>
+        <div class="mention-info">
+          <div class="mention-name">
+            ${safeName}
+            ${m.isAdmin ? '<i class="fa-solid fa-crown" style="color: #f59e0b; font-size: 0.68rem;" title="Master Admin"></i>' : ''}
+          </div>
+          ${m.location ? `<div class="mention-sub"><i class="fa-solid fa-location-dot" style="font-size: 8px; color: #ea580c;"></i> ${Security.escapeHTML(m.location)}</div>` : ''}
+        </div>
+        ${isFriend ? '<span class="mention-badge"><i class="fa-solid fa-heart" style="font-size: 7px;"></i> මිතුරෙකි</span>' : ''}
+      </div>
+    `;
+  }).join('');
+
+  dropdown.classList.remove('hidden');
+}
+
+window.selectMentionMember = function(postId, uid, memberName) {
+  if (!activeMentionContext) return;
+  const input = activeMentionContext.input;
+  if (!input) return;
+
+  const val = input.value || '';
+  const atIndex = activeMentionContext.atIndex;
+  const cursorPos = input.selectionStart || val.length;
+
+  const beforeAt = val.slice(0, atIndex);
+  const afterCursor = val.slice(cursorPos);
+  const insertText = `@${memberName} `;
+
+  input.value = beforeAt + insertText + afterCursor;
+
+  const newPos = beforeAt.length + insertText.length;
+  input.setSelectionRange(newPos, newPos);
+  input.focus();
+
+  const dropdown = document.getElementById(`mention-dropdown-${postId}`);
+  if (dropdown) dropdown.classList.add('hidden');
+  activeMentionContext = null;
+};
+
+window.handleCommentInputKeydown = function(event, postId) {
+  if (!activeMentionContext || !activeMentionContext.results.length) return;
+  const dropdown = document.getElementById(`mention-dropdown-${postId}`);
+  if (!dropdown || dropdown.classList.contains('hidden')) return;
+
+  if (event.key === 'ArrowDown') {
+    event.preventDefault();
+    activeMentionContext.selectedIndex = (activeMentionContext.selectedIndex + 1) % activeMentionContext.results.length;
+    renderMentionDropdown(dropdown, activeMentionContext.results, activeMentionContext.selectedIndex, postId);
+  } else if (event.key === 'ArrowUp') {
+    event.preventDefault();
+    activeMentionContext.selectedIndex = (activeMentionContext.selectedIndex - 1 + activeMentionContext.results.length) % activeMentionContext.results.length;
+    renderMentionDropdown(dropdown, activeMentionContext.results, activeMentionContext.selectedIndex, postId);
+  } else if (event.key === 'Enter' || event.key === 'Tab') {
+    event.preventDefault();
+    const sel = activeMentionContext.results[activeMentionContext.selectedIndex];
+    if (sel) {
+      selectMentionMember(postId, sel.uid, sel.name);
+    }
+  } else if (event.key === 'Escape') {
+    dropdown.classList.add('hidden');
+    activeMentionContext = null;
+  }
+};
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.comment-form') && !e.target.closest('.reels-comment-input-wrap')) {
+    document.querySelectorAll('.mention-autocomplete-dropdown').forEach(d => d.classList.add('hidden'));
+    activeMentionContext = null;
+  }
+});
 
 // WhatsApp-Style Emoji Reaction Controls
 window.toggleCommentEmojiPicker = function(event, postId, commentKey) {
@@ -4088,7 +4281,7 @@ window.renderReelCommentsList = function(post) {
             <span class="reels-comment-author" onclick="closeReelsViewer(); viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(cAuthorName)}')">${Security.escapeHTML(cAuthorName)}</span>
             <span class="reels-comment-time">${Security.escapeHTML(formatRelativeTimeSinhala(c.timestamp, c.time || 'දැන්'))}</span>
           </div>
-          <div class="reels-comment-text">${Security.escapeHTML(c.text)}</div>
+          <div class="reels-comment-text">${formatCommentTextWithMentions(c.text)}</div>
         </div>
       </div>
     `;
@@ -5620,6 +5813,8 @@ window.renderNotificationsList = function() {
       typeIconHtml = '<span class="notif-type-icon sadhu" title="සාදුකාරයක්">🙏</span>';
     } else if (n.type === 'comment') {
       typeIconHtml = '<span class="notif-type-icon comment" title="පුණ්‍යානුමෝදනාවක්"><i class="fa-solid fa-comment" style="font-size: 8px;"></i></span>';
+    } else if (n.type === 'mention') {
+      typeIconHtml = '<span class="notif-type-icon mention" title="ඔබව සිහිපත් කළාය" style="background: #fef3c7; color: #d97706;"><i class="fa-solid fa-at" style="font-size: 9px;"></i></span>';
     } else if (n.type === 'mithra_request') {
       typeIconHtml = '<span class="notif-type-icon mithra" title="කල්‍යාණ මිත්‍ර ඇරයුම">🪷</span>';
       if (!isAccepted && !isDeclined && (!n.status || n.status === 'pending')) {
@@ -5729,6 +5924,10 @@ window.handleNotificationClick = async function(notifId, postId, postType) {
     if (elem) {
       elem.scrollIntoView({ behavior: 'smooth', block: 'center' });
       elem.classList.add('highlight-post-pulse');
+      if (postType === 'comment' || postType === 'mention') {
+        const box = document.getElementById(`comments-box-${postId}`);
+        if (box) box.style.display = 'block';
+      }
       setTimeout(() => {
         elem.classList.remove('highlight-post-pulse');
       }, 3000);

@@ -51,12 +51,12 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=79">
+    <link rel="stylesheet" href="css/styles.css?v=80">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
       (function() {
-        var v = 'v79';
+        var v = 'v80';
         if (localStorage.getItem('pinPotha_active_build') !== v) {
           localStorage.setItem('pinPotha_active_build', v);
           if ('caches' in window) {
@@ -2317,8 +2317,9 @@
                     <div class="reels-comment-user-avatar" id="reelsDrawerUserAvatar">
                         <!-- Current user's avatar image or letter -->
                     </div>
-                    <div class="reels-comment-input-wrap">
-                        <input type="text" id="reelsCommentInput" class="reels-comment-input" placeholder="පුණ්‍යානුමෝදනාවක් හෝ ප්‍රාර්ථනාවක් ලියන්න..." maxlength="300" autocomplete="off" required>
+                    <div class="reels-comment-input-wrap" style="position: relative;">
+                        <input type="text" id="reelsCommentInput" class="reels-comment-input" placeholder="පුණ්‍යානුමෝදනාවක් හෝ ප්‍රාර්ථනාවක් ලියන්න..." maxlength="300" autocomplete="off" required oninput="handleCommentInputMention(this, 'reels')" onkeydown="handleCommentInputKeydown(event, 'reels')">
+                        <div id="mention-dropdown-reels" class="mention-autocomplete-dropdown hidden"></div>
                     </div>
                     <button type="submit" class="reels-comment-send-btn" id="reelsCommentSubmitBtn" title="එක් කරන්න">
                         <i class="fa-solid fa-paper-plane"></i>
@@ -2458,6 +2459,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=79"></script>
+    <script type="module" src="js/app.js?v=80"></script>
 </body>
 </html>

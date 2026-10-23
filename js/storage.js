@@ -1640,6 +1640,31 @@ export const StorageService = {
       });
     }
 
+    // Trigger Notification for Mentioned Members (@Mention)
+    if (val.text && val.text.includes('@')) {
+      const allMembers = (this._cachedCommunityMembers && this._cachedCommunityMembers.length > 0)
+        ? this._cachedCommunityMembers
+        : this.getLocalPosts().map(p => ({ uid: p.uid, name: p.author }));
+      const notifiedUids = new Set();
+      if (targetPost && targetPost.uid) notifiedUids.add(targetPost.uid);
+
+      allMembers.forEach(m => {
+        if (m.uid && m.uid !== this.currentUser?.uid && m.name && !notifiedUids.has(m.uid)) {
+          if (val.text.includes(`@${m.name}`)) {
+            notifiedUids.add(m.uid);
+            const snippet = val.text.length > 45 ? val.text.substring(0, 45) + '...' : val.text;
+            this.createNotification({
+              recipientUid: m.uid,
+              type: 'mention',
+              postId: targetPost ? targetPost.id : postId,
+              postTitle: targetPost?.title || 'පින්කම',
+              message: `ප්‍රාර්ථනාවකදී ඔබව සිහිපත් කළාය: "${snippet}"`
+            });
+          }
+        }
+      });
+    }
+
     return commentObj;
   },
 
