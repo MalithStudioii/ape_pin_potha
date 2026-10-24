@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>නිල ආරාධනා පත්‍රය - අපේ පිං පොත (Ape Pin Potha Official Letterhead)</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Sinhala:wght@400;500;600;700;800&family=Noto+Serif+Sinhala:wght@600;700;800&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <style>
+        :root {
+            --primary-gold: #b45309;
+            --accent-gold: #d97706;
+            --light-gold: #fef3c7;
+            --text-dark: #1e293b;
+            --text-muted: #475569;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Noto Sans Sinhala', 'Outfit', sans-serif;
+            background: #f1f5f9;
+            color: var(--text-dark);
+            line-height: 1.65;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        /* Floating Action Toolbar */
+        .toolbar {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            background: #1e293b;
+            color: #ffffff;
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .toolbar-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.95rem;
+            font-weight: 700;
+        }
+
+        .toolbar-title span {
+            color: #fde68a;
+        }
+
+        .btn-print {
+            background: linear-gradient(135deg, #d97706, #b45309);
+            color: #ffffff;
+            border: none;
+            padding: 10px 22px;
+            border-radius: 9999px;
+            font-weight: 700;
+            font-size: 0.92rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(217, 119, 6, 0.35);
+            transition: all 0.2s ease;
+        }
+
+        .btn-print:hover {
+            background: linear-gradient(135deg, #b45309, #92400e);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(217, 119, 6, 0.45);
+        }
+
+        /* A4 Page Container */
+        .page-wrap {
+            max-width: 210mm;
+            margin: 28px auto 40px auto;
+            background: #ffffff;
+            min-height: 297mm;
+            padding: 18mm 20mm 16mm 20mm;
+            box-shadow: 0 10px 35px rgba(0, 0, 0, 0.12);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        /* Watermark */
+        .watermark {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 380px;
+            height: 380px;
+            opacity: 0.035;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .content-layer {
+            position: relative;
+            z-index: 2;
+        }
+
+        /* Letterhead Header */
+        .letterhead-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 14px;
+            border-bottom: 3px double #d97706;
+            margin-bottom: 20px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo-wrap {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #d97706, #92400e);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #fef3c7;
+            box-shadow: 0 3px 10px rgba(217, 119, 6, 0.3);
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+
+        .logo-wrap img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .title-box h1 {
+            font-family: 'Noto Serif Sinhala', serif;
+            font-size: 1.7rem;
+            font-weight: 800;
+            color: #78350f;
+            line-height: 1.15;
+            letter-spacing: 0.2px;
+        }
+
+        .title-box .eng-name {
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: #b45309;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+        }
+
+        .title-box .tagline {
+            font-size: 0.72rem;
+            color: #64748b;
+            font-weight: 600;
+            margin-top: 2px;
+        }
+
+        .header-right {
+            text-align: right;
+            font-size: 0.76rem;
+            color: #475569;
+            line-height: 1.45;
+        }
+
+        .header-right .domain-pill {
+            display: inline-block;
+            background: #fffbeb;
+            color: #b45309;
+            font-weight: 700;
+            border: 1px solid #fde68a;
+            padding: 3px 10px;
+            border-radius: 9999px;
+            margin-bottom: 5px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.82rem;
+        }
+
+        /* Letter Meta */
+        .letter-meta {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 16px;
+            font-size: 0.86rem;
+            color: #334155;
+            font-weight: 600;
+        }
+
+        .recipient-box {
+            margin-bottom: 18px;
+            font-size: 0.88rem;
+            line-height: 1.6;
+        }
+
+        .recipient-box strong {
+            color: #0f172a;
+            font-size: 0.94rem;
+        }
+
+        /* Subject Box */
+        .subject-box {
+            background: rgba(254, 243, 199, 0.45);
+            border-left: 4px solid #d97706;
+            border-right: 1px solid rgba(217, 119, 6, 0.2);
+            border-top: 1px solid rgba(217, 119, 6, 0.2);
+            border-bottom: 1px solid rgba(217, 119, 6, 0.2);
+            padding: 10px 14px;
+            border-radius: 0 8px 8px 0;
+            margin-bottom: 18px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #78350f;
+            line-height: 1.5;
+        }
+
+        /* Letter Body */
+        .letter-body {
+            font-size: 0.88rem;
+            color: #1e293b;
+            text-align: justify;
+            line-height: 1.7;
+        }
+
+        .letter-body p {
+            margin-bottom: 12px;
+            text-indent: 26px;
+        }
+
+        .letter-body .no-indent {
+            text-indent: 0;
+        }
+
+        .salutation {
+            font-weight: 700;
+            color: #78350f;
+            margin-bottom: 8px !important;
+            font-size: 0.94rem;
+        }
+
+        /* Key Highlights Box */
+        .highlights-card {
+            background: #fffdf7;
+            border: 1px solid #fde68a;
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin: 14px 0 16px 0;
+        }
+
+        .highlights-card h4 {
+            font-size: 0.86rem;
+            color: #92400e;
+            font-weight: 700;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .highlights-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+            font-size: 0.84rem;
+        }
+
+        .highlights-list li {
+            position: relative;
+            padding-left: 20px;
+            line-height: 1.55;
+        }
+
+        .highlights-list li::before {
+            content: "❖";
+            position: absolute;
+            left: 0;
+            color: #d97706;
+            font-size: 0.78rem;
+        }
+
+        .highlights-list strong {
+            color: #78350f;
+        }
+
+        /* Contact Details Card */
+        .contact-pill-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            background: #f8fafc;
+            border: 1px dashed #cbd5e1;
+            padding: 10px 14px;
+            border-radius: 8px;
+            margin: 14px 0 18px 0;
+            font-size: 0.82rem;
+        }
+
+        .contact-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #334155;
+        }
+
+        .contact-item i {
+            color: #d97706;
+            width: 14px;
+        }
+
+        /* Signature Section */
+        .signature-section {
+            margin-top: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            font-size: 0.88rem;
+        }
+
+        .closing-text {
+            color: #78350f;
+            font-weight: 700;
+            margin-bottom: 30px;
+        }
+
+        .sign-box {
+            text-align: left;
+            line-height: 1.45;
+        }
+
+        .sign-box strong {
+            font-size: 0.94rem;
+            color: #0f172a;
+        }
+
+        .sign-box .role-desc {
+            font-size: 0.8rem;
+            color: #64748b;
+        }
+
+        /* Letterhead Footer */
+        .letterhead-footer {
+            margin-top: 24px;
+            padding-top: 10px;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.72rem;
+            color: #94a3b8;
+        }
+
+        .footer-left {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .footer-left i {
+            color: #d97706;
+        }
+
+        /* Print Media Styles */
+        @media print {
+            body {
+                background: #ffffff !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+
+            .page-wrap {
+                margin: 0 !important;
+                padding: 12mm 16mm 10mm 16mm !important;
+                box-shadow: none !important;
+                max-width: 100% !important;
+                min-height: 100vh !important;
+                page-break-after: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Floating Top Toolbar (Hidden on Print) -->
+    <div class="toolbar no-print">
+        <div class="toolbar-title">
+            <i class="fa-solid fa-file-contract" style="color: #f59e0b; font-size: 1.1rem;"></i>
+            <span>අපේ පිං පොත</span> | නිල ආරාධනා ලිපිය (Official Letterhead)
+        </div>
+        <button type="button" class="btn-print" onclick="window.print()">
+            <i class="fa-solid fa-print"></i> A4 මුද්‍රණය කරන්න / PDF සුරකින්න
+        </button>
+    </div>
+
+    <!-- Printable A4 Document Sheet -->
+    <div class="page-wrap">
+        
+        <!-- Subtle Center Dharmachakra Watermark -->
+        <img src="assets/icon-192.png" alt="Ape Pin Potha Watermark" class="watermark" onerror="this.style.display='none'">
+
+        <div class="content-layer">
+
+            <!-- Official Header -->
+            <header class="letterhead-header">
+                <div class="header-left">
+                    <div class="logo-wrap">
+                        <img src="assets/icon-192.png" alt="අපේ පිං පොත ලාංඡනය" onerror="this.parentElement.innerHTML='<i class=\'fa-solid fa-dharmachakra\' style=\'color:#ffffff; font-size: 2rem;\'></i>'">
+                    </div>
+                    <div class="title-box">
+                        <h1>අපේ පිං පොත</h1>
+                        <div class="eng-name">Ape Pin Potha</div>
+                        <div class="tagline">ශ්‍රී ලාංකේය ඩිජිටල් පුණ්‍ය වේදිකාව • Free Buddhist Spiritual Sanctuary</div>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <div class="domain-pill">🌐 apepinpotha.lk</div>
+                    <div><strong>විද්‍යුත් තැපෑල:</strong> supportnexiapro@gmail.com</div>
+                    <div><strong>සංවර්ධන පියවර:</strong> නිල දියත් කිරීම (Official Launch)</div>
+                </div>
+            </header>
+
+            <!-- Letter Meta (Date & Reference) -->
+            <div class="letter-meta">
+                <div><strong>ලිපි අංකය:</strong> APP/OFFICIAL/2026/01</div>
+                <div><strong>දිනය:</strong> 2026 ඔක්තෝබර් 24</div>
+            </div>
+
+            <!-- Recipient Information -->
+            <div class="recipient-box">
+                <strong>ගරු මාධ්‍ය සම්බන්ධීකාරක / ලේකම් මහතාණෙනි,</strong><br>
+                (පූජ්‍ය වැලිමඩ සද්ධාසීල ස්වාමීන් වහන්සේ / පූජ්‍ය මැස්සන්නේ විජිත ස්වාමීන් වහන්සේගේ නිල මාධ්‍ය අංශය වෙත),<br>
+                ශ්‍රී ලංකාව.
+            </div>
+
+            <!-- Subject Line -->
+            <div class="subject-box">
+                විෂය: පූජනීය මහා සංඝරත්නයේ උතුම් ධර්ම දේශනා සහ සදහම් පණිවිඩ ලෝවාසී බෞද්ධ ජනතාව වෙත ගෙන යාම උදෙසා නිර්මාණය කළ "අපේ පිං පොත" (apepinpotha.lk) ඩිජිටල් පුණ්‍ය වේදිකාව හා නිල වශයෙන් එක්වීමට කෙරෙන කාරුණික ආරාධනයයි.
+            </div>
+
+            <!-- Letter Body Content -->
+            <div class="letter-body">
+                <p class="salutation no-indent">අවසරයි ගෞරවනීය ස්වාමීන් වහන්ස / ගෞරවනීය මහත්මයාණෙනි,</p>
+
+                <p>
+                    නමස්කාර පූර්වකව ඉතාමත් ගෞරවයෙන් දන්වා සිටින වග නම්, වර්තමාන ඩිජිටල් යුගය තුළ ලෝවාසී ශ්‍රී ලාංකික බෞද්ධ ජනතාව, විශේෂයෙන්ම තරුණ පරපුර සමාජ මාධ්‍ය තුළ විවිධ අකුසල සහගත, අනවශ්‍ය අරමුණු ඔස්සේ කාලය නාස්ති කරගන්නා පසුබිමක; බෞද්ධ සැදැහැවතුන්ගේ සිත නිරන්තරයෙන් කුසලයෙහි පිහිටුවීම, තමන් සිදුකරන දාන, ශීල, භාවනාදී පුණ්‍යකර්මයන් ඩිජිටල් ලෙස සටහන් කරගැනීම සහ එකිනෙකා අතර පින් අනුමෝදන් කරගැනීම උදෙසා <strong>"අපේ පිං පොත" (www.apepinpotha.lk)</strong> නමින් සම්පූර්ණයෙන්ම නොමිලේ පවත්වාගෙන යනු ලබන ස්වාධීන, පිරිසිදු බෞද්ධ සමාජ වේදිකාවක් (Buddhist Spiritual Sanctuary) මා විසින් නිර්මාණය කර දියත් කිරීමට සියලු කටයුතු සූදානම් කර ඇත.
+                </p>
+
+                <p>
+                    මෙය කිසිදු වාණිජමය හෝ මුදල් ඉපැයීමේ පරමාර්ථයකින් තොරව, ලෝකවාසී සුවහසක් සැදැහැවතුන්ගේ සසර මඟ සුගතිගාමී කරවීම උදෙසා සිදුකරන ලද උතුම් ධර්ම දානමය සමාජ සත්කාරයකි. අපේ රටේ අතිමහත් ජනතාවක් අතිශය ශ්‍රද්ධාවෙන් යුතුව ධර්මය ශ්‍රවණය කරන අපගේ <strong>ගෞරවනීය ස්වාමීන් වහන්සේගේ</strong> උතුම් දේශනා, සදහම් උපදෙස්, ආශිර්වාද සහ කෙටි ධර්ම වීඩියෝ (Short Dharma Clips) අපේ පිං පොත පරිශීලනය කරන ලක්ෂ සංඛ්‍යාත සැදැහැවතුන්ගේ දෛනික ජීවිතයට සමීප කරවීම අපගේ ඒකායන අරමුණයි.
+                </p>
+
+                <!-- Key Highlights Card -->
+                <div class="highlights-card">
+                    <h4><i class="fa-solid fa-dharmachakra"></i> උන්වහන්සේගේ නිල මාධ්‍ය අංශය වෙනුවෙන් "අපේ පිං පොත" සලසන පහසුකම්:</h4>
+                    <ul class="highlights-list">
+                        <li>
+                            <strong>විශේෂ නිල සංඝ සත්‍යාපිත ගිණුම (Verified Monastic Profile):</strong> උන්වහන්සේගේ ඡායාරූපය සහ නිල ලාංඡනය සහිතව, ගෞරවනීය ලෙස දෛනික ධර්ම සටහන් සහ පණිවිඩ පළ කිරීම සඳහා නිල ඉඩක් ලබාදීම.
+                        </li>
+                        <li>
+                            <strong>"පුණ්‍ය දැක්ම" (Dharma Shorts / Video Feed):</strong> උන්වහන්සේගේ නිල YouTube / Facebook මාධ්‍ය ඔස්සේ පළවන කෙටි ධර්ම දේශනා සහ වීඩියෝ සෘජුවම අපගේ පද්ධතිය තුළ සැදැහැවතුන්ට නැරඹීමට සහ අනුමෝදන් වීමට අවස්ථාව සැලසීම.
+                        </li>
+                        <li>
+                            <strong>පිරිසිදු බෞද්ධ පරිසරය (Ad-Free & Spiritual):</strong> කිසිදු වාණිජ වෙළඳ දැන්වීමක් නොමැති, සැදැහැවතුන්ට සිත පහදවාගත හැකි සන්සුන් ඩිජිටල් පරිසරයක් සහතික කිරීම.
+                        </li>
+                    </ul>
+                </div>
+
+                <p>
+                    මෙම උතුම් ධර්ම සත්කාරය සාර්ථක කරගැනීම සඳහා ගෞරවනීය ස්වාමීන් වහන්සේගේ උතුම් ආශිර්වාදය අප වෙත ප්‍රදානය කරන මෙන්ද, උන්වහන්සේගේ නිල මාධ්‍ය කණ්ඩායම හරහා මේ පිළිබඳව කෙටි සාකච්ඡාවකට හෝ නිල සම්බන්ධීකරණයකට අවස්ථාවක් ලබාදෙන මෙන්ද ඉතාමත් ගෞරවයෙන් හා බැති සිතින් යුතුව ඉල්ලා සිටිමි.
+                </p>
+
+                <!-- Contact Grid -->
+                <div class="contact-pill-grid">
+                    <div class="contact-item">
+                        <i class="fa-solid fa-globe"></i>
+                        <span><strong>නිල වෙබ් අඩවිය:</strong> https://apepinpotha.lk</span>
+                    </div>
+                    <div class="contact-item">
+                        <i class="fa-solid fa-envelope"></i>
+                        <span><strong>විද්‍යුත් තැපෑල:</strong> supportnexiapro@gmail.com</span>
+                    </div>
+                    <div class="contact-item">
+                        <i class="fa-solid fa-laptop-code"></i>
+                        <span><strong>පූර්ව දසුන:</strong> malithstudioii.github.io/ape_pin_potha_beta/</span>
+                    </div>
+                    <div class="contact-item">
+                        <i class="fa-solid fa-phone"></i>
+                        <span><strong>දුරකථන අංකය:</strong> +94 (ඔබගේ අංකය ඇතුළත් කරන්න)</span>
+                    </div>
+                </div>
+
+                <!-- Signoff Section -->
+                <div class="signature-section">
+                    <div>
+                        <div class="closing-text">තෙරුවන් සරණයි!</div>
+                        <div class="sign-box">
+                            <strong>මලිත් දුෂාන්ත (Malith Dushantha)</strong><br>
+                            <span class="role-desc">නිර්මාතෘ සහ මෘදුකාංග ඉංජිනේරු (Founder & Lead Developer)</span><br>
+                            <span style="font-size: 0.78rem; color: #b45309; font-weight: 700;">"අපේ පිං පොත" ව්‍යාපෘතිය</span>
+                        </div>
+                    </div>
+
+                    <div style="text-align: right;">
+                        <div style="display: inline-block; border-bottom: 1px dashed #94a3b8; width: 140px; margin-bottom: 6px;"></div>
+                        <div style="font-size: 0.76rem; color: #64748b;">(අත්සන හා දිනය)</div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- Official Letterhead Footer -->
+        <footer class="letterhead-footer">
+            <div class="footer-left">
+                <i class="fa-solid fa-dharmachakra"></i>
+                <span>නොමිලේ ලබාදෙන ඩිජිටල් බෞද්ධ සත්කාරයකි • Non-Commercial Spiritual Platform</span>
+            </div>
+            <div>apepinpotha.lk • පිටුව 01 / 01</div>
+        </footer>
+
+    </div>
+
+</body>
+</html>
