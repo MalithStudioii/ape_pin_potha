@@ -3866,7 +3866,7 @@ body {
   justify-content: center !important;
   background: linear-gradient(135deg, #d97706, #92400e) !important;
   color: #ffffff !important;
-  border: 2px solid #fbbf24 !important;
+  border: 1.5px solid #fbbf24 !important;
   box-shadow: 0 3px 10px rgba(217, 119, 6, 0.3) !important;
   box-sizing: border-box !important;
 }
@@ -3875,15 +3875,15 @@ body {
   position: absolute !important;
   top: 50% !important;
   left: 50% !important;
-  width: 140% !important;
-  height: 140% !important;
-  transform: translate(-49%, -50%) !important;
+  width: 124% !important;
+  height: 124% !important;
+  transform: translate(-50%, -50%) !important;
   pointer-events: none !important;
   z-index: 10 !important;
-  filter: drop-shadow(0 3px 6px rgba(180, 83, 9, 0.5)) !important;
+  filter: drop-shadow(0 2px 4px rgba(180, 83, 9, 0.45)) !important;
 }
 
-/* Specific fine-tuning for Member Profile Modal Avatar */
+/* Specific fine-tuning for Member Profile Modal Avatar (larger size) */
 .member-avatar-ring.sangha-framed-avatar {
   overflow: visible !important;
   border: none !important;
@@ -3901,14 +3901,15 @@ body {
   justify-content: center !important;
   background: linear-gradient(135deg, #d97706, #92400e) !important;
   color: #ffffff !important;
-  border: 4px solid #fef3c7 !important;
-  box-shadow: 0 5px 18px rgba(0, 0, 0, 0.22) !important;
+  border: 2px solid #fbbf24 !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2) !important;
+  box-sizing: border-box !important;
 }
 
 .member-avatar-ring.sangha-framed-avatar .sangha-vatapatha-frame {
-  width: 144% !important;
-  height: 144% !important;
-  transform: translate(-49%, -50%) !important;
+  width: 124% !important;
+  height: 124% !important;
+  transform: translate(-50%, -50%) !important;
 }
 
 .official-avatar-circle {
