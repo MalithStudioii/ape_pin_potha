@@ -578,21 +578,31 @@ window.openMemberProfileModal = async function(uid, authorName) {
   const coverImg = document.getElementById('memCoverImg');
   if (coverImg) coverImg.src = member.coverImage || 'assets/banner.jpg';
 
+  const isSangha = StorageService.isSangha(member);
+  const isMaster = StorageService.isMasterAdmin();
+  const currentUid = StorageService.currentUser?.uid;
+
   const avatarWrap = document.getElementById('memAvatarWrap');
   if (avatarWrap) {
-    if (member.photo) {
-      avatarWrap.innerHTML = `<img src="${member.photo}" alt="${member.name}" onerror="this.parentElement.innerText = '${(member.name || 'ක').charAt(0)}';">`;
+    const initialChar = (member.name || authorName || 'ක').trim().charAt(0);
+    const innerPhoto = member.photo 
+      ? `<img src="${member.photo}" alt="${Security.escapeHTML(member.name || '')}" onerror="this.parentElement.innerHTML = '<span>${initialChar}</span>';">`
+      : `<span>${initialChar}</span>`;
+
+    if (isSangha) {
+      avatarWrap.classList.add('sangha-framed-avatar');
+      avatarWrap.innerHTML = `
+        ${innerPhoto}
+        <img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත රාමුව">
+      `;
     } else {
-      avatarWrap.innerText = (member.name || authorName || 'ක').trim().charAt(0);
+      avatarWrap.classList.remove('sangha-framed-avatar');
+      avatarWrap.innerHTML = innerPhoto;
     }
   }
 
   const nameEl = document.getElementById('memFullName');
   if (nameEl) nameEl.innerText = member.name || authorName || 'කල්‍යාණ මිත්‍ර';
-
-  const isSangha = StorageService.isSangha(member);
-  const isMaster = StorageService.isMasterAdmin();
-  const currentUid = StorageService.currentUser?.uid;
 
   const badgeEl = document.getElementById('memVerifiedBadge');
   if (badgeEl) {
@@ -1401,8 +1411,9 @@ function renderSingleCommentHTML(c, postId, user, index) {
 
   return `
     <div class="comment-bubble" id="comment-bubble-${commentKey}">
-      <div class="comment-avatar ${isCommentSangha ? 'sangha-avatar' : ''}" onclick="viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(cAuthorName)}')" style="cursor: pointer;" title="${Security.escapeHTML(cAuthorName)} ගේ Profile එක බලන්න">
-        ${cAuthorPhoto ? `<img src="${Security.sanitizeUrl(cAuthorPhoto)}" alt="${Security.escapeHTML(cAuthorName)}" loading="lazy">` : Security.escapeHTML(cAuthorName.charAt(0) || '👤')}
+      <div class="comment-avatar ${isCommentSangha ? 'sangha-framed-avatar' : ''}" onclick="viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(cAuthorName)}')" style="cursor: pointer;" title="${Security.escapeHTML(cAuthorName)} ගේ Profile එක බලන්න">
+        ${cAuthorPhoto ? `<img src="${Security.sanitizeUrl(cAuthorPhoto)}" alt="${Security.escapeHTML(cAuthorName)}" loading="lazy">` : `<span>${Security.escapeHTML(cAuthorName.charAt(0) || '👤')}</span>`}
+        ${isCommentSangha ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
       </div>
       <div class="comment-text-box">
         <div class="comment-author-row">
@@ -1619,8 +1630,9 @@ function renderPostCardHTML(post, user) {
                 </div>
               </div>
             ` : `
-              <div class="post-avatar ${isNeed ? 'need' : ''} ${isAuthorSangha ? 'sangha-avatar' : ''}" onclick="viewUserProfile('${post.uid}', '${Security.escapeHTML(postAuthorName)}')" style="cursor: pointer;" title="${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න">
-                ${postAuthorPhoto ? `<img src="${Security.sanitizeUrl(postAuthorPhoto)}" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover;">` : Security.escapeHTML(postAuthorName.charAt(0))}
+              <div class="post-avatar ${isNeed ? 'need' : ''} ${isAuthorSangha ? 'sangha-framed-avatar' : ''}" onclick="viewUserProfile('${post.uid}', '${Security.escapeHTML(postAuthorName)}')" style="cursor: pointer;" title="${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න">
+                ${postAuthorPhoto ? `<img src="${Security.sanitizeUrl(postAuthorPhoto)}" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover;">` : `<span>${Security.escapeHTML(postAuthorName.charAt(0))}</span>`}
+                ${isAuthorSangha ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
               </div>
               <div>
                 <div class="post-badges-wrap">
@@ -6207,8 +6219,9 @@ window.renderCommunityDirectory = async function(filtered = null) {
 
     return `
       <div class="mithra-card directory-member-card" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}')">
-        <div class="mithra-card-avatar ${isMemberSangha ? 'sangha-avatar' : ''}" style="cursor: pointer;">
-          ${m.photo ? `<img src="${Security.sanitizeUrl(m.photo)}" alt="${Security.escapeHTML(m.name)}" onerror="this.parentElement.innerText = '${initial}';">` : initial}
+        <div class="mithra-card-avatar ${isMemberSangha ? 'sangha-framed-avatar' : ''}" style="cursor: pointer;">
+          ${m.photo ? `<img src="${Security.sanitizeUrl(m.photo)}" alt="${Security.escapeHTML(m.name)}" onerror="this.parentElement.innerText = '${initial}';">` : `<span>${initial}</span>`}
+          ${isMemberSangha ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
         </div>
         <div class="mithra-card-details">
           <div class="mithra-card-name" style="cursor: pointer;">
@@ -6317,10 +6330,12 @@ window.renderPcSidebarMembers = async function(filterQuery = '') {
       `;
     }
 
+    const isMemberSangha = StorageService.isSangha(m);
     return `
       <div class="sidebar-member-item" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}')" title="${Security.escapeHTML(m.name)} ගේ පැතිකඩ බලන්න">
-        <div class="sidebar-member-avatar">
-          ${m.photo ? `<img src="${Security.sanitizeUrl(m.photo)}" alt="${Security.escapeHTML(m.name)}" onerror="this.parentElement.innerText = '${initial}';">` : initial}
+        <div class="sidebar-member-avatar ${isMemberSangha ? 'sangha-framed-avatar' : ''}">
+          ${m.photo ? `<img src="${Security.sanitizeUrl(m.photo)}" alt="${Security.escapeHTML(m.name)}" onerror="this.parentElement.innerText = '${initial}';">` : `<span>${initial}</span>`}
+          ${isMemberSangha ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
         </div>
         <div class="sidebar-member-info">
           <div class="sidebar-member-name">
