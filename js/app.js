@@ -590,9 +590,16 @@ window.openMemberProfileModal = async function(uid, authorName) {
   const nameEl = document.getElementById('memFullName');
   if (nameEl) nameEl.innerText = member.name || authorName || 'කල්‍යාණ මිත්‍ර';
 
+  const isSangha = StorageService.isSangha(member);
+  const isMaster = StorageService.isMasterAdmin();
+  const currentUid = StorageService.currentUser?.uid;
+
   const badgeEl = document.getElementById('memVerifiedBadge');
   if (badgeEl) {
-    if (member.isAdmin) {
+    if (isSangha) {
+      badgeEl.className = 'sangha-verified-badge';
+      badgeEl.innerHTML = `<i class="fa-solid fa-dharmachakra"></i> <span>පූජනීය මහා සංඝරත්නය</span>`;
+    } else if (member.isAdmin) {
       badgeEl.className = 'official-author-badge';
       badgeEl.innerHTML = `<i class="fa-solid fa-crown"></i> <span>Master Admin</span>`;
     } else if (member.email) {
@@ -652,41 +659,72 @@ window.openMemberProfileModal = async function(uid, authorName) {
   if (statPhotos) statPhotos.innerText = totalPhotos;
   if (statMithrayan) statMithrayan.innerText = Array.isArray(member.mithrayan) ? member.mithrayan.length : 0;
 
-  // Kalyana Mithra Action Button in Member Profile Modal
+  // Kalyana Mithra & Sangha Reverence Action Button in Member Profile Modal
   const mithraStatus = StorageService.getMithraStatus(uid);
   const mithraWrap = document.getElementById('memMithraActionWrapper');
   if (mithraWrap) {
-    if (mithraStatus === 'self') {
+    if (uid === currentUid) {
       mithraWrap.innerHTML = '';
-    } else if (mithraStatus === 'connected') {
+    } else if (isSangha) {
+      const isRevering = StorageService.isReveringSangha(uid);
       mithraWrap.innerHTML = `
-        <button type="button" class="btn-connected-mithra" onclick="handleRemoveMithra('${uid}')" title="කල්‍යාණ මිත්‍ර සබඳතාව ඉවත් කරන්න">
-          <i class="fa-solid fa-heart-circle-check"></i> <span>කල්‍යාණ මිතුරෙකි</span>
-        </button>
-      `;
-    } else if (mithraStatus === 'pending_sent') {
-      mithraWrap.innerHTML = `
-        <button type="button" class="btn-pending-mithra" disabled title="ඔබ විසින් ඇරයුමක් යවා ඇත">
-          <i class="fa-solid fa-hourglass-half"></i> <span>ඇරයුම යවා ඇත</span>
-        </button>
-      `;
-    } else if (mithraStatus === 'pending_received') {
-      mithraWrap.innerHTML = `
-        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-          <button type="button" class="btn-accept-mithra" onclick="handleAcceptMithra(null, '${uid}', '${Security.escapeHTML(member.name)}')">
-            <i class="fa-solid fa-circle-check"></i> <span>ඇරයුම පිළිගන්න (සාදු!)</span>
-          </button>
-          <button type="button" class="btn-notif-reject" onclick="handleRejectMithra(null, '${uid}')">
-            <i class="fa-solid fa-xmark"></i> ඉවත් කරන්න
-          </button>
+        <div style="display: flex; flex-direction: column; gap: 8px; align-items: center; width: 100%;">
+          ${isRevering ? `
+            <button type="button" class="btn-sangha-revered" onclick="handleToggleSanghaReverence('${uid}', '${Security.escapeHTML(member.name)}')">
+              <i class="fa-solid fa-hands-praying"></i> <span>වන්දනා කරමි (නමස්කාර කර ඇත 🙏)</span>
+            </button>
+          ` : `
+            <button type="button" class="btn-sangha-reverence" onclick="handleToggleSanghaReverence('${uid}', '${Security.escapeHTML(member.name)}')">
+              <i class="fa-solid fa-hands-praying"></i> <span>නමස්කාර කරමි (අනුගමනය කරන්න 🙏)</span>
+            </button>
+          `}
+          ${isMaster ? `
+            <button type="button" style="background: rgba(217, 119, 6, 0.12); color: #b45309; border: 1px dashed #d97706; padding: 4px 12px; border-radius: 9999px; font-size: 0.68rem; font-weight: 700; cursor: pointer;" onclick="handleToggleAdminSanghaVerification('${uid}', false)">
+              <i class="fa-solid fa-circle-xmark"></i> සංඝ තත්ත්වය ඉවත් කරන්න
+            </button>
+          ` : ''}
         </div>
       `;
     } else {
-      mithraWrap.innerHTML = `
-        <button type="button" class="btn-connect-mithra" onclick="handleSendMithra('${uid}', '${Security.escapeHTML(member.name)}')">
-          <i class="fa-solid fa-hands-praying"></i> <span>කල්‍යාණ මිත්‍රයෙකු කරගන්න</span>
-        </button>
-      `;
+      let html = '';
+      if (mithraStatus === 'connected') {
+        html = `
+          <button type="button" class="btn-connected-mithra" onclick="handleRemoveMithra('${uid}')" title="කල්‍යාණ මිත්‍ර සබඳතාව ඉවත් කරන්න">
+            <i class="fa-solid fa-heart-circle-check"></i> <span>කල්‍යාණ මිතුරෙකි</span>
+          </button>
+        `;
+      } else if (mithraStatus === 'pending_sent') {
+        html = `
+          <button type="button" class="btn-pending-mithra" disabled title="ඔබ විසින් ඇරයුමක් යවා ඇත">
+            <i class="fa-solid fa-hourglass-half"></i> <span>ඇරයුම යවා ඇත</span>
+          </button>
+        `;
+      } else if (mithraStatus === 'pending_received') {
+        html = `
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" class="btn-accept-mithra" onclick="handleAcceptMithra(null, '${uid}', '${Security.escapeHTML(member.name)}')">
+              <i class="fa-solid fa-circle-check"></i> <span>ඇරයුම පිළිගන්න (සාදු!)</span>
+            </button>
+            <button type="button" class="btn-notif-reject" onclick="handleRejectMithra(null, '${uid}')">
+              <i class="fa-solid fa-xmark"></i> ඉවත් කරන්න
+            </button>
+          </div>
+        `;
+      } else {
+        html = `
+          <button type="button" class="btn-connect-mithra" onclick="handleSendMithra('${uid}', '${Security.escapeHTML(member.name)}')">
+            <i class="fa-solid fa-hands-praying"></i> <span>කල්‍යාණ මිත්‍රයෙකු කරගන්න</span>
+          </button>
+        `;
+      }
+      if (isMaster) {
+        html += `
+          <button type="button" style="background: rgba(217, 119, 6, 0.12); color: #b45309; border: 1px dashed #d97706; padding: 4px 12px; border-radius: 9999px; font-size: 0.68rem; font-weight: 700; cursor: pointer; margin-top: 6px;" onclick="handleToggleAdminSanghaVerification('${uid}', true)">
+            <i class="fa-solid fa-dharmachakra"></i> පූජනීය සංඝරත්නය ලෙස සත්‍යාපනය කරන්න
+          </button>
+        `;
+      }
+      mithraWrap.innerHTML = html;
     }
   }
 
@@ -695,7 +733,7 @@ window.openMemberProfileModal = async function(uid, authorName) {
   const memFriendsCountLbl = document.getElementById('memFriendsSubCount');
   const memberMithrayanUids = Array.isArray(member.mithrayan) ? member.mithrayan : [];
   if (memFriendsCountLbl) {
-    memFriendsCountLbl.innerText = `මිතුරන් ${memberMithrayanUids.length} දෙනෙක්`;
+    memFriendsCountLbl.innerText = isSangha ? `වන්දනාමාන කරන සැදැහැවතුන් ${memberMithrayanUids.length} දෙනෙක්` : `මිතුරන් ${memberMithrayanUids.length} දෙනෙක්`;
   }
   if (memFriendsGrid) {
     if (memberMithrayanUids.length === 0) {
@@ -1347,6 +1385,7 @@ function renderSingleCommentHTML(c, postId, user, index) {
   const isMaster = StorageService.isMasterAdmin();
   const cAuthorName = StorageService.resolveAuthorName(c);
   const cAuthorPhoto = StorageService.resolveAuthorPhoto(c);
+  const isCommentSangha = StorageService.isSangha(c) || StorageService.isSangha({ name: cAuthorName, authorRole: c.authorRole });
   
   if (!c.id) {
     c.id = 'c_' + postId + '_' + (index !== undefined ? index : '0');
@@ -1362,13 +1401,14 @@ function renderSingleCommentHTML(c, postId, user, index) {
 
   return `
     <div class="comment-bubble" id="comment-bubble-${commentKey}">
-      <div class="comment-avatar" onclick="viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(cAuthorName)}')" style="cursor: pointer;" title="${Security.escapeHTML(cAuthorName)} ගේ Profile එක බලන්න">
+      <div class="comment-avatar ${isCommentSangha ? 'sangha-avatar' : ''}" onclick="viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(cAuthorName)}')" style="cursor: pointer;" title="${Security.escapeHTML(cAuthorName)} ගේ Profile එක බලන්න">
         ${cAuthorPhoto ? `<img src="${Security.sanitizeUrl(cAuthorPhoto)}" alt="${Security.escapeHTML(cAuthorName)}" loading="lazy">` : Security.escapeHTML(cAuthorName.charAt(0) || '👤')}
       </div>
       <div class="comment-text-box">
         <div class="comment-author-row">
           <div class="comment-meta-left">
             <span class="author-click-link" onclick="viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(cAuthorName)}')" style="cursor: pointer; font-weight: 700; color: #1e293b;" title="${Security.escapeHTML(cAuthorName)} ගේ Profile එක බලන්න">${Security.escapeHTML(cAuthorName)}</span>
+            ${isCommentSangha ? '<span class="sangha-author-badge" style="padding: 1.5px 7px; font-size: 0.62rem; margin-left: 4px;"><i class="fa-solid fa-dharmachakra"></i> පූජනීය සංඝරත්නය</span>' : ''}
             <span class="comment-time">${Security.escapeHTML(formatRelativeTimeSinhala(c.timestamp, c.time || 'දැන්'))}</span>
             ${c.isEdited ? '<span class="comment-edited-tag" title="මෙම ප්‍රාර්ථනාව සංස්කරණය කරන ලදී">(සංස්කරණය කළ)</span>' : ''}
           </div>
@@ -1479,11 +1519,12 @@ function renderPostCardHTML(post, user) {
   // Dynamically resolved author details (syncs immediately when someone updates profile name/photo)
   const postAuthorName = StorageService.resolveAuthorName(post);
   const postAuthorPhoto = StorageService.resolveAuthorPhoto(post);
+  const isAuthorSangha = StorageService.isSangha(post) || StorageService.isSangha({ name: postAuthorName, authorRole: post.authorRole });
   const origAuthorName = orig ? StorageService.resolveAuthorName(orig) : '';
   const origAuthorPhoto = orig ? StorageService.resolveAuthorPhoto(orig) : null;
 
   return `
-    <article class="post-card ${isNeed ? 'need-card' : ''} ${isRepost ? 'repost-card' : ''} ${post.isOfficial ? 'official-card' : ''}" id="post-elem-${post.id}">
+    <article class="post-card ${isNeed ? 'need-card' : ''} ${isRepost ? 'repost-card' : ''} ${post.isOfficial ? 'official-card' : ''} ${isAuthorSangha ? 'sangha-card' : ''}" id="post-elem-${post.id}">
       
       <!-- Pinned Banner (For non-official pinned posts) -->
       ${(!post.isOfficial && post.isPinned) ? `
@@ -1578,12 +1619,15 @@ function renderPostCardHTML(post, user) {
                 </div>
               </div>
             ` : `
-              <div class="post-avatar ${isNeed ? 'need' : ''}" onclick="viewUserProfile('${post.uid}', '${Security.escapeHTML(postAuthorName)}')" style="cursor: pointer;" title="${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න">
+              <div class="post-avatar ${isNeed ? 'need' : ''} ${isAuthorSangha ? 'sangha-avatar' : ''}" onclick="viewUserProfile('${post.uid}', '${Security.escapeHTML(postAuthorName)}')" style="cursor: pointer;" title="${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න">
                 ${postAuthorPhoto ? `<img src="${Security.sanitizeUrl(postAuthorPhoto)}" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover;">` : Security.escapeHTML(postAuthorName.charAt(0))}
               </div>
               <div>
                 <div class="post-badges-wrap">
                   <span class="post-author-name author-click-link" onclick="viewUserProfile('${post.uid}', '${Security.escapeHTML(postAuthorName)}')" style="cursor: pointer;" title="${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න">${Security.escapeHTML(postAuthorName)}</span>
+                  ${isAuthorSangha ? `
+                    <span class="sangha-author-badge" title="පූජනීය මහා සංඝරත්නය"><i class="fa-solid fa-dharmachakra"></i> පූජනීය සංඝරත්නය</span>
+                  ` : ''}
                   ${(post.authorRole === 'admin' || (post.authorEmail && post.authorEmail.toLowerCase() === 'silvadilan9@gmail.com')) ? `
                     <span class="official-author-badge" title="Verified Master Admin"><i class="fa-solid fa-crown"></i> Master Admin</span>
                   ` : ''}
@@ -5815,6 +5859,8 @@ window.renderNotificationsList = function() {
       typeIconHtml = '<span class="notif-type-icon comment" title="පුණ්‍යානුමෝදනාවක්"><i class="fa-solid fa-comment" style="font-size: 8px;"></i></span>';
     } else if (n.type === 'mention') {
       typeIconHtml = '<span class="notif-type-icon mention" title="ඔබව සිහිපත් කළාය" style="background: #fef3c7; color: #d97706;"><i class="fa-solid fa-at" style="font-size: 9px;"></i></span>';
+    } else if (n.type === 'sangha_reverence') {
+      typeIconHtml = '<span class="notif-type-icon sangha" title="නමස්කාර ගෞරවය" style="background: #fef3c7; color: #b45309;"><i class="fa-solid fa-hands-praying" style="font-size: 9px;"></i></span>';
     } else if (n.type === 'mithra_request') {
       typeIconHtml = '<span class="notif-type-icon mithra" title="කල්‍යාණ මිත්‍ර ඇරයුම">🪷</span>';
       if (!isAccepted && !isDeclined && (!n.status || n.status === 'pending')) {
@@ -5850,7 +5896,9 @@ window.renderNotificationsList = function() {
     }
 
     let notifBodyText = '';
-    if (n.type === 'mithra_accepted') {
+    if (n.type === 'sangha_reverence') {
+      notifBodyText = `<strong>${Security.escapeHTML(n.senderName || 'පින්වත් සැදැහැවතෙක්')}</strong> ඔබ වහන්සේට නමස්කාර පූර්වකව ගෞරව දක්වමින් අනුගමනය කළාය. 🙏`;
+    } else if (n.type === 'mithra_accepted') {
       notifBodyText = `ඔබගේ කල්‍යාණ මිත්‍ර ඇරයුම <strong>${Security.escapeHTML(n.senderName || 'කල්‍යාණ මිත්‍රයා')}</strong> විසින් පිළිගන්නා ලදී. 🙏`;
     } else if (n.type === 'mithra_rejected') {
       notifBodyText = `ඔබගේ කල්‍යාණ මිත්‍ර ඇරයුම <strong>${Security.escapeHTML(n.senderName || 'කල්‍යාණ මිත්‍රයා')}</strong> විසින් පිළි නොගන්නා ලදී.`;
@@ -6135,9 +6183,16 @@ window.renderCommunityDirectory = async function(filtered = null) {
     const isSent = currentSent.includes(m.uid);
     const initial = (m.name || 'ක').charAt(0);
 
+    const isMemberSangha = StorageService.isSangha(m);
+
     let actionBtnHtml = '';
     if (isMe) {
       actionBtnHtml = `<span class="badge-connected-friend" style="background: #fef3c7; border-color: #fde68a; color: #92400e;"><i class="fa-solid fa-circle-user"></i> ඔබගේ පැතිකඩ</span>`;
+    } else if (isMemberSangha) {
+      const isRevered = StorageService.isReveringSangha(m.uid);
+      actionBtnHtml = isRevered
+        ? `<button type="button" class="btn-sangha-revered" style="padding: 5px 10px; font-size: 0.72rem;" onclick="event.stopPropagation(); handleToggleSanghaReverence('${m.uid}', '${Security.escapeHTML(m.name)}')"><i class="fa-solid fa-hands-praying"></i> වන්දනා කර ඇත 🙏</button>`
+        : `<button type="button" class="btn-sangha-reverence" style="padding: 5px 10px; font-size: 0.72rem;" onclick="event.stopPropagation(); handleToggleSanghaReverence('${m.uid}', '${Security.escapeHTML(m.name)}')"><i class="fa-solid fa-hands-praying"></i> නමස්කාර කරමි 🙏</button>`;
     } else if (isFriend) {
       actionBtnHtml = `<span class="badge-connected-friend"><i class="fa-solid fa-circle-check"></i> මිතුරෙකි</span>`;
     } else if (isSent) {
@@ -6152,12 +6207,13 @@ window.renderCommunityDirectory = async function(filtered = null) {
 
     return `
       <div class="mithra-card directory-member-card" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}')">
-        <div class="mithra-card-avatar" style="cursor: pointer;">
+        <div class="mithra-card-avatar ${isMemberSangha ? 'sangha-avatar' : ''}" style="cursor: pointer;">
           ${m.photo ? `<img src="${Security.sanitizeUrl(m.photo)}" alt="${Security.escapeHTML(m.name)}" onerror="this.parentElement.innerText = '${initial}';">` : initial}
         </div>
         <div class="mithra-card-details">
           <div class="mithra-card-name" style="cursor: pointer;">
             <span>${Security.escapeHTML(m.name || 'කල්‍යාණ මිත්‍ර')}</span>
+            ${isMemberSangha ? `<span class="sangha-author-badge" style="margin-left: 4px; padding: 1px 7px; font-size: 0.62rem;"><i class="fa-solid fa-dharmachakra"></i> පූජනීය සංඝරත්නය</span>` : ''}
             ${m.isAdmin ? `<i class="fa-solid fa-crown" style="color: #f59e0b; font-size: 0.7rem; margin-left: 4px;" title="Master Admin"></i>` : ''}
           </div>
           <div class="mithra-card-loc">
@@ -6304,6 +6360,61 @@ window.handleSendMithraFromDirectory = async function(targetUid, targetName) {
 // ============================================================================
 // Kalyana Mithra (Buddhist Spiritual Friendship) Controller
 // ============================================================================
+
+window.handleToggleSanghaReverence = async function(targetUid, targetName) {
+  if (isGuestUser()) {
+    showAuthRequiredModal('ස්වාමීන් වහන්සේට වන්දනාමාන කිරීමට හෝ අනුගමනය කිරීමට');
+    return;
+  }
+  if (!targetUid) return;
+
+  try {
+    triggerHaptic('success');
+    SoundService.play('sadhu');
+  } catch (e) {}
+
+  try {
+    const isNowFollowing = await StorageService.toggleSanghaReverence(targetUid, targetName);
+    alert(isNowFollowing 
+      ? `සාදු! සාදු! ${targetName || 'පූජනීය ස්වාමීන් වහන්සේ'} වෙත ඔබගේ වන්දනාමාන ගෞරවය සටහන් විය. 🙏`
+      : `වන්දනාමාන සටහන ඉවත් කරන ලදී.`
+    );
+
+    const memModal = document.getElementById('memberProfileModal');
+    if (memModal && !memModal.classList.contains('hidden')) {
+      await openMemberProfileModal(targetUid, targetName);
+    }
+    if (activeTab === 'profile') {
+      renderProfileView();
+    }
+    updateUserInfoUI();
+  } catch (err) {
+    console.error('Failed to toggle Sangha reverence:', err);
+    alert(err.message || 'වන්දනාමාන සටහන සිදුකිරීමට නොහැකි විය.');
+  }
+};
+
+window.handleToggleAdminSanghaVerification = async function(targetUid, newStatus) {
+  if (!StorageService.isMasterAdmin()) {
+    alert("මෙම පහසුකම භාවිතා කළ හැක්කේ Master Admin හට පමණි.");
+    return;
+  }
+  const promptText = newStatus 
+    ? "මෙම සාමාජික ගිණුම 'පූජනීය මහා සංඝරත්නය' ලෙස සත්‍යාපනය කිරීමට අවශ්‍යද?"
+    : "මෙම සාමාජික ගිණුමේ 'පූජනීය සංඝරත්නය' තත්ත්වය ඉවත් කිරීමට අවශ්‍යද?";
+  if (!confirm(promptText)) return;
+
+  try {
+    await StorageService.setMemberSanghaStatus(targetUid, newStatus);
+    alert("සාර්ථකයි! සංඝ සත්‍යාපන තත්ත්වය යාවත්කාලීන කරන ලදී. 🙏");
+    const memModal = document.getElementById('memberProfileModal');
+    if (memModal && !memModal.classList.contains('hidden')) {
+      await openMemberProfileModal(targetUid);
+    }
+  } catch (e) {
+    alert(e.message || "දෝෂයක් සිදුවිය.");
+  }
+};
 
 window.handleSendMithra = async function(targetUid, targetName) {
   if (isGuestUser()) {

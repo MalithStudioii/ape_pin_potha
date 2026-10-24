@@ -232,7 +232,9 @@ export const StorageService = {
             location: data.location || data.district || '',
             joinedDate: data.joinedDate || '',
             updatedAt: data.updatedAt || 0,
-            isAdmin: (data.email || '').trim().toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase()
+            isAdmin: (data.email || '').trim().toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase(),
+            isSangha: data.isSangha === true || data.role === 'sangha' || (data.authorRole === 'sangha') || this.isSangha({ name: data.name || data.firstName }),
+            role: data.role || (data.isSangha ? 'sangha' : 'member')
           });
         });
       } catch (e) {
@@ -253,7 +255,9 @@ export const StorageService = {
             location: p.location || '',
             joinedDate: '2026',
             updatedAt: p.timestamp || 0,
-            isAdmin: false
+            isAdmin: false,
+            isSangha: p.isSangha || p.authorRole === 'sangha' || this.isSangha({ name: p.author }),
+            role: (p.isSangha || p.authorRole === 'sangha') ? 'sangha' : 'member'
           });
         }
       });
@@ -2148,6 +2152,7 @@ export const StorageService = {
         const snap = await getDoc(doc(db, COLLECTIONS.USERS, uid));
         if (snap.exists()) {
           const data = snap.data();
+          data.isSangha = data.isSangha === true || data.role === 'sangha' || this.isSangha({ name: data.name });
           localStorage.setItem('pinPotha_profile_' + uid, JSON.stringify(data));
           return data;
         }
@@ -2169,11 +2174,132 @@ export const StorageService = {
         location: userPost.location || '',
         occupation: '',
         joinedDate: '2026 ඔක්තෝබර්',
-        isAdmin: userPost.authorRole === 'admin'
+        isAdmin: userPost.authorRole === 'admin',
+        isSangha: userPost.isSangha || userPost.authorRole === 'sangha' || this.isSangha({ name: userPost.author }),
+        role: (userPost.isSangha || userPost.authorRole === 'sangha') ? 'sangha' : 'member'
       };
     }
 
     return null;
+  },
+
+  /**
+   * Check if a member / user / post author is venerated Sangha
+   */
+  isSangha(userOrMember) {
+    if (!userOrMember) return false;
+    if (userOrMember.isSangha === true || userOrMember.role === 'sangha' || userOrMember.authorRole === 'sangha') {
+      return true;
+    }
+    const name = (userOrMember.name || userOrMember.author || '').trim();
+    if (name.includes('ස්වාමීන් වහන්සේ') || name.includes('හිමි') || name.includes('තෙරුන්') || name.startsWith('පූජ්‍ය ') || name.startsWith('පූජ්‍යපාද ')) {
+      return true;
+    }
+    return false;
+  },
+
+  /**
+   * Checks if current user is revering/following target Sangha UID
+   */
+  isReveringSangha(targetUid) {
+    if (!this.currentUser || !this.currentUser.uid || !targetUid) return false;
+    const list = Array.isArray(this.currentUser.reveredSangha) ? this.currentUser.reveredSangha : (this.currentUser.mithrayan || []);
+    return list.includes(targetUid);
+  },
+
+  /**
+   * Toggles Reverence / Follow for a Venerated Monk
+   */
+  async toggleSanghaReverence(targetUid, targetName) {
+    if (!this.currentUser || !this.currentUser.uid) {
+      throw new Error("ස්වාමීන් වහන්සේට වන්දනාමාන කිරීමට හෝ අනුගමනය කිරීමට කරුණාකර පළමුව Log වන්න.");
+    }
+    if (targetUid === this.currentUser.uid) return false;
+
+    if (!Array.isArray(this.currentUser.reveredSangha)) {
+      this.currentUser.reveredSangha = [];
+    }
+    if (!Array.isArray(this.currentUser.mithrayan)) {
+      this.currentUser.mithrayan = [];
+    }
+
+    const idx = this.currentUser.reveredSangha.indexOf(targetUid);
+    const isNowFollowing = (idx === -1);
+
+    if (isNowFollowing) {
+      this.currentUser.reveredSangha.push(targetUid);
+      if (!this.currentUser.mithrayan.includes(targetUid)) {
+        this.currentUser.mithrayan.push(targetUid);
+      }
+    } else {
+      this.currentUser.reveredSangha.splice(idx, 1);
+      const mIdx = this.currentUser.mithrayan.indexOf(targetUid);
+      if (mIdx !== -1) this.currentUser.mithrayan.splice(mIdx, 1);
+    }
+
+    localStorage.setItem('pinPotha_currentUser', JSON.stringify(this.currentUser));
+    localStorage.setItem('pinPotha_profile_' + this.currentUser.uid, JSON.stringify(this.currentUser));
+
+    if (isCloudReady && db) {
+      try {
+        const { doc, setDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        await setDoc(doc(db, COLLECTIONS.USERS, this.currentUser.uid), {
+          reveredSangha: this.currentUser.reveredSangha,
+          mithrayan: this.currentUser.mithrayan,
+          updatedAt: Date.now()
+        }, { merge: true });
+      } catch (err) {
+        console.warn('[Storage] Cloud toggleSanghaReverence sync warning:', err);
+      }
+    }
+
+    if (isNowFollowing) {
+      await this.createNotification({
+        recipientUid: targetUid,
+        type: 'sangha_reverence',
+        senderUid: this.currentUser.uid,
+        senderName: this.currentUser.name || 'පින්වත් සැදැහැවතෙක්',
+        senderPhoto: this.currentUser.photo || null,
+        message: 'ඔබ වහන්සේට නමස්කාර පූර්වකව ගෞරව දක්වමින් අනුගමනය කළාය. 🙏'
+      });
+    }
+
+    this.notifyListeners();
+    this.notifyNotificationListeners();
+    return isNowFollowing;
+  },
+
+  /**
+   * Master Admin can toggle Sangha Status of any member
+   */
+  async setMemberSanghaStatus(targetUid, isSangha) {
+    if (!this.isMasterAdmin()) {
+      throw new Error("මෙම වෙනස්කම සිදුකළ හැක්කේ ප්‍රධාන පරිපාලක (Master Admin) හට පමණි.");
+    }
+    try {
+      const raw = localStorage.getItem('pinPotha_profile_' + targetUid);
+      if (raw) {
+        const p = JSON.parse(raw);
+        p.isSangha = isSangha;
+        p.role = isSangha ? 'sangha' : 'member';
+        localStorage.setItem('pinPotha_profile_' + targetUid, JSON.stringify(p));
+      }
+    } catch (e) {}
+
+    if (isCloudReady && db) {
+      try {
+        const { doc, setDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        await setDoc(doc(db, COLLECTIONS.USERS, targetUid), {
+          isSangha: isSangha,
+          role: isSangha ? 'sangha' : 'member',
+          updatedAt: Date.now()
+        }, { merge: true });
+      } catch (err) {
+        console.warn('[Storage] Cloud setMemberSanghaStatus warning:', err);
+      }
+    }
+    this.notifyListeners();
+    return true;
   },
 
   /**
