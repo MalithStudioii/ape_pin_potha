@@ -333,10 +333,14 @@ function renderUsersTable(usersToRender) {
         const isCurrentAdmin = (u.role === 'admin' || isMaster);
         const isBanned = !!u.isBanned;
 
+        const isSangha = u.isSangha === true || u.role === 'sangha' || (u.authorRole === 'sangha') || (u.name && (u.name.includes('ස්වාමීන් වහන්සේ') || u.name.includes('හිමි') || u.name.includes('තෙරුන්') || u.name.startsWith('පූජ්‍ය ') || u.name.startsWith('පූජ්‍යපාද ')));
+
         // Role badge
         let roleBadge = `<span class="role-badge role-member"><i class="fa-solid fa-user"></i> Member</span>`;
         if (isMaster) {
             roleBadge = `<span class="role-badge role-master"><i class="fa-solid fa-crown"></i> Master Admin</span>`;
+        } else if (isSangha) {
+            roleBadge = `<span class="role-badge" style="background: linear-gradient(135deg, #d97706, #92400e); color: #ffffff; border: 1px solid #fde68a; font-weight: 800; padding: 2px 8px; border-radius: 9999px; font-size: 0.7rem; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-dharmachakra" style="color:#fde68a;"></i> පූජනීය සංඝ</span>`;
         } else if (u.role === 'admin') {
             roleBadge = `<span class="role-badge role-admin"><i class="fa-solid fa-shield"></i> Sub-Admin</span>`;
         }
@@ -350,8 +354,23 @@ function renderUsersTable(usersToRender) {
         let actionsHTML = '';
 
         if (!isMaster) {
-            // Master Admin can promote/demote
+            // Master Admin can promote/demote & verify Sangha
             if (isMasterAdmin) {
+                // Sangha Verification Toggle Button
+                if (isSangha) {
+                    actionsHTML += `
+                        <button class="btn-table-action" style="background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.35); font-weight: 700;" onclick="toggleAdminSangha('${u.uid}', false)" title="සංඝ තත්ත්වය ඉවත් කරන්න">
+                            <i class="fa-solid fa-circle-xmark"></i> සංඝ ඉවත් කරන්න
+                        </button>
+                    `;
+                } else {
+                    actionsHTML += `
+                        <button class="btn-table-action" style="background: linear-gradient(135deg, rgba(217, 119, 6, 0.25), rgba(180, 83, 9, 0.35)); color: #fde68a; border: 1px solid #f59e0b; font-weight: 700;" onclick="toggleAdminSangha('${u.uid}', true)" title="පූජනීය මහා සංඝරත්නය ලෙස සත්‍යාපනය කරන්න">
+                            <i class="fa-solid fa-dharmachakra" style="color: #fbbf24;"></i> සංඝ සත්‍යාපනය
+                        </button>
+                    `;
+                }
+
                 if (u.role === 'admin') {
                     actionsHTML += `
                         <button class="btn-table-action btn-table-demote" onclick="toggleUserRole('${u.uid}', 'member')" title="Admin බලතල ඉවත් කරන්න">
@@ -433,13 +452,16 @@ window.filterUsersTable = function() {
 
         let matchesRole = true;
         const isMaster = (u.email && u.email.toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase());
+        const isSangha = u.isSangha === true || u.role === 'sangha' || (u.authorRole === 'sangha') || (u.name && (u.name.includes('ස්වාමීන් වහන්සේ') || u.name.includes('හිමි') || u.name.includes('තෙරුන්') || u.name.startsWith('පූජ්‍ය ') || u.name.startsWith('පූජ්‍යපාද ')));
 
         if (roleVal === 'master') {
             matchesRole = isMaster;
         } else if (roleVal === 'admin') {
-            matchesRole = (u.role === 'admin');
+            matchesRole = (u.role === 'admin' || isMaster);
+        } else if (roleVal === 'sangha') {
+            matchesRole = isSangha;
         } else if (roleVal === 'member') {
-            matchesRole = (!isMaster && u.role !== 'admin');
+            matchesRole = (!isMaster && u.role !== 'admin' && !isSangha);
         } else if (roleVal === 'banned') {
             matchesRole = !!u.isBanned;
         }
@@ -448,6 +470,67 @@ window.filterUsersTable = function() {
     });
 
     renderUsersTable(filtered);
+};
+
+window.toggleAdminSangha = async function(uid, isSangha) {
+    if (!isMasterAdmin) {
+        alert('පූජනීය සංඝරත්නය ලෙස සත්‍යාපනය කිරීමේ හෝ ඉවත්කිරීමේ බලය ඇත්තේ Master Admin ට පමණි.');
+        return;
+    }
+
+    const user = allUsersList.find(u => u.uid === uid);
+    if (!user) return;
+
+    const actionText = isSangha ? 'පූජනීය මහා සංඝරත්නය ලෙස සත්‍යාපනය කිරීමට' : 'සංඝ සත්‍යාපන තත්ත්වය ඉවත් කිරීමට';
+    if (!confirm(`ඔබට "${user.name}" (${user.email || 'No email'}) ${actionText} අවශ්‍ය බව තහවුරු කරන්නද?`)) {
+        return;
+    }
+
+    try {
+        const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        await updateDoc(doc(db, COLLECTIONS.USERS, uid), {
+            isSangha: isSangha,
+            role: isSangha ? 'sangha' : (user.role === 'admin' ? 'admin' : 'member'),
+            sanghaVerifiedBy: currentAdminUser.email,
+            sanghaVerifiedAt: Date.now()
+        });
+
+        // Update local memory
+        user.isSangha = isSangha;
+        if (isSangha && user.role !== 'admin') user.role = 'sangha';
+        if (!isSangha && user.role === 'sangha') user.role = 'member';
+
+        // Dispatch celebratory notification to the user/monk
+        if (isSangha) {
+            try {
+                const { collection, addDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+                await addDoc(collection(db, COLLECTIONS.NOTIFICATIONS), {
+                    recipientUid: uid,
+                    senderUid: currentAdminUser.uid,
+                    senderName: 'ප්‍රධාන පරිපාලක (Master Admin)',
+                    type: 'system_alert',
+                    title: '☸️ ඔබගේ පැතිකඩ පූජනීය සංඝරත්නය ලෙස සත්‍යාපනය කරන ලදී',
+                    message: 'ප්‍රධාන පරිපාලක විසින් ඔබ වහන්සේගේ ගිණුම "පූජනීය මහා සංඝරත්නය" ලෙස නිල වශයෙන් සත්‍යාපනය කරන ලදී. සැදැහැවතුන්ට නමස්කාර පූර්වකව ඔබ වහන්සේව අනුගමනය කළ හැක. සාදු! 🙏',
+                    timestamp: Date.now(),
+                    read: false
+                });
+            } catch (notifErr) {
+                console.warn('[Admin] Sangha Notif dispatch note:', notifErr);
+            }
+        }
+
+        // Audit Log
+        await recordAuditLog(
+            `Sangha Verification`,
+            `"${user.name}" ${isSangha ? 'පූජනීය සංඝරත්නය ලෙස සත්‍යාපනය කරන ලදී' : 'සංඝ තත්ත්වය ඉවත් කරන ලදී'}.`
+        );
+
+        alert(`සාර්ථකයි! "${user.name}" ${isSangha ? 'පූජනීය මහා සංඝරත්නය ලෙස සත්‍යාපනය විය. ☸️🙏' : 'සාමාන්‍ය සාමාජිකයෙකු බවට පත්කෙරිණි.'}`);
+        filterUsersTable();
+    } catch (err) {
+        console.error('[Admin] toggleAdminSangha error:', err);
+        alert('සංඝ තත්ත්වය වෙනස් කිරීමේදී දෝෂයක් ඇතිවිය: ' + err.message);
+    }
 };
 
 window.toggleUserRole = async function(uid, newRole) {
