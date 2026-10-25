@@ -1646,7 +1646,6 @@ function renderPostCardHTML(post, user) {
                   ${isTrending ? '<span class="post-badge trending-badge" title="පින්වතුන් බොහෝදෙනෙකුගේ සාදුකාර ලැබූ ප්‍රමුඛ සටහනක්"><i class="fa-solid fa-fire-flame-curved"></i> ප්‍රමුඛ</span>' : ''}
                   ${!isGeneral ? `<span class="post-badge category">${Security.escapeHTML(post.category)}</span>` : ''}
                   ${isNeed ? '<span class="post-badge need">🤝 සත්කාර ඉල්ලීමක්</span>' : ''}
-                  ${isGeneral ? '<span class="post-badge" style="background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd;"><i class="fa-solid fa-mug-hot"></i> සාමාන්‍ය සටහනක්</span>' : ''}
                   ${isNeed && post.isVerifiedNeed ? '<span class="verified-need-badge" title="පරිපාලනය විසින් සත්‍යාපනය කරන ලද සත්කාරයකි"><i class="fa-solid fa-circle-check"></i> සත්‍යාපිත සත්කාරයකි</span>' : ''}
                   ${post.visibility === 'private' ? '<span class="post-badge private"><i class="fa-solid fa-lock" style="font-size: 9px;"></i> Private</span>' : ''}
                 </div>
@@ -1686,7 +1685,27 @@ function renderPostCardHTML(post, user) {
 
         <!-- Post Content Body -->
         <div class="post-content-body">
-          ${(post.title && post.title.trim() && post.title !== 'පුණ්‍ය සිතුවිලි' && (!post.isOfficial || post.title !== 'පිං පොත නිල නිවේදනය')) ? `<h3 class="post-title">${Security.escapeHTML(post.title)}</h3>` : ''}
+          ${(() => {
+            const cleanTitle = (post.title || '').trim();
+            const cleanDesc = (post.description || '').trim();
+            
+            const normTitle = cleanTitle.replace(/\.\.\.$/, '').replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, "").trim().toLowerCase();
+            const normDesc = cleanDesc.replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, "").trim().toLowerCase();
+
+            const isDuplicate = !cleanTitle || 
+              cleanTitle === 'පුණ්‍ය සිතුවිලි' || 
+              cleanTitle === 'පින්කම් සටහන' || 
+              cleanTitle === 'සාමාන්‍ය සටහන' ||
+              isGeneral ||
+              (normDesc.startsWith(normTitle)) ||
+              (normTitle.startsWith(normDesc)) ||
+              (normTitle === normDesc);
+
+            if (!isDuplicate && (!post.isOfficial || cleanTitle !== 'පිං පොත නිල නිවේදනය')) {
+              return `<h3 class="post-title">${Security.escapeHTML(cleanTitle)}</h3>`;
+            }
+            return '';
+          })()}
           <p class="post-desc">${Security.escapeHTML(post.description)}</p>
         </div>
 
@@ -1846,10 +1865,20 @@ function renderFeed() {
     return true;
   });
 
+  // Deduplicate by post id
+  const seenIds = new Set();
+  const deduplicatedFiltered = [];
+  for (const p of filtered) {
+    if (p && p.id && !seenIds.has(p.id)) {
+      seenIds.add(p.id);
+      deduplicatedFiltered.push(p);
+    }
+  }
+
   // Rank using the intelligent FeedAlgorithm (Trending / Latest / Top Sadhu)
   const ranked = (activeTab === 'mybook')
-    ? filtered.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
-    : FeedAlgorithm.rankPosts(filtered, currentFeedSort);
+    ? deduplicatedFiltered.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+    : FeedAlgorithm.rankPosts(deduplicatedFiltered, currentFeedSort);
 
   if (ranked.length === 0) {
     if (activeTab === 'mybook') {
@@ -3265,7 +3294,7 @@ window.closeModal = function() {
   if (chkOfficial) chkOfficial.checked = false;
   if (chkPinned) chkPinned.checked = false;
   const titleInput = document.getElementById('postTitle');
-  if (titleInput) titleInput.required = true;
+  if (titleInput) titleInput.required = false;
   compressedBase64Image = null;
   selectedImagesList = [];
   renderComposerThumbnails();
@@ -3356,10 +3385,10 @@ window.setPostType = function(type) {
 
     // 1. Show Title for merit
     if (titleWrap) titleWrap.style.display = 'block';
-    if (titleLabel) titleLabel.innerText = 'මාතෘකාව *';
+    if (titleLabel) titleLabel.innerText = 'මාතෘකාව (විකල්ප)';
     if (titleInput) {
-      titleInput.required = true;
-      titleInput.placeholder = 'උදා: රුවන්වැලිසෑය අභියස සුවඳ මල් පූජාව';
+      titleInput.required = false;
+      titleInput.placeholder = 'උදා: රුවන්වැලිසෑය අභියස සුවඳ මල් පූජාව (විකල්ප)';
     }
 
     // 2. Show Category & Visibility side-by-side
@@ -4488,11 +4517,9 @@ function setupEventListeners() {
 
     let title = (document.getElementById('postTitle')?.value || '').trim();
     if (selectedPostType === 'general') {
-      title = isOfficial ? 'පිං පොත නිල නිවේදනය' : (title || 'පුණ්‍ය සිතුවිලි');
+      title = isOfficial ? 'පිං පොත නිල නිවේදනය' : title;
     } else if (isOfficial && !title) {
       title = 'පිං පොත නිල නිවේදනය';
-    } else if (!title) {
-      title = 'පින්කම් සටහන';
     }
 
     const category = selectedPostType === 'general' ? (document.getElementById('postCategory')?.value || 'සාමාන්‍ය') : (document.getElementById('postCategory')?.value || 'දානමය');

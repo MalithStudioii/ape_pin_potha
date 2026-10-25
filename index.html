@@ -51,12 +51,12 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=84">
+    <link rel="stylesheet" href="css/styles.css?v=85">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
       (function() {
-        var v = 'v84';
+        var v = 'v85';
         if (localStorage.getItem('pinPotha_active_build') !== v) {
           localStorage.setItem('pinPotha_active_build', v);
           if ('caches' in window) {
@@ -876,8 +876,8 @@
                 </div>
 
                 <div class="form-group" id="titleWrapper">
-                    <label class="form-label" id="titleLabel">මාතෘකාව *</label>
-                    <input type="text" id="postTitle" class="form-input" required maxlength="150" placeholder="උදා: රුවන්වැලිසෑය අභියස සුවඳ මල් පූජාව">
+                    <label class="form-label" id="titleLabel">මාතෘකාව (විකල්ප)</label>
+                    <input type="text" id="postTitle" class="form-input" maxlength="150" placeholder="උදා: රුවන්වැලිසෑය අභියස සුවඳ මල් පූජාව (විකල්ප)">
                 </div>
 
                 <div id="categoryVisibilityRow" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
@@ -2459,6 +2459,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=84"></script>
+    <script type="module" src="js/app.js?v=85"></script>
 </body>
 </html>

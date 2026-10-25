@@ -1232,16 +1232,8 @@ export const StorageService = {
     const isOfficial = isMaster && !!postToProcess.isOfficial;
 
     let safeTitle = (postToProcess.title || '').trim();
-    if (!safeTitle || safeTitle.length < 3) {
-      if (isOfficial) {
-        safeTitle = 'පිං පොත නිල නිවේදනය';
-      } else if (postToProcess.type === 'general') {
-        safeTitle = 'පුණ්‍ය සිතුවිලි';
-      } else if (postToProcess.type === 'repost') {
-        safeTitle = 'යළි බෙදාගැනීමක්';
-      } else {
-        safeTitle = 'පින්කම් සටහන';
-      }
+    if (isOfficial && (!safeTitle || safeTitle.length < 3)) {
+      safeTitle = 'පිං පොත නිල නිවේදනය';
     }
     postToProcess.title = safeTitle;
 
