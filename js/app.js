@@ -425,6 +425,8 @@ function updateCloudBanner(isConnected) {
 function updateUserInfoUI() {
   const user = StorageService.currentUser;
   const isMaster = StorageService.isMasterAdmin();
+  const isSub = StorageService.isSubAdmin(user);
+  const isAdminUser = isMaster || isSub || user.isAdmin || user.role === 'admin';
   const firstLetter = (user.name || 'අ').trim().charAt(0);
 
   const displayEl = document.getElementById('userNameDisplay');
@@ -432,14 +434,12 @@ function updateUserInfoUI() {
   const navAvatarEl = document.getElementById('navAvatar');
   const sideAvatarEl = document.getElementById('sideAvatar');
   const composerAvatarEl = document.getElementById('composerAvatar');
+  const crownBtn = document.getElementById('headerAdminCrownBtn');
 
   if (displayEl) displayEl.innerText = user.name || 'අමුත්තා';
   if (sideNameEl) sideNameEl.innerText = user.name || 'අමුත්තා';
 
   // Toggle Header Crown Button for Master Admin & Sub-Admins
-  const isMaster = StorageService.isMasterAdmin();
-  const isSub = StorageService.isSubAdmin(user);
-  const isAdminUser = isMaster || isSub || user.isAdmin || user.role === 'admin';
   if (crownBtn) {
     if (isAdminUser) {
       crownBtn.classList.remove('hidden');
