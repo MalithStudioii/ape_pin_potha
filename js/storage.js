@@ -2083,7 +2083,8 @@ export const StorageService = {
     const lName = savedProfile.lastName || (nameParts.length > 1 ? nameParts.slice(1).join(' ') : "");
     const fullName = confirmedName || `${fName} ${lName}`.trim() || "";
 
-    const isMaster = (user.email || '').trim().toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase();
+    const isMaster = (user.email || '').trim().toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase() || user.uid === 'user_malith';
+    const isSub = !isMaster && (savedProfile.role === 'admin' || savedProfile.isAdmin === true || savedProfile.isSubAdmin === true || (this._knownAdminUids && this._knownAdminUids.has(user.uid)));
 
     this.currentUser = {
       uid: user.uid,
@@ -2091,7 +2092,9 @@ export const StorageService = {
       lastName: lName,
       name: fullName || (user.displayName || "කල්‍යාණ මිත්‍ර"),
       email: user.email,
-      isAdmin: isMaster,
+      role: savedProfile.role || (isMaster ? 'master_admin' : (isSub ? 'admin' : 'member')),
+      isAdmin: isMaster || isSub,
+      isSubAdmin: isSub,
       photo: savedProfile.photo || user.photoURL || null,
       bio: savedProfile.bio || "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏",
       location: savedProfile.location || "",
@@ -2106,6 +2109,9 @@ export const StorageService = {
       isAnonymous: false,
       needsNameConfirmation: (!fullName || fullName === 'අමුත්තා' || fullName.length < 2)
     };
+    if (isSub) {
+      this._knownAdminUids.add(user.uid);
+    }
 
     localStorage.setItem('pinPotha_currentUser', JSON.stringify(this.currentUser));
     localStorage.setItem('pinPotha_profile_' + user.uid, JSON.stringify(this.currentUser));
@@ -2140,6 +2146,17 @@ export const StorageService = {
           if (cloudData.joinedDate) this.currentUser.joinedDate = cloudData.joinedDate;
           if (Array.isArray(cloudData.mithrayan)) this.currentUser.mithrayan = cloudData.mithrayan;
           if (Array.isArray(cloudData.pendingMithraSent)) this.currentUser.pendingMithraSent = cloudData.pendingMithraSent;
+
+          // CRITICAL: Sync role and admin privileges from Cloud Firestore!
+          const isCloudMaster = (user.email || '').trim().toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase() || user.uid === 'user_malith';
+          const isCloudSub = !isCloudMaster && (cloudData.role === 'admin' || cloudData.isAdmin === true || cloudData.isSubAdmin === true || (this._knownAdminUids && this._knownAdminUids.has(user.uid)));
+          this.currentUser.role = cloudData.role || (isCloudMaster ? 'master_admin' : (isCloudSub ? 'admin' : 'member'));
+          this.currentUser.isAdmin = isCloudMaster || isCloudSub;
+          this.currentUser.isSubAdmin = isCloudSub;
+          if (isCloudSub) {
+            this._knownAdminUids.add(user.uid);
+            localStorage.setItem('pinPotha_admin_uids', JSON.stringify(Array.from(this._knownAdminUids)));
+          }
 
           localStorage.setItem('pinPotha_currentUser', JSON.stringify(this.currentUser));
           localStorage.setItem('pinPotha_profile_' + user.uid, JSON.stringify(this.currentUser));

@@ -51,12 +51,12 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=88">
+    <link rel="stylesheet" href="css/styles.css?v=89">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
       (function() {
-        var v = 'v88';
+        var v = 'v89';
         if (localStorage.getItem('pinPotha_active_build') !== v) {
           localStorage.setItem('pinPotha_active_build', v);
           if ('caches' in window) {
@@ -516,6 +516,10 @@
 
                 <!-- Action Buttons -->
                 <div class="profile-header-actions">
+                    <button id="profAdminDashboardBtn" onclick="window.location.href='admin.html'" class="btn-profile-primary" style="display: none; background: linear-gradient(135deg, #d97706, #b45309); border: none;">
+                        <i class="fa-solid fa-crown" id="profAdminDashboardIcon"></i>
+                        <span id="profAdminDashboardText">Admin Dashboard</span>
+                    </button>
                     <button onclick="openModal('merit')" class="btn-profile-primary">
                         <i class="fa-solid fa-plus"></i>
                         <span>පින්කමක්</span>
@@ -2550,6 +2554,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=88"></script>
+    <script type="module" src="js/app.js?v=89"></script>
 </body>
 </html>

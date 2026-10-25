@@ -445,6 +445,15 @@ function updateUserInfoUI() {
       crownBtn.classList.remove('hidden');
       crownBtn.style.display = 'inline-flex';
       crownBtn.onclick = () => { window.location.href = 'admin.html'; };
+      if (isMaster) {
+        crownBtn.innerHTML = '<i class="fa-solid fa-crown"></i><span>Admin</span>';
+        crownBtn.title = "👑 Master Admin Dashboard";
+        crownBtn.classList.remove('header-admin-shield-btn');
+      } else {
+        crownBtn.innerHTML = '<i class="fa-solid fa-shield-halved"></i><span>Admin</span>';
+        crownBtn.title = "🛡️ පිං පොත පරිපාලක Dashboard";
+        crownBtn.classList.add('header-admin-shield-btn');
+      }
     } else {
       crownBtn.classList.add('hidden');
       crownBtn.style.display = 'none';
@@ -4821,23 +4830,62 @@ function renderProfileView() {
     }
   }
 
-  // 3. Name & Verified Badge
+  // 3. Name & Verified Badge & Admin Dash Button
+  const isMaster = StorageService.isMasterAdmin();
+  const isSub = StorageService.isSubAdmin(user);
+  const isAdminUser = isMaster || isSub || user.isAdmin || user.role === 'admin';
+  const isSangha = StorageService.isSangha(user);
+
   const nameEl = document.getElementById('profFullName');
-  if (nameEl) nameEl.innerText = user.name || 'කල්‍යාණ මිත්‍ර';
+  if (nameEl) {
+    nameEl.innerHTML = `
+      ${Security.escapeHTML(user.name || 'කල්‍යාණ මිත්‍ර')}
+      ${isMaster ? `<span class="badge-crown" style="font-size: 1.15rem;" title="Master Admin">👑</span>` : (isSub ? `<span class="badge-shield" style="font-size: 1.05rem;" title="පරිපාලක (Admin)">🛡️</span>` : '')}
+    `;
+  }
 
   const badgeEl = document.getElementById('profVerifiedBadge');
   if (badgeEl) {
-    if (user.email && !user.isAnonymous) {
-      badgeEl.style.display = 'inline-flex';
+    badgeEl.style.display = 'inline-flex';
+    if (isSangha) {
+      badgeEl.className = 'sangha-verified-badge';
+      badgeEl.innerHTML = `<i class="fa-solid fa-dharmachakra"></i> <span>පූජනීය මහා සංඝරත්නය</span>`;
+    } else if (isMaster) {
+      badgeEl.className = 'official-author-badge';
+      badgeEl.innerHTML = `<span class="badge-crown">👑</span> <span>Master Admin</span>`;
+    } else if (isSub) {
+      badgeEl.className = 'admin-shield-badge';
+      badgeEl.innerHTML = `<span class="badge-shield">🛡️</span> <span>පිං පොත පරිපාලක</span>`;
+    } else if (user.email && !user.isAnonymous) {
       badgeEl.className = 'verified-pill';
       badgeEl.innerHTML = `<i class="fa-solid fa-circle-check"></i> <span>Google සත්‍යාපිත කල්‍යාණ මිත්‍ර</span>`;
     } else {
-      badgeEl.style.display = 'inline-flex';
       badgeEl.className = 'verified-pill';
       badgeEl.style.background = '#fef3c7';
       badgeEl.style.color = '#92400e';
       badgeEl.style.borderColor = '#fde68a';
       badgeEl.innerHTML = `<i class="fa-solid fa-seedling"></i> <span>පිංවත් සාමාජික</span>`;
+    }
+  }
+
+  // Profile Admin Dashboard Quick Jump Button
+  const profAdminBtn = document.getElementById('profAdminDashboardBtn');
+  const profAdminIcon = document.getElementById('profAdminDashboardIcon');
+  const profAdminText = document.getElementById('profAdminDashboardText');
+  if (profAdminBtn) {
+    if (isAdminUser) {
+      profAdminBtn.style.display = 'inline-flex';
+      if (isMaster) {
+        if (profAdminIcon) profAdminIcon.className = 'fa-solid fa-crown';
+        if (profAdminText) profAdminText.innerText = 'Master Admin Dashboard';
+        profAdminBtn.style.background = 'linear-gradient(135deg, #d97706, #b45309)';
+      } else {
+        if (profAdminIcon) profAdminIcon.className = 'fa-solid fa-shield-halved';
+        if (profAdminText) profAdminText.innerText = 'පරිපාලක Dashboard';
+        profAdminBtn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+      }
+    } else {
+      profAdminBtn.style.display = 'none';
     }
   }
 
