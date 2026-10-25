@@ -3770,6 +3770,94 @@ body {
   margin-left: 4px;
 }
 
+/* Minimalist, Sleek Admin Badges (👑 Master Admin, 🛡️ Admin) */
+.badge-crown {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.84rem;
+  line-height: 1;
+  vertical-align: middle;
+  margin-left: 4px;
+  filter: drop-shadow(0 1px 2px rgba(245, 158, 11, 0.45));
+  cursor: default;
+  transition: transform 0.15s ease;
+  user-select: none;
+}
+.badge-crown:hover {
+  transform: scale(1.22);
+}
+
+.badge-shield {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  line-height: 1;
+  vertical-align: middle;
+  margin-left: 4px;
+  filter: drop-shadow(0 1px 2px rgba(16, 185, 129, 0.45));
+  cursor: default;
+  transition: transform 0.15s ease;
+  user-select: none;
+}
+.badge-shield:hover {
+  transform: scale(1.22);
+}
+
+.admin-shield-badge {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  box-shadow: 0 1px 4px rgba(5, 150, 105, 0.12);
+}
+
+.btn-admin-manage-toggle {
+  padding: 6px 14px;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  margin-top: 6px;
+}
+
+.btn-admin-promote {
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+  border: 1px dashed #10b981;
+}
+.btn-admin-promote:hover {
+  background: #10b981;
+  color: #ffffff;
+  border-style: solid;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+}
+
+.btn-admin-demote {
+  background: rgba(239, 68, 68, 0.1);
+  color: #b91c1c;
+  border: 1px dashed #ef4444;
+}
+.btn-admin-demote:hover {
+  background: #ef4444;
+  color: #ffffff;
+  border-style: solid;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
+}
+
 /* ==========================================================================
    Venerated Maha Sangha Role & Verification System
    ========================================================================== */

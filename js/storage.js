@@ -174,13 +174,48 @@ export const StorageService = {
     isAnonymous: true
   },
 
+  _knownAdminUids: new Set(['user_malith']),
+
   /**
-   * Checks whether the current user is Master Admin (silvadilan9@gmail.com)
+   * Checks whether a user/email/post is Master Admin (silvadilan9@gmail.com)
    */
-  isMasterAdmin() {
-    if (!this.currentUser) return false;
-    const email = (this.currentUser.email || '').trim().toLowerCase();
-    return email === MASTER_ADMIN_EMAIL.toLowerCase();
+  isMasterAdmin(userOrEmailOrUid) {
+    if (!userOrEmailOrUid) {
+      if (!this.currentUser) return false;
+      const email = (this.currentUser.email || '').trim().toLowerCase();
+      return email === MASTER_ADMIN_EMAIL.toLowerCase() || this.currentUser.uid === 'user_malith';
+    }
+    if (typeof userOrEmailOrUid === 'string') {
+      const lower = userOrEmailOrUid.trim().toLowerCase();
+      return lower === MASTER_ADMIN_EMAIL.toLowerCase() || lower === 'user_malith';
+    }
+    const email = (userOrEmailOrUid.email || userOrEmailOrUid.authorEmail || '').trim().toLowerCase();
+    const uid = userOrEmailOrUid.uid || '';
+    return email === MASTER_ADMIN_EMAIL.toLowerCase() || uid === 'user_malith';
+  },
+
+  /**
+   * Checks whether a user/post/comment/uid is an appointed Sub-Admin (🛡️)
+   */
+  isSubAdmin(userOrPostOrUid) {
+    if (!userOrPostOrUid) return false;
+    if (this.isMasterAdmin(userOrPostOrUid)) return false;
+
+    if (typeof userOrPostOrUid === 'object') {
+      const role = (userOrPostOrUid.role || userOrPostOrUid.authorRole || '').toLowerCase();
+      if (role === 'admin' || role === 'sub_admin' || userOrPostOrUid.isAdmin === true || userOrPostOrUid.isSubAdmin === true) {
+        return true;
+      }
+      const uid = userOrPostOrUid.uid;
+      if (uid && this._knownAdminUids && this._knownAdminUids.has(uid)) {
+        return true;
+      }
+    } else if (typeof userOrPostOrUid === 'string') {
+      if (this._knownAdminUids && this._knownAdminUids.has(userOrPostOrUid)) {
+        return true;
+      }
+    }
+    return false;
   },
 
   /**
@@ -224,6 +259,11 @@ export const StorageService = {
         const snap = await getDocs(q);
         snap.forEach(docSnap => {
           const data = docSnap.data();
+          const isMaster = (data.email || '').trim().toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase() || docSnap.id === 'user_malith';
+          const isSub = !isMaster && (data.role === 'admin' || data.authorRole === 'admin' || data.isAdmin === true || data.isSubAdmin === true);
+          if (isSub) {
+            this._knownAdminUids.add(docSnap.id);
+          }
           members.push({
             uid: docSnap.id,
             name: data.name || data.firstName || 'කල්‍යාණ මිත්‍ර',
@@ -232,9 +272,10 @@ export const StorageService = {
             location: data.location || data.district || '',
             joinedDate: data.joinedDate || '',
             updatedAt: data.updatedAt || 0,
-            isAdmin: (data.email || '').trim().toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase(),
+            isAdmin: isMaster,
+            isSubAdmin: isSub,
             isSangha: data.isSangha === true || data.role === 'sangha' || (data.authorRole === 'sangha') || this.isSangha({ name: data.name || data.firstName }),
-            role: data.role || (data.isSangha ? 'sangha' : 'member')
+            role: data.role || (data.isSangha ? 'sangha' : (isSub ? 'admin' : 'member'))
           });
         });
       } catch (e) {
@@ -302,6 +343,16 @@ export const StorageService = {
       if (!Array.isArray(this.currentUser.pendingMithraSent)) this.currentUser.pendingMithraSent = [];
     }
     this.currentUser.isAdmin = this.isMasterAdmin();
+
+    try {
+      const savedAdminUids = localStorage.getItem('pinPotha_admin_uids');
+      if (savedAdminUids) {
+        const arr = JSON.parse(savedAdminUids);
+        if (Array.isArray(arr)) {
+          arr.forEach(id => this._knownAdminUids.add(id));
+        }
+      }
+    } catch(e) {}
 
     if (isFirebaseConfigured()) {
       try {
@@ -2144,7 +2195,14 @@ export const StorageService = {
         const snap = await getDoc(doc(db, COLLECTIONS.USERS, uid));
         if (snap.exists()) {
           const data = snap.data();
+          const isMaster = (data.email || '').trim().toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase() || uid === 'user_malith';
+          const isSub = !isMaster && (data.role === 'admin' || data.authorRole === 'admin' || data.isAdmin === true || data.isSubAdmin === true);
+          if (isSub) {
+            this._knownAdminUids.add(uid);
+          }
           data.isSangha = data.isSangha === true || data.role === 'sangha' || this.isSangha({ name: data.name });
+          data.isAdmin = isMaster;
+          data.isSubAdmin = isSub;
           localStorage.setItem('pinPotha_profile_' + uid, JSON.stringify(data));
           return data;
         }
@@ -2290,6 +2348,73 @@ export const StorageService = {
         console.warn('[Storage] Cloud setMemberSanghaStatus warning:', err);
       }
     }
+    this.notifyListeners();
+    return true;
+  },
+
+  /**
+   * Master Admin can promote/demote any member to/from Sub-Admin (🛡️)
+   */
+  async setMemberAdminStatus(targetUid, setAsAdmin) {
+    if (!this.isMasterAdmin()) {
+      throw new Error("මෙම වෙනස්කම සිදුකළ හැක්කේ ප්‍රධාන පරිපාලක (Master Admin) හට පමණි.");
+    }
+    if (!targetUid) return false;
+
+    const newRole = setAsAdmin ? 'admin' : 'member';
+    if (setAsAdmin) {
+      this._knownAdminUids.add(targetUid);
+    } else {
+      this._knownAdminUids.delete(targetUid);
+    }
+
+    try {
+      localStorage.setItem('pinPotha_admin_uids', JSON.stringify(Array.from(this._knownAdminUids)));
+    } catch(e) {}
+
+    try {
+      const raw = localStorage.getItem('pinPotha_profile_' + targetUid);
+      if (raw) {
+        const p = JSON.parse(raw);
+        p.role = newRole;
+        p.authorRole = newRole;
+        p.isAdmin = false;
+        p.isSubAdmin = setAsAdmin;
+        localStorage.setItem('pinPotha_profile_' + targetUid, JSON.stringify(p));
+      }
+    } catch (e) {}
+
+    if (isCloudReady && db) {
+      try {
+        const { doc, setDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        await setDoc(doc(db, COLLECTIONS.USERS, targetUid), {
+          role: newRole,
+          authorRole: newRole,
+          isAdmin: false,
+          isSubAdmin: setAsAdmin,
+          roleUpdatedBy: this.currentUser?.email || 'Master Admin',
+          roleUpdatedAt: Date.now()
+        }, { merge: true });
+      } catch (err) {
+        console.warn('[Storage] Cloud setMemberAdminStatus warning:', err);
+      }
+    }
+
+    // Also update any posts in memory authored by this user
+    const posts = this.getLocalPosts();
+    let changed = false;
+    posts.forEach(p => {
+      if (p.uid === targetUid && !this.isMasterAdmin(p)) {
+        p.authorRole = newRole;
+        p.isSubAdmin = setAsAdmin;
+        changed = true;
+      }
+    });
+    if (changed) {
+      this.cacheLocal(posts);
+      this.notifyListeners(posts);
+    }
+
     this.notifyListeners();
     return true;
   },

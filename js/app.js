@@ -601,17 +601,28 @@ window.openMemberProfileModal = async function(uid, authorName) {
     }
   }
 
+  const isProfileMaster = StorageService.isMasterAdmin(member);
+  const isProfileSubAdmin = !isProfileMaster && StorageService.isSubAdmin(member);
+
   const nameEl = document.getElementById('memFullName');
-  if (nameEl) nameEl.innerText = member.name || authorName || 'කල්‍යාණ මිත්‍ර';
+  if (nameEl) {
+    nameEl.innerHTML = `
+      ${Security.escapeHTML(member.name || authorName || 'කල්‍යාණ මිත්‍ර')}
+      ${isProfileMaster ? `<span class="badge-crown" style="font-size: 1.15rem;" title="Master Admin">👑</span>` : (isProfileSubAdmin ? `<span class="badge-shield" style="font-size: 1.05rem;" title="පරිපාලක (Admin)">🛡️</span>` : '')}
+    `;
+  }
 
   const badgeEl = document.getElementById('memVerifiedBadge');
   if (badgeEl) {
     if (isSangha) {
       badgeEl.className = 'sangha-verified-badge';
       badgeEl.innerHTML = `<i class="fa-solid fa-dharmachakra"></i> <span>පූජනීය මහා සංඝරත්නය</span>`;
-    } else if (member.isAdmin) {
+    } else if (isProfileMaster) {
       badgeEl.className = 'official-author-badge';
-      badgeEl.innerHTML = `<i class="fa-solid fa-crown"></i> <span>Master Admin</span>`;
+      badgeEl.innerHTML = `<span class="badge-crown">👑</span> <span>Master Admin</span>`;
+    } else if (isProfileSubAdmin) {
+      badgeEl.className = 'admin-shield-badge';
+      badgeEl.innerHTML = `<span class="badge-shield">🛡️</span> <span>පිං පොත පරිපාලක</span>`;
     } else if (member.email) {
       badgeEl.className = 'verified-pill';
       badgeEl.innerHTML = `<i class="fa-solid fa-circle-check"></i> <span>Google සත්‍යාපිත කල්‍යාණ මිත්‍ර</span>`;
@@ -727,7 +738,20 @@ window.openMemberProfileModal = async function(uid, authorName) {
           </button>
         `;
       }
-      if (isMaster) {
+      if (isMaster && uid !== currentUid) {
+        if (isProfileSubAdmin) {
+          html += `
+            <button type="button" class="btn-admin-manage-toggle btn-admin-demote" onclick="handleToggleUserAdminStatus('${uid}', false)">
+              <i class="fa-solid fa-shield-xmark"></i> 🛡️ Admin තනතුර ඉවත් කරන්න
+            </button>
+          `;
+        } else if (!isProfileMaster) {
+          html += `
+            <button type="button" class="btn-admin-manage-toggle btn-admin-promote" onclick="handleToggleUserAdminStatus('${uid}', true)">
+              <i class="fa-solid fa-shield-halved"></i> 🛡️ Admin (පරිපාලක) ලෙස පත්කරන්න
+            </button>
+          `;
+        }
         html += `
           <button type="button" style="background: rgba(217, 119, 6, 0.12); color: #b45309; border: 1px dashed #d97706; padding: 4px 12px; border-radius: 9999px; font-size: 0.68rem; font-weight: 700; cursor: pointer; margin-top: 6px;" onclick="handleToggleAdminSanghaVerification('${uid}', true)">
             <i class="fa-solid fa-dharmachakra"></i> පූජනීය සංඝරත්නය ලෙස සත්‍යාපනය කරන්න
@@ -1396,6 +1420,8 @@ function renderSingleCommentHTML(c, postId, user, index) {
   const cAuthorName = StorageService.resolveAuthorName(c);
   const cAuthorPhoto = StorageService.resolveAuthorPhoto(c);
   const isCommentSangha = StorageService.isSangha(c) || StorageService.isSangha({ name: cAuthorName, authorRole: c.authorRole });
+  const isCommentMaster = StorageService.isMasterAdmin(c);
+  const isCommentSubAdmin = !isCommentMaster && StorageService.isSubAdmin(c);
   
   if (!c.id) {
     c.id = 'c_' + postId + '_' + (index !== undefined ? index : '0');
@@ -1419,6 +1445,7 @@ function renderSingleCommentHTML(c, postId, user, index) {
         <div class="comment-author-row">
           <div class="comment-meta-left">
             <span class="author-click-link" onclick="viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(cAuthorName)}')" style="cursor: pointer; font-weight: 700; color: #1e293b;" title="${Security.escapeHTML(cAuthorName)} ගේ Profile එක බලන්න">${Security.escapeHTML(cAuthorName)}</span>
+            ${isCommentMaster ? `<span class="badge-crown" title="Master Admin">👑</span>` : (isCommentSubAdmin ? `<span class="badge-shield" title="පරිපාලක (Admin)">🛡️</span>` : '')}
             ${isCommentSangha ? '<span class="sangha-author-badge" style="padding: 1.5px 7px; font-size: 0.62rem; margin-left: 4px;"><i class="fa-solid fa-dharmachakra"></i> පූජනීය සංඝරත්නය</span>' : ''}
             <span class="comment-time">${Security.escapeHTML(formatRelativeTimeSinhala(c.timestamp, c.time || 'දැන්'))}</span>
             ${c.isEdited ? '<span class="comment-edited-tag" title="මෙම ප්‍රාර්ථනාව සංස්කරණය කරන ලදී">(සංස්කරණය කළ)</span>' : ''}
@@ -1531,6 +1558,8 @@ function renderPostCardHTML(post, user) {
   const postAuthorName = StorageService.resolveAuthorName(post);
   const postAuthorPhoto = StorageService.resolveAuthorPhoto(post);
   const isAuthorSangha = StorageService.isSangha(post) || StorageService.isSangha({ name: postAuthorName, authorRole: post.authorRole });
+  const isAuthorMaster = StorageService.isMasterAdmin(post);
+  const isAuthorSubAdmin = !isAuthorMaster && StorageService.isSubAdmin(post);
   const origAuthorName = orig ? StorageService.resolveAuthorName(orig) : '';
   const origAuthorPhoto = orig ? StorageService.resolveAuthorPhoto(orig) : null;
 
@@ -1637,11 +1666,9 @@ function renderPostCardHTML(post, user) {
               <div>
                 <div class="post-badges-wrap">
                   <span class="post-author-name author-click-link" onclick="viewUserProfile('${post.uid}', '${Security.escapeHTML(postAuthorName)}')" style="cursor: pointer;" title="${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න">${Security.escapeHTML(postAuthorName)}</span>
+                  ${isAuthorMaster ? `<span class="badge-crown" title="Master Admin">👑</span>` : (isAuthorSubAdmin ? `<span class="badge-shield" title="පරිපාලක (Admin)">🛡️</span>` : '')}
                   ${isAuthorSangha ? `
                     <span class="sangha-author-badge" title="පූජනීය මහා සංඝරත්නය"><i class="fa-solid fa-dharmachakra"></i> පූජනීය සංඝරත්නය</span>
-                  ` : ''}
-                  ${(post.authorRole === 'admin' || (post.authorEmail && post.authorEmail.toLowerCase() === 'silvadilan9@gmail.com')) ? `
-                    <span class="official-author-badge" title="Verified Master Admin"><i class="fa-solid fa-crown"></i> Master Admin</span>
                   ` : ''}
                   ${isTrending ? '<span class="post-badge trending-badge" title="පින්වතුන් බොහෝදෙනෙකුගේ සාදුකාර ලැබූ ප්‍රමුඛ සටහනක්"><i class="fa-solid fa-fire-flame-curved"></i> ප්‍රමුඛ</span>' : ''}
                   ${!isGeneral ? `<span class="post-badge category">${Security.escapeHTML(post.category)}</span>` : ''}
@@ -6223,6 +6250,8 @@ window.renderCommunityDirectory = async function(filtered = null) {
     const initial = (m.name || 'ක').charAt(0);
 
     const isMemberSangha = StorageService.isSangha(m);
+    const isMemberMaster = StorageService.isMasterAdmin(m);
+    const isMemberSubAdmin = !isMemberMaster && StorageService.isSubAdmin(m);
 
     let actionBtnHtml = '';
     if (isMe) {
@@ -6253,8 +6282,8 @@ window.renderCommunityDirectory = async function(filtered = null) {
         <div class="mithra-card-details">
           <div class="mithra-card-name" style="cursor: pointer;">
             <span>${Security.escapeHTML(m.name || 'කල්‍යාණ මිත්‍ර')}</span>
+            ${isMemberMaster ? `<span class="badge-crown" title="Master Admin">👑</span>` : (isMemberSubAdmin ? `<span class="badge-shield" title="පරිපාලක (Admin)">🛡️</span>` : '')}
             ${isMemberSangha ? `<span class="sangha-author-badge" style="margin-left: 4px; padding: 1px 7px; font-size: 0.62rem;"><i class="fa-solid fa-dharmachakra"></i> පූජනීය සංඝරත්නය</span>` : ''}
-            ${m.isAdmin ? `<i class="fa-solid fa-crown" style="color: #f59e0b; font-size: 0.7rem; margin-left: 4px;" title="Master Admin"></i>` : ''}
           </div>
           <div class="mithra-card-loc">
             ${m.location ? `<i class="fa-solid fa-location-dot" style="color: #ea580c;"></i> <span>${Security.escapeHTML(m.location)}</span>` : `<i class="fa-solid fa-calendar-check" style="color: #059669;"></i> <span>${Security.escapeHTML(m.joinedDate || '2026')}</span>`}
@@ -6453,6 +6482,31 @@ window.handleToggleAdminSanghaVerification = async function(targetUid, newStatus
     if (memModal && !memModal.classList.contains('hidden')) {
       await openMemberProfileModal(targetUid);
     }
+  } catch (e) {
+    alert(e.message || "දෝෂයක් සිදුවිය.");
+  }
+};
+
+window.handleToggleUserAdminStatus = async function(targetUid, setAsAdmin) {
+  if (!StorageService.isMasterAdmin()) {
+    alert("මෙම පහසුකම භාවිතා කළ හැක්කේ Master Admin හට පමණි.");
+    return;
+  }
+  const promptText = setAsAdmin 
+    ? "මෙම සාමාජිකයාව 'පිං පොත පරිපාලක (🛡️ Admin)' කෙනෙකු ලෙස පත් කිරීමට අවශ්‍යද?"
+    : "මෙම සාමාජිකයාගේ '🛡️ Admin' තනතුර ඉවත් කිරීමට අවශ්‍යද?";
+  if (!confirm(promptText)) return;
+
+  try {
+    await StorageService.setMemberAdminStatus(targetUid, setAsAdmin);
+    SoundService.playSadhu();
+    triggerHaptic([30, 60, 30]);
+    alert(setAsAdmin ? "🎉 සාදු! සාමාජිකයාව සාර්ථකව පිං පොත පරිපාලක (🛡️ Admin) ලෙස පත් කරන ලදී!" : "සාමාජිකයාගේ Admin තනතුර ඉවත් කරන ලදී.");
+    const memModal = document.getElementById('memberProfileModal');
+    if (memModal && !memModal.classList.contains('hidden')) {
+      await openMemberProfileModal(targetUid);
+    }
+    renderFeed();
   } catch (e) {
     alert(e.message || "දෝෂයක් සිදුවිය.");
   }
