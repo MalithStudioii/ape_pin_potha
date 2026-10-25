@@ -203,7 +203,7 @@ export const StorageService = {
 
     if (typeof userOrPostOrUid === 'object') {
       const role = (userOrPostOrUid.role || userOrPostOrUid.authorRole || '').toLowerCase();
-      if (role === 'admin' || role === 'sub_admin' || userOrPostOrUid.isAdmin === true || userOrPostOrUid.isSubAdmin === true) {
+      if (role === 'admin' || role === 'sub_admin' || userOrPostOrUid.isSubAdmin === true) {
         return true;
       }
       const uid = userOrPostOrUid.uid;
@@ -260,9 +260,11 @@ export const StorageService = {
         snap.forEach(docSnap => {
           const data = docSnap.data();
           const isMaster = (data.email || '').trim().toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase() || docSnap.id === 'user_malith';
-          const isSub = !isMaster && (data.role === 'admin' || data.authorRole === 'admin' || data.isAdmin === true || data.isSubAdmin === true);
+          const isSub = !isMaster && (data.role === 'admin' || data.authorRole === 'admin' || data.isSubAdmin === true);
           if (isSub) {
             this._knownAdminUids.add(docSnap.id);
+          } else {
+            this._knownAdminUids.delete(docSnap.id);
           }
           members.push({
             uid: docSnap.id,
@@ -2149,12 +2151,15 @@ export const StorageService = {
 
           // CRITICAL: Sync role and admin privileges from Cloud Firestore!
           const isCloudMaster = (user.email || '').trim().toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase() || user.uid === 'user_malith';
-          const isCloudSub = !isCloudMaster && (cloudData.role === 'admin' || cloudData.isAdmin === true || cloudData.isSubAdmin === true || (this._knownAdminUids && this._knownAdminUids.has(user.uid)));
+          const isCloudSub = !isCloudMaster && (cloudData.role === 'admin' || cloudData.isSubAdmin === true);
           this.currentUser.role = cloudData.role || (isCloudMaster ? 'master_admin' : (isCloudSub ? 'admin' : 'member'));
-          this.currentUser.isAdmin = isCloudMaster || isCloudSub;
+          this.currentUser.isAdmin = isCloudMaster;
           this.currentUser.isSubAdmin = isCloudSub;
           if (isCloudSub) {
             this._knownAdminUids.add(user.uid);
+            localStorage.setItem('pinPotha_admin_uids', JSON.stringify(Array.from(this._knownAdminUids)));
+          } else {
+            this._knownAdminUids.delete(user.uid);
             localStorage.setItem('pinPotha_admin_uids', JSON.stringify(Array.from(this._knownAdminUids)));
           }
 

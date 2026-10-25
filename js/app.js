@@ -426,7 +426,7 @@ function updateUserInfoUI() {
   const user = StorageService.currentUser;
   const isMaster = StorageService.isMasterAdmin();
   const isSub = StorageService.isSubAdmin(user);
-  const isAdminUser = isMaster || isSub || user.isAdmin || user.role === 'admin';
+  const isAdminUser = isMaster || isSub;
   const firstLetter = (user.name || 'අ').trim().charAt(0);
 
   const displayEl = document.getElementById('userNameDisplay');
@@ -457,6 +457,7 @@ function updateUserInfoUI() {
     } else {
       crownBtn.classList.add('hidden');
       crownBtn.style.display = 'none';
+      crownBtn.onclick = null;
     }
   }
 
@@ -4833,7 +4834,7 @@ function renderProfileView() {
   // 3. Name & Verified Badge & Admin Dash Button
   const isMaster = StorageService.isMasterAdmin();
   const isSub = StorageService.isSubAdmin(user);
-  const isAdminUser = isMaster || isSub || user.isAdmin || user.role === 'admin';
+  const isAdminUser = isMaster || isSub;
   const isSangha = StorageService.isSangha(user);
 
   const nameEl = document.getElementById('profFullName');

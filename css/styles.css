@@ -3669,6 +3669,11 @@ body {
   transition: all 0.2s ease;
 }
 
+.header-admin-crown-btn.hidden,
+.header-admin-crown-btn[style*="display: none"] {
+  display: none !important;
+}
+
 .header-admin-crown-btn:hover {
   transform: translateY(-1px) scale(1.05);
   box-shadow: 0 4px 14px rgba(217, 119, 6, 0.5);
@@ -4525,10 +4530,18 @@ html, body {
     height: 35px !important;
     font-size: 0.85rem !important;
     border-radius: 9999px !important;
-    display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
     flex-shrink: 0 !important;
+  }
+
+  .header-admin-crown-btn.hidden,
+  .header-admin-crown-btn[style*="display: none"] {
+    display: none !important;
+  }
+
+  .header-admin-crown-btn:not(.hidden) {
+    display: inline-flex !important;
   }
 
   .header-admin-crown-btn span {
