@@ -6,6 +6,7 @@
 
 import { firebaseConfig, isFirebaseConfigured, COLLECTIONS } from './firebase-config.js?v=22';
 import { Security } from './security.js?v=48';
+import { INITIAL_ARANYA_LIST, SRI_LANKA_DISTRICTS } from './aranya-data.js';
 
 let db = null;
 let auth = null;
@@ -3015,5 +3016,74 @@ export const StorageService = {
     };
     localStorage.setItem('pinPotha_currentUser', JSON.stringify(this.currentUser));
     this.notifyListeners();
+  },
+
+  /**
+   * Returns list of Aranya Senasana (seed + cloud/local custom entries)
+   */
+  async getAranyaSenasanaList() {
+    let list = [...INITIAL_ARANYA_LIST];
+    try {
+      const localCustom = localStorage.getItem('pinPotha_custom_aranya');
+      if (localCustom) {
+        const parsed = JSON.parse(localCustom);
+        if (Array.isArray(parsed)) {
+          parsed.forEach(item => {
+            if (!list.some(a => a.id === item.id)) {
+              list.push(item);
+            }
+          });
+        }
+      }
+    } catch (e) {}
+
+    if (isCloudReady && db) {
+      try {
+        const { collection, getDocs } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const snap = await getDocs(collection(db, COLLECTIONS.ARANYA));
+        snap.forEach(docSnap => {
+          const data = { id: docSnap.id, ...docSnap.data() };
+          const idx = list.findIndex(a => a.id === data.id);
+          if (idx !== -1) {
+            list[idx] = { ...list[idx], ...data };
+          } else {
+            list.push(data);
+          }
+        });
+      } catch (e) {
+        console.warn('[Storage] Aranya cloud sync warning:', e);
+      }
+    }
+
+    return list;
+  },
+
+  /**
+   * Devotee suggests an Aranya Senasana for inclusion
+   */
+  async suggestAranyaSenasana(suggestion) {
+    if (!suggestion || !suggestion.name) return false;
+    const payload = {
+      ...suggestion,
+      timestamp: Date.now(),
+      status: 'pending',
+      suggestedBy: (this.currentUser && this.currentUser.name) ? this.currentUser.name : 'කල්‍යාණ මිත්‍ර'
+    };
+
+    try {
+      const existing = JSON.parse(localStorage.getItem('pinPotha_aranya_suggestions') || '[]');
+      existing.unshift(payload);
+      localStorage.setItem('pinPotha_aranya_suggestions', JSON.stringify(existing));
+    } catch(e) {}
+
+    if (isCloudReady && db) {
+      try {
+        const { collection, addDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        await addDoc(collection(db, 'aranya_suggestions'), payload);
+      } catch (e) {
+        console.warn('[Storage] Cloud suggest aranya warning:', e);
+      }
+    }
+    return true;
   }
 };

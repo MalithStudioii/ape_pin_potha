@@ -7993,6 +7993,527 @@ html, body {
   gap: 3px;
 }
 
+/* ==========================================================================
+   Sri Lanka Aranya Senasana Directory Styling
+   ========================================================================== */
+.aranya-page-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px 20px 80px;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.aranya-page-container.hidden {
+  display: none !important;
+}
+
+/* Hero Banner Card */
+.aranya-hero-card {
+  background: linear-gradient(135deg, #064e3b 0%, #065f46 50%, #047857 100%);
+  color: #ffffff;
+  border-radius: var(--radius-xl);
+  padding: 32px 28px;
+  box-shadow: 0 10px 30px rgba(6, 78, 59, 0.25);
+  margin-bottom: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.aranya-hero-card::after {
+  content: "";
+  position: absolute;
+  top: -50px;
+  right: -50px;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(254, 243, 199, 0.15) 0%, transparent 70%);
+  border-radius: 9999px;
+  pointer-events: none;
+}
+
+.aranya-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(8px);
+  color: #fef3c7;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  font-size: 0.78rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+  border: 1px solid rgba(254, 243, 199, 0.25);
+}
+
+.aranya-hero-title {
+  font-family: var(--font-serif);
+  font-size: 1.65rem;
+  font-weight: 800;
+  margin: 0 0 10px;
+  color: #ffffff;
+  line-height: 1.35;
+}
+
+.aranya-hero-desc {
+  font-size: 0.92rem;
+  color: rgba(255, 255, 255, 0.88);
+  margin: 0 0 20px;
+  max-width: 780px;
+  line-height: 1.6;
+}
+
+.aranya-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.btn-suggest-aranya {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-full);
+  padding: 9px 18px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(217, 119, 6, 0.35);
+  transition: all 0.2s ease;
+}
+
+.btn-suggest-aranya:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(217, 119, 6, 0.45);
+}
+
+.btn-aranya-back {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: var(--radius-full);
+  padding: 8px 16px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-aranya-back:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Advisory Box */
+.aranya-advisory-box {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-left: 4px solid #d97706;
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 22px;
+  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.08);
+}
+
+.aranya-advisory-box .advisory-icon {
+  color: #d97706;
+  font-size: 1.25rem;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.aranya-advisory-box .advisory-text {
+  font-size: 0.82rem;
+  color: #78350f;
+  line-height: 1.6;
+}
+
+/* Search & Filter Card */
+.aranya-search-filter-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+}
+
+.aranya-search-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.aranya-search-input-wrap i {
+  position: absolute;
+  left: 14px;
+  color: #94a3b8;
+  font-size: 0.95rem;
+}
+
+.aranya-search-input-wrap input {
+  width: 100%;
+  padding: 11px 40px 11px 40px;
+  font-size: 0.88rem;
+  border: 1.5px solid #cbd5e1;
+  border-radius: var(--radius-full);
+  outline: none;
+  background: #f8fafc;
+  transition: all 0.2s ease;
+}
+
+.aranya-search-input-wrap input:focus {
+  border-color: #059669;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15);
+}
+
+.aranya-clear-search-btn {
+  position: absolute;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px;
+  font-size: 0.95rem;
+}
+
+.aranya-districts-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+
+.aranya-district-chip {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-full);
+  padding: 5px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.aranya-district-chip:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.aranya-district-chip.active {
+  background: #065f46;
+  color: #ffffff;
+  border-color: #064e3b;
+  box-shadow: 0 2px 6px rgba(6, 95, 70, 0.3);
+}
+
+/* Results header */
+.aranya-results-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.aranya-results-count {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.aranya-sort-legend {
+  font-size: 0.74rem;
+  color: #059669;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: #ecfdf5;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid #a7f3d0;
+}
+
+/* Monastery Cards Grid */
+.aranya-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 18px;
+}
+
+.aranya-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-xl);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 3px 12px rgba(6, 78, 59, 0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  position: relative;
+}
+
+.aranya-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(6, 78, 59, 0.12);
+  border-color: #86efac;
+}
+
+.aranya-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.aranya-tradition-tag {
+  background: #f0fdf4;
+  color: #166534;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: var(--radius-full);
+  border: 1px solid #bbf7d0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.aranya-district-tag {
+  background: #fef3c7;
+  color: #b45309;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  border: 1px solid #fde68a;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.aranya-title {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 2px;
+  line-height: 1.35;
+}
+
+.aranya-subtitle {
+  font-size: 0.74rem;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+
+.aranya-location {
+  font-size: 0.78rem;
+  color: #047857;
+  font-weight: 600;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.aranya-location i {
+  color: #059669;
+  margin-top: 2px;
+}
+
+.aranya-desc {
+  font-size: 0.8rem;
+  color: #475569;
+  line-height: 1.55;
+  margin: 0 0 12px;
+  flex-grow: 1;
+}
+
+.aranya-calling-hours {
+  background: #fffbeb;
+  border-radius: var(--radius-md);
+  padding: 7px 10px;
+  font-size: 0.74rem;
+  color: #92400e;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  border-left: 3px solid #f59e0b;
+}
+
+.aranya-contact-person {
+  font-size: 0.74rem;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.aranya-services-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 16px;
+}
+
+.aranya-service-pill {
+  background: #f8fafc;
+  color: #334155;
+  border: 1px solid #e2e8f0;
+  font-size: 0.68rem;
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.aranya-action-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 14px;
+  border-top: 1px solid #f1f5f9;
+  flex-wrap: wrap;
+}
+
+.aranya-action-btn {
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  font-size: 0.76rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  border: none;
+}
+
+.aranya-action-btn.btn-call {
+  background: #059669;
+  color: #ffffff;
+  flex-grow: 1;
+  justify-content: center;
+}
+
+.aranya-action-btn.btn-call:hover {
+  background: #047857;
+  transform: translateY(-1px);
+}
+
+.aranya-action-btn.btn-call-sub {
+  background: #f0fdf4;
+  color: #047857;
+  border: 1px solid #86efac;
+}
+
+.aranya-action-btn.btn-wa {
+  background: #25d366;
+  color: #ffffff;
+}
+
+.aranya-action-btn.btn-wa:hover {
+  background: #1ebc59;
+}
+
+.aranya-action-btn.btn-map {
+  background: #f8fafc;
+  color: #0284c7;
+  border: 1px solid #e0f2fe;
+}
+
+.aranya-action-btn.btn-map:hover {
+  background: #e0f2fe;
+}
+
+.aranya-action-btn.btn-copy {
+  background: #f1f5f9;
+  color: #475569;
+  padding: 6px 10px;
+}
+
+.aranya-action-btn.btn-copy:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+/* Empty State */
+.aranya-empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  background: #ffffff;
+  border-radius: var(--radius-xl);
+  border: 1px dashed #cbd5e1;
+  margin-top: 20px;
+}
+
+.aranya-empty-state .empty-icon {
+  font-size: 3rem;
+  color: #94a3b8;
+  margin-bottom: 14px;
+}
+
+.aranya-empty-state h3 {
+  font-size: 1.15rem;
+  color: #1e293b;
+  margin: 0 0 6px;
+}
+
+.aranya-empty-state p {
+  font-size: 0.84rem;
+  color: #64748b;
+  margin: 0 0 16px;
+}
+
+/* Suggest Aranya Modal Box */
+.suggest-aranya-box {
+  background: #ffffff;
+  border-radius: var(--radius-xl);
+  max-width: 540px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+  animation: slideUp 0.25s ease-out;
+}
+
+@media (max-width: 768px) {
+  .aranya-page-container {
+    padding: 10px 12px 90px;
+  }
+  .aranya-hero-card {
+    padding: 22px 18px;
+  }
+  .aranya-hero-title {
+    font-size: 1.3rem;
+  }
+  .aranya-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
 
 
 

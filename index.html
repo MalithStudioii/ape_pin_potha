@@ -51,12 +51,12 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=91">
+    <link rel="stylesheet" href="css/styles.css?v=92">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
       (function() {
-        var v = 'v91';
+        var v = 'v92';
         if (localStorage.getItem('pinPotha_active_build') !== v) {
           localStorage.setItem('pinPotha_active_build', v);
           if ('caches' in window) {
@@ -109,6 +109,9 @@
                         <i class="fa-solid fa-hand-holding-heart"></i>
                         <span class="badge-live-mini">Live</span>
                     </div>
+                </button>
+                <button onclick="switchTab('aranya')" id="desk-tab-aranya" class="nav-tab-btn" title="ශ්‍රී ලංකා ආරණ්‍ය සේනාසන නාමාවලිය" aria-label="ආරණ්‍ය සේනාසන නාමාවලිය">
+                    <i class="fa-solid fa-mountain-sun" style="color: #10b981;"></i>
                 </button>
             </nav>
 
@@ -242,6 +245,12 @@
 
             <!-- Category Filter Menu -->
             <div class="card category-menu-card">
+                <!-- Aranya Senasana Directory Sidebar Shortcut -->
+                <button onclick="switchTab('aranya')" id="side-btn-aranya" class="category-item" style="background: linear-gradient(135deg, #f0fdf4, #dcfce7); border: 1px solid #86efac; color: #166534; font-weight: 700; margin-bottom: 8px;" title="ශ්‍රී ලංකා ආරණ්‍ය සේනාසන සහ භාවනා මධ්‍යස්ථාන නාමාවලිය">
+                    <span><i class="fa-solid fa-mountain-sun cat-icon" style="color: #15803d;"></i> ආරණ්‍ය සේනාසන</span>
+                    <span class="badge-live" style="background: linear-gradient(135deg, #15803d, #059669); font-size: 0.65rem; padding: 2px 7px;">නාමාවලිය</span>
+                </button>
+
                 <h3 class="category-title">පින්කම් වර්ගීකරණය</h3>
                 <div style="display: flex; flex-direction: column; gap: 4px;">
                     <button onclick="openShortsUploadModal()" class="category-item reels-sidebar-btn" style="background: linear-gradient(135deg, #fef2f2, #fff1f2); border: 1px solid #fecaca; color: #b91c1c; font-weight: 700; margin-bottom: 4px;" title="නව Short වීඩියෝ සබැඳියක් (Link) එක් කරන්න">
@@ -854,6 +863,158 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- ================= ARANYA SENASANA DIRECTORY VIEW ================= -->
+    <div id="aranyaPageContainer" class="aranya-page-container hidden" style="display: none;">
+        <div class="aranya-page-content">
+            <!-- Hero Banner Card -->
+            <div class="aranya-hero-card">
+                <div class="aranya-hero-badge">
+                    <i class="fa-solid fa-mountain-sun"></i>
+                    <span>පූජනීය වන සෙනසුන් සෙවුම</span>
+                </div>
+                <h1 class="aranya-hero-title">ශ්‍රී ලංකා ආරණ්‍ය සේනාසන & භාවනා මධ්‍යස්ථාන නාමාවලිය</h1>
+                <p class="aranya-hero-desc">
+                    පින්වත් මහා සංඝරත්නය උදෙසා දන්පැන්, ගිලන්පස, බෙහෙත් හේත් පූජා කිරීමට සහ භාවනා වැඩසටහන් පිළිබඳ විමසීමට දිවයින පුරා සත්‍යාපිත දුරකථන අංක සහ මඟපෙන්වීම්.
+                </p>
+                <div class="aranya-hero-actions">
+                    <button type="button" class="btn-suggest-aranya" onclick="openSuggestAranyaModal()">
+                        <i class="fa-solid fa-circle-plus"></i>
+                        <span>ඔබ දන්නා ආරණ්‍යයක් යෝජනා කරන්න</span>
+                    </button>
+                    <button type="button" class="btn-aranya-back" onclick="switchTab('feed')">
+                        <i class="fa-solid fa-arrow-left"></i>
+                        <span>පුණ්‍ය පවුර වෙත</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Important Monastic Calling Hours Advisory -->
+            <div class="aranya-advisory-box">
+                <div class="advisory-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                <div class="advisory-text">
+                    <strong>ගෞරවනීය සිහිපත් කිරීම:</strong> ආරණ්‍යවාසී පින්වත් භික්ෂූන් වහන්සේලා භාවනානුයෝගීව (විවේක සුවයෙන්) වැඩවසන බැවින්, මෙම අංක අයත් වන්නේ <strong>දායක සභාව, විහාර කාර්යාලය හෝ කප්පියකාරක මහතුන්</strong> වෙත වේ. කරුණාකර එක් එක් ආරණ්‍යය ඉදිරියේ දක්වා ඇති <strong>නිශ්චිත ඇමතුම් වේලාවන්හිදී පමණක්</strong> අමතා ඔබගේ දානමය හා පුණ්‍ය කටයුතු සම්පාදනය කරගන්න.
+                </div>
+            </div>
+
+            <!-- Search & Filter Controls -->
+            <div class="aranya-search-filter-card">
+                <div class="aranya-search-input-wrap">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="aranyaSearchInput" placeholder="ආරණ්‍යයේ නම, නගරය හෝ සේවාවන් සොයන්න..." oninput="filterAranyaDirectory()">
+                    <button type="button" id="aranyaSearchClearBtn" class="aranya-clear-search-btn hidden" onclick="clearAranyaSearch()" title="මකන්න">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <!-- District Horizontal Scroll Chips -->
+                <div class="aranya-districts-bar" id="aranyaDistrictsBar">
+                    <!-- Populated dynamically via JS -->
+                </div>
+            </div>
+
+            <!-- Results Counter & Verified Legend -->
+            <div class="aranya-results-header">
+                <span id="aranyaResultsCount" class="aranya-results-count">සෙනසුන් පූරණය වෙමින්...</span>
+                <div class="aranya-sort-legend">
+                    <i class="fa-solid fa-shield-halved" style="color: #059669;"></i>
+                    <span>සත්‍යාපිත සබඳතා තොරතුරු (Verified Directory)</span>
+                </div>
+            </div>
+
+            <!-- Monastery Cards Grid -->
+            <div class="aranya-grid" id="aranyaGrid">
+                <!-- Rendered dynamically via JS -->
+            </div>
+
+            <!-- Empty State when no results found -->
+            <div id="aranyaEmptyState" class="aranya-empty-state hidden" style="display: none;">
+                <i class="fa-solid fa-mountain-sun empty-icon"></i>
+                <h3>කිසිදු ආරණ්‍ය සේනාසනයක් හමු නොවීය</h3>
+                <p>ඔබ සොයන ආරණ්‍යයේ නම හෝ දිස්ත්‍රික්කය වෙනස් කර නැවත සොයන්න.</p>
+                <button type="button" class="btn-profile-primary" onclick="resetAranyaFilters()" style="margin: 0 auto;">
+                    <i class="fa-solid fa-rotate-left"></i> සියලු ආරණ්‍ය පෙන්වන්න
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Suggest Aranya Senasana Modal Dialog -->
+    <div id="suggestAranyaModal" class="modal-overlay hidden" onclick="closeSuggestAranyaModalOnBackdrop(event)">
+        <div class="modal-box suggest-aranya-box">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-mountain-sun" style="color: #059669; font-size: 1.1rem;"></i>
+                    <h3 class="modal-title">ආරණ්‍ය සේනාසනයක් යෝජනා කරන්න</h3>
+                </div>
+                <button type="button" class="modal-close-btn" onclick="closeSuggestAranyaModal()" aria-label="වසන්න">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form id="suggestAranyaForm" onsubmit="submitAranyaSuggestion(event)" style="padding: 20px;">
+                <p style="font-size: 0.8rem; color: #64748b; margin-top: 0; margin-bottom: 16px;">
+                    ඔබ දන්නා ආරණ්‍ය සේනාසනයක නිවැරදි විස්තර මෙහි සටහන් කරන්න. අපගේ කණ්ඩායම විසින් සත්‍යාපනය කිරීමෙන් පසු එය ප්‍රධාන නාමාවලියට ඇතුළත් කරනු ඇත.
+                </p>
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label class="form-label" style="font-size: 0.82rem; font-weight: 700; color: #334155;">ආරණ්‍ය සේනාසනයේ නම *</label>
+                    <input type="text" id="suggAranyaName" class="form-control" placeholder="උදා: නා උයන ආරණ්‍ය සේනාසනය" required style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 0.86rem;">
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+                    <div class="form-group">
+                        <label class="form-label" style="font-size: 0.82rem; font-weight: 700; color: #334155;">දිස්ත්‍රික්කය *</label>
+                        <select id="suggAranyaDistrict" class="form-control" required style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 0.86rem;">
+                            <option value="">තෝරන්න...</option>
+                            <option value="කුරුණෑගල">කුරුණෑගල</option>
+                            <option value="මහනුවර">මහනුවර</option>
+                            <option value="මාතලේ">මාතලේ</option>
+                            <option value="කොළඹ">කොළඹ</option>
+                            <option value="ගම්පහ">ගම්පහ</option>
+                            <option value="කළුතර">කළුතර</option>
+                            <option value="ගාල්ල">ගාල්ල</option>
+                            <option value="මාතර">මාතර</option>
+                            <option value="හම්බන්තොට">හම්බන්තොට</option>
+                            <option value="අනුරාධපුරය">අනුරාධපුරය</option>
+                            <option value="පොළොන්නරුව">පොළොන්නරුව</option>
+                            <option value="බදුල්ල">බදුල්ල</option>
+                            <option value="රත්නපුරය">රත්නපුරය</option>
+                            <option value="අම්පාර">අම්පාර</option>
+                            <option value="කෑගල්ල">කෑගල්ල</option>
+                            <option value="මොණරාගල">මොණරාගල</option>
+                            <option value="නුවරඑළිය">නුවරඑළිය</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" style="font-size: 0.82rem; font-weight: 700; color: #334155;">නගරය / ප්‍රදේශය *</label>
+                        <input type="text" id="suggAranyaTown" class="form-control" placeholder="උදා: මැල්සිරිපුර" required style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 0.86rem;">
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+                    <div class="form-group">
+                        <label class="form-label" style="font-size: 0.82rem; font-weight: 700; color: #334155;">දුරකථන අංකය *</label>
+                        <input type="tel" id="suggAranyaPhone" class="form-control" placeholder="071 XXXXXXX" required style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 0.86rem;">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" style="font-size: 0.82rem; font-weight: 700; color: #334155;">WhatsApp අංකය (තිබේ නම්)</label>
+                        <input type="tel" id="suggAranyaWa" class="form-control" placeholder="07X XXXXXXX" style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 0.86rem;">
+                    </div>
+                </div>
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label class="form-label" style="font-size: 0.82rem; font-weight: 700; color: #334155;">ඇමතුම් ලබාගත හැකි වේලාව</label>
+                    <input type="text" id="suggAranyaHours" class="form-control" placeholder="උදා: දහවල් 12:00 - 1:30" style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 0.86rem;">
+                </div>
+                <div class="form-group" style="margin-bottom: 18px;">
+                    <label class="form-label" style="font-size: 0.82rem; font-weight: 700; color: #334155;">අමතර සටහන් (විශේෂතා / සේවාවන්)</label>
+                    <textarea id="suggAranyaNotes" class="form-control" rows="2" placeholder="දාන වෙන්කිරීම්, පිණ්ඩපාතය, කුටි පූජා ආදිය..." style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 0.86rem;"></textarea>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                    <button type="button" class="btn" onclick="closeSuggestAranyaModal()" style="padding: 8px 16px; border-radius: 8px; background: #f1f5f9; color: #475569; font-weight: 600; font-size: 0.84rem; border: none; cursor: pointer;">අවලංගු කරන්න</button>
+                    <button type="submit" id="btnSubmitAranyaSugg" class="btn btn-primary" style="padding: 8px 20px; border-radius: 8px; background: linear-gradient(135deg, #059669, #047857); color: #ffffff; font-weight: 700; font-size: 0.84rem; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-paper-plane"></i> යෝජනා කරන්න
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -2554,6 +2715,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=91"></script>
+    <script type="module" src="js/app.js?v=92"></script>
 </body>
 </html>

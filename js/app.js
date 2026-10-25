@@ -883,7 +883,7 @@ window.switchTab = function(tab, pushHistory = true) {
   document.querySelector('.app-header')?.classList.remove('header-hidden');
 
   // Update navigation buttons (both desktop & mobile)
-  ['feed', 'profile', 'mybook', 'needs', 'friends'].forEach(t => {
+  ['feed', 'profile', 'mybook', 'needs', 'friends', 'aranya'].forEach(t => {
     const dBtn = document.getElementById(`desk-tab-${t}`);
     const mBtn = document.getElementById(`mob-tab-${t}`);
     if (dBtn) {
@@ -896,6 +896,12 @@ window.switchTab = function(tab, pushHistory = true) {
     }
   });
 
+  const sideAranyaBtn = document.getElementById('side-btn-aranya');
+  if (sideAranyaBtn) {
+    if (tab === 'aranya') sideAranyaBtn.classList.add('active');
+    else sideAranyaBtn.classList.remove('active');
+  }
+
   const userProfBtn = document.getElementById('userProfileBtn');
   if (userProfBtn) {
     if (tab === 'profile') userProfBtn.classList.add('active');
@@ -904,12 +910,17 @@ window.switchTab = function(tab, pushHistory = true) {
 
   const feedLayout = document.getElementById('mainFeedLayout');
   const profileContainer = document.getElementById('profilePageContainer');
+  const aranyaContainer = document.getElementById('aranyaPageContainer');
   const banner = document.getElementById('tabHeaderBanner');
 
   if (tab === 'profile') {
     if (feedLayout) {
       feedLayout.classList.add('hidden');
       feedLayout.style.setProperty('display', 'none', 'important');
+    }
+    if (aranyaContainer) {
+      aranyaContainer.classList.add('hidden');
+      aranyaContainer.style.setProperty('display', 'none', 'important');
     }
     if (profileContainer) {
       profileContainer.classList.remove('hidden');
@@ -927,7 +938,32 @@ window.switchTab = function(tab, pushHistory = true) {
     return;
   }
 
-  // Non-profile tabs: show main feed layout, hide profile container
+  if (tab === 'aranya') {
+    if (feedLayout) {
+      feedLayout.classList.add('hidden');
+      feedLayout.style.setProperty('display', 'none', 'important');
+    }
+    if (profileContainer) {
+      profileContainer.classList.add('hidden');
+      profileContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (aranyaContainer) {
+      aranyaContainer.classList.remove('hidden');
+      aranyaContainer.style.setProperty('display', 'block', 'important');
+    }
+    if (banner) banner.style.display = 'none';
+
+    try {
+      renderAranyaDirectoryView();
+    } catch (err) {
+      console.error('[Aranya] Error rendering aranya view:', err);
+    }
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+
+  // Non-profile, non-aranya tabs: show main feed layout, hide profile & aranya container
   if (feedLayout) {
     feedLayout.classList.remove('hidden');
     feedLayout.style.removeProperty('display');
@@ -936,6 +972,10 @@ window.switchTab = function(tab, pushHistory = true) {
   if (profileContainer) {
     profileContainer.classList.add('hidden');
     profileContainer.style.setProperty('display', 'none', 'important');
+  }
+  if (aranyaContainer) {
+    aranyaContainer.classList.add('hidden');
+    aranyaContainer.style.setProperty('display', 'none', 'important');
   }
 
   // Context banner
@@ -8015,5 +8055,323 @@ window.handleSavePoyaCalendarModal = async function(e) {
     alert("දෝෂයකි: " + err.message);
   } finally {
     if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
+  }
+};
+
+/* ==========================================================================
+   Sri Lanka Aranya Senasana Directory Controller
+   ========================================================================== */
+let allAranyaSenasana = [];
+let currentAranyaDistrict = 'සියලුම';
+let currentAranyaSearch = '';
+
+window.renderAranyaDirectoryView = async function() {
+  const grid = document.getElementById('aranyaGrid');
+  const countEl = document.getElementById('aranyaResultsCount');
+
+  if (grid) {
+    grid.innerHTML = `
+      <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #059669;">
+        <i class="fa-solid fa-spinner fa-spin" style="font-size: 1.8rem; margin-bottom: 10px;"></i>
+        <p style="font-weight: 600; font-size: 0.9rem;">පූජනීය ආරණ්‍ය සේනාසන නාමාවලිය පූරණය වෙමින්...</p>
+      </div>
+    `;
+  }
+
+  try {
+    allAranyaSenasana = await StorageService.getAranyaSenasanaList();
+  } catch (err) {
+    console.error('[Aranya] Failed to load list:', err);
+    allAranyaSenasana = [];
+  }
+
+  // Render Districts Bar if not rendered or update counts
+  renderAranyaDistrictsBar();
+
+  // Filter & Render Cards
+  filterAndRenderAranyaCards();
+};
+
+function renderAranyaDistrictsBar() {
+  const bar = document.getElementById('aranyaDistrictsBar');
+  if (!bar) return;
+
+  const districts = [
+    'සියලුම', 'කුරුණෑගල', 'ගාල්ල', 'කළුතර', 'ගම්පහ', 'මහනුවර', 'මාතලේ',
+    'අනුරාධපුරය', 'පොළොන්නරුව', 'හම්බන්තොට', 'බදුල්ල', 'රත්නපුරය', 'අම්පාර', 'මාතර'
+  ];
+
+  bar.innerHTML = districts.map(d => {
+    let count = 0;
+    if (d === 'සියලුම') {
+      count = allAranyaSenasana.length;
+    } else {
+      count = allAranyaSenasana.filter(a => (a.district || '').includes(d)).length;
+    }
+
+    const isActive = currentAranyaDistrict === d;
+    return `
+      <button type="button" 
+        class="aranya-district-chip ${isActive ? 'active' : ''}" 
+        onclick="setAranyaDistrictFilter('${d}')">
+        <span>${d}</span>
+        <span style="font-size: 0.68rem; opacity: 0.85; margin-left: 3px;">(${count})</span>
+      </button>
+    `;
+  }).join('');
+}
+
+window.setAranyaDistrictFilter = function(district) {
+  triggerHaptic(10);
+  currentAranyaDistrict = district;
+  renderAranyaDistrictsBar();
+  filterAndRenderAranyaCards();
+};
+
+window.filterAranyaDirectory = function() {
+  const input = document.getElementById('aranyaSearchInput');
+  const clearBtn = document.getElementById('aranyaSearchClearBtn');
+  currentAranyaSearch = (input?.value || '').trim().toLowerCase();
+
+  if (clearBtn) {
+    if (currentAranyaSearch) clearBtn.classList.remove('hidden');
+    else clearBtn.classList.add('hidden');
+  }
+
+  filterAndRenderAranyaCards();
+};
+
+window.clearAranyaSearch = function() {
+  const input = document.getElementById('aranyaSearchInput');
+  const clearBtn = document.getElementById('aranyaSearchClearBtn');
+  if (input) input.value = '';
+  if (clearBtn) clearBtn.classList.add('hidden');
+  currentAranyaSearch = '';
+  filterAndRenderAranyaCards();
+};
+
+window.resetAranyaFilters = function() {
+  currentAranyaDistrict = 'සියලුම';
+  currentAranyaSearch = '';
+  const input = document.getElementById('aranyaSearchInput');
+  const clearBtn = document.getElementById('aranyaSearchClearBtn');
+  if (input) input.value = '';
+  if (clearBtn) clearBtn.classList.add('hidden');
+  renderAranyaDistrictsBar();
+  filterAndRenderAranyaCards();
+};
+
+function filterAndRenderAranyaCards() {
+  const grid = document.getElementById('aranyaGrid');
+  const emptyState = document.getElementById('aranyaEmptyState');
+  const countEl = document.getElementById('aranyaResultsCount');
+  if (!grid) return;
+
+  let filtered = [...allAranyaSenasana];
+
+  // District filter
+  if (currentAranyaDistrict !== 'සියලුම') {
+    filtered = filtered.filter(a => (a.district || '').includes(currentAranyaDistrict));
+  }
+
+  // Search query filter
+  if (currentAranyaSearch) {
+    const q = currentAranyaSearch;
+    filtered = filtered.filter(a => {
+      const name = (a.name || '').toLowerCase();
+      const nameEn = (a.nameEn || '').toLowerCase();
+      const town = (a.town || '').toLowerCase();
+      const district = (a.district || '').toLowerCase();
+      const tradition = (a.tradition || '').toLowerCase();
+      const desc = (a.description || '').toLowerCase();
+      const services = (a.services || []).join(' ').toLowerCase();
+      return name.includes(q) || nameEn.includes(q) || town.includes(q) || district.includes(q) || tradition.includes(q) || desc.includes(q) || services.includes(q);
+    });
+  }
+
+  // Update counter
+  if (countEl) {
+    countEl.innerText = `සෙනසුන් ${filtered.length} ක් හමුවිය`;
+  }
+
+  if (filtered.length === 0) {
+    grid.innerHTML = '';
+    if (emptyState) emptyState.style.display = 'block';
+    return;
+  }
+
+  if (emptyState) emptyState.style.display = 'none';
+
+  grid.innerHTML = filtered.map(item => {
+    const primaryPhone = item.phones && item.phones[0] ? item.phones[0] : '';
+    const secondaryPhone = item.phones && item.phones[1] ? item.phones[1] : '';
+    const cleanPhoneForTel = primaryPhone.replace(/[^0-9]/g, '');
+    const cleanSecPhoneForTel = secondaryPhone.replace(/[^0-9]/g, '');
+    const waClean = (item.whatsapp || primaryPhone).replace(/[^0-9]/g, '').replace(/^0/, '94');
+
+    const servicesHtml = (item.services || []).map(s => `
+      <span class="aranya-service-pill">${Security.escapeHTML(s)}</span>
+    `).join('');
+
+    return `
+      <div class="aranya-card" id="card_${item.id}">
+        <div class="aranya-card-top">
+          <span class="aranya-tradition-tag">
+            <i class="fa-solid fa-dharmachakra"></i>
+            <span>${Security.escapeHTML(item.tradition || 'ආරණ්‍ය සම්ප්‍රදාය')}</span>
+          </span>
+          <span class="aranya-district-tag">
+            <i class="fa-solid fa-location-dot"></i>
+            <span>${Security.escapeHTML(item.district || 'දිස්ත්‍රික්කය')}</span>
+          </span>
+        </div>
+
+        <h3 class="aranya-title">${Security.escapeHTML(item.name)}</h3>
+        ${item.nameEn ? `<div class="aranya-subtitle">${Security.escapeHTML(item.nameEn)}</div>` : ''}
+
+        <div class="aranya-location">
+          <i class="fa-solid fa-map-pin"></i>
+          <span>${Security.escapeHTML(item.town || '')}</span>
+        </div>
+
+        <p class="aranya-desc">${Security.escapeHTML(item.description || '')}</p>
+
+        ${item.callingHours ? `
+          <div class="aranya-calling-hours">
+            <i class="fa-regular fa-clock"></i>
+            <span><strong>ඇමතුම් වේලාව:</strong> ${Security.escapeHTML(item.callingHours)}</span>
+          </div>
+        ` : ''}
+
+        <div class="aranya-contact-person">
+          <i class="fa-solid fa-user-tie" style="color: #64748b;"></i>
+          <span>${Security.escapeHTML(item.contactPerson || 'දායක සභාව / කාර්යාලය')}</span>
+        </div>
+
+        ${servicesHtml ? `<div class="aranya-services-list">${servicesHtml}</div>` : ''}
+
+        <div class="aranya-action-bar">
+          ${primaryPhone ? `
+            <a href="tel:${cleanPhoneForTel}" class="aranya-action-btn btn-call" title="දුරකථන ඇමතුමක් ලබාගන්න">
+              <i class="fa-solid fa-phone"></i>
+              <span>${primaryPhone}</span>
+            </a>
+          ` : ''}
+
+          ${secondaryPhone ? `
+            <a href="tel:${cleanSecPhoneForTel}" class="aranya-action-btn btn-call-sub" title="දෙවන අංකය අමතන්න">
+              <i class="fa-solid fa-phone-volume"></i>
+              <span>${secondaryPhone}</span>
+            </a>
+          ` : ''}
+
+          ${item.whatsapp ? `
+            <a href="https://wa.me/${waClean}" target="_blank" rel="noopener" class="aranya-action-btn btn-wa" title="WhatsApp පණිවිඩයක් යොමු කරන්න">
+              <i class="fa-brands fa-whatsapp"></i>
+              <span>WhatsApp</span>
+            </a>
+          ` : ''}
+
+          ${item.mapUrl ? `
+            <a href="${item.mapUrl}" target="_blank" rel="noopener" class="aranya-action-btn btn-map" title="Google Maps මඟින් යන මඟ බලන්න">
+              <i class="fa-solid fa-diamond-turn-right"></i>
+              <span>Maps</span>
+            </a>
+          ` : ''}
+
+          ${primaryPhone ? `
+            <button type="button" class="aranya-action-btn btn-copy" onclick="copyAranyaPhone('${primaryPhone}', this)" title="අංකය Copy කරගන්න">
+              <i class="fa-regular fa-copy"></i>
+            </button>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+window.copyAranyaPhone = function(phone, btn) {
+  triggerHaptic(15);
+  if (!navigator.clipboard) {
+    alert("දුරකථන අංකය: " + phone);
+    return;
+  }
+  navigator.clipboard.writeText(phone).then(() => {
+    if (btn) {
+      const origHtml = btn.innerHTML;
+      btn.innerHTML = '<i class="fa-solid fa-check" style="color: #059669;"></i>';
+      setTimeout(() => { btn.innerHTML = origHtml; }, 1800);
+    }
+  }).catch(() => {
+    alert("දුරකථන අංකය: " + phone);
+  });
+};
+
+/* Suggest Monastery Modal Logic */
+window.openSuggestAranyaModal = function() {
+  triggerHaptic(12);
+  const modal = document.getElementById('suggestAranyaModal');
+  if (modal) modal.classList.remove('hidden');
+};
+
+window.closeSuggestAranyaModal = function() {
+  const modal = document.getElementById('suggestAranyaModal');
+  if (modal) modal.classList.add('hidden');
+};
+
+window.closeSuggestAranyaModalOnBackdrop = function(e) {
+  if (e.target && e.target.id === 'suggestAranyaModal') {
+    closeSuggestAranyaModal();
+  }
+};
+
+window.submitAranyaSuggestion = async function(e) {
+  if (e) e.preventDefault();
+  const name = (document.getElementById('suggAranyaName')?.value || '').trim();
+  const district = (document.getElementById('suggAranyaDistrict')?.value || '').trim();
+  const town = (document.getElementById('suggAranyaTown')?.value || '').trim();
+  const phone = (document.getElementById('suggAranyaPhone')?.value || '').trim();
+  const whatsapp = (document.getElementById('suggAranyaWa')?.value || '').trim();
+  const callingHours = (document.getElementById('suggAranyaHours')?.value || '').trim();
+  const notes = (document.getElementById('suggAranyaNotes')?.value || '').trim();
+
+  if (!name || !district || !town || !phone) {
+    alert("කරුණාකර ආරණ්‍යයේ නම, දිස්ත්‍රික්කය, නගරය සහ දුරකථන අංකය ඇතුළත් කරන්න.");
+    return;
+  }
+
+  const btn = document.getElementById('btnSubmitAranyaSugg');
+  const origHtml = btn ? btn.innerHTML : '';
+
+  try {
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> යොමු කරමින්...';
+    }
+
+    await StorageService.suggestAranyaSenasana({
+      name,
+      district,
+      town,
+      phone,
+      whatsapp,
+      callingHours,
+      notes
+    });
+
+    SoundService.playPublish();
+    triggerHaptic([30, 60, 30]);
+    alert("සාදු! ඔබගේ යෝජනාව සාර්ථකව ලැබුණි. පරිපාලක මණ්ඩලය විසින් සත්‍යාපනය කිරීමෙන් පසු එය ප්‍රධාන නාමාවලියට ඇතුළත් කරනු ඇත. 🙏🌿");
+
+    const form = document.getElementById('suggestAranyaForm');
+    if (form) form.reset();
+    closeSuggestAranyaModal();
+  } catch (err) {
+    alert("දෝෂයක් සිදු විය: " + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+    }
   }
 };

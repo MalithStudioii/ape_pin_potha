@@ -114,5 +114,18 @@ service cloud.firestore {
       allow read, create: if isAdmin();
       allow update, delete: if isMasterAdmin();
     }
+
+    // =========================================================================
+    // 6. ආරණ්‍ය සේනාසන නාමාවලිය (Aranya Senasana Directory)
+    // =========================================================================
+    match /aranya_senasana/{aranyaId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /aranya_suggestions/{suggId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
   }
 }

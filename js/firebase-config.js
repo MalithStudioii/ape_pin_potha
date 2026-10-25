@@ -34,6 +34,7 @@ export const COLLECTIONS = {
   COMMENTS: "comments",
   NEEDS: "charity_needs",
   NOTIFICATIONS: "notifications",
-  SETTINGS: "admin_settings"
+  SETTINGS: "admin_settings",
+  ARANYA: "aranya_senasana"
 };
 
