@@ -51,12 +51,12 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=86">
+    <link rel="stylesheet" href="css/styles.css?v=87">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
       (function() {
-        var v = 'v86';
+        var v = 'v87';
         if (localStorage.getItem('pinPotha_active_build') !== v) {
           localStorage.setItem('pinPotha_active_build', v);
           if ('caches' in window) {
@@ -367,9 +367,14 @@
             <!-- Daily Dhamma Verse Card -->
             <div class="dhamma-quote-card">
                 <i class="fa-solid fa-dharmachakra bg-icon"></i>
-                <div class="quote-title">
-                    <i class="fa-solid fa-sun"></i>
-                    <span>දවසේ ධර්ම පදය</span>
+                <div class="quote-title" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-sun"></i>
+                        <span>දවසේ ධම්ම පදය</span>
+                    </div>
+                    <button type="button" class="btn-sidebar-widget-edit" id="btnEditDailyVerse" onclick="openDhammaVerseEditModal()" title="දවසේ ධම්ම පදය සංස්කරණය" style="display: none;">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                    </button>
                 </div>
                 <p class="quote-pali" id="dailyDhammaPali">
                     "පුඤ්ඤං චේ පුරිසෝ කයිරා - කයිරාථේනං පුනප්පුනං<br>
@@ -401,9 +406,15 @@
 
             <!-- Upcoming Buddhist Calendar Widget -->
             <div class="widget-card">
-                <h3 class="widget-title" style="margin-bottom: 12px;">
-                    <i class="fa-solid fa-moon" style="color: #d97706;"></i> පුණ්‍ය දින දර්ශනය
-                </h3>
+                <div class="widget-header" style="margin-bottom: 12px;">
+                    <h3 class="widget-title" style="margin: 0; display: flex; align-items: center; gap: 8px;">
+                        <i class="fa-solid fa-moon" style="color: #d97706;"></i>
+                        <span>පුණ්‍ය දින දර්ශනය</span>
+                    </h3>
+                    <button type="button" class="btn-sidebar-widget-edit" id="btnEditPoyaCalendar" onclick="openPoyaCalendarEditModal()" title="පුණ්‍ය දින දර්ශනය සංස්කරණය" style="display: none;">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                    </button>
+                </div>
                 <div style="display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 12px; background: #fffbeb; border: 1px solid #fef3c7;">
                     <div style="background: #d97706; color: #fff; font-weight: 800; padding: 4px 10px; border-radius: 8px; text-align: center; line-height: 1.1;">
                         <span id="poyaMonthBadge" style="font-size: 0.65rem; display: block;">ඔක්</span>
@@ -1737,7 +1748,7 @@
                     <div class="admin-section-box">
                         <div class="admin-section-title">
                             <i class="fa-solid fa-sun" style="color: #d97706;"></i>
-                            <span>දවසේ ධර්ම පදය සංස්කරණය (Daily Dhamma Verse)</span>
+                            <span>දවසේ ධම්ම පදය සංස්කරණය (Daily Dhamma Verse)</span>
                         </div>
                         <p style="font-size: 0.72rem; color: #64748b; margin-bottom: 8px;">
                             දකුණු පස තීරුවේ දිස්වන පාළි ගාථාව සහ සිංහල තේරුම ක්ෂණිකව යාවත්කාලීන කරන්න.
@@ -2124,6 +2135,86 @@
     <div id="viralStatusCardRenderBox" aria-hidden="true"></div>
 
     <!-- ========================================================================= -->
+    <!-- Daily Dhamma Verse Edit Modal Dialog                                      -->
+    <!-- ========================================================================= -->
+    <div id="dhammaVerseModal" class="modal-overlay hidden" onclick="if(event.target === this) closeDhammaVerseEditModal()">
+        <div class="modal-card" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-sun" style="color: #f59e0b;"></i>
+                    <span>දවසේ ධම්ම පදය සංස්කරණය</span>
+                </h3>
+                <button type="button" onclick="closeDhammaVerseEditModal()" class="modal-close-btn">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form onsubmit="handleSaveDhammaVerseModal(event)">
+                <div class="form-group">
+                    <label class="form-label" style="font-weight: 700; color: #78350f;">ගාථාව / පාලි පාඨය (Pali Stanza) *</label>
+                    <textarea id="modalVersePaliInput" class="form-textarea" rows="3" required placeholder="උදා: පුඤ්ඤං චේ පුරිසෝ කයිරා - කයිරාථේනං පුනප්පුනං..." style="font-family: var(--font-serif);"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" style="font-weight: 700; color: #78350f;">සිංහල තේරුම (Sinhala Meaning) *</label>
+                    <textarea id="modalVerseSinhalaInput" class="form-textarea" rows="4" required placeholder="උදා: යම් පුද්ගලයෙක් පිනක් කරන්නේ නම්, එය නැවත නැවතත් කරන්න..."></textarea>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 18px;">
+                    <button type="button" onclick="closeDhammaVerseEditModal()" class="btn-crop-cancel" style="flex: 1;">
+                        අවලංගු කරන්න
+                    </button>
+                    <button type="submit" id="btnSaveVerseSubmit" class="btn-submit-merit" style="flex: 2; margin: 0; background: linear-gradient(135deg, #d97706, #b45309);">
+                        <i class="fa-solid fa-floppy-disk"></i> <span>ධම්ම පදය සුරකින්න</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- Poya Calendar Edit Modal Dialog                                          -->
+    <!-- ========================================================================= -->
+    <div id="poyaCalendarModal" class="modal-overlay hidden" onclick="if(event.target === this) closePoyaCalendarEditModal()">
+        <div class="modal-card" style="max-width: 480px;">
+            <div class="modal-header">
+                <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-moon" style="color: #d97706;"></i>
+                    <span>පුණ්‍ය දින දර්ශනය සංස්කරණය</span>
+                </h3>
+                <button type="button" onclick="closePoyaCalendarEditModal()" class="modal-close-btn">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form onsubmit="handleSavePoyaCalendarModal(event)">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+                    <div class="form-group" style="margin: 0;">
+                        <label class="form-label" style="font-weight: 700; color: #78350f;">මාසය (Month) *</label>
+                        <input type="text" id="modalPoyaMonthInput" class="form-input" maxlength="10" placeholder="උදා: ඔක්" required>
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label class="form-label" style="font-weight: 700; color: #78350f;">දිනය (Day) *</label>
+                        <input type="text" id="modalPoyaDayInput" class="form-input" maxlength="6" placeholder="උදා: 25" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" style="font-weight: 700; color: #78350f;">පොහොය / පුණ්‍ය දිනය (Title) *</label>
+                    <input type="text" id="modalPoyaTitleInput" class="form-input" maxlength="80" placeholder="උදා: වප් පුර පසළොස්වක පොහොය" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" style="font-weight: 700; color: #78350f;">විස්තරය (Description / Subtitle)</label>
+                    <input type="text" id="modalPoyaDescInput" class="form-input" maxlength="120" placeholder="උදා: කඨින චීවර මාසයේ ආරම්භය">
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 18px;">
+                    <button type="button" onclick="closePoyaCalendarEditModal()" class="btn-crop-cancel" style="flex: 1;">
+                        අවලංගු කරන්න
+                    </button>
+                    <button type="submit" id="btnSavePoyaSubmit" class="btn-submit-merit" style="flex: 2; margin: 0; background: linear-gradient(135deg, #d97706, #b45309);">
+                        <i class="fa-solid fa-floppy-disk"></i> <span>දින දර්ශනය සුරකින්න</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
     <!-- Google Sign-In Required Auth Guard Modal                                  -->
     <!-- ========================================================================= -->
     <div id="authRequiredModal" class="modal-overlay hidden" onclick="closeAuthRequiredOnBackdrop(event)">
@@ -2459,6 +2550,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=86"></script>
+    <script type="module" src="js/app.js?v=87"></script>
 </body>
 </html>

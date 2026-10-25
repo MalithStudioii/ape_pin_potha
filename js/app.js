@@ -437,8 +437,9 @@ function updateUserInfoUI() {
   if (sideNameEl) sideNameEl.innerText = user.name || 'අමුත්තා';
 
   // Toggle Header Crown Button for Master Admin & Sub-Admins
-  const crownBtn = document.getElementById('headerAdminCrownBtn');
-  const isAdminUser = isMaster || user.isAdmin || user.role === 'admin';
+  const isMaster = StorageService.isMasterAdmin();
+  const isSub = StorageService.isSubAdmin(user);
+  const isAdminUser = isMaster || isSub || user.isAdmin || user.role === 'admin';
   if (crownBtn) {
     if (isAdminUser) {
       crownBtn.classList.remove('hidden');
@@ -450,10 +451,20 @@ function updateUserInfoUI() {
     }
   }
 
+  // Toggle Admin Edit buttons on Sidebar Widgets
+  const btnEditVerse = document.getElementById('btnEditDailyVerse');
+  if (btnEditVerse) {
+    btnEditVerse.style.display = isAdminUser ? 'inline-flex' : 'none';
+  }
+  const btnEditPoya = document.getElementById('btnEditPoyaCalendar');
+  if (btnEditPoya) {
+    btnEditPoya.style.display = isAdminUser ? 'inline-flex' : 'none';
+  }
+
   // Toggle Admin Tab Button in Settings Modal
   const adminTabBtn = document.getElementById('set-tab-admin');
   if (adminTabBtn) {
-    if (isMaster) {
+    if (isAdminUser) {
       adminTabBtn.classList.remove('hidden');
       adminTabBtn.style.display = 'inline-flex';
     } else {
@@ -7862,3 +7873,98 @@ function initSmartHeaderScroll() {
 
   window.addEventListener('scroll', onScroll, { passive: true });
 }
+
+// =========================================================================
+// Sidebar Daily Dhamma Verse & Poya Calendar Admin Modals
+// =========================================================================
+window.openDhammaVerseEditModal = function() {
+  if (!StorageService.isMasterAdmin() && !StorageService.isSubAdmin(StorageService.currentUser)) {
+    alert("මෙම පහසුකම භාවිතා කළ හැක්කේ පරිපාලකයින්ට පමණි.");
+    return;
+  }
+  const verse = StorageService.getDailyDhammaVerse();
+  const paliInput = document.getElementById('modalVersePaliInput');
+  const sinhalaInput = document.getElementById('modalVerseSinhalaInput');
+  if (paliInput) paliInput.value = (verse && verse.pali) ? verse.pali : '';
+  if (sinhalaInput) sinhalaInput.value = (verse && verse.sinhala) ? verse.sinhala : '';
+  const modal = document.getElementById('dhammaVerseModal');
+  if (modal) modal.classList.remove('hidden');
+};
+
+window.closeDhammaVerseEditModal = function() {
+  const modal = document.getElementById('dhammaVerseModal');
+  if (modal) modal.classList.add('hidden');
+};
+
+window.handleSaveDhammaVerseModal = async function(e) {
+  if (e) e.preventDefault();
+  const pali = (document.getElementById('modalVersePaliInput')?.value || '').trim();
+  const sinhala = (document.getElementById('modalVerseSinhalaInput')?.value || '').trim();
+  if (!pali || !sinhala) {
+    alert("කරුණාකර ගාථාව සහ සිංහල තේරුම යන දෙකම ඇතුළත් කරන්න.");
+    return;
+  }
+  const btn = document.getElementById('btnSaveVerseSubmit');
+  const origHtml = btn ? btn.innerHTML : '';
+  try {
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> සුරකිමින්...'; }
+    await StorageService.saveDailyDhammaVerse(pali, sinhala);
+    SoundService.playPublish();
+    triggerHaptic([30, 60, 30]);
+    alert("🎉 සාදු! දවසේ ධම්ම පදය සාර්ථකව යාවත්කාලීන විය!");
+    closeDhammaVerseEditModal();
+  } catch (err) {
+    alert("දෝෂයකි: " + err.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
+  }
+};
+
+window.openPoyaCalendarEditModal = function() {
+  if (!StorageService.isMasterAdmin() && !StorageService.isSubAdmin(StorageService.currentUser)) {
+    alert("මෙම පහසුකම භාවිතා කළ හැක්කේ පරිපාලකයින්ට පමණි.");
+    return;
+  }
+  const poya = StorageService.getPoyaEvent();
+  const mInput = document.getElementById('modalPoyaMonthInput');
+  const dInput = document.getElementById('modalPoyaDayInput');
+  const tInput = document.getElementById('modalPoyaTitleInput');
+  const descInput = document.getElementById('modalPoyaDescInput');
+  if (mInput) mInput.value = (poya && poya.month) ? poya.month : '';
+  if (dInput) dInput.value = (poya && poya.day) ? poya.day : '';
+  if (tInput) tInput.value = (poya && poya.title) ? poya.title : '';
+  if (descInput) descInput.value = (poya && poya.desc) ? poya.desc : '';
+  const modal = document.getElementById('poyaCalendarModal');
+  if (modal) modal.classList.remove('hidden');
+};
+
+window.closePoyaCalendarEditModal = function() {
+  const modal = document.getElementById('poyaCalendarModal');
+  if (modal) modal.classList.add('hidden');
+};
+
+window.handleSavePoyaCalendarModal = async function(e) {
+  if (e) e.preventDefault();
+  const month = (document.getElementById('modalPoyaMonthInput')?.value || '').trim();
+  const day = (document.getElementById('modalPoyaDayInput')?.value || '').trim();
+  const title = (document.getElementById('modalPoyaTitleInput')?.value || '').trim();
+  const desc = (document.getElementById('modalPoyaDescInput')?.value || '').trim();
+  if (!month || !day || !title) {
+    alert("කරුණාකර මාසය, දිනය සහ පොහොය නම ඇතුළත් කරන්න.");
+    return;
+  }
+  const btn = document.getElementById('btnSavePoyaSubmit');
+  const origHtml = btn ? btn.innerHTML : '';
+  try {
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> සුරකිමින්...'; }
+    await StorageService.savePoyaEvent({ month, day, title, desc });
+    SoundService.playPublish();
+    triggerHaptic([30, 60, 30]);
+    alert("🎉 සාදු! පුණ්‍ය දින දර්ශනය සාර්ථකව යාවත්කාලීන විය!");
+    closePoyaCalendarEditModal();
+  } catch (err) {
+    alert("දෝෂයකි: " + err.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
+  }
+};

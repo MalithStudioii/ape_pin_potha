@@ -736,8 +736,8 @@ export const StorageService = {
   },
 
   async saveAdminAnnouncement(data) {
-    if (!this.isMasterAdmin()) {
-      throw new Error('පරිපාලක (Master Admin) අවසරය අවශ්‍ය වේ.');
+    if (!this.isMasterAdmin() && !this.isSubAdmin(this.currentUser)) {
+      throw new Error('පරිපාලක අවසරය අවශ්‍ය වේ.');
     }
     const msg = (data && (data.message || data.text)) || '';
     const active = data ? !!data.active : false;
@@ -777,8 +777,8 @@ export const StorageService = {
   },
 
   async saveDailyDhammaVerse(arg1, arg2) {
-    if (!this.isMasterAdmin()) {
-      throw new Error('පරිපාලක (Master Admin) අවසරය අවශ්‍ය වේ.');
+    if (!this.isMasterAdmin() && !this.isSubAdmin(this.currentUser)) {
+      throw new Error('පරිපාලක අවසරය අවශ්‍ය වේ.');
     }
     let paliText = '';
     let sinhalaText = '';
@@ -830,8 +830,8 @@ export const StorageService = {
   },
 
   async savePoyaEvent({ month, day, title, desc }) {
-    if (!this.isMasterAdmin()) {
-      throw new Error('පරිපාලක (Master Admin) අවසරය අවශ්‍ය වේ.');
+    if (!this.isMasterAdmin() && !this.isSubAdmin(this.currentUser)) {
+      throw new Error('පරිපාලක අවසරය අවශ්‍ය වේ.');
     }
     const payload = {
       month: Security.escapeHTML(Security.sanitizeText(month || 'පෝය')),

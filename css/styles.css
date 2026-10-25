@@ -3858,6 +3858,42 @@ body {
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
 }
 
+/* Sidebar Widget Edit Action Buttons for Admins */
+.btn-sidebar-widget-edit {
+  background: rgba(254, 243, 199, 0.95);
+  color: #b45309;
+  border: 1px solid #fde68a;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 4px rgba(217, 119, 6, 0.12);
+  flex-shrink: 0;
+}
+.btn-sidebar-widget-edit:hover {
+  background: #f59e0b;
+  color: #ffffff;
+  border-color: #d97706;
+  transform: scale(1.12);
+  box-shadow: 0 4px 10px rgba(217, 119, 6, 0.3);
+}
+
+.dhamma-quote-card .btn-sidebar-widget-edit {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fef3c7;
+  border: 1px solid rgba(253, 230, 138, 0.35);
+}
+.dhamma-quote-card .btn-sidebar-widget-edit:hover {
+  background: #f59e0b;
+  color: #ffffff;
+  border-color: #f59e0b;
+}
+
 /* ==========================================================================
    Venerated Maha Sangha Role & Verification System
    ========================================================================== */
