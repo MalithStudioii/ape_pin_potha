@@ -3815,11 +3815,11 @@ let lastLightboxOpenTime = 0;
 
 window.closeLightboxOnBackdrop = function(e) {
   // Prevent immediate closure if the touch/click was part of opening
-  if (Date.now() - lastLightboxOpenTime < 800) {
+  if (Date.now() - lastLightboxOpenTime < 1000) {
     return;
   }
   // Only close if clicking outside the image content on the backdrop overlay
-  if (e.target.id === 'photoLightboxModal' || e.target.classList.contains('lightbox-backdrop')) {
+  if (e.target.classList.contains('lightbox-backdrop') || e.target.id === 'photoLightboxModal') {
     if (currentLightboxZoom > 1) {
       resetZoomLightbox();
     } else {
@@ -8029,7 +8029,7 @@ function initPWAEngine() {
   const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()) && !window.MSStream;
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v98';
+  const ACTIVE_BUILD = 'v99';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {

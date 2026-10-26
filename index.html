@@ -51,26 +51,25 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=98">
+    <link rel="stylesheet" href="css/styles.css?v=99">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
       (function() {
-        var v = 'v97';
+        var v = 'v99';
         if (localStorage.getItem('pinPotha_active_build') !== v) {
           localStorage.setItem('pinPotha_active_build', v);
           if ('caches' in window) {
             caches.keys().then(function(keys) {
-              keys.forEach(function(k) {
-                if (k !== 'pin-potha-cache-' + v) caches.delete(k);
-              });
+              keys.forEach(function(k) { caches.delete(k); });
             });
           }
           if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function(regs) {
-              regs.forEach(function(r) { try { r.update(); } catch(e){} });
+              regs.forEach(function(r) { try { r.unregister(); } catch(e){} });
             });
           }
+          setTimeout(function() { window.location.reload(true); }, 200);
         }
       })();
     </script>
@@ -2447,9 +2446,9 @@
     <!-- ========================================================================= -->
     <!-- Fullscreen Photo Lightbox / Gallery Viewer                                -->
     <!-- ========================================================================= -->
-    <div id="photoLightboxModal" class="lightbox-overlay hidden" onclick="closeLightboxOnBackdrop(event)">
+    <div id="photoLightboxModal" class="lightbox-overlay hidden">
         <!-- Dedicated Backdrop Click Surface -->
-        <div class="lightbox-backdrop" style="position: absolute; inset: 0; z-index: 1;"></div>
+        <div class="lightbox-backdrop" style="position: absolute; inset: 0; z-index: 1;" onclick="closeLightboxOnBackdrop(event)"></div>
 
         <!-- Top Toolbar with Counter, Zoom Controls, and Close Button -->
         <div class="lightbox-top-bar" style="z-index: 30;" onclick="event.stopPropagation()">
@@ -2723,6 +2722,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=98"></script>
+    <script type="module" src="js/app.js?v=99"></script>
 </body>
 </html>
