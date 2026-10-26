@@ -497,6 +497,20 @@ function updateUserInfoUI() {
   applyAvatar(navAvatarEl);
   applyAvatar(sideAvatarEl);
   applyAvatar(composerAvatarEl);
+
+  // Sync User Info inside Mobile Slide Drawer
+  const drawerAvatarEl = document.getElementById('drawerNavAvatar');
+  const drawerNameEl = document.getElementById('drawerUserName');
+  const drawerStatusEl = document.getElementById('drawerUserStatus');
+  if (drawerNameEl) drawerNameEl.innerText = user.name || 'කල්‍යාණ මිතුරා';
+  applyAvatar(drawerAvatarEl);
+  if (drawerStatusEl) {
+    if (isMaster) drawerStatusEl.textContent = '👑 Master Admin';
+    else if (isSub) drawerStatusEl.textContent = '🛡️ Admin';
+    else if (user.role === 'monk' || user.isMonk) drawerStatusEl.textContent = 'පූජනීය මහා සංඝරත්නය';
+    else drawerStatusEl.textContent = 'කල්‍යාණ මිත්‍ර සාමාජික';
+  }
+
   updateCommunityMemberCount();
 
   // Update Kalyana Mithra pending request badges
@@ -8047,7 +8061,7 @@ function initPWAEngine() {
   const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()) && !window.MSStream;
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v101';
+  const ACTIVE_BUILD = 'v102';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
@@ -8365,6 +8379,65 @@ export function toggleAranyaTab() {
   }
 }
 window.toggleAranyaTab = toggleAranyaTab;
+
+// ============================================================================
+// Native Mobile App Slide Drawer Menu Controller
+// ============================================================================
+export function openMobileMenuDrawer() {
+  triggerHaptic(12);
+  const overlay = document.getElementById('mobileDrawerOverlay');
+  const drawer = document.getElementById('mobileDrawer');
+  if (!drawer) return;
+
+  updateUserInfoUI();
+
+  overlay?.classList.remove('hidden');
+  drawer.classList.remove('hidden');
+
+  requestAnimationFrame(() => {
+    overlay?.classList.add('open');
+    drawer.classList.add('open');
+    document.body.classList.add('drawer-open');
+  });
+}
+window.openMobileMenuDrawer = openMobileMenuDrawer;
+
+export function closeMobileMenuDrawer() {
+  triggerHaptic(8);
+  const overlay = document.getElementById('mobileDrawerOverlay');
+  const drawer = document.getElementById('mobileDrawer');
+  if (!drawer) return;
+
+  overlay?.classList.remove('open');
+  drawer.classList.remove('open');
+  document.body.classList.remove('drawer-open');
+
+  setTimeout(() => {
+    overlay?.classList.add('hidden');
+    drawer.classList.add('hidden');
+  }, 300);
+}
+window.closeMobileMenuDrawer = closeMobileMenuDrawer;
+
+export function toggleMobileMenuDrawer() {
+  const drawer = document.getElementById('mobileDrawer');
+  if (drawer && drawer.classList.contains('open')) {
+    closeMobileMenuDrawer();
+  } else {
+    openMobileMenuDrawer();
+  }
+}
+window.toggleMobileMenuDrawer = toggleMobileMenuDrawer;
+
+// Keyboard Escape listener to dismiss drawer
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const drawer = document.getElementById('mobileDrawer');
+    if (drawer && drawer.classList.contains('open')) {
+      closeMobileMenuDrawer();
+    }
+  }
+});
 
 // =========================================================================
 // Sidebar Daily Dhamma Verse & Poya Calendar Admin Modals

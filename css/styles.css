@@ -533,6 +533,35 @@ body {
   color: #ffffff;
 }
 
+/* Header 3-Lines Hamburger Menu Button */
+.header-menu-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-full);
+  background: rgba(26, 10, 2, 0.45);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  color: #fef3c7;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  -webkit-tap-highlight-color: transparent;
+  font-size: 1.1rem;
+}
+
+.header-menu-btn:hover {
+  background: rgba(245, 158, 11, 0.25);
+  border-color: #fbbf24;
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25);
+}
+
+.header-menu-btn:active {
+  transform: scale(0.92);
+}
+
 .notification-badge {
   position: absolute;
   top: -4px;
@@ -4680,24 +4709,17 @@ html, body {
     flex-shrink: 0 !important;
   }
 
-  /* Aranya Senasana Stupa Pin button on mobile (pic-3) */
-  .header-aranya-btn {
+  /* Mobile 3-Lines Menu Button in header */
+  .header-menu-btn {
     width: 35px !important;
     height: 35px !important;
+    font-size: 1.05rem !important;
     padding: 0 !important;
     border-radius: 9999px !important;
+    display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
     flex-shrink: 0 !important;
-  }
-
-  .header-aranya-btn .aranya-header-text {
-    display: none !important;
-  }
-
-  .header-aranya-btn .stupa-pin-icon {
-    width: 20px !important;
-    height: 24px !important;
   }
 
   .header-admin-crown-btn.hidden,
@@ -8676,6 +8698,392 @@ html, body {
   .aranya-grid {
     grid-template-columns: 1fr;
   }
+/* ==========================================================================
+   Native Mobile App Slide Drawer Menu (Right Slide-In)
+   ========================================================================== */
+.mobile-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 9998;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.28s ease, visibility 0.28s ease;
+  pointer-events: none;
+}
+
+.mobile-drawer-overlay.open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.mobile-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 325px;
+  max-width: 86vw;
+  background: #ffffff;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.28);
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+  overflow: hidden;
+}
+
+.mobile-drawer.open {
+  transform: translateX(0);
+}
+
+body.drawer-open {
+  overflow: hidden !important;
+}
+
+/* Drawer Header */
+.mobile-drawer-header {
+  background: linear-gradient(135deg, #451a03 0%, #78350f 100%);
+  color: #ffffff;
+  padding: calc(env(safe-area-inset-top, 0px) + 16px) 16px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1.5px solid rgba(251, 191, 36, 0.3);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+}
+
+.drawer-user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  min-width: 0;
+  flex: 1;
+}
+
+.drawer-avatar-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #ffffff;
+  font-family: var(--font-serif);
+  font-weight: 700;
+  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #fbbf24;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.drawer-user-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.drawer-user-name {
+  font-weight: 700;
+  font-size: 0.96rem;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.drawer-user-status {
+  font-size: 0.68rem;
+  color: #fef08a;
+  background: rgba(254, 240, 138, 0.15);
+  padding: 1px 7px;
+  border-radius: 9999px;
+  border: 1px solid rgba(254, 240, 138, 0.3);
+  display: inline-block;
+  width: fit-content;
+}
+
+.drawer-close-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.drawer-close-btn:active {
+  transform: scale(0.9);
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Drawer Content Body */
+.mobile-drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px 14px calc(env(safe-area-inset-bottom, 0px) + 30px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: #fafaf9;
+}
+
+.drawer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.drawer-section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #78350f;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 0 4px;
+}
+
+/* 1. Featured Aranya Item Card */
+.drawer-item-featured {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  border: 1.5px solid #fcd34d;
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.14);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  text-align: left;
+  width: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.drawer-item-featured:hover {
+  border-color: #f59e0b;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(245, 158, 11, 0.22);
+}
+
+.drawer-item-featured:active {
+  transform: scale(0.98);
+}
+
+.drawer-item-icon-wrap.aranya-pin-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #059669, #047857);
+  border: 1.5px solid #34d399;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 10px rgba(5, 150, 105, 0.25);
+  flex-shrink: 0;
+}
+
+.drawer-item-icon-wrap.aranya-pin-wrap .stupa-pin-icon {
+  width: 24px;
+  height: 28px;
+}
+
+.drawer-item-icon-wrap.aranya-pin-wrap .pin-outer {
+  fill: #ffffff;
+}
+
+.drawer-item-icon-wrap.aranya-pin-wrap .pin-inner-disc {
+  fill: #ecfdf5;
+}
+
+.drawer-item-icon-wrap.aranya-pin-wrap .stupa-base-1,
+.drawer-item-icon-wrap.aranya-pin-wrap .stupa-base-2,
+.drawer-item-icon-wrap.aranya-pin-wrap .stupa-dome,
+.drawer-item-icon-wrap.aranya-pin-wrap .stupa-cube,
+.drawer-item-icon-wrap.aranya-pin-wrap .stupa-spire,
+.drawer-item-icon-wrap.aranya-pin-wrap .stupa-gem-ring,
+.drawer-item-icon-wrap.aranya-pin-wrap .stupa-pinnacle {
+  fill: #047857;
+}
+
+.drawer-item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.drawer-item-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.drawer-item-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #78350f;
+  font-family: var(--font-serif);
+}
+
+.drawer-badge-emerald {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #065f46;
+  background: #d1fae5;
+  border: 1px solid #6ee7b7;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  letter-spacing: 0.3px;
+}
+
+.drawer-item-desc {
+  font-size: 0.72rem;
+  color: #92400e;
+  line-height: 1.35;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.drawer-chevron {
+  color: #d97706;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+/* 2. Structured List Buttons */
+.drawer-items-list {
+  background: #ffffff;
+  border-radius: 14px;
+  border: 1px solid #e7e5e4;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.drawer-list-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid #f5f5f4;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.18s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.drawer-list-btn:last-child {
+  border-bottom: none;
+}
+
+.drawer-list-btn:hover {
+  background: #fafaf9;
+}
+
+.drawer-list-btn:active {
+  background: #f5f5f4;
+  transform: scale(0.99);
+}
+
+.drawer-btn-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+
+.drawer-btn-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.drawer-btn-title {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: #292524;
+}
+
+.drawer-btn-sub {
+  font-size: 0.68rem;
+  color: #78716c;
+}
+
+.drawer-mini-pill {
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  text-transform: uppercase;
+}
+
+.drawer-chevron-mini {
+  color: #a8a29e;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+/* 3. Future Section Slot */
+.drawer-future-banner {
+  background: linear-gradient(135deg, #fefce8, #fef9c3);
+  border: 1px dashed #fde047;
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #854d0e;
+}
+
+/* Drawer Footer */
+.drawer-footer-meta {
+  margin-top: auto;
+  text-align: center;
+  padding-top: 10px;
+}
+
+.drawer-footer-meta p {
+  margin: 0;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #a8a29e;
+}
+
+.drawer-footer-meta span {
+  font-size: 0.68rem;
+  color: #d6d3d1;
 }
 
 

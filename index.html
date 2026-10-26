@@ -51,12 +51,12 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=101">
+    <link rel="stylesheet" href="css/styles.css?v=102">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
       (function() {
-        var v = 'v101';
+        var v = 'v102';
         if (localStorage.getItem('pinPotha_active_build') !== v) {
           localStorage.setItem('pinPotha_active_build', v);
           if ('caches' in window) {
@@ -176,21 +176,8 @@
                     </div>
                 </div>
 
-                <!-- Sri Lanka Aranya Senasana Directory Shortcut (Stupa Location Pin - pic-3) -->
-                <button type="button" id="headerAranyaBtn" class="header-icon-btn header-aranya-btn" onclick="toggleAranyaTab()" title="ශ්‍රී ලංකා ආරණ්‍ය සේනාසන සහ භාවනා මධ්‍යස්ථාන නාමාවලිය" aria-label="ආරණ්‍ය සේනාසන නාමාවලිය">
-                    <svg class="stupa-pin-icon" viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
-                        <path class="pin-outer" d="M 50 116 C 45 100 12 70 12 48 A 38 38 0 1 1 88 48 C 88 70 55 100 50 116 Z" />
-                        <circle class="pin-inner-disc" cx="50" cy="48" r="27" />
-                        <path class="stupa-base-1" d="M 32 64 C 38 65.2 62 65.2 68 64 L 67 62 C 61 63.2 39 63.2 33 62 Z" />
-                        <path class="stupa-base-2" d="M 34.5 61.5 C 40 62.5 60 62.5 65.5 61.5 L 64.5 59.5 C 59.5 60.5 40.5 60.5 35.5 59.5 Z" />
-                        <path class="stupa-dome" d="M 37 59.5 C 37 46 43 41 50 41 C 57 41 63 46 63 59.5 Z" />
-                        <rect class="stupa-cube" x="46.5" y="36" width="7" height="4.5" rx="0.4" />
-                        <polygon class="stupa-spire" points="47.8,36 52.2,36 50.8,25 49.2,25" />
-                        <circle class="stupa-gem-ring" cx="50" cy="23.5" r="1.5" />
-                        <polygon class="stupa-pinnacle" points="49.3,22 50.7,22 50,17.5" />
-                    </svg>
-                    <span class="aranya-header-text">ආරණ්‍ය</span>
-                </button>
+                <!-- Hidden anchors for background scripts expecting these IDs -->
+                <span id="headerAranyaBtn" style="display: none;"></span>
                 <span id="navSettingsBtn" style="display: none;"></span>
 
                 <!-- Admin Crown Button (Visible only to Master Admin & Admins) -->
@@ -202,6 +189,11 @@
                 <button onclick="switchTab('profile')" id="userProfileBtn" class="user-profile-btn" title="මගේ ප්‍රොෆයිලය බලන්න">
                     <div class="user-avatar-circle" id="navAvatar">ම</div>
                     <span id="userNameDisplay">මලිත්</span>
+                </button>
+
+                <!-- Mobile 3-Lines Hamburger Menu Button (To the right of profile) -->
+                <button type="button" id="headerMenuBtn" class="header-icon-btn header-menu-btn" onclick="toggleMobileMenuDrawer()" title="මෙනුව (Menu)" aria-label="මෙනුව">
+                    <i class="fa-solid fa-bars"></i>
                 </button>
             </div>
         </div>
@@ -2725,6 +2717,148 @@
         </div>
     </div>
 
+    <!-- ========================================================================= -->
+    <!-- Native Mobile App Slide Drawer Menu                                       -->
+    <!-- ========================================================================= -->
+    <div id="mobileDrawerOverlay" class="mobile-drawer-overlay hidden" onclick="closeMobileMenuDrawer()"></div>
+    
+    <aside id="mobileDrawer" class="mobile-drawer hidden" aria-label="ප්‍රධාන මෙනුව">
+        <!-- Drawer Header -->
+        <div class="mobile-drawer-header">
+            <div class="drawer-user-info" onclick="closeMobileMenuDrawer(); switchTab('profile');">
+                <div class="drawer-avatar-circle" id="drawerNavAvatar">ම</div>
+                <div class="drawer-user-meta">
+                    <div class="drawer-user-name" id="drawerUserName">මලිත්</div>
+                    <span class="drawer-user-status" id="drawerUserStatus">සාමාජික</span>
+                </div>
+            </div>
+            <button type="button" class="drawer-close-btn" onclick="closeMobileMenuDrawer()" title="වසන්න" aria-label="වසන්න">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <!-- Drawer Content Body -->
+        <div class="mobile-drawer-body">
+            
+            <!-- Section 1: Featured (ආරණ්‍ය සේනාසන - Item No. 1) -->
+            <div class="drawer-section">
+                <div class="drawer-section-title">
+                    <i class="fa-solid fa-star" style="color: #f59e0b;"></i>
+                    <span>ප්‍රමුඛ සේවාවන්</span>
+                </div>
+
+                <!-- 1. Aranya Senasana Directory Featured Card -->
+                <button type="button" class="drawer-item-card drawer-item-featured" onclick="closeMobileMenuDrawer(); switchTab('aranya');">
+                    <div class="drawer-item-icon-wrap aranya-pin-wrap">
+                        <svg class="stupa-pin-icon" viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
+                            <path class="pin-outer" d="M 50 116 C 45 100 12 70 12 48 A 38 38 0 1 1 88 48 C 88 70 55 100 50 116 Z" />
+                            <circle class="pin-inner-disc" cx="50" cy="48" r="27" />
+                            <path class="stupa-base-1" d="M 32 64 C 38 65.2 62 65.2 68 64 L 67 62 C 61 63.2 39 63.2 33 62 Z" />
+                            <path class="stupa-base-2" d="M 34.5 61.5 C 40 62.5 60 62.5 65.5 61.5 L 64.5 59.5 C 59.5 60.5 40.5 60.5 35.5 59.5 Z" />
+                            <path class="stupa-dome" d="M 37 59.5 C 37 46 43 41 50 41 C 57 41 63 46 63 59.5 Z" />
+                            <rect class="stupa-cube" x="46.5" y="36" width="7" height="4.5" rx="0.4" />
+                            <polygon class="stupa-spire" points="47.8,36 52.2,36 50.8,25 49.2,25" />
+                            <circle class="stupa-gem-ring" cx="50" cy="23.5" r="1.5" />
+                            <polygon class="stupa-pinnacle" points="49.3,22 50.7,22 50,17.5" />
+                        </svg>
+                    </div>
+                    <div class="drawer-item-content">
+                        <div class="drawer-item-title-row">
+                            <span class="drawer-item-title">ආරණ්‍ය සේනාසන</span>
+                            <span class="drawer-badge-emerald">නාමාවලිය</span>
+                        </div>
+                        <p class="drawer-item-desc">දිවයින පුරා පූජනීය වන සෙනසුන් හා භාවනා මධ්‍යස්ථාන තොරතුරු</p>
+                    </div>
+                    <i class="fa-solid fa-chevron-right drawer-chevron"></i>
+                </button>
+            </div>
+
+            <!-- Section 2: Shortcuts & Future Features -->
+            <div class="drawer-section">
+                <div class="drawer-section-title">
+                    <i class="fa-solid fa-compass" style="color: #b45309;"></i>
+                    <span>පහසුකම් & සේවා</span>
+                </div>
+
+                <div class="drawer-items-list">
+                    <!-- Dharma Shorts -->
+                    <button type="button" class="drawer-list-btn" onclick="closeMobileMenuDrawer(); openReelsViewer();">
+                        <div class="drawer-btn-icon" style="background: rgba(239, 68, 68, 0.12); color: #ef4444;">
+                            <i class="fa-solid fa-play"></i>
+                        </div>
+                        <div class="drawer-btn-text">
+                            <span class="drawer-btn-title">පුණ්‍ය දැක්ම (Dharma Shorts)</span>
+                            <span class="drawer-btn-sub">කෙටි දහම් වීඩියෝ</span>
+                        </div>
+                        <span class="drawer-mini-pill" style="background: #fee2e2; color: #b91c1c;">Shorts</span>
+                    </button>
+
+                    <!-- Sathkara Hawula -->
+                    <button type="button" class="drawer-list-btn" onclick="closeMobileMenuDrawer(); switchTab('needs');">
+                        <div class="drawer-btn-icon" style="background: rgba(245, 158, 11, 0.12); color: #d97706;">
+                            <i class="fa-solid fa-hand-holding-heart"></i>
+                        </div>
+                        <div class="drawer-btn-text">
+                            <span class="drawer-btn-title">සත්කාර හවුල</span>
+                            <span class="drawer-btn-sub">සජීවී ආධාර හා අවශ්‍යතා</span>
+                        </div>
+                        <span class="drawer-mini-pill" style="background: #fef3c7; color: #b45309;">Live</span>
+                    </button>
+
+                    <!-- Kalyana Mithra Friends -->
+                    <button type="button" class="drawer-list-btn" onclick="closeMobileMenuDrawer(); openFriendsView();">
+                        <div class="drawer-btn-icon" style="background: rgba(14, 165, 233, 0.12); color: #0284c7;">
+                            <i class="fa-solid fa-user-group"></i>
+                        </div>
+                        <div class="drawer-btn-text">
+                            <span class="drawer-btn-title">කල්‍යාණ මිතුරු පවුර</span>
+                            <span class="drawer-btn-sub">මිතුරන් සොයා සම්බන්ධ වන්න</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-right drawer-chevron-mini"></i>
+                    </button>
+
+                    <!-- Personal Merit Book -->
+                    <button type="button" class="drawer-list-btn" onclick="closeMobileMenuDrawer(); switchTab('mybook');">
+                        <div class="drawer-btn-icon" style="background: rgba(16, 185, 129, 0.12); color: #059669;">
+                            <i class="fa-solid fa-book-bookmark"></i>
+                        </div>
+                        <div class="drawer-btn-text">
+                            <span class="drawer-btn-title">පෞද්ගලික පිං පොත</span>
+                            <span class="drawer-btn-sub">ඔබේ රහසිගත පින්කම්</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-right drawer-chevron-mini"></i>
+                    </button>
+
+                    <!-- Settings & Policies -->
+                    <button type="button" class="drawer-list-btn" onclick="closeMobileMenuDrawer(); openSettingsModal('profile');">
+                        <div class="drawer-btn-icon" style="background: rgba(100, 116, 139, 0.12); color: #475569;">
+                            <i class="fa-solid fa-gear"></i>
+                        </div>
+                        <div class="drawer-btn-text">
+                            <span class="drawer-btn-title">සැකසුම් & ප්‍රතිපත්ති</span>
+                            <span class="drawer-btn-sub">ගිණුම, ශබ්ද හා පෞද්ගලිකත්වය</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-right drawer-chevron-mini"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Section 3: Extensible Slot for Future New Features -->
+            <div class="drawer-section drawer-future-slot">
+                <div class="drawer-future-banner">
+                    <i class="fa-solid fa-wand-magic-sparkles" style="color: #d97706;"></i>
+                    <span>තවත් නව විශේෂාංග ළඟදීම එක්වේ...</span>
+                </div>
+            </div>
+
+            <!-- Drawer Footer Info -->
+            <div class="drawer-footer-meta">
+                <p>පිං පොත • කල්‍යාණ මිත්‍ර පුණ්‍ය ජාලය</p>
+                <span>Version 2.0.5 (Beta)</span>
+            </div>
+        </div>
+    </aside>
+
     <!-- Cropper.js Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 
@@ -2732,6 +2866,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=101"></script>
+    <script type="module" src="js/app.js?v=102"></script>
 </body>
 </html>
