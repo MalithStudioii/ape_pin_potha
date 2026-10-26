@@ -51,12 +51,12 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=96">
+    <link rel="stylesheet" href="css/styles.css?v=97">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
       (function() {
-        var v = 'v96';
+        var v = 'v97';
         if (localStorage.getItem('pinPotha_active_build') !== v) {
           localStorage.setItem('pinPotha_active_build', v);
           if ('caches' in window) {
@@ -64,6 +64,11 @@
               keys.forEach(function(k) {
                 if (k !== 'pin-potha-cache-' + v) caches.delete(k);
               });
+            });
+          }
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(regs) {
+              regs.forEach(function(r) { try { r.update(); } catch(e){} });
             });
           }
         }
@@ -2443,8 +2448,11 @@
     <!-- Fullscreen Photo Lightbox / Gallery Viewer                                -->
     <!-- ========================================================================= -->
     <div id="photoLightboxModal" class="lightbox-overlay hidden" onclick="closeLightboxOnBackdrop(event)">
+        <!-- Dedicated Backdrop Click Surface -->
+        <div class="lightbox-backdrop" style="position: absolute; inset: 0; z-index: 1;"></div>
+
         <!-- Top Toolbar with Counter, Zoom Controls, and Close Button -->
-        <div class="lightbox-top-bar" onclick="event.stopPropagation()">
+        <div class="lightbox-top-bar" style="z-index: 30;" onclick="event.stopPropagation()">
             <div class="lightbox-counter-badge" id="lightboxCounter">1 / 1</div>
 
             <div class="lightbox-zoom-controls">
@@ -2464,15 +2472,15 @@
             </button>
         </div>
 
-        <button class="lightbox-nav-btn prev" id="lightboxPrevBtn" onclick="prevLightboxImage()" title="කලින් ඡායාරූපය">
+        <button class="lightbox-nav-btn prev" id="lightboxPrevBtn" style="z-index: 30;" onclick="event.stopPropagation(); prevLightboxImage()" title="කලින් ඡායාරූපය">
             <i class="fa-solid fa-chevron-left"></i>
         </button>
 
-        <div class="lightbox-content-box" id="lightboxContentBox">
+        <div class="lightbox-content-box" id="lightboxContentBox" style="z-index: 20;" onclick="event.stopPropagation()">
             <img id="lightboxActiveImage" src="" alt="පින්කම් ඡායාරූපය" class="lightbox-main-img">
         </div>
 
-        <button class="lightbox-nav-btn next" id="lightboxNextBtn" onclick="nextLightboxImage()" title="ඊළඟ ඡායාරූපය">
+        <button class="lightbox-nav-btn next" id="lightboxNextBtn" style="z-index: 30;" onclick="event.stopPropagation(); nextLightboxImage()" title="ඊළඟ ඡායාරූපය">
             <i class="fa-solid fa-chevron-right"></i>
         </button>
     </div>
@@ -2715,6 +2723,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=96"></script>
+    <script type="module" src="js/app.js?v=97"></script>
 </body>
 </html>

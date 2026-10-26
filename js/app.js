@@ -4,8 +4,8 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=96';
-import { Security } from './security.js?v=96';
+import { StorageService } from './storage.js?v=97';
+import { Security } from './security.js?v=97';
 import { uploadToImgBB } from './imgbb-service.js?v=66';
 import { SoundService, triggerHaptic } from './sound.js?v=66';
 import { FeedAlgorithm } from './algorithm.js?v=66';
@@ -1125,10 +1125,10 @@ function renderPostImagesCollage(post) {
   // 1 Image (Full View)
   if (cleanImages.length === 1) {
     return `
-      <div class="photo-collage-container" data-post-id="${post.id}" onclick="openPostLightbox('${post.id}', 0)">
+      <div class="photo-collage-container" data-post-id="${post.id}" onclick="openPostLightbox('${post.id}', 0, this)" role="button" tabindex="0" style="cursor: pointer;">
         <div class="collage-grid collage-1">
-          <div class="collage-item" data-index="0" onclick="openPostLightbox('${post.id}', 0)">
-            <img src="${cleanImages[0]}" alt="${Security.escapeHTML(post.title || '')}" loading="lazy">
+          <div class="collage-item" data-index="0" onclick="event.stopPropagation(); openPostLightbox('${post.id}', 0, this)" role="button" tabindex="0" style="cursor: pointer;">
+            <img src="${cleanImages[0]}" alt="${Security.escapeHTML(post.title || '')}" onclick="event.stopPropagation(); openPostLightbox('${post.id}', 0, this)" loading="lazy" role="button" style="cursor: pointer;">
           </div>
         </div>
       </div>
@@ -1138,11 +1138,11 @@ function renderPostImagesCollage(post) {
   // 2 Images (Side by Side)
   if (cleanImages.length === 2) {
     return `
-      <div class="photo-collage-container" data-post-id="${post.id}">
+      <div class="photo-collage-container" data-post-id="${post.id}" onclick="openPostLightbox('${post.id}', 0, this)" role="button" tabindex="0" style="cursor: pointer;">
         <div class="collage-grid collage-2">
           ${cleanImages.map((img, i) => `
-            <div class="collage-item" data-index="${i}" onclick="openPostLightbox('${post.id}', ${i})">
-              <img src="${img}" alt="ඡායාරූපය ${i+1}" loading="lazy">
+            <div class="collage-item" data-index="${i}" onclick="event.stopPropagation(); openPostLightbox('${post.id}', ${i}, this)" role="button" tabindex="0" style="cursor: pointer;">
+              <img src="${img}" alt="ඡායාරූපය ${i+1}" onclick="event.stopPropagation(); openPostLightbox('${post.id}', ${i}, this)" loading="lazy" role="button" style="cursor: pointer;">
             </div>
           `).join('')}
         </div>
@@ -1153,11 +1153,11 @@ function renderPostImagesCollage(post) {
   // 3 Images (1 Large, 2 Stacked)
   if (cleanImages.length === 3) {
     return `
-      <div class="photo-collage-container" data-post-id="${post.id}">
+      <div class="photo-collage-container" data-post-id="${post.id}" onclick="openPostLightbox('${post.id}', 0, this)" role="button" tabindex="0" style="cursor: pointer;">
         <div class="collage-grid collage-3">
           ${cleanImages.map((img, i) => `
-            <div class="collage-item" data-index="${i}" onclick="openPostLightbox('${post.id}', ${i})">
-              <img src="${img}" alt="ඡායාරූපය ${i+1}" loading="lazy">
+            <div class="collage-item" data-index="${i}" onclick="event.stopPropagation(); openPostLightbox('${post.id}', ${i}, this)" role="button" tabindex="0" style="cursor: pointer;">
+              <img src="${img}" alt="ඡායාරූපය ${i+1}" onclick="event.stopPropagation(); openPostLightbox('${post.id}', ${i}, this)" loading="lazy" role="button" style="cursor: pointer;">
             </div>
           `).join('')}
         </div>
@@ -1168,11 +1168,11 @@ function renderPostImagesCollage(post) {
   // 4 Images (2x2 Grid)
   if (cleanImages.length === 4) {
     return `
-      <div class="photo-collage-container" data-post-id="${post.id}">
+      <div class="photo-collage-container" data-post-id="${post.id}" onclick="openPostLightbox('${post.id}', 0, this)" role="button" tabindex="0" style="cursor: pointer;">
         <div class="collage-grid collage-4">
           ${cleanImages.map((img, i) => `
-            <div class="collage-item" data-index="${i}" onclick="openPostLightbox('${post.id}', ${i})">
-              <img src="${img}" alt="ඡායාරූපය ${i+1}" loading="lazy">
+            <div class="collage-item" data-index="${i}" onclick="event.stopPropagation(); openPostLightbox('${post.id}', ${i}, this)" role="button" tabindex="0" style="cursor: pointer;">
+              <img src="${img}" alt="ඡායාරූපය ${i+1}" onclick="event.stopPropagation(); openPostLightbox('${post.id}', ${i}, this)" loading="lazy" role="button" style="cursor: pointer;">
             </div>
           `).join('')}
         </div>
@@ -1185,13 +1185,13 @@ function renderPostImagesCollage(post) {
   const remainingCount = cleanImages.length - 5;
 
   return `
-    <div class="photo-collage-container" data-post-id="${post.id}">
+    <div class="photo-collage-container" data-post-id="${post.id}" onclick="openPostLightbox('${post.id}', 0, this)" role="button" tabindex="0" style="cursor: pointer;">
       <div class="collage-grid collage-5">
         ${displayImages.map((img, i) => {
           const isLast = (i === 4 && remainingCount > 0);
           return `
-            <div class="collage-item" data-index="${i}" onclick="openPostLightbox('${post.id}', ${i})">
-              <img src="${img}" alt="ඡායාරූපය ${i+1}" loading="lazy">
+            <div class="collage-item" data-index="${i}" onclick="event.stopPropagation(); openPostLightbox('${post.id}', ${i}, this)" role="button" tabindex="0" style="cursor: pointer;">
+              <img src="${img}" alt="ඡායාරූපය ${i+1}" onclick="event.stopPropagation(); openPostLightbox('${post.id}', ${i}, this)" loading="lazy" role="button" style="cursor: pointer;">
               ${isLast ? `
                 <div class="collage-overlay">
                   <span>+${remainingCount + 1}</span>
@@ -1714,8 +1714,8 @@ function renderPostCardHTML(post, user) {
                 </div>
               </div>
             ` : (orig.image || (orig.images && orig.images.length > 0) ? `
-              <div class="quoted-merit-image" onclick="event.stopPropagation(); openPostLightbox('${orig.id}', 0)" style="cursor: pointer;" title="ඡායාරූපය විශාල කර බලන්න">
-                <img src="${Security.sanitizeUrl(orig.image || orig.images[0])}" alt="${Security.escapeHTML(orig.title)}" loading="lazy">
+              <div class="quoted-merit-image" onclick="event.stopPropagation(); openPostLightbox('${orig.id}', 0, this)" style="cursor: pointer;" title="ඡායාරූපය විශාල කර බලන්න" role="button" tabindex="0">
+                <img src="${Security.sanitizeUrl(orig.image || orig.images[0])}" alt="${Security.escapeHTML(orig.title)}" onclick="event.stopPropagation(); openPostLightbox('${orig.id}', 0, this)" loading="lazy" style="cursor: pointer;" role="button">
               </div>
             ` : '')}
           </div>
@@ -3680,12 +3680,11 @@ window.resetZoomLightbox = function() {
   triggerHaptic(10);
 };
 
-window.openPostLightbox = function(postId, startIndex = 0) {
+window.openPostLightbox = function(postId, startIndex = 0, el = null) {
   try {
-    if (!postId && postId !== 0) return;
-    const strId = String(postId);
+    const strId = (postId != null) ? String(postId) : '';
     let images = [];
-    if (window._postImagesMap && window._postImagesMap[strId]) {
+    if (strId && window._postImagesMap && window._postImagesMap[strId] && window._postImagesMap[strId].length > 0) {
       images = window._postImagesMap[strId];
     }
     if ((!images || images.length === 0) && typeof currentPostsData !== 'undefined' && Array.isArray(currentPostsData)) {
@@ -3703,8 +3702,16 @@ window.openPostLightbox = function(postId, startIndex = 0) {
         }
       } catch (e) {}
     }
-    if ((!images || images.length === 0) && typeof postId === 'string' && (postId.startsWith('http') || postId.startsWith('data:') || postId.startsWith('blob:'))) {
-      images = [postId];
+    if ((!images || images.length === 0) && el) {
+      const container = el.closest ? el.closest('.photo-collage-container') : null;
+      if (container) {
+        images = Array.from(container.querySelectorAll('img')).map(i => i.currentSrc || i.src).filter(Boolean);
+      } else if (el.tagName === 'IMG') {
+        images = [el.currentSrc || el.src];
+      }
+    }
+    if ((!images || images.length === 0) && strId && (strId.startsWith('http') || strId.startsWith('data:') || strId.startsWith('blob:') || strId.startsWith('assets/'))) {
+      images = [strId];
     }
     if (images && images.length > 0) {
       window.openLightbox(images, startIndex);
@@ -3797,11 +3804,11 @@ let lastLightboxOpenTime = 0;
 
 window.closeLightboxOnBackdrop = function(e) {
   // Prevent immediate closure if the touch/click was part of opening
-  if (Date.now() - lastLightboxOpenTime < 400) {
+  if (Date.now() - lastLightboxOpenTime < 800) {
     return;
   }
   // Only close if clicking outside the image content on the backdrop overlay
-  if (e.target.id === 'photoLightboxModal') {
+  if (e.target.id === 'photoLightboxModal' || e.target.classList.contains('lightbox-backdrop')) {
     if (currentLightboxZoom > 1) {
       resetZoomLightbox();
     } else {
@@ -3858,11 +3865,16 @@ document.addEventListener('click', (e) => {
 
     const postId = collageContainer.dataset.postId || collageContainer.getAttribute('data-post-id');
     let images = [];
-    if (postId && window._postImagesMap && window._postImagesMap[String(postId)]) {
+    if (postId && window._postImagesMap && window._postImagesMap[String(postId)] && window._postImagesMap[String(postId)].length > 0) {
       images = window._postImagesMap[String(postId)];
     }
     if (!images || images.length === 0) {
       images = Array.from(collageContainer.querySelectorAll('img')).map(img => img.currentSrc || img.src).filter(Boolean);
+    }
+    if (!images || images.length === 0) {
+      if (e.target.tagName === 'IMG' && (e.target.currentSrc || e.target.src)) {
+        images = [e.target.currentSrc || e.target.src];
+      }
     }
 
     let startIndex = 0;
@@ -5491,8 +5503,8 @@ function renderProfileSubTabContent(user, myPosts, myPhotosPosts, myPrivatePosts
       });
 
       photosContainer.innerHTML = myPhotosPosts.map(p => `
-        <div class="gallery-card" onclick="openPostLightbox('${p.id}', 0)" title="${Security.escapeHTML(p.title)}" style="cursor: pointer;">
-          <img src="${Security.sanitizeUrl(p.image || (p.images && p.images[0]))}" alt="${Security.escapeHTML(p.title)}" loading="lazy">
+        <div class="gallery-card" onclick="openPostLightbox('${p.id}', 0, this)" title="${Security.escapeHTML(p.title)}" style="cursor: pointer;" role="button" tabindex="0">
+          <img src="${Security.sanitizeUrl(p.image || (p.images && p.images[0]))}" alt="${Security.escapeHTML(p.title)}" onclick="event.stopPropagation(); openPostLightbox('${p.id}', 0, this)" loading="lazy" role="button" style="cursor: pointer;">
           <div class="gallery-overlay">
             <h4 style="font-size: 0.82rem; font-weight: 700; line-height: 1.3;">${Security.escapeHTML(p.title)}</h4>
             <p style="font-size: 0.68rem; opacity: 0.85; margin-top: 2px;">
@@ -7893,7 +7905,7 @@ function initPWAEngine() {
   const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()) && !window.MSStream;
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v70';
+  const ACTIVE_BUILD = 'v97';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
@@ -7910,7 +7922,7 @@ function initPWAEngine() {
   // Register Service Worker
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=96', { updateViaCache: 'none' })
+      navigator.serviceWorker.register('./sw.js?v=97', { updateViaCache: 'none' })
         .then((registration) => {
           // Immediately check for service worker updates
           try { registration.update(); } catch (e) {}

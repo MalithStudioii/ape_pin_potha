@@ -1,14 +1,14 @@
-// Ape Pin Potha Service Worker (v96)
+// Ape Pin Potha Service Worker (v97)
 // Strategy: Network-First for HTML, JS, CSS to guarantee instant updates; Stale-While-Revalidate for media assets
-const CACHE_NAME = 'pin-potha-cache-v96';
+const CACHE_NAME = 'pin-potha-cache-v97';
 const STATIC_ASSETS = [
   './',
   './index.html',
-  './css/styles.css?v=96',
-  './js/app.js?v=96',
-  './js/storage.js?v=96',
+  './css/styles.css?v=97',
+  './js/app.js?v=97',
+  './js/storage.js?v=97',
   './js/aranya-data.js',
-  './js/security.js?v=96',
+  './js/security.js?v=97',
   './js/algorithm.js?v=70',
   './js/sound.js?v=70',
   './manifest.json',
@@ -93,8 +93,9 @@ self.addEventListener('fetch', (event) => {
     url.pathname === '/';
 
   if (isAppShell) {
+    const fetchTarget = (request.mode === 'navigate') ? request.url : request;
     event.respondWith(
-      fetch(request, { cache: 'no-store' })
+      fetch(fetchTarget, { cache: 'no-store' })
         .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             const copy = networkResponse.clone();

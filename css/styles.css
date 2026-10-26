@@ -3413,8 +3413,9 @@ body {
 .collage-item {
   position: relative;
   overflow: hidden;
-  cursor: pointer;
+  cursor: pointer !important;
   background: #1e293b;
+  -webkit-tap-highlight-color: rgba(245, 158, 11, 0.25);
 }
 
 .collage-item img {
@@ -3423,6 +3424,8 @@ body {
   object-fit: cover;
   transition: transform 0.28s ease, filter 0.28s ease;
   display: block;
+  cursor: pointer !important;
+  -webkit-tap-highlight-color: rgba(245, 158, 11, 0.25);
 }
 
 .collage-item:hover img {
