@@ -3292,6 +3292,7 @@ body {
   background: #f8fafc;
   border: 1px solid rgba(245, 158, 11, 0.2);
   width: 100%;
+  cursor: pointer;
 }
 
 .quoted-merit-image img {
@@ -3301,6 +3302,12 @@ body {
   object-fit: contain;
   display: block;
   border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.quoted-merit-image:hover img {
+  transform: scale(1.015);
 }
 
 /* ========================================================================= */
@@ -3313,6 +3320,7 @@ body {
   background: #0f172a;
   overflow: hidden;
   user-select: none;
+  cursor: pointer;
 }
 
 .collage-grid {
@@ -3334,6 +3342,7 @@ body {
   background: #000000;
   max-height: 520px;
   width: 100%;
+  cursor: pointer;
 }
 .collage-grid.collage-1 .collage-item img {
   max-height: 520px;
@@ -3341,6 +3350,7 @@ body {
   object-fit: contain;
   background: #000000;
   display: block;
+  cursor: pointer;
 }
 
 .collage-grid.collage-2 {
@@ -3495,6 +3505,10 @@ body {
 }
 
 /* Lightbox Modal */
+.lightbox-overlay.hidden {
+  display: none !important;
+}
+
 .lightbox-overlay {
   position: fixed;
   inset: 0;

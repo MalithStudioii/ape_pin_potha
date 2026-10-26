@@ -1108,12 +1108,16 @@ function renderPostImagesCollage(post) {
   const cleanImages = images.map(img => Security.sanitizeUrl(img)).filter(Boolean);
   if (cleanImages.length === 0) return '';
 
-  const jsonStr = encodeURIComponent(JSON.stringify(cleanImages));
+  // Cache images globally by post ID for instant, 100% reliable click access without attribute size limits
+  if (typeof window !== 'undefined') {
+    window._postImagesMap = window._postImagesMap || {};
+    window._postImagesMap[post.id] = cleanImages;
+  }
 
   // 1 Image (Full View)
   if (cleanImages.length === 1) {
     return `
-      <div class="photo-collage-container" onclick="openLightbox('${jsonStr}', 0)">
+      <div class="photo-collage-container" onclick="openPostLightbox('${post.id}', 0)">
         <div class="collage-grid collage-1">
           <div class="collage-item">
             <img src="${cleanImages[0]}" alt="${Security.escapeHTML(post.title || '')}" loading="lazy">
@@ -1129,7 +1133,7 @@ function renderPostImagesCollage(post) {
       <div class="photo-collage-container">
         <div class="collage-grid collage-2">
           ${cleanImages.map((img, i) => `
-            <div class="collage-item" onclick="openLightbox('${jsonStr}', ${i})">
+            <div class="collage-item" onclick="openPostLightbox('${post.id}', ${i})">
               <img src="${img}" alt="ඡායාරූපය ${i+1}" loading="lazy">
             </div>
           `).join('')}
@@ -1144,7 +1148,7 @@ function renderPostImagesCollage(post) {
       <div class="photo-collage-container">
         <div class="collage-grid collage-3">
           ${cleanImages.map((img, i) => `
-            <div class="collage-item" onclick="openLightbox('${jsonStr}', ${i})">
+            <div class="collage-item" onclick="openPostLightbox('${post.id}', ${i})">
               <img src="${img}" alt="ඡායාරූපය ${i+1}" loading="lazy">
             </div>
           `).join('')}
@@ -1159,7 +1163,7 @@ function renderPostImagesCollage(post) {
       <div class="photo-collage-container">
         <div class="collage-grid collage-4">
           ${cleanImages.map((img, i) => `
-            <div class="collage-item" onclick="openLightbox('${jsonStr}', ${i})">
+            <div class="collage-item" onclick="openPostLightbox('${post.id}', ${i})">
               <img src="${img}" alt="ඡායාරූපය ${i+1}" loading="lazy">
             </div>
           `).join('')}
@@ -1178,7 +1182,7 @@ function renderPostImagesCollage(post) {
         ${displayImages.map((img, i) => {
           const isLast = (i === 4 && remainingCount > 0);
           return `
-            <div class="collage-item" onclick="openLightbox('${jsonStr}', ${i})">
+            <div class="collage-item" onclick="openPostLightbox('${post.id}', ${i})">
               <img src="${img}" alt="ඡායාරූපය ${i+1}" loading="lazy">
               ${isLast ? `
                 <div class="collage-overlay">
@@ -1623,6 +1627,14 @@ function renderPostCardHTML(post, user) {
   const isAuthorSubAdmin = !isAuthorMaster && StorageService.isSubAdmin(post);
   const origAuthorName = orig ? StorageService.resolveAuthorName(orig) : '';
   const origAuthorPhoto = orig ? StorageService.resolveAuthorPhoto(orig) : null;
+  if (orig && typeof window !== 'undefined') {
+    const origImages = (orig.images && orig.images.length > 0) ? orig.images : (orig.image ? [orig.image] : []);
+    const cleanOrigImages = origImages.map(img => Security.sanitizeUrl(img)).filter(Boolean);
+    if (cleanOrigImages.length > 0) {
+      window._postImagesMap = window._postImagesMap || {};
+      window._postImagesMap[orig.id] = cleanOrigImages;
+    }
+  }
 
   return `
     <article class="post-card ${isNeed ? 'need-card' : ''} ${isRepost ? 'repost-card' : ''} ${post.isOfficial ? 'official-card' : ''} ${isAuthorSangha ? 'sangha-card' : ''}" id="post-elem-${post.id}">
@@ -1694,7 +1706,7 @@ function renderPostCardHTML(post, user) {
                 </div>
               </div>
             ` : (orig.image || (orig.images && orig.images.length > 0) ? `
-              <div class="quoted-merit-image">
+              <div class="quoted-merit-image" onclick="event.stopPropagation(); openPostLightbox('${orig.id}', 0)" style="cursor: pointer;" title="ඡායාරූපය විශාල කර බලන්න">
                 <img src="${Security.sanitizeUrl(orig.image || orig.images[0])}" alt="${Security.escapeHTML(orig.title)}" loading="lazy">
               </div>
             ` : '')}
@@ -3660,10 +3672,68 @@ window.resetZoomLightbox = function() {
   triggerHaptic(10);
 };
 
+window.openPostLightbox = function(postId, startIndex = 0) {
+  try {
+    if (!postId) return;
+    let images = [];
+    if (window._postImagesMap && window._postImagesMap[postId]) {
+      images = window._postImagesMap[postId];
+    }
+    if ((!images || images.length === 0) && typeof currentPostsData !== 'undefined' && Array.isArray(currentPostsData)) {
+      const p = currentPostsData.find(item => item && String(item.id) === String(postId));
+      if (p) {
+        images = (p.images && p.images.length > 0) ? p.images : (p.image ? [p.image] : []);
+      }
+    }
+    if ((!images || images.length === 0) && typeof StorageService !== 'undefined' && StorageService.getLocalPosts) {
+      try {
+        const localPosts = StorageService.getLocalPosts() || [];
+        const p = localPosts.find(item => item && String(item.id) === String(postId));
+        if (p) {
+          images = (p.images && p.images.length > 0) ? p.images : (p.image ? [p.image] : []);
+        }
+      } catch (e) {}
+    }
+    if ((!images || images.length === 0) && typeof postId === 'string' && (postId.startsWith('http') || postId.startsWith('data:') || postId.startsWith('blob:'))) {
+      images = [postId];
+    }
+    if (images && images.length > 0) {
+      window.openLightbox(images, startIndex);
+    } else {
+      console.warn('[openPostLightbox] No images found for post:', postId);
+    }
+  } catch (err) {
+    console.error('[openPostLightbox] Error:', err);
+  }
+};
+
 window.openLightbox = function(encodedImages, startIndex = 0) {
   try {
-    const images = typeof encodedImages === 'string' ? JSON.parse(decodeURIComponent(encodedImages)) : encodedImages;
-    if (!images || !Array.isArray(images) || images.length === 0) return;
+    let images = [];
+    if (Array.isArray(encodedImages)) {
+      images = encodedImages;
+    } else if (typeof encodedImages === 'string') {
+      const trimmed = encodedImages.trim();
+      if (trimmed.startsWith('[') || trimmed.startsWith('%5B') || trimmed.startsWith('%5b')) {
+        try {
+          const decoded = trimmed.startsWith('%') ? decodeURIComponent(trimmed) : trimmed;
+          const parsed = JSON.parse(decoded);
+          if (Array.isArray(parsed)) images = parsed;
+        } catch (e) {
+          images = [trimmed];
+        }
+      } else if (trimmed.startsWith('data:') || trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('blob:') || trimmed.startsWith('/') || trimmed.startsWith('./')) {
+        images = [trimmed];
+      } else if (window._postImagesMap && window._postImagesMap[trimmed]) {
+        images = window._postImagesMap[trimmed];
+      } else {
+        images = [trimmed];
+      }
+    }
+
+    images = (images || []).map(img => Security.sanitizeUrl(img)).filter(Boolean);
+    if (!images || images.length === 0) return;
+
     currentLightboxImages = images;
     currentLightboxIndex = startIndex >= 0 && startIndex < images.length ? startIndex : 0;
 
@@ -3686,6 +3756,7 @@ window.openLightbox = function(encodedImages, startIndex = 0) {
         history.pushState({ type: 'modal', id: 'photoLightboxModal' }, '');
       } catch (e) {}
       modal.classList.remove('hidden');
+      modal.style.setProperty('display', 'flex', 'important');
       document.body.style.overflow = 'hidden';
     }
   } catch (err) {
@@ -3698,6 +3769,7 @@ window.closeLightbox = function() {
   const modal = document.getElementById('photoLightboxModal');
   if (modal) {
     modal.classList.add('hidden');
+    modal.style.setProperty('display', 'none', 'important');
     document.body.style.overflow = '';
   }
 };
@@ -5291,9 +5363,19 @@ function renderProfileSubTabContent(user, myPosts, myPhotosPosts, myPrivatePosts
         </div>
       `;
     } else {
+      // Cache photos in _postImagesMap so openPostLightbox opens them in high-def Lightbox
+      myPhotosPosts.forEach(p => {
+        const pImages = (p.images && p.images.length > 0) ? p.images : (p.image ? [p.image] : []);
+        const cleanPImages = pImages.map(img => Security.sanitizeUrl(img)).filter(Boolean);
+        if (cleanPImages.length > 0) {
+          window._postImagesMap = window._postImagesMap || {};
+          window._postImagesMap[p.id] = cleanPImages;
+        }
+      });
+
       photosContainer.innerHTML = myPhotosPosts.map(p => `
-        <div class="gallery-card" onclick="window.open('${Security.sanitizeUrl(p.image)}', '_blank')" title="${Security.escapeHTML(p.title)}">
-          <img src="${Security.sanitizeUrl(p.image)}" alt="${Security.escapeHTML(p.title)}" loading="lazy">
+        <div class="gallery-card" onclick="openPostLightbox('${p.id}', 0)" title="${Security.escapeHTML(p.title)}" style="cursor: pointer;">
+          <img src="${Security.sanitizeUrl(p.image || (p.images && p.images[0]))}" alt="${Security.escapeHTML(p.title)}" loading="lazy">
           <div class="gallery-overlay">
             <h4 style="font-size: 0.82rem; font-weight: 700; line-height: 1.3;">${Security.escapeHTML(p.title)}</h4>
             <p style="font-size: 0.68rem; opacity: 0.85; margin-top: 2px;">
