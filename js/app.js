@@ -5,7 +5,7 @@
  */
 
 import { StorageService } from './storage.js?v=66';
-import { Security } from './security.js?v=66';
+import { Security } from './security.js?v=94';
 import { uploadToImgBB } from './imgbb-service.js?v=66';
 import { SoundService, triggerHaptic } from './sound.js?v=66';
 import { FeedAlgorithm } from './algorithm.js?v=66';
@@ -1105,13 +1105,13 @@ function renderPostImagesCollage(post) {
 
   if (images.length === 0) return '';
 
-  const cleanImages = images.map(img => Security.sanitizeUrl(img)).filter(Boolean);
+  const cleanImages = images.map(img => Security.sanitizeUrl(img) || img).filter(Boolean);
   if (cleanImages.length === 0) return '';
 
   // Cache images globally by post ID for instant, 100% reliable click access without attribute size limits
   if (typeof window !== 'undefined') {
     window._postImagesMap = window._postImagesMap || {};
-    window._postImagesMap[post.id] = cleanImages;
+    window._postImagesMap[String(post.id)] = cleanImages;
   }
 
   // 1 Image (Full View)
@@ -3606,9 +3606,9 @@ function renderComposerThumbnails() {
 
   container.style.display = 'block';
   grid.innerHTML = selectedImagesList.map((img, idx) => `
-    <div class="composer-thumb-item">
+    <div class="composer-thumb-item" onclick="openLightbox(selectedImagesList, ${idx})" style="cursor: pointer;" title="විශාල කර බලන්න">
       <img src="${img}" alt="තෝරාගත් ඡායාරූපය ${idx + 1}">
-      <button type="button" class="composer-thumb-remove" onclick="removeSelectedComposerImage(${idx})" title="ඉවත් කරන්න">
+      <button type="button" class="composer-thumb-remove" onclick="event.stopPropagation(); removeSelectedComposerImage(${idx})" title="ඉවත් කරන්න">
         <i class="fa-solid fa-xmark"></i>
       </button>
     </div>
@@ -3616,7 +3616,7 @@ function renderComposerThumbnails() {
 
   const totalSizeKB = Math.round(selectedImagesList.reduce((acc, img) => acc + (img.length * 3 / 4), 0) / 1024);
   if (statsEl) {
-    statsEl.innerText = `ඡායාරූප ${selectedImagesList.length}/5 ක් තෝරාගන්නා ලදී (සම්පීඩිත ධාරිතාව: ~${totalSizeKB} KB)`;
+    statsEl.innerText = `ඡායාරූප ${selectedImagesList.length}/5 ක් තෝරාගන්නා ලදී (සම්පීඩිත ධාරිතාව: ~${totalSizeKB} KB) • විශාල කර බැලීමට පින්තූරය ඔබන්න`;
   }
 }
 
@@ -3674,13 +3674,14 @@ window.resetZoomLightbox = function() {
 
 window.openPostLightbox = function(postId, startIndex = 0) {
   try {
-    if (!postId) return;
+    if (!postId && postId !== 0) return;
+    const strId = String(postId);
     let images = [];
-    if (window._postImagesMap && window._postImagesMap[postId]) {
-      images = window._postImagesMap[postId];
+    if (window._postImagesMap && window._postImagesMap[strId]) {
+      images = window._postImagesMap[strId];
     }
     if ((!images || images.length === 0) && typeof currentPostsData !== 'undefined' && Array.isArray(currentPostsData)) {
-      const p = currentPostsData.find(item => item && String(item.id) === String(postId));
+      const p = currentPostsData.find(item => item && String(item.id) === strId);
       if (p) {
         images = (p.images && p.images.length > 0) ? p.images : (p.image ? [p.image] : []);
       }
@@ -3688,7 +3689,7 @@ window.openPostLightbox = function(postId, startIndex = 0) {
     if ((!images || images.length === 0) && typeof StorageService !== 'undefined' && StorageService.getLocalPosts) {
       try {
         const localPosts = StorageService.getLocalPosts() || [];
-        const p = localPosts.find(item => item && String(item.id) === String(postId));
+        const p = localPosts.find(item => item && String(item.id) === strId);
         if (p) {
           images = (p.images && p.images.length > 0) ? p.images : (p.image ? [p.image] : []);
         }
@@ -3711,7 +3712,7 @@ window.openLightbox = function(encodedImages, startIndex = 0) {
   try {
     let images = [];
     if (Array.isArray(encodedImages)) {
-      images = encodedImages;
+      images = [...encodedImages];
     } else if (typeof encodedImages === 'string') {
       const trimmed = encodedImages.trim();
       if (trimmed.startsWith('[') || trimmed.startsWith('%5B') || trimmed.startsWith('%5b')) {
@@ -3722,7 +3723,7 @@ window.openLightbox = function(encodedImages, startIndex = 0) {
         } catch (e) {
           images = [trimmed];
         }
-      } else if (trimmed.startsWith('data:') || trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('blob:') || trimmed.startsWith('/') || trimmed.startsWith('./')) {
+      } else if (trimmed.startsWith('data:') || trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('blob:') || trimmed.startsWith('/') || trimmed.startsWith('./') || trimmed.startsWith('assets/')) {
         images = [trimmed];
       } else if (window._postImagesMap && window._postImagesMap[trimmed]) {
         images = window._postImagesMap[trimmed];
@@ -3731,7 +3732,14 @@ window.openLightbox = function(encodedImages, startIndex = 0) {
       }
     }
 
-    images = (images || []).map(img => Security.sanitizeUrl(img)).filter(Boolean);
+    const cleanList = (images || []).map(img => {
+      if (typeof img !== 'string') return null;
+      return Security.sanitizeUrl(img) || img;
+    }).filter(Boolean);
+
+    if (cleanList.length > 0) {
+      images = cleanList;
+    }
     if (!images || images.length === 0) return;
 
     currentLightboxImages = images;
@@ -3745,7 +3753,9 @@ window.openLightbox = function(encodedImages, startIndex = 0) {
     const prevBtn = document.getElementById('lightboxPrevBtn');
     const nextBtn = document.getElementById('lightboxNextBtn');
 
-    if (imgEl) imgEl.src = currentLightboxImages[currentLightboxIndex];
+    if (imgEl && currentLightboxImages[currentLightboxIndex]) {
+      imgEl.src = currentLightboxImages[currentLightboxIndex];
+    }
     if (counterEl) counterEl.innerText = `${currentLightboxIndex + 1} / ${currentLightboxImages.length}`;
 
     if (prevBtn) prevBtn.style.display = currentLightboxImages.length > 1 ? 'flex' : 'none';

@@ -54,12 +54,22 @@ export const Security = {
     if (!url || typeof url !== 'string') return null;
     const cleanUrl = url.trim();
 
-    // Allow safely compressed Base64 images
-    if (/^data:image\/(webp|jpeg|png|jpg);base64,[A-Za-z0-9+/=]+$/i.test(cleanUrl)) {
+    // 1. Allow safely formatted Data URLs (Base64 images of all standard web formats)
+    if (/^data:image\/[a-zA-Z0-9.+_-]+;base64,/i.test(cleanUrl)) {
       return cleanUrl;
     }
 
-    // Allow valid HTTPS/HTTP URLs
+    // 2. Allow Blob URLs (Used during camera/file selection previews)
+    if (cleanUrl.startsWith('blob:')) {
+      return cleanUrl;
+    }
+
+    // 3. Allow Relative media paths (e.g., assets/..., ./..., /...)
+    if (cleanUrl.startsWith('./') || cleanUrl.startsWith('/') || cleanUrl.startsWith('assets/')) {
+      return cleanUrl;
+    }
+
+    // 4. Allow valid HTTPS/HTTP URLs
     try {
       const parsed = new URL(cleanUrl);
       if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
