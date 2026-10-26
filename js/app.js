@@ -4,8 +4,8 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=66';
-import { Security } from './security.js?v=95';
+import { StorageService } from './storage.js?v=96';
+import { Security } from './security.js?v=96';
 import { uploadToImgBB } from './imgbb-service.js?v=66';
 import { SoundService, triggerHaptic } from './sound.js?v=66';
 import { FeedAlgorithm } from './algorithm.js?v=66';
@@ -813,20 +813,28 @@ window.openMemberProfileModal = async function(uid, authorName) {
           `;
           return;
         }
-        memFriendsGrid.innerHTML = friends.map(f => `
+        memFriendsGrid.innerHTML = friends.map(f => {
+          const isFSangha = StorageService.isSangha(f);
+          const initial = (f.name || 'ක').charAt(0);
+          return `
           <div class="mem-fb-friend-card" onclick="openMemberProfileModal('${f.uid}', '${Security.escapeHTML(f.name)}')">
-            <div class="mem-fb-friend-thumb">
-              ${f.photo ? `<img src="${Security.sanitizeUrl(f.photo)}" alt="${Security.escapeHTML(f.name)}" onerror="this.parentElement.innerText = '${(f.name || 'ක').charAt(0)}';">` : (f.name || 'ක').charAt(0)}
+            <div class="mem-fb-friend-thumb ${isFSangha ? 'sangha-framed-avatar' : ''}">
+              ${f.photo ? `<img src="${Security.sanitizeUrl(f.photo)}" alt="${Security.escapeHTML(f.name)}" onerror="this.parentElement.innerText = '${initial}';">` : initial}
+              ${isFSangha ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත" style="position:absolute; inset:-3px; width:calc(100% + 6px); height:calc(100% + 6px); pointer-events:none;">' : ''}
             </div>
             <div class="mem-fb-friend-info">
-              <div class="mem-fb-friend-name" title="${Security.escapeHTML(f.name || 'කල්‍යාණ මිත්‍ර')}">${Security.escapeHTML(f.name || 'කල්‍යාණ මිත්‍ර')}</div>
+              <div class="mem-fb-friend-name" title="${Security.escapeHTML(f.name || 'කල්‍යාණ මිත්‍ර')}">
+                <span>${Security.escapeHTML(f.name || 'කල්‍යාණ මිත්‍ර')}</span>
+                ${isFSangha ? `<span class="sangha-author-badge" style="margin-left: 3px; padding: 1px 5px; font-size: 0.58rem;"><i class="fa-solid fa-dharmachakra"></i> සංඝරත්නය</span>` : ''}
+              </div>
               <div class="mem-fb-friend-loc">
                 <i class="fa-solid fa-location-dot" style="color: #ea580c; font-size: 0.6rem;"></i>
                 <span>${Security.escapeHTML(f.district || f.location || 'ශ්‍රී ලංකා')}</span>
               </div>
             </div>
           </div>
-        `).join('');
+        `;
+        }).join('');
       });
     }
   }
@@ -5365,13 +5373,20 @@ function renderProfileSubTabContent(user, myPosts, myPhotosPosts, myPrivatePosts
       if (pendingIncoming.length > 0) {
         pendingSection.style.display = 'block';
         if (pendingCountText) pendingCountText.innerText = `(${pendingIncoming.length})`;
-        pendingList.innerHTML = pendingIncoming.map(req => `
+        pendingList.innerHTML = pendingIncoming.map(req => {
+          const isReqSangha = StorageService.isSangha(req) || StorageService.isSangha({ uid: req.senderUid, name: req.senderName });
+          const initial = (req.senderName || 'ක').charAt(0);
+          return `
           <div class="mithra-card" style="border-color: #fde68a; background: #fffdf8;">
-            <div class="mithra-card-avatar" onclick="openMemberProfileModal('${req.senderUid}', '${Security.escapeHTML(req.senderName)}')" style="cursor: pointer;">
-              ${req.senderPhoto ? `<img src="${Security.sanitizeUrl(req.senderPhoto)}" alt="${Security.escapeHTML(req.senderName)}" onerror="this.parentElement.innerText = '${(req.senderName || 'ක').charAt(0)}';">` : (req.senderName || 'ක').charAt(0)}
+            <div class="mithra-card-avatar ${isReqSangha ? 'sangha-framed-avatar' : ''}" onclick="openMemberProfileModal('${req.senderUid}', '${Security.escapeHTML(req.senderName)}')" style="cursor: pointer;">
+              ${req.senderPhoto ? `<img src="${Security.sanitizeUrl(req.senderPhoto)}" alt="${Security.escapeHTML(req.senderName)}" onerror="this.parentElement.innerText = '${initial}';">` : initial}
+              ${isReqSangha ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
             </div>
             <div class="mithra-card-details" onclick="openMemberProfileModal('${req.senderUid}', '${Security.escapeHTML(req.senderName)}')" style="cursor: pointer;">
-              <div class="mithra-card-name">${Security.escapeHTML(req.senderName || 'කල්‍යාණ මිත්‍ර')}</div>
+              <div class="mithra-card-name">
+                <span>${Security.escapeHTML(req.senderName || 'කල්‍යාණ මිත්‍ර')}</span>
+                ${isReqSangha ? `<span class="sangha-author-badge" style="margin-left: 4px; padding: 1px 7px; font-size: 0.62rem;"><i class="fa-solid fa-dharmachakra"></i> පූජනීය සංඝරත්නය</span>` : ''}
+              </div>
               <div class="mithra-card-loc">
                 <i class="fa-solid fa-clock"></i> <span>ඇරයුමක් එවා ඇත</span>
               </div>
@@ -5385,7 +5400,8 @@ function renderProfileSubTabContent(user, myPosts, myPhotosPosts, myPrivatePosts
               </button>
             </div>
           </div>
-        `).join('');
+        `;
+        }).join('');
       } else {
         pendingSection.style.display = 'none';
       }
@@ -5414,13 +5430,23 @@ function renderProfileSubTabContent(user, myPosts, myPhotosPosts, myPrivatePosts
           `;
           return;
         }
-        friendsContainer.innerHTML = profiles.map(m => `
+        friendsContainer.innerHTML = profiles.map(m => {
+          const isMemberSangha = StorageService.isSangha(m);
+          const isMemberMaster = StorageService.isMasterAdmin(m);
+          const isMemberSubAdmin = !isMemberMaster && StorageService.isSubAdmin(m);
+          const initial = (m.name || 'ක').charAt(0);
+          return `
           <div class="mithra-card">
-            <div class="mithra-card-avatar" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}')" style="cursor: pointer;">
-              ${m.photo ? `<img src="${Security.sanitizeUrl(m.photo)}" alt="${Security.escapeHTML(m.name)}" onerror="this.parentElement.innerText = '${(m.name || 'ක').charAt(0)}';">` : (m.name || 'ක').charAt(0)}
+            <div class="mithra-card-avatar ${isMemberSangha ? 'sangha-framed-avatar' : ''}" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}')" style="cursor: pointer;">
+              ${m.photo ? `<img src="${Security.sanitizeUrl(m.photo)}" alt="${Security.escapeHTML(m.name)}" onerror="this.parentElement.innerText = '${initial}';">` : `<span>${initial}</span>`}
+              ${isMemberSangha ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
             </div>
             <div class="mithra-card-details" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}')" style="cursor: pointer;">
-              <div class="mithra-card-name">${Security.escapeHTML(m.name || 'කල්‍යාණ මිත්‍ර')}</div>
+              <div class="mithra-card-name">
+                <span>${Security.escapeHTML(m.name || 'කල්‍යාණ මිත්‍ර')}</span>
+                ${isMemberMaster ? `<span class="badge-crown" title="Master Admin">👑</span>` : (isMemberSubAdmin ? `<span class="badge-shield" title="පරිපාලක (Admin)">🛡️</span>` : '')}
+                ${isMemberSangha ? `<span class="sangha-author-badge" style="margin-left: 4px; padding: 1px 7px; font-size: 0.62rem;"><i class="fa-solid fa-dharmachakra"></i> පූජනීය සංඝරත්නය</span>` : ''}
+              </div>
               <div class="mithra-card-loc">
                 <i class="fa-solid fa-location-dot" style="color: #ea580c;"></i>
                 <span>${Security.escapeHTML(m.district || m.location || 'ශ්‍රී ලංකා')}</span>
@@ -5435,7 +5461,8 @@ function renderProfileSubTabContent(user, myPosts, myPhotosPosts, myPrivatePosts
               </button>
             </div>
           </div>
-        `).join('');
+        `;
+        }).join('');
         applyFriendsViewModeUI();
       });
     }
@@ -6669,6 +6696,7 @@ window.renderPcSidebarMembers = async function(filterQuery = '') {
           <div class="sidebar-member-name">
             <span>${Security.escapeHTML(m.name || 'කල්‍යාණ මිත්‍ර')}</span>
             ${m.isAdmin ? `<i class="fa-solid fa-crown" style="color: #f59e0b; font-size: 0.65rem;" title="Master Admin"></i>` : ''}
+            ${isMemberSangha ? `<span class="sangha-author-badge" style="margin-left: 3px; padding: 1px 5px; font-size: 0.58rem;"><i class="fa-solid fa-dharmachakra"></i> සංඝරත්නය</span>` : ''}
           </div>
           <div class="sidebar-member-meta">
             ${m.location ? `<i class="fa-solid fa-location-dot"></i> ${Security.escapeHTML(m.location)}` : (m.joinedDate ? `<i class="fa-solid fa-calendar-check"></i> ${Security.escapeHTML(m.joinedDate)}` : 'කල්‍යාණ මිත්‍ර')}
@@ -6749,6 +6777,9 @@ window.handleToggleAdminSanghaVerification = async function(targetUid, newStatus
 
   try {
     await StorageService.setMemberSanghaStatus(targetUid, newStatus);
+    allCommunityMembersCache = [];
+    renderCommunityDirectory();
+    renderFeed();
     alert("සාර්ථකයි! සංඝ සත්‍යාපන තත්ත්වය යාවත්කාලීන කරන ලදී. 🙏");
     const memModal = document.getElementById('memberProfileModal');
     if (memModal && !memModal.classList.contains('hidden')) {
@@ -7879,7 +7910,7 @@ function initPWAEngine() {
   // Register Service Worker
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=95', { updateViaCache: 'none' })
+      navigator.serviceWorker.register('./sw.js?v=96', { updateViaCache: 'none' })
         .then((registration) => {
           // Immediately check for service worker updates
           try { registration.update(); } catch (e) {}

@@ -176,6 +176,7 @@ export const StorageService = {
   },
 
   _knownAdminUids: new Set(['user_malith']),
+  _knownSanghaUids: new Set(),
 
   /**
    * Checks whether a user/email/post is Master Admin (silvadilan9@gmail.com)
@@ -267,6 +268,10 @@ export const StorageService = {
           } else {
             this._knownAdminUids.delete(docSnap.id);
           }
+          const isMemberSangha = data.isSangha === true || data.role === 'sangha' || (data.authorRole === 'sangha') || this.isSangha({ uid: docSnap.id, name: data.name || data.firstName });
+          if (isMemberSangha) {
+            this._knownSanghaUids.add(docSnap.id);
+          }
           members.push({
             uid: docSnap.id,
             name: data.name || data.firstName || 'කල්‍යාණ මිත්‍ර',
@@ -277,8 +282,8 @@ export const StorageService = {
             updatedAt: data.updatedAt || 0,
             isAdmin: isMaster,
             isSubAdmin: isSub,
-            isSangha: data.isSangha === true || data.role === 'sangha' || (data.authorRole === 'sangha') || this.isSangha({ name: data.name || data.firstName }),
-            role: data.role || (data.isSangha ? 'sangha' : (isSub ? 'admin' : 'member'))
+            isSangha: isMemberSangha,
+            role: data.role || (isMemberSangha ? 'sangha' : (isSub ? 'admin' : 'member'))
           });
         });
       } catch (e) {
@@ -353,6 +358,16 @@ export const StorageService = {
         const arr = JSON.parse(savedAdminUids);
         if (Array.isArray(arr)) {
           arr.forEach(id => this._knownAdminUids.add(id));
+        }
+      }
+    } catch(e) {}
+
+    try {
+      const savedSanghaUids = localStorage.getItem('pinPotha_sangha_uids');
+      if (savedSanghaUids) {
+        const arr = JSON.parse(savedSanghaUids);
+        if (Array.isArray(arr)) {
+          arr.forEach(id => this._knownSanghaUids.add(id));
         }
       }
     } catch(e) {}
@@ -2261,13 +2276,76 @@ export const StorageService = {
    */
   isSangha(userOrMember) {
     if (!userOrMember) return false;
-    if (userOrMember.isSangha === true || userOrMember.role === 'sangha' || userOrMember.authorRole === 'sangha') {
+
+    // 1. Direct UID matching in cached Sangha Set
+    const uid = typeof userOrMember === 'string' ? userOrMember : (userOrMember.uid || userOrMember.senderUid || userOrMember.id);
+    if (uid && this._knownSanghaUids && this._knownSanghaUids.has(uid)) {
       return true;
     }
-    const name = (userOrMember.name || userOrMember.author || '').trim();
-    if (name.includes('ස්වාමීන් වහන්සේ') || name.includes('හිමි') || name.includes('තෙරුන්') || name.startsWith('පූජ්‍ය ') || name.startsWith('පූජ්‍යපාද ')) {
+
+    // 2. Check local profile cache if UID is present
+    if (uid) {
+      try {
+        const raw = localStorage.getItem('pinPotha_profile_' + uid);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && (parsed.isSangha === true || parsed.role === 'sangha' || parsed.authorRole === 'sangha')) {
+            if (this._knownSanghaUids) this._knownSanghaUids.add(uid);
+            return true;
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 3. Explicit properties on object
+    if (typeof userOrMember === 'object') {
+      if (userOrMember.isSangha === true || userOrMember.role === 'sangha' || userOrMember.authorRole === 'sangha') {
+        if (uid && this._knownSanghaUids) this._knownSanghaUids.add(uid);
+        return true;
+      }
+    }
+
+    // 4. Honorific and Title Pattern Matching (Sinhala & English)
+    const rawName = typeof userOrMember === 'string'
+      ? userOrMember
+      : (userOrMember.name || userOrMember.author || userOrMember.senderName || userOrMember.firstName || '').trim();
+
+    if (!rawName) return false;
+
+    // Sinhala checks
+    if (
+      rawName.includes('ස්වාමීන් වහන්සේ') ||
+      rawName.includes('ස්වාමින් වහන්සේ') ||
+      rawName.includes('හිමි') ||
+      rawName.includes('තෙරුන්') ||
+      rawName.includes('හාමුදුරුවෝ') ||
+      rawName.startsWith('පූජ්‍ය ') ||
+      rawName.startsWith('පූජ්‍යපාද ')
+    ) {
+      if (uid && this._knownSanghaUids) this._knownSanghaUids.add(uid);
       return true;
     }
+
+    // English checks (case-insensitive for handles and Romanized Pali/Sinhala names)
+    const lowerName = rawName.toLowerCase();
+    if (
+      lowerName.includes('himi') ||
+      lowerName.includes('thero') ||
+      lowerName.includes('théro') ||
+      lowerName.includes('thera') ||
+      lowerName.includes('bhikkhu') ||
+      lowerName.includes('bhikku') ||
+      lowerName.includes('bhante') ||
+      lowerName.includes('swaminwahanse') ||
+      lowerName.includes('hamuduruwo') ||
+      lowerName.startsWith('ven ') ||
+      lowerName.startsWith('ven. ') ||
+      lowerName.startsWith('venerable ')
+    ) {
+      if (uid && this._knownSanghaUids) this._knownSanghaUids.add(uid);
+      return true;
+    }
+
     return false;
   },
 
@@ -2349,6 +2427,19 @@ export const StorageService = {
     if (!this.isMasterAdmin()) {
       throw new Error("මෙම වෙනස්කම සිදුකළ හැක්කේ ප්‍රධාන පරිපාලක (Master Admin) හට පමණි.");
     }
+    if (isSangha) {
+      this._knownSanghaUids.add(targetUid);
+    } else {
+      this._knownSanghaUids.delete(targetUid);
+    }
+    try {
+      localStorage.setItem('pinPotha_sangha_uids', JSON.stringify(Array.from(this._knownSanghaUids)));
+    } catch (e) {}
+
+    // Invalidate community cache so lists re-render freshly
+    this._cachedCommunityMembers = null;
+    this._lastCommunityMembersFetchTime = 0;
+
     try {
       const raw = localStorage.getItem('pinPotha_profile_' + targetUid);
       if (raw) {
