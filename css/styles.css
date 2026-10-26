@@ -2880,6 +2880,7 @@ body {
   box-shadow: var(--shadow-sm);
   cursor: pointer;
   background: #f1f5f9;
+  touch-action: pan-y manipulation;
 }
 
 .gallery-card img {
@@ -2887,10 +2888,17 @@ body {
   height: 100%;
   object-fit: cover;
   transition: transform 0.3s ease;
+  touch-action: pan-y manipulation;
 }
 
-.gallery-card:hover img {
-  transform: scale(1.06);
+@media (hover: hover) and (pointer: fine) {
+  .gallery-card:hover img {
+    transform: scale(1.06);
+  }
+}
+
+.gallery-card:active img {
+  opacity: 0.92;
 }
 
 .gallery-overlay {
@@ -3304,10 +3312,17 @@ body {
   border-radius: 8px;
   cursor: pointer;
   transition: transform 0.2s ease;
+  touch-action: pan-y manipulation;
 }
 
-.quoted-merit-image:hover img {
-  transform: scale(1.015);
+@media (hover: hover) and (pointer: fine) {
+  .quoted-merit-image:hover img {
+    transform: scale(1.015);
+  }
+}
+
+.quoted-merit-image:active img {
+  opacity: 0.92;
 }
 
 /* ========================================================================= */
@@ -3321,6 +3336,7 @@ body {
   overflow: hidden;
   user-select: none;
   cursor: pointer;
+  touch-action: pan-y manipulation;
 }
 
 .collage-grid {
@@ -3416,6 +3432,7 @@ body {
   cursor: pointer !important;
   background: #1e293b;
   -webkit-tap-highlight-color: rgba(245, 158, 11, 0.25);
+  touch-action: pan-y manipulation;
 }
 
 .collage-item img {
@@ -3426,11 +3443,18 @@ body {
   display: block;
   cursor: pointer !important;
   -webkit-tap-highlight-color: rgba(245, 158, 11, 0.25);
+  touch-action: pan-y manipulation;
 }
 
-.collage-item:hover img {
-  transform: scale(1.03);
-  filter: brightness(0.95);
+@media (hover: hover) and (pointer: fine) {
+  .collage-item:hover img {
+    transform: scale(1.03);
+    filter: brightness(0.95);
+  }
+}
+
+.collage-item:active img {
+  opacity: 0.92;
 }
 
 .collage-overlay {
@@ -3515,14 +3539,16 @@ body {
 .lightbox-overlay {
   position: fixed;
   inset: 0;
-  z-index: 100000;
-  background: rgba(10, 10, 15, 0.94);
+  z-index: 200000;
+  background: rgba(10, 10, 15, 0.96);
   backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   display: flex;
   align-items: center;
   justify-content: center;
   animation: fadeIn 0.2s ease;
   user-select: none;
+  touch-action: none;
 }
 
 .lightbox-top-bar {

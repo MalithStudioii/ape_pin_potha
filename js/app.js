@@ -3783,6 +3783,11 @@ window.openLightbox = function(encodedImages, startIndex = 0) {
       } catch (e) {}
       modal.classList.remove('hidden');
       modal.style.setProperty('display', 'flex', 'important');
+      modal.style.background = '';
+      if (imgEl) {
+        imgEl.style.transform = 'translate(0px, 0px) scale(1)';
+        imgEl.style.transition = '';
+      }
       document.body.style.overflow = 'hidden';
     }
   } catch (err) {
@@ -3793,10 +3798,16 @@ window.openLightbox = function(encodedImages, startIndex = 0) {
 window.closeLightbox = function() {
   resetZoomLightbox();
   const modal = document.getElementById('photoLightboxModal');
+  const imgEl = document.getElementById('lightboxActiveImage');
   if (modal) {
     modal.classList.add('hidden');
     modal.style.setProperty('display', 'none', 'important');
+    modal.style.background = '';
     document.body.style.overflow = '';
+  }
+  if (imgEl) {
+    imgEl.style.transform = 'translate(0px, 0px) scale(1)';
+    imgEl.style.transition = '';
   }
 };
 
@@ -3852,89 +3863,183 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// Global Universal Photo Click Interceptor (Event Delegation - Capture Phase)
-document.addEventListener('click', (e) => {
-  if (e.target.closest('.lightbox-top-bar') || e.target.closest('.lightbox-nav-btn')) return;
-  if (e.target.closest('.composer-thumb-remove')) return;
+// Universal Photo Open Handler (Shared between Touch & Click)
+let lastPhotoTriggerTime = 0;
+
+function handlePhotoOpenTarget(target) {
+  if (!target) return false;
+  if (target.closest('.lightbox-top-bar') || target.closest('.lightbox-nav-btn')) return false;
+  if (target.closest('.composer-thumb-remove')) return false;
 
   // 1. Post Photo Collage Grid item or container
-  const collageContainer = e.target.closest('.photo-collage-container');
+  const collageContainer = target.closest('.photo-collage-container');
   if (collageContainer) {
-    e.preventDefault();
-    e.stopPropagation();
-
     const postId = collageContainer.dataset.postId || collageContainer.getAttribute('data-post-id');
     let images = [];
     if (postId && window._postImagesMap && window._postImagesMap[String(postId)] && window._postImagesMap[String(postId)].length > 0) {
       images = window._postImagesMap[String(postId)];
     }
+    if ((!images || images.length === 0) && typeof currentPostsData !== 'undefined' && Array.isArray(currentPostsData)) {
+      const p = currentPostsData.find(item => item && String(item.id) === String(postId));
+      if (p) {
+        images = (p.images && p.images.length > 0) ? p.images : (p.image ? [p.image] : []);
+      }
+    }
+    if ((!images || images.length === 0) && typeof StorageService !== 'undefined' && StorageService.getLocalPosts) {
+      try {
+        const localPosts = StorageService.getLocalPosts() || [];
+        const p = localPosts.find(item => item && String(item.id) === String(postId));
+        if (p) {
+          images = (p.images && p.images.length > 0) ? p.images : (p.image ? [p.image] : []);
+        }
+      } catch (e) {}
+    }
     if (!images || images.length === 0) {
       images = Array.from(collageContainer.querySelectorAll('img')).map(img => img.currentSrc || img.src).filter(Boolean);
     }
     if (!images || images.length === 0) {
-      if (e.target.tagName === 'IMG' && (e.target.currentSrc || e.target.src)) {
-        images = [e.target.currentSrc || e.target.src];
+      const directImg = target.tagName === 'IMG' ? target : target.querySelector('img');
+      if (directImg && (directImg.currentSrc || directImg.src)) {
+        images = [directImg.currentSrc || directImg.src];
       }
     }
 
     let startIndex = 0;
-    const collageItem = e.target.closest('.collage-item');
+    const collageItem = target.closest('.collage-item');
     if (collageItem) {
-      const allItems = Array.from(collageContainer.querySelectorAll('.collage-item'));
-      const idx = allItems.indexOf(collageItem);
-      if (idx >= 0) startIndex = idx;
+      const dataIdx = collageItem.dataset.index || collageItem.getAttribute('data-index');
+      if (dataIdx !== null && dataIdx !== undefined && !isNaN(parseInt(dataIdx, 10))) {
+        startIndex = parseInt(dataIdx, 10);
+      } else {
+        const allItems = Array.from(collageContainer.querySelectorAll('.collage-item'));
+        const idx = allItems.indexOf(collageItem);
+        if (idx >= 0) startIndex = idx;
+      }
     }
 
     if (images && images.length > 0) {
       window.openLightbox(images, startIndex);
+      return true;
     }
-    return;
+    return false;
   }
 
   // 2. Quoted Merit Image
-  const quoted = e.target.closest('.quoted-merit-image');
+  const quoted = target.closest('.quoted-merit-image');
   if (quoted) {
-    e.preventDefault();
-    e.stopPropagation();
-    const img = quoted.querySelector('img');
+    const img = quoted.querySelector('img') || (target.tagName === 'IMG' ? target : null);
     if (img && (img.currentSrc || img.src)) {
       window.openLightbox([img.currentSrc || img.src], 0);
+      return true;
     }
-    return;
   }
 
   // 3. Profile Gallery Card
-  const gallery = e.target.closest('.gallery-card');
+  const gallery = target.closest('.gallery-card');
   if (gallery) {
-    e.preventDefault();
-    e.stopPropagation();
-    const img = gallery.querySelector('img');
+    const img = gallery.querySelector('img') || (target.tagName === 'IMG' ? target : null);
     if (img && (img.currentSrc || img.src)) {
       window.openLightbox([img.currentSrc || img.src], 0);
+      return true;
     }
-    return;
   }
 
   // 4. Composer Upload Preview Thumbnails
-  const thumb = e.target.closest('.composer-thumb-item');
+  const thumb = target.closest('.composer-thumb-item');
   if (thumb) {
-    e.preventDefault();
-    e.stopPropagation();
     const allThumbs = Array.from(document.querySelectorAll('.composer-thumb-item'));
     const idx = allThumbs.indexOf(thumb);
     if (typeof selectedImagesList !== 'undefined' && selectedImagesList.length > 0) {
       window.openLightbox(selectedImagesList, Math.max(0, idx));
+      return true;
     }
+  }
+
+  return false;
+}
+
+// Mobile Fast Touch-Tap Detector (Bypasses Hover & Synthetic Click Lag)
+let photoTouchStartX = 0;
+let photoTouchStartY = 0;
+let photoTouchStartTime = 0;
+let photoTouchCandidate = null;
+let photoTouchMoved = false;
+
+document.addEventListener('touchstart', (e) => {
+  if (e.touches.length !== 1) {
+    photoTouchCandidate = null;
     return;
+  }
+  const touch = e.touches[0];
+  const target = touch.target;
+  const isPhotoTarget = target.closest('.photo-collage-container') ||
+                        target.closest('.quoted-merit-image') ||
+                        target.closest('.gallery-card') ||
+                        target.closest('.composer-thumb-item');
+  if (isPhotoTarget) {
+    photoTouchStartX = touch.clientX;
+    photoTouchStartY = touch.clientY;
+    photoTouchStartTime = Date.now();
+    photoTouchCandidate = target;
+    photoTouchMoved = false;
+  } else {
+    photoTouchCandidate = null;
+  }
+}, { passive: true });
+
+document.addEventListener('touchmove', (e) => {
+  if (!photoTouchCandidate || e.touches.length !== 1) return;
+  const touch = e.touches[0];
+  const dx = touch.clientX - photoTouchStartX;
+  const dy = touch.clientY - photoTouchStartY;
+  if (Math.hypot(dx, dy) > 10) {
+    photoTouchMoved = true;
+    photoTouchCandidate = null;
+  }
+}, { passive: true });
+
+document.addEventListener('touchend', (e) => {
+  if (!photoTouchCandidate || photoTouchMoved) {
+    photoTouchCandidate = null;
+    return;
+  }
+  const duration = Date.now() - photoTouchStartTime;
+  const target = photoTouchCandidate;
+  photoTouchCandidate = null;
+
+  if (duration < 380 && target) {
+    if (Date.now() - lastPhotoTriggerTime < 450) return;
+    lastPhotoTriggerTime = Date.now();
+    const handled = handlePhotoOpenTarget(target);
+    if (handled && e.cancelable) {
+      e.preventDefault();
+    }
+  }
+}, { passive: false });
+
+// Desktop Mouse Click Interceptor (Event Delegation - Capture Phase)
+document.addEventListener('click', (e) => {
+  if (e.target.closest('.lightbox-top-bar') || e.target.closest('.lightbox-nav-btn')) return;
+  if (e.target.closest('.composer-thumb-remove')) return;
+
+  const isPhotoTarget = e.target.closest('.photo-collage-container') ||
+                        e.target.closest('.quoted-merit-image') ||
+                        e.target.closest('.gallery-card') ||
+                        e.target.closest('.composer-thumb-item');
+  if (isPhotoTarget) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (Date.now() - lastPhotoTriggerTime < 450) return;
+    lastPhotoTriggerTime = Date.now();
+    handlePhotoOpenTarget(e.target);
   }
 }, true);
 
-// Touch Gestures: Swipe left/right, Pinch to zoom, Double-tap to zoom, Pan when enlarged
+// Fullscreen Photo Lightbox Gestures (Swipe Left/Right, Swipe Down to Dismiss, Pinch & Double-tap Zoom)
 function initLightboxTouchGestures() {
   const modal = document.getElementById('photoLightboxModal');
-  const contentBox = document.getElementById('lightboxContentBox') || modal;
   const imgEl = document.getElementById('lightboxActiveImage');
-  if (!modal || !contentBox || !imgEl) return;
+  if (!modal || !imgEl) return;
 
   let touchStartX = 0;
   let touchStartY = 0;
@@ -3949,7 +4054,7 @@ function initLightboxTouchGestures() {
   let pinchStartZoom = 1;
   let lastTapTime = 0;
 
-  contentBox.addEventListener('touchstart', (e) => {
+  modal.addEventListener('touchstart', (e) => {
     if (e.target.closest('.lightbox-top-bar') || e.target.closest('.lightbox-nav-btn')) return;
 
     if (e.touches.length === 1) {
@@ -3977,7 +4082,7 @@ function initLightboxTouchGestures() {
     }
   }, { passive: false });
 
-  contentBox.addEventListener('touchmove', (e) => {
+  modal.addEventListener('touchmove', (e) => {
     if (isPinching && e.touches.length === 2) {
       e.preventDefault();
       const t1 = e.touches[0];
@@ -3999,16 +4104,25 @@ function initLightboxTouchGestures() {
         currentLightboxPanY = t.clientY - panStartY;
         applyLightboxTransform(true);
       } else if (currentLightboxZoom === 1) {
-        if (Math.abs(touchDeltaX) > Math.abs(touchDeltaY) && currentLightboxImages.length > 1) {
+        // Vertical Swipe-Down/Up to Dismiss (Facebook style)
+        if (Math.abs(touchDeltaY) > Math.abs(touchDeltaX) * 1.1) {
           e.preventDefault();
-          imgEl.style.transform = `translate(${touchDeltaX * 0.35}px, 0px) scale(1)`;
+          const scale = Math.max(0.72, 1 - Math.abs(touchDeltaY) / 900);
           imgEl.style.transition = 'none';
+          imgEl.style.transform = `translate(0px, ${touchDeltaY}px) scale(${scale})`;
+          const bgOpacity = Math.max(0.25, 0.96 - Math.abs(touchDeltaY) / 500);
+          modal.style.background = `rgba(10, 10, 15, ${bgOpacity})`;
+        } else if (Math.abs(touchDeltaX) > Math.abs(touchDeltaY) && currentLightboxImages.length > 1) {
+          // Horizontal Swipe to view next/prev image
+          e.preventDefault();
+          imgEl.style.transition = 'none';
+          imgEl.style.transform = `translate(${touchDeltaX * 0.4}px, 0px) scale(1)`;
         }
       }
     }
   }, { passive: false });
 
-  contentBox.addEventListener('touchend', (e) => {
+  modal.addEventListener('touchend', (e) => {
     if (isPinching) {
       isPinching = false;
       if (currentLightboxZoom < 1.05) {
@@ -4024,7 +4138,7 @@ function initLightboxTouchGestures() {
       const now = Date.now();
       const tapDist = Math.hypot(touchDeltaX, touchDeltaY);
 
-      // Double-tap to zoom in / reset
+      // Double-tap to zoom in (2.2x) or reset (1x)
       if (tapDist < 12 && (now - lastTapTime) < 300) {
         lastTapTime = 0;
         if (currentLightboxZoom > 1) {
@@ -4042,16 +4156,26 @@ function initLightboxTouchGestures() {
         isDraggingPan = false;
         applyLightboxTransform(false);
       } else {
-        // Horizontal Swipe navigation
-        imgEl.style.transition = 'transform 0.22s cubic-bezier(0.2, 0, 0.2, 1)';
+        // Vertical swipe to dismiss threshold (Facebook style)
+        if (Math.abs(touchDeltaY) > 75 && Math.abs(touchDeltaY) > Math.abs(touchDeltaX) * 1.1) {
+          window.closeLightbox();
+          modal.style.background = '';
+          return;
+        }
+
+        // Horizontal swipe to next/prev image threshold
         if (Math.abs(touchDeltaX) > 45 && Math.abs(touchDeltaX) > Math.abs(touchDeltaY) * 1.2 && currentLightboxImages.length > 1) {
+          imgEl.style.transition = 'transform 0.22s cubic-bezier(0.2, 0, 0.2, 1)';
           if (touchDeltaX < 0) {
             window.nextLightboxImage();
           } else {
             window.prevLightboxImage();
           }
         } else {
+          // Snap back to center
+          imgEl.style.transition = 'transform 0.22s cubic-bezier(0.2, 0, 0.2, 1)';
           imgEl.style.transform = 'translate(0px, 0px) scale(1)';
+          modal.style.background = '';
         }
       }
     }
