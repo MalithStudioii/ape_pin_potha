@@ -205,6 +205,7 @@ let selectedPostType = 'merit';
 let compressedBase64Image = null;
 let selectedImagesList = [];
 let currentLightboxImages = [];
+let currentLightboxIndex = 0;
 let currentPostsData = [];
 window.currentPostsData = currentPostsData;
 let activeProfileSubTab = 'timeline';
@@ -3656,13 +3657,14 @@ function applyLightboxTransform(isDragging = false) {
   imgEl.style.transition = isDragging ? 'none' : 'transform 0.22s cubic-bezier(0.2, 0, 0.2, 1)';
 }
 
-window.zoomInLightbox = function(step = 0.5) {
+export function zoomInLightbox(step = 0.5) {
   currentLightboxZoom = Math.min(4, Math.round((currentLightboxZoom + step) * 10) / 10);
   applyLightboxTransform(false);
   triggerHaptic(10);
-};
+}
+window.zoomInLightbox = zoomInLightbox;
 
-window.zoomOutLightbox = function(step = 0.5) {
+export function zoomOutLightbox(step = 0.5) {
   currentLightboxZoom = Math.max(1, Math.round((currentLightboxZoom - step) * 10) / 10);
   if (currentLightboxZoom === 1) {
     currentLightboxPanX = 0;
@@ -3670,17 +3672,19 @@ window.zoomOutLightbox = function(step = 0.5) {
   }
   applyLightboxTransform(false);
   triggerHaptic(10);
-};
+}
+window.zoomOutLightbox = zoomOutLightbox;
 
-window.resetZoomLightbox = function() {
+export function resetZoomLightbox() {
   currentLightboxZoom = 1;
   currentLightboxPanX = 0;
   currentLightboxPanY = 0;
   applyLightboxTransform(false);
   triggerHaptic(10);
-};
+}
+window.resetZoomLightbox = resetZoomLightbox;
 
-window.openPostLightbox = function(postId, startIndex = 0, el = null) {
+export function openPostLightbox(postId, startIndex = 0, el = null) {
   try {
     const strId = (postId != null) ? String(postId) : '';
     let images = [];
@@ -3714,16 +3718,17 @@ window.openPostLightbox = function(postId, startIndex = 0, el = null) {
       images = [strId];
     }
     if (images && images.length > 0) {
-      window.openLightbox(images, startIndex);
+      openLightbox(images, startIndex);
     } else {
       console.warn('[openPostLightbox] No images found for post:', postId);
     }
   } catch (err) {
     console.error('[openPostLightbox] Error:', err);
   }
-};
+}
+window.openPostLightbox = openPostLightbox;
 
-window.openLightbox = function(encodedImages, startIndex = 0) {
+export function openLightbox(encodedImages, startIndex = 0) {
   try {
     let images = [];
     if (Array.isArray(encodedImages)) {
@@ -3793,9 +3798,10 @@ window.openLightbox = function(encodedImages, startIndex = 0) {
   } catch (err) {
     console.error('[Lightbox] Failed to open:', err);
   }
-};
+}
+window.openLightbox = openLightbox;
 
-window.closeLightbox = function() {
+export function closeLightbox() {
   resetZoomLightbox();
   const modal = document.getElementById('photoLightboxModal');
   const imgEl = document.getElementById('lightboxActiveImage');
@@ -3809,11 +3815,12 @@ window.closeLightbox = function() {
     imgEl.style.transform = 'translate(0px, 0px) scale(1)';
     imgEl.style.transition = '';
   }
-};
+}
+window.closeLightbox = closeLightbox;
 
 let lastLightboxOpenTime = 0;
 
-window.closeLightboxOnBackdrop = function(e) {
+export function closeLightboxOnBackdrop(e) {
   // Prevent immediate closure if the touch/click was part of opening
   if (Date.now() - lastLightboxOpenTime < 1000) {
     return;
@@ -3823,26 +3830,29 @@ window.closeLightboxOnBackdrop = function(e) {
     if (currentLightboxZoom > 1) {
       resetZoomLightbox();
     } else {
-      window.closeLightbox();
+      closeLightbox();
     }
   }
-};
+}
+window.closeLightboxOnBackdrop = closeLightboxOnBackdrop;
 
-window.nextLightboxImage = function() {
+export function nextLightboxImage() {
   if (currentLightboxImages.length <= 1) return;
   currentLightboxIndex = (currentLightboxIndex + 1) % currentLightboxImages.length;
   updateLightboxView();
   triggerHaptic(15);
-};
+}
+window.nextLightboxImage = nextLightboxImage;
 
-window.prevLightboxImage = function() {
+export function prevLightboxImage() {
   if (currentLightboxImages.length <= 1) return;
   currentLightboxIndex = (currentLightboxIndex - 1 + currentLightboxImages.length) % currentLightboxImages.length;
   updateLightboxView();
   triggerHaptic(15);
-};
+}
+window.prevLightboxImage = prevLightboxImage;
 
-function updateLightboxView() {
+export function updateLightboxView() {
   resetZoomLightbox();
   const imgEl = document.getElementById('lightboxActiveImage');
   const counterEl = document.getElementById('lightboxCounter');
@@ -6502,7 +6512,7 @@ let activeFriendsSegment = 'my';
 let currentDirectoryFilterType = 'all';
 let currentDirectorySearchQuery = '';
 
-window.updateCommunityMemberCount = async function() {
+export async function updateCommunityMemberCount() {
   try {
     const counterPill = document.getElementById('headerMemberCounter');
     const countText = document.getElementById('globalMemberCountText');
@@ -6521,7 +6531,8 @@ window.updateCommunityMemberCount = async function() {
   } catch (err) {
     console.warn('[App] Update community member count warning:', err);
   }
-};
+}
+window.updateCommunityMemberCount = updateCommunityMemberCount;
 
 // ============================================================================
 // Friends & Directory View Mode (Grid vs List)
@@ -8029,7 +8040,7 @@ function initPWAEngine() {
   const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()) && !window.MSStream;
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v99';
+  const ACTIVE_BUILD = 'v100';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
