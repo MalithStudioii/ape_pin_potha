@@ -438,6 +438,101 @@ body {
   box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.5);
 }
 
+/* Header Aranya Senasana Stupa Location Pin Button (pic-3) */
+.header-aranya-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: var(--radius-full);
+  background: rgba(26, 10, 2, 0.45);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  color: #fef3c7;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.header-aranya-btn .stupa-pin-icon {
+  width: 20px;
+  height: 24px;
+  flex-shrink: 0;
+  display: block;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
+}
+
+.header-aranya-btn .pin-outer {
+  fill: #f59e0b;
+  transition: fill 0.2s ease;
+}
+
+.header-aranya-btn .pin-inner-disc {
+  fill: #ffffff;
+}
+
+.header-aranya-btn .stupa-base-1,
+.header-aranya-btn .stupa-base-2,
+.header-aranya-btn .stupa-dome,
+.header-aranya-btn .stupa-cube,
+.header-aranya-btn .stupa-spire,
+.header-aranya-btn .stupa-gem-ring,
+.header-aranya-btn .stupa-pinnacle {
+  fill: #78350f;
+  transition: fill 0.2s ease;
+}
+
+.header-aranya-btn .aranya-header-text {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #fef08a;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+
+.header-aranya-btn:hover {
+  background: rgba(245, 158, 11, 0.25);
+  border-color: #fbbf24;
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.3);
+}
+
+.header-aranya-btn:active {
+  transform: scale(0.92);
+}
+
+.header-aranya-btn.active {
+  background: linear-gradient(135deg, #059669, #047857) !important;
+  border-color: #34d399 !important;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.5) !important;
+}
+
+.header-aranya-btn.active .pin-outer {
+  fill: #ffffff;
+}
+
+.header-aranya-btn.active .pin-inner-disc {
+  fill: #ecfdf5;
+}
+
+.header-aranya-btn.active .stupa-dome,
+.header-aranya-btn.active .stupa-base-1,
+.header-aranya-btn.active .stupa-base-2,
+.header-aranya-btn.active .stupa-cube,
+.header-aranya-btn.active .stupa-spire,
+.header-aranya-btn.active .stupa-gem-ring,
+.header-aranya-btn.active .stupa-pinnacle {
+  fill: #047857;
+}
+
+.header-aranya-btn.active .aranya-header-text {
+  color: #ffffff;
+}
+
 .notification-badge {
   position: absolute;
   top: -4px;
@@ -2193,8 +2288,12 @@ body {
   bottom: 0;
   left: 0;
   right: 0;
+  width: 100%;
+  max-width: 100vw;
+  box-sizing: border-box;
   height: 60px;
-  background: rgba(255, 255, 255, 0.95);
+  height: calc(60px + env(safe-area-inset-bottom, 0px));
+  background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-top: 1px solid rgba(217, 119, 6, 0.16);
@@ -2202,9 +2301,12 @@ body {
   display: flex;
   justify-content: space-around;
   align-items: center;
-  padding: 0 6px env(safe-area-inset-bottom, 0) 6px;
+  padding: 0 6px max(6px, env(safe-area-inset-bottom, 0px)) 6px;
   z-index: 990;
   user-select: none;
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+  will-change: transform, bottom;
 }
 
 @media (min-width: 769px) {
@@ -4576,6 +4678,26 @@ html, body {
     align-items: center !important;
     justify-content: center !important;
     flex-shrink: 0 !important;
+  }
+
+  /* Aranya Senasana Stupa Pin button on mobile (pic-3) */
+  .header-aranya-btn {
+    width: 35px !important;
+    height: 35px !important;
+    padding: 0 !important;
+    border-radius: 9999px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+  }
+
+  .header-aranya-btn .aranya-header-text {
+    display: none !important;
+  }
+
+  .header-aranya-btn .stupa-pin-icon {
+    width: 20px !important;
+    height: 24px !important;
   }
 
   .header-admin-crown-btn.hidden,

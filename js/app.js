@@ -255,6 +255,7 @@ const COVER_PRESETS = [
 // Initialize Application
 document.addEventListener('DOMContentLoaded', async () => {
   initSmartHeaderScroll();
+  initMobileBottomBarLock();
   const initResult = await StorageService.init();
   updateCloudBanner(initResult.isCloud);
   updateUserInfoUI();
@@ -909,6 +910,12 @@ window.switchTab = function(tab, pushHistory = true) {
   if (sideAranyaBtn) {
     if (tab === 'aranya') sideAranyaBtn.classList.add('active');
     else sideAranyaBtn.classList.remove('active');
+  }
+
+  const headerAranyaBtn = document.getElementById('headerAranyaBtn');
+  if (headerAranyaBtn) {
+    if (tab === 'aranya') headerAranyaBtn.classList.add('active');
+    else headerAranyaBtn.classList.remove('active');
   }
 
   const userProfBtn = document.getElementById('userProfileBtn');
@@ -8040,7 +8047,7 @@ function initPWAEngine() {
   const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()) && !window.MSStream;
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v100';
+  const ACTIVE_BUILD = 'v101';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
@@ -8312,6 +8319,52 @@ function initSmartHeaderScroll() {
 
   window.addEventListener('scroll', onScroll, { passive: true });
 }
+
+// ============================================================================
+// Lock Mobile Bottom Navigation Bar to Visual Viewport (Prevents Sinking on Scroll)
+// ============================================================================
+function initMobileBottomBarLock() {
+  const bar = document.getElementById('mobileBottomBar');
+  if (!bar) return;
+
+  let scheduled = false;
+  const updatePosition = () => {
+    if (window.innerWidth > 768) return;
+    if (!scheduled) {
+      scheduled = true;
+      window.requestAnimationFrame(() => {
+        scheduled = false;
+        if (window.visualViewport) {
+          const vv = window.visualViewport;
+          const layoutHeight = document.documentElement.clientHeight || window.innerHeight;
+          const offset = Math.max(0, layoutHeight - (vv.height + vv.offsetTop));
+          bar.style.bottom = `${offset}px`;
+        } else {
+          bar.style.bottom = '0px';
+        }
+      });
+    }
+  };
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', updatePosition, { passive: true });
+    window.visualViewport.addEventListener('scroll', updatePosition, { passive: true });
+  }
+  window.addEventListener('scroll', updatePosition, { passive: true });
+  window.addEventListener('resize', updatePosition, { passive: true });
+  window.addEventListener('orientationchange', () => setTimeout(updatePosition, 100));
+  updatePosition();
+}
+
+export function toggleAranyaTab() {
+  triggerHaptic(12);
+  if (activeTab === 'aranya') {
+    switchTab('feed');
+  } else {
+    switchTab('aranya');
+  }
+}
+window.toggleAranyaTab = toggleAranyaTab;
 
 // =========================================================================
 // Sidebar Daily Dhamma Verse & Poya Calendar Admin Modals
