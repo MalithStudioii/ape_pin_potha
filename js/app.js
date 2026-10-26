@@ -5,7 +5,7 @@
  */
 
 import { StorageService } from './storage.js?v=66';
-import { Security } from './security.js?v=94';
+import { Security } from './security.js?v=95';
 import { uploadToImgBB } from './imgbb-service.js?v=66';
 import { SoundService, triggerHaptic } from './sound.js?v=66';
 import { FeedAlgorithm } from './algorithm.js?v=66';
@@ -1117,9 +1117,9 @@ function renderPostImagesCollage(post) {
   // 1 Image (Full View)
   if (cleanImages.length === 1) {
     return `
-      <div class="photo-collage-container" onclick="openPostLightbox('${post.id}', 0)">
+      <div class="photo-collage-container" data-post-id="${post.id}" onclick="openPostLightbox('${post.id}', 0)">
         <div class="collage-grid collage-1">
-          <div class="collage-item">
+          <div class="collage-item" data-index="0" onclick="openPostLightbox('${post.id}', 0)">
             <img src="${cleanImages[0]}" alt="${Security.escapeHTML(post.title || '')}" loading="lazy">
           </div>
         </div>
@@ -1130,10 +1130,10 @@ function renderPostImagesCollage(post) {
   // 2 Images (Side by Side)
   if (cleanImages.length === 2) {
     return `
-      <div class="photo-collage-container">
+      <div class="photo-collage-container" data-post-id="${post.id}">
         <div class="collage-grid collage-2">
           ${cleanImages.map((img, i) => `
-            <div class="collage-item" onclick="openPostLightbox('${post.id}', ${i})">
+            <div class="collage-item" data-index="${i}" onclick="openPostLightbox('${post.id}', ${i})">
               <img src="${img}" alt="ඡායාරූපය ${i+1}" loading="lazy">
             </div>
           `).join('')}
@@ -1145,10 +1145,10 @@ function renderPostImagesCollage(post) {
   // 3 Images (1 Large, 2 Stacked)
   if (cleanImages.length === 3) {
     return `
-      <div class="photo-collage-container">
+      <div class="photo-collage-container" data-post-id="${post.id}">
         <div class="collage-grid collage-3">
           ${cleanImages.map((img, i) => `
-            <div class="collage-item" onclick="openPostLightbox('${post.id}', ${i})">
+            <div class="collage-item" data-index="${i}" onclick="openPostLightbox('${post.id}', ${i})">
               <img src="${img}" alt="ඡායාරූපය ${i+1}" loading="lazy">
             </div>
           `).join('')}
@@ -1160,10 +1160,10 @@ function renderPostImagesCollage(post) {
   // 4 Images (2x2 Grid)
   if (cleanImages.length === 4) {
     return `
-      <div class="photo-collage-container">
+      <div class="photo-collage-container" data-post-id="${post.id}">
         <div class="collage-grid collage-4">
           ${cleanImages.map((img, i) => `
-            <div class="collage-item" onclick="openPostLightbox('${post.id}', ${i})">
+            <div class="collage-item" data-index="${i}" onclick="openPostLightbox('${post.id}', ${i})">
               <img src="${img}" alt="ඡායාරූපය ${i+1}" loading="lazy">
             </div>
           `).join('')}
@@ -1177,12 +1177,12 @@ function renderPostImagesCollage(post) {
   const remainingCount = cleanImages.length - 5;
 
   return `
-    <div class="photo-collage-container">
+    <div class="photo-collage-container" data-post-id="${post.id}">
       <div class="collage-grid collage-5">
         ${displayImages.map((img, i) => {
           const isLast = (i === 4 && remainingCount > 0);
           return `
-            <div class="collage-item" onclick="openPostLightbox('${post.id}', ${i})">
+            <div class="collage-item" data-index="${i}" onclick="openPostLightbox('${post.id}', ${i})">
               <img src="${img}" alt="ඡායාරූපය ${i+1}" loading="lazy">
               ${isLast ? `
                 <div class="collage-overlay">
@@ -3762,6 +3762,7 @@ window.openLightbox = function(encodedImages, startIndex = 0) {
     if (nextBtn) nextBtn.style.display = currentLightboxImages.length > 1 ? 'flex' : 'none';
 
     if (modal) {
+      lastLightboxOpenTime = Date.now();
       try {
         history.pushState({ type: 'modal', id: 'photoLightboxModal' }, '');
       } catch (e) {}
@@ -3784,8 +3785,15 @@ window.closeLightbox = function() {
   }
 };
 
+let lastLightboxOpenTime = 0;
+
 window.closeLightboxOnBackdrop = function(e) {
-  if (e.target.id === 'photoLightboxModal' || e.target.id === 'lightboxContentBox') {
+  // Prevent immediate closure if the touch/click was part of opening
+  if (Date.now() - lastLightboxOpenTime < 400) {
+    return;
+  }
+  // Only close if clicking outside the image content on the backdrop overlay
+  if (e.target.id === 'photoLightboxModal') {
     if (currentLightboxZoom > 1) {
       resetZoomLightbox();
     } else {
@@ -3828,6 +3836,78 @@ document.addEventListener('keydown', (e) => {
     else if (e.key === '0') window.resetZoomLightbox();
   }
 });
+
+// Global Universal Photo Click Interceptor (Event Delegation - Capture Phase)
+document.addEventListener('click', (e) => {
+  if (e.target.closest('.lightbox-top-bar') || e.target.closest('.lightbox-nav-btn')) return;
+  if (e.target.closest('.composer-thumb-remove')) return;
+
+  // 1. Post Photo Collage Grid item or container
+  const collageContainer = e.target.closest('.photo-collage-container');
+  if (collageContainer) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const postId = collageContainer.dataset.postId || collageContainer.getAttribute('data-post-id');
+    let images = [];
+    if (postId && window._postImagesMap && window._postImagesMap[String(postId)]) {
+      images = window._postImagesMap[String(postId)];
+    }
+    if (!images || images.length === 0) {
+      images = Array.from(collageContainer.querySelectorAll('img')).map(img => img.currentSrc || img.src).filter(Boolean);
+    }
+
+    let startIndex = 0;
+    const collageItem = e.target.closest('.collage-item');
+    if (collageItem) {
+      const allItems = Array.from(collageContainer.querySelectorAll('.collage-item'));
+      const idx = allItems.indexOf(collageItem);
+      if (idx >= 0) startIndex = idx;
+    }
+
+    if (images && images.length > 0) {
+      window.openLightbox(images, startIndex);
+    }
+    return;
+  }
+
+  // 2. Quoted Merit Image
+  const quoted = e.target.closest('.quoted-merit-image');
+  if (quoted) {
+    e.preventDefault();
+    e.stopPropagation();
+    const img = quoted.querySelector('img');
+    if (img && (img.currentSrc || img.src)) {
+      window.openLightbox([img.currentSrc || img.src], 0);
+    }
+    return;
+  }
+
+  // 3. Profile Gallery Card
+  const gallery = e.target.closest('.gallery-card');
+  if (gallery) {
+    e.preventDefault();
+    e.stopPropagation();
+    const img = gallery.querySelector('img');
+    if (img && (img.currentSrc || img.src)) {
+      window.openLightbox([img.currentSrc || img.src], 0);
+    }
+    return;
+  }
+
+  // 4. Composer Upload Preview Thumbnails
+  const thumb = e.target.closest('.composer-thumb-item');
+  if (thumb) {
+    e.preventDefault();
+    e.stopPropagation();
+    const allThumbs = Array.from(document.querySelectorAll('.composer-thumb-item'));
+    const idx = allThumbs.indexOf(thumb);
+    if (typeof selectedImagesList !== 'undefined' && selectedImagesList.length > 0) {
+      window.openLightbox(selectedImagesList, Math.max(0, idx));
+    }
+    return;
+  }
+}, true);
 
 // Touch Gestures: Swipe left/right, Pinch to zoom, Double-tap to zoom, Pan when enlarged
 function initLightboxTouchGestures() {
@@ -7799,7 +7879,7 @@ function initPWAEngine() {
   // Register Service Worker
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=68', { updateViaCache: 'none' })
+      navigator.serviceWorker.register('./sw.js?v=95', { updateViaCache: 'none' })
         .then((registration) => {
           // Immediately check for service worker updates
           try { registration.update(); } catch (e) {}
