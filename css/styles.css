@@ -52,6 +52,10 @@
   padding: 0;
 }
 
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   font-family: var(--font-sans);
   background-color: var(--color-bg-page);
@@ -3565,8 +3569,9 @@ body {
   background: #0f172a;
   overflow: hidden;
   user-select: none;
+  -webkit-user-select: none;
   cursor: pointer;
-  touch-action: pan-y manipulation;
+  touch-action: pan-y pinch-zoom;
 }
 
 .collage-grid {
@@ -3662,7 +3667,7 @@ body {
   cursor: pointer !important;
   background: #1e293b;
   -webkit-tap-highlight-color: rgba(245, 158, 11, 0.25);
-  touch-action: pan-y manipulation;
+  touch-action: pan-y pinch-zoom;
 }
 
 .collage-item img {
@@ -3673,7 +3678,7 @@ body {
   display: block;
   cursor: pointer !important;
   -webkit-tap-highlight-color: rgba(245, 158, 11, 0.25);
-  touch-action: pan-y manipulation;
+  touch-action: pan-y pinch-zoom;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -3769,16 +3774,22 @@ body {
 .lightbox-overlay {
   position: fixed;
   inset: 0;
-  z-index: 200000;
+  z-index: 99999999 !important;
   background: rgba(10, 10, 15, 0.96);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: fadeIn 0.2s ease;
+  animation: lightboxFadeIn 0.18s ease-out;
   user-select: none;
+  -webkit-user-select: none;
   touch-action: none;
+}
+
+@keyframes lightboxFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .lightbox-top-bar {

@@ -1982,8 +1982,10 @@ function renderFeed() {
   const searchQ = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
   const user = StorageService.currentUser;
 
+  const isMaster = StorageService.isMasterAdmin();
+
   const filtered = currentPostsData.filter(post => {
-    if (activeCategory !== 'සියල්ල' && post.category !== activeCategory) return false;
+    if (!post) return false;
 
     if (searchQ) {
       const matchTitle = (post.title || '').toLowerCase().includes(searchQ);
@@ -1992,9 +1994,26 @@ function renderFeed() {
       if (!matchTitle && !matchDesc && !matchLoc) return false;
     }
 
-    if (activeTab === 'feed') return post.visibility === 'public';
-    if (activeTab === 'mybook') return post.uid === user.uid;
-    if (activeTab === 'needs') return post.type === 'need';
+    const isOfficial = StorageService.isOfficialPost ? StorageService.isOfficialPost(post) : (post.isOfficial || post.author === 'අපේ පිං පොත');
+
+    if (activeTab === 'feed') {
+      if (activeCategory !== 'සියල්ල' && post.category !== activeCategory && !post.isPinned && !isOfficial) return false;
+      return isOfficial || post.visibility !== 'private';
+    }
+
+    if (activeTab === 'mybook') {
+      if (activeCategory !== 'සියල්ල' && post.category !== activeCategory) return false;
+      const isOwner = (user && post.uid === user.uid) ||
+                      (user && user.email && post.authorEmail && post.authorEmail.toLowerCase() === user.email.toLowerCase()) ||
+                      (isMaster && (isOfficial || post.uid === 'user_malith' || post.author === 'අපේ පිං පොත'));
+      return isOwner;
+    }
+
+    if (activeTab === 'needs') {
+      if (activeCategory !== 'සියල්ල' && post.category !== activeCategory) return false;
+      return post.type === 'need';
+    }
+
     return true;
   });
 
@@ -2188,19 +2207,39 @@ export function appendNewPostsToFeed(allPosts, prevIdsStr) {
   const user = StorageService.currentUser;
   const searchQ = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
 
+  const isMaster = StorageService.isMasterAdmin();
   // Extract only the newly arrived posts
   const newlyFetched = (allPosts || []).filter(p => !prevIdSet.has(p.id));
   const filteredNew = newlyFetched.filter(post => {
-    if (activeCategory !== 'සියල්ල' && post.category !== activeCategory) return false;
+    if (!post) return false;
+
     if (searchQ) {
       const matchTitle = (post.title || '').toLowerCase().includes(searchQ);
       const matchDesc = (post.description || '').toLowerCase().includes(searchQ);
       const matchLoc = (post.location || '').toLowerCase().includes(searchQ);
       if (!matchTitle && !matchDesc && !matchLoc) return false;
     }
-    if (activeTab === 'feed') return post.visibility === 'public';
-    if (activeTab === 'mybook') return post.uid === user.uid;
-    if (activeTab === 'needs') return post.type === 'need';
+
+    const isOfficial = StorageService.isOfficialPost ? StorageService.isOfficialPost(post) : (post.isOfficial || post.author === 'අපේ පිං පොත');
+
+    if (activeTab === 'feed') {
+      if (activeCategory !== 'සියල්ල' && post.category !== activeCategory && !post.isPinned && !isOfficial) return false;
+      return isOfficial || post.visibility !== 'private';
+    }
+
+    if (activeTab === 'mybook') {
+      if (activeCategory !== 'සියල්ල' && post.category !== activeCategory) return false;
+      const isOwner = (user && post.uid === user.uid) ||
+                      (user && user.email && post.authorEmail && post.authorEmail.toLowerCase() === user.email.toLowerCase()) ||
+                      (isMaster && (isOfficial || post.uid === 'user_malith' || post.author === 'අපේ පිං පොත'));
+      return isOwner;
+    }
+
+    if (activeTab === 'needs') {
+      if (activeCategory !== 'සියල්ල' && post.category !== activeCategory) return false;
+      return post.type === 'need';
+    }
+
     return true;
   });
 
@@ -2965,7 +3004,9 @@ window.viewOriginalPost = function(origId, parentPostId) {
       const orig = parentPost.originalPost;
       post = {
         id: orig.id || origId,
-        author: orig.author || 'කල්‍යාණ මිත්‍ර',
+        author: StorageService.resolveAuthorName(orig) || orig.author || 'කල්‍යාණ මිත්‍ර',
+        authorUid: orig.authorUid || orig.uid || null,
+        authorPhoto: StorageService.resolveAuthorPhoto(orig) || orig.authorPhoto || null,
         title: orig.title || '',
         description: orig.description || '',
         category: orig.category || 'දානමය',
@@ -4145,16 +4186,23 @@ function handlePhotoOpenTarget(target) {
   return false;
 }
 
-// Mobile Fast Touch-Tap Detector (Bypasses Hover & Synthetic Click Lag)
+// =========================================================================
+// Facebook-style High-Precision Photo Tap & Click Handler (Mobile & Desktop)
+// =========================================================================
 let photoTouchStartX = 0;
 let photoTouchStartY = 0;
 let photoTouchStartTime = 0;
-let photoTouchCandidate = null;
+let photoTouchTarget = null;
 let photoTouchMoved = false;
+
+// 26px threshold accommodates natural finger compression/roll on high-DPI screens without canceling taps
+const PHOTO_TAP_MAX_DISTANCE = 26;
+// Up to 650ms accommodates natural and deliberate mobile taps
+const PHOTO_TAP_MAX_DURATION = 650;
 
 document.addEventListener('touchstart', (e) => {
   if (e.touches.length !== 1) {
-    photoTouchCandidate = null;
+    photoTouchTarget = null;
     return;
   }
   const touch = e.touches[0];
@@ -4167,44 +4215,51 @@ document.addEventListener('touchstart', (e) => {
     photoTouchStartX = touch.clientX;
     photoTouchStartY = touch.clientY;
     photoTouchStartTime = Date.now();
-    photoTouchCandidate = target;
+    photoTouchTarget = target;
     photoTouchMoved = false;
   } else {
-    photoTouchCandidate = null;
+    photoTouchTarget = null;
   }
 }, { passive: true });
 
 document.addEventListener('touchmove', (e) => {
-  if (!photoTouchCandidate || e.touches.length !== 1) return;
+  if (!photoTouchTarget || e.touches.length !== 1) return;
   const touch = e.touches[0];
   const dx = touch.clientX - photoTouchStartX;
   const dy = touch.clientY - photoTouchStartY;
-  if (Math.hypot(dx, dy) > 10) {
+  // Only classify as a feed scroll if user drags beyond 26px
+  if (Math.hypot(dx, dy) > PHOTO_TAP_MAX_DISTANCE) {
     photoTouchMoved = true;
-    photoTouchCandidate = null;
+    photoTouchTarget = null;
   }
 }, { passive: true });
 
 document.addEventListener('touchend', (e) => {
-  if (!photoTouchCandidate || photoTouchMoved) {
-    photoTouchCandidate = null;
+  if (!photoTouchTarget || photoTouchMoved) {
+    photoTouchTarget = null;
     return;
   }
   const duration = Date.now() - photoTouchStartTime;
-  const target = photoTouchCandidate;
-  photoTouchCandidate = null;
+  const target = photoTouchTarget;
+  photoTouchTarget = null;
 
-  if (duration < 380 && target) {
-    if (Date.now() - lastPhotoTriggerTime < 450) return;
+  if (duration < PHOTO_TAP_MAX_DURATION && target) {
+    if (Date.now() - lastPhotoTriggerTime < 400) return;
     lastPhotoTriggerTime = Date.now();
     const handled = handlePhotoOpenTarget(target);
     if (handled && e.cancelable) {
+      // Prevent browser's delayed synthetic click to avoid duplicate execution
       e.preventDefault();
     }
   }
 }, { passive: false });
 
-// Desktop Mouse Click Interceptor (Event Delegation - Capture Phase)
+document.addEventListener('touchcancel', () => {
+  photoTouchTarget = null;
+  photoTouchMoved = false;
+});
+
+// Desktop Mouse Click & Fallback Browser Click Interceptor (Event Delegation - Capture Phase)
 document.addEventListener('click', (e) => {
   if (e.target.closest('.lightbox-top-bar') || e.target.closest('.lightbox-nav-btn')) return;
   if (e.target.closest('.composer-thumb-remove')) return;
@@ -4214,10 +4269,15 @@ document.addEventListener('click', (e) => {
                         e.target.closest('.gallery-card') ||
                         e.target.closest('.composer-thumb-item');
   if (isPhotoTarget) {
+    // If touchend already handled this tap, prevent duplicate execution from synthetic click
+    if (Date.now() - lastPhotoTriggerTime < 450) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    lastPhotoTriggerTime = Date.now();
     e.preventDefault();
     e.stopPropagation();
-    if (Date.now() - lastPhotoTriggerTime < 450) return;
-    lastPhotoTriggerTime = Date.now();
     handlePhotoOpenTarget(e.target);
   }
 }, true);
@@ -4449,8 +4509,8 @@ window.openReelsViewer = function(initialPostId = null) {
 
   // Render slides into reelsViewport
   viewport.innerHTML = videoPosts.map((reel, index) => {
-    const authorName = reel.author || 'කල්‍යාණ මිත්‍රයෙක්';
-    const authorPhoto = reel.authorPhoto || null;
+    const authorName = StorageService.resolveAuthorName(reel) || reel.author || 'කල්‍යාණ මිත්‍රයෙක්';
+    const authorPhoto = StorageService.resolveAuthorPhoto(reel) || reel.authorPhoto || null;
     const sadhuCount = Math.max(0, parseInt(reel.sadhuCount, 10) || (Array.isArray(reel.sadhuUsers) ? reel.sadhuUsers.length : 0));
     const commentsCount = Array.isArray(reel.comments) ? reel.comments.length : 0;
     const hasGivenSadhu = StorageService.hasUserGivenSadhu ? StorageService.hasUserGivenSadhu(reel) : false;
@@ -5210,12 +5270,21 @@ function setupEventListeners() {
     renderFeed();
   });
 
-  document.getElementById('profileForm')?.addEventListener('submit', (e) => {
+  document.getElementById('profileForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const input = document.getElementById('profileNameInput');
-    if (input && input.value.trim()) {
-      StorageService.setUserName(input.value.trim());
+    const newName = (input?.value || '').trim();
+    if (newName && newName.length >= 2) {
+      await StorageService.setUserName(newName);
       closeProfileModal();
+      updateUserInfoUI();
+      if (typeof activeTab !== 'undefined' && activeTab === 'profile') renderProfileView();
+      renderFeed();
+      triggerHaptic([25, 50, 25]);
+      SoundService.playSadhu();
+      alert("ඔබගේ නම සාර්ථකව වෙනස් විය! සියලුම සටහන් යාවත්කාලීන විය. 🙏");
+    } else {
+      alert("කරුණාකර වලංගු නමක් ඇතුළත් කරන්න (අවම වශයෙන් අකුරු 2ක්).");
     }
   });
 
@@ -7460,13 +7529,14 @@ window.openRepostModal = function(postId) {
   const orig = post.originalPost || post;
   const origImg = orig.image || (orig.images && orig.images[0]) || null;
 
+  const origAuthorName = StorageService.resolveAuthorName(orig) || orig.author || 'කල්‍යාණ මිත්‍ර';
   if (previewBox) {
     previewBox.innerHTML = `
       <div class="quoted-merit-header">
         <div style="display: flex; align-items: center; gap: 8px;">
-          <div class="quoted-avatar">${Security.escapeHTML((orig.author || 'ක').charAt(0))}</div>
+          <div class="quoted-avatar">${Security.escapeHTML(origAuthorName.charAt(0) || 'ක')}</div>
           <div>
-            <div style="font-weight: 700; font-size: 0.82rem; color: #78350f;">${Security.escapeHTML(orig.author || 'කල්‍යාණ මිත්‍ර')}</div>
+            <div style="font-weight: 700; font-size: 0.82rem; color: #78350f;">${Security.escapeHTML(origAuthorName)}</div>
             <div style="font-size: 0.68rem; color: #94a3b8;">${Security.escapeHTML(formatRelativeTimeSinhala(orig.timestamp, orig.date || 'මෑතකදී'))} ${orig.location ? '• ' + Security.escapeHTML(orig.location) : ''}</div>
           </div>
         </div>
@@ -7711,7 +7781,7 @@ window.renderAdminDashboard = async function() {
                 ${isVer ? '<span class="verified-need-badge"><i class="fa-solid fa-circle-check"></i> සත්‍යාපිතයි</span>' : '<span style="font-size: 0.62rem; color: #d97706; background: #fffbeb; padding: 1px 6px; border-radius: 4px; font-weight: 700;">අසත්‍යාපිතයි</span>'}
               </div>
               <div style="font-size: 0.68rem; color: #64748b; margin-top: 2px;">
-                <span>${Security.escapeHTML(n.author || 'කල්‍යාණ මිත්‍ර')}</span> • <span>📞 ${Security.escapeHTML(n.contact || 'නැත')}</span>
+                <span>${Security.escapeHTML(StorageService.resolveAuthorName(n) || n.author || 'කල්‍යාණ මිත්‍ර')}</span> • <span>📞 ${Security.escapeHTML(n.contact || 'නැත')}</span>
               </div>
             </div>
             <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
@@ -7758,7 +7828,7 @@ window.renderAdminDashboard = async function() {
                 <span style="font-size: 0.65rem; color: #64748b;">(${Security.escapeHTML(p.category || 'පින්කම')})</span>
               </div>
               <div style="font-size: 0.68rem; color: #94a3b8; margin-top: 2px;">
-                <span>${isOfficial ? 'අපේ පිං පොත (නිල)' : Security.escapeHTML(p.author || 'නොදන්නා')}</span> • <span>${Security.escapeHTML(p.date || 'දැන්')}</span>
+                <span>${isOfficial ? 'අපේ පිං පොත (නිල)' : Security.escapeHTML(StorageService.resolveAuthorName(p) || p.author || 'නොදන්නා')}</span> • <span>${Security.escapeHTML(p.date || 'දැන්')}</span>
               </div>
             </div>
             <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
@@ -8255,7 +8325,7 @@ function initPWAEngine() {
   const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()) && !window.MSStream;
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v103';
+  const ACTIVE_BUILD = 'v105';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
@@ -8272,7 +8342,7 @@ function initPWAEngine() {
   // Register Service Worker
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=97', { updateViaCache: 'none' })
+      navigator.serviceWorker.register('./sw.js?v=105', { updateViaCache: 'none' })
         .then((registration) => {
           // Immediately check for service worker updates
           try { registration.update(); } catch (e) {}

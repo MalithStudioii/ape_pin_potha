@@ -19,6 +19,10 @@ let poyaListeners = [];
 let bannedWordsListeners = [];
 
 export const MASTER_ADMIN_EMAIL = "silvadilan9@gmail.com";
+export const MASTER_ADMIN_EMAILS = [
+  "silvadilan9@gmail.com",
+  "creativeparadise25@gmail.com"
+];
 
 const DEFAULT_POYA_EVENT = {
   month: 'ඔක්',
@@ -167,7 +171,7 @@ const SEED_NOTIFICATIONS = [
 
 export const StorageService = {
   _cachedPosts: null,
-  FEED_PAGE_SIZE: 20,
+  FEED_PAGE_SIZE: 50,
   _lastVisibleDoc: null,
   _hasMorePosts: true,
   _isLoadingMore: false,
@@ -184,21 +188,37 @@ export const StorageService = {
   _knownSanghaUids: new Set(),
 
   /**
-   * Checks whether a user/email/post is Master Admin (silvadilan9@gmail.com)
+   * Helper to accurately determine whether a post is an Official Post from 'අපේ පිං පොත'
+   */
+  isOfficialPost(post) {
+    if (!post) return false;
+    return post.isOfficial === true ||
+           post.isOfficial === 'true' ||
+           post.authorRole === 'official' ||
+           (post.author && post.author.trim() === 'අපේ පිං පොත') ||
+           (post.title && post.title.trim() === 'පිං පොත නිල නිවේදනය');
+  },
+
+  /**
+   * Checks whether a user/email/post is Master Admin (silvadilan9@gmail.com, creativeparadise25@gmail.com, user_malith)
    */
   isMasterAdmin(userOrEmailOrUid) {
+    const isMasterEmail = (email) => {
+      if (!email) return false;
+      const clean = email.trim().toLowerCase();
+      return MASTER_ADMIN_EMAILS.some(adm => adm.toLowerCase() === clean);
+    };
+
     if (!userOrEmailOrUid) {
       if (!this.currentUser) return false;
-      const email = (this.currentUser.email || '').trim().toLowerCase();
-      return email === MASTER_ADMIN_EMAIL.toLowerCase() || this.currentUser.uid === 'user_malith';
+      return isMasterEmail(this.currentUser.email) || this.currentUser.uid === 'user_malith';
     }
     if (typeof userOrEmailOrUid === 'string') {
-      const lower = userOrEmailOrUid.trim().toLowerCase();
-      return lower === MASTER_ADMIN_EMAIL.toLowerCase() || lower === 'user_malith';
+      return isMasterEmail(userOrEmailOrUid) || userOrEmailOrUid.trim().toLowerCase() === 'user_malith';
     }
     const email = (userOrEmailOrUid.email || userOrEmailOrUid.authorEmail || '').trim().toLowerCase();
     const uid = userOrEmailOrUid.uid || '';
-    return email === MASTER_ADMIN_EMAIL.toLowerCase() || uid === 'user_malith';
+    return isMasterEmail(email) || uid === 'user_malith';
   },
 
   /**
@@ -417,50 +437,49 @@ export const StorageService = {
           await this.restoreUserProfile(user);
           if (user?.uid) {
             this.initUserNotificationsSubscription(user.uid);
+            this.initUserPostsSubscription(user.uid);
           }
         });
 
-        // Real-time Firestore Feed Subscription (Initial Page Limit: 20)
-        const q = query(collection(db, COLLECTIONS.POSTS), orderBy("timestamp", "desc"), limit(this.FEED_PAGE_SIZE));
+        // Real-time Firestore Feed Subscription - Comprehensive Stream (All Merit, Need & Official Posts)
+        const q = collection(db, COLLECTIONS.POSTS);
         onSnapshot(q, (snapshot) => {
           const deletedIds = this.getDeletedPostIds();
-          const firstPagePosts = [];
+          const posts = [];
           snapshot.forEach((doc) => {
             const data = doc.data();
-            if (!deletedIds.includes(doc.id) && data.isDeleted !== true) {
+            const isOfficial = this.isOfficialPost(data);
+            const isUserPost = Boolean(this.currentUser && (
+              data.uid === this.currentUser.uid ||
+              (this.currentUser.email && data.authorEmail && data.authorEmail.toLowerCase() === this.currentUser.email.toLowerCase())
+            ));
+
+            // Only hide if deleted in cloud or explicitly deleted locally (never hide user's own posts or official posts)
+            const isDeletedInCloud = data.isDeleted === true;
+            const isLocallyDeleted = deletedIds.includes(doc.id) && !isOfficial && !isUserPost;
+
+            if (!isDeletedInCloud && !isLocallyDeleted) {
               const rawSadhu = typeof data.sadhuCount === 'number' ? data.sadhuCount : 0;
               const sanitizedSadhu = Math.max(0, rawSadhu);
-              firstPagePosts.push({
+              const normTimestamp = typeof data.timestamp === 'number' ? data.timestamp : (data.serverCreatedAt?.toMillis ? data.serverCreatedAt.toMillis() : (data.date ? Date.parse(data.date) || Date.now() : Date.now()));
+
+              posts.push({
                 id: doc.id,
                 ...data,
+                timestamp: normTimestamp,
+                isOfficial: isOfficial,
                 sadhuCount: sanitizedSadhu,
                 sadhuUsers: Array.isArray(data.sadhuUsers) ? data.sadhuUsers : []
               });
             }
           });
 
-          const docsCount = snapshot.docs.length;
-          if (docsCount > 0) {
-            // Update _lastVisibleDoc for pagination anchor if deeper pages are not yet loaded
-            if (this._loadedPosts.length <= this.FEED_PAGE_SIZE) {
-              this._lastVisibleDoc = snapshot.docs[docsCount - 1];
-            }
-            this._hasMorePosts = docsCount >= this.FEED_PAGE_SIZE;
-          } else {
-            this._hasMorePosts = false;
-          }
+          // Sort newest to oldest
+          posts.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
-          // Merge real-time first page with any existing deeper pages without losing scroll items
-          const existingDeeperPosts = (this._loadedPosts || []).slice(this.FEED_PAGE_SIZE);
-          const mergedMap = new Map();
-          firstPagePosts.forEach(p => mergedMap.set(p.id, p));
-          existingDeeperPosts.forEach(p => {
-            if (!mergedMap.has(p.id) && !deletedIds.includes(p.id) && p.isDeleted !== true) {
-              mergedMap.set(p.id, p);
-            }
-          });
-
-          this._loadedPosts = Array.from(mergedMap.values());
+          this._loadedPosts = posts;
+          this._cachedPosts = posts;
+          this._hasMorePosts = false;
           this.syncPostsWithUserSadhus(this._loadedPosts);
           this.cacheLocal(this._loadedPosts);
           this.notifyListeners(this._loadedPosts);
@@ -474,6 +493,7 @@ export const StorageService = {
         // Real-time Firestore Notifications Subscription for authenticated user
         if (this.currentUser && this.currentUser.uid && !this.currentUser.isAnonymous) {
           this.initUserNotificationsSubscription(this.currentUser.uid);
+          this.initUserPostsSubscription(this.currentUser.uid);
         }
 
         // Real-time Firestore Admin Settings Subscription
@@ -517,6 +537,9 @@ export const StorageService = {
         } catch (sErr) {
           console.warn('[Firestore] Admin settings listener note:', sErr);
         }
+
+        // Pre-fetch community members in background to keep author names and photos fresh
+        this.getAllCommunityMembers().catch(() => {});
 
         return { isCloud: true };
       } catch (err) {
@@ -656,50 +679,136 @@ export const StorageService = {
 
   getLocalPosts() {
     const deletedIds = this.getDeletedPostIds();
+    const isCleanPost = (p) => {
+      if (!p || p.isDeleted === true) return false;
+      const isOff = this.isOfficialPost(p);
+      const isUser = Boolean(this.currentUser && (
+        p.uid === this.currentUser.uid ||
+        (this.currentUser.email && p.authorEmail && p.authorEmail.toLowerCase() === this.currentUser.email.toLowerCase())
+      ));
+      if (isOff || isUser) return true;
+      return !deletedIds.includes(p.id);
+    };
+
     if (this._loadedPosts && Array.isArray(this._loadedPosts) && this._loadedPosts.length > 0) {
-      const clean = this._loadedPosts.filter(p => !deletedIds.includes(p.id) && p.isDeleted !== true);
+      const clean = this._loadedPosts.filter(isCleanPost);
       return this.syncPostsWithUserSadhus(clean);
     }
     if (this._cachedPosts && Array.isArray(this._cachedPosts) && this._cachedPosts.length > 0) {
-      const clean = this._cachedPosts.filter(p => !deletedIds.includes(p.id) && p.isDeleted !== true);
+      const clean = this._cachedPosts.filter(isCleanPost);
       this._loadedPosts = clean;
       return this.syncPostsWithUserSadhus(clean);
     }
+
     try {
-      const data = localStorage.getItem('pinPotha_sandbox_posts');
-      const posts = data ? JSON.parse(data) : SEED_POSTS;
-      const clean = (Array.isArray(posts) ? posts : SEED_POSTS).filter(p => !deletedIds.includes(p.id) && p.isDeleted !== true);
+      const rawSandbox = localStorage.getItem('pinPotha_sandbox_posts');
+      const rawPosts = localStorage.getItem('pinPotha_posts');
+      let combined = [];
+
+      if (rawSandbox) {
+        try {
+          const list = JSON.parse(rawSandbox);
+          if (Array.isArray(list)) combined = combined.concat(list);
+        } catch (e) {}
+      }
+      if (rawPosts) {
+        try {
+          const list = JSON.parse(rawPosts);
+          if (Array.isArray(list)) combined = combined.concat(list);
+        } catch (e) {}
+      }
+
+      const map = new Map();
+      combined.forEach(p => {
+        if (p && p.id) {
+          p.isOfficial = this.isOfficialPost(p);
+          map.set(p.id, p);
+        }
+      });
+
+      SEED_POSTS.forEach(p => {
+        if (p && p.id && !map.has(p.id)) {
+          p.isOfficial = this.isOfficialPost(p);
+          map.set(p.id, p);
+        }
+      });
+
+      let posts = Array.from(map.values());
+      const clean = posts.filter(isCleanPost);
       this._cachedPosts = clean;
       this._loadedPosts = clean;
       return this.syncPostsWithUserSadhus(clean);
     } catch {
-      return this.syncPostsWithUserSadhus(SEED_POSTS.filter(p => !deletedIds.includes(p.id) && p.isDeleted !== true));
+      return this.syncPostsWithUserSadhus(SEED_POSTS.filter(isCleanPost));
     }
   },
 
   cacheLocal(posts) {
+    if (!Array.isArray(posts) || posts.length === 0) return;
     const deletedIds = this.getDeletedPostIds();
-    const cleanPosts = (posts || []).filter(p => !deletedIds.includes(p.id));
+    const cleanPosts = (posts || []).filter(p => {
+      if (!p || p.isDeleted === true) return false;
+      const isOff = this.isOfficialPost(p);
+      const isUser = Boolean(this.currentUser && (
+        p.uid === this.currentUser.uid ||
+        (this.currentUser.email && p.authorEmail && p.authorEmail.toLowerCase() === this.currentUser.email.toLowerCase())
+      ));
+      if (isOff || isUser) return true;
+      return !deletedIds.includes(p.id);
+    });
+
+    if (cleanPosts.length === 0) return;
     this._cachedPosts = cleanPosts;
     this._loadedPosts = cleanPosts;
 
     try {
-      // Store top 30 in localStorage so initial paint is instantaneous and quota never exceeds 5MB
-      const topCache = cleanPosts.slice(0, 30);
+      // Store up to 200 in localStorage so initial paint is instantaneous
+      const topCache = cleanPosts.slice(0, 200);
       localStorage.setItem('pinPotha_sandbox_posts', JSON.stringify(topCache));
+      localStorage.setItem('pinPotha_posts', JSON.stringify(topCache));
     } catch (e) {
       console.warn('[Storage] LocalStorage quota reached, storing lightweight cache:', e);
       try {
-        // Strip heavy base64 data URLs from offline cache so localStorage never crashes
-        const lightPosts = cleanPosts.slice(0, 20).map(p => ({
+        const lightPosts = cleanPosts.slice(0, 60).map(p => ({
           ...p,
           image: p.image && String(p.image).startsWith('data:') ? null : p.image,
           images: Array.isArray(p.images) ? p.images.filter(img => !String(img).startsWith('data:')) : []
         }));
         localStorage.setItem('pinPotha_sandbox_posts', JSON.stringify(lightPosts));
+        localStorage.setItem('pinPotha_posts', JSON.stringify(lightPosts));
       } catch (err2) {
         console.warn('[Storage] Lightweight cache fallback also failed:', err2);
       }
+    }
+  },
+
+  /**
+   * Merge additional posts (Official announcements, user posts, etc.) into loaded posts without duplicates
+   */
+  mergeAdditionalPosts(additionalPosts) {
+    if (!Array.isArray(additionalPosts) || additionalPosts.length === 0) return;
+    const deletedIds = this.getDeletedPostIds();
+    const currentList = (this._loadedPosts && this._loadedPosts.length > 0) ? this._loadedPosts : this.getLocalPosts();
+    const map = new Map();
+    (currentList || []).forEach(p => map.set(p.id, p));
+    let hasNew = false;
+    additionalPosts.forEach(p => {
+      if ((!deletedIds.includes(p.id) || p.isOfficial) && p.isDeleted !== true) {
+        if (!map.has(p.id)) {
+          map.set(p.id, p);
+          hasNew = true;
+        } else {
+          const old = map.get(p.id);
+          map.set(p.id, { ...old, ...p });
+        }
+      }
+    });
+    if (hasNew) {
+      this._loadedPosts = Array.from(map.values());
+      this._cachedPosts = this._loadedPosts;
+      this.syncPostsWithUserSadhus(this._loadedPosts);
+      this.cacheLocal(this._loadedPosts);
+      this.notifyListeners(this._loadedPosts);
     }
   },
 
@@ -1308,6 +1417,47 @@ export const StorageService = {
       });
     } catch (nErr) {
       console.warn('[Firestore] Realtime notifications subscription error', nErr);
+    }
+  },
+
+  /**
+   * Realtime subscription for current user's posts to ensure "මගේ පිං පොත" always has all user posts
+   */
+  initUserPostsSubscription(uid) {
+    if (this._userPostsUnsubscribe) {
+      try { this._userPostsUnsubscribe(); } catch (e) {}
+      this._userPostsUnsubscribe = null;
+    }
+
+    if (!isCloudReady || !db || !uid || uid.startsWith('user_guest_')) {
+      return;
+    }
+
+    try {
+      import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js').then(({ collection, query, where, onSnapshot }) => {
+        const uq = query(
+          collection(db, COLLECTIONS.POSTS),
+          where("uid", "==", uid)
+        );
+        this._userPostsUnsubscribe = onSnapshot(uq, (snapshot) => {
+          const userPosts = [];
+          snapshot.forEach((doc) => {
+            const data = doc.data();
+            if (data.isDeleted !== true) {
+              userPosts.push({ id: doc.id, ...data });
+            }
+          });
+          if (userPosts.length > 0) {
+            this.mergeAdditionalPosts(userPosts);
+          }
+        }, (err) => {
+          console.warn('[Firestore] Realtime user posts listener note:', err);
+        });
+      }).catch(err => {
+        console.warn('[Firestore] User posts import note:', err);
+      });
+    } catch (uErr) {
+      console.warn('[Firestore] Realtime user posts subscription note:', uErr);
     }
   },
 
@@ -2904,7 +3054,7 @@ export const StorageService = {
    */
   resolveAuthorName(item) {
     if (!item) return 'කල්‍යාණ මිත්‍ර';
-    if (item.isOfficial) return 'අපේ පිං පොත';
+    if (this.isOfficialPost(item)) return 'අපේ පිං පොත';
 
     const targetUid = item.uid;
 
@@ -2913,7 +3063,15 @@ export const StorageService = {
       return this.currentUser.name || item.author || 'කල්‍යාණ මිත්‍ර';
     }
 
-    // 2. Cached profile check for other users
+    // 2. Cached community members check (live synced users from Firestore)
+    if (targetUid && this._cachedCommunityMembers && Array.isArray(this._cachedCommunityMembers)) {
+      const member = this._cachedCommunityMembers.find(m => m.uid === targetUid);
+      if (member && member.name && member.name.trim().length > 0) {
+        return member.name;
+      }
+    }
+
+    // 3. Cached profile check for other users by UID in localStorage
     if (targetUid) {
       try {
         const cached = localStorage.getItem('pinPotha_profile_' + targetUid);
@@ -2926,7 +3084,7 @@ export const StorageService = {
       } catch (e) {}
     }
 
-    // 3. Fallback to item stored author
+    // 4. Fallback to item stored author
     return item.author || 'කල්‍යාණ මිත්‍ර';
   },
 
@@ -2935,7 +3093,7 @@ export const StorageService = {
    */
   resolveAuthorPhoto(item) {
     if (!item) return null;
-    if (item.isOfficial) return null;
+    if (this.isOfficialPost(item)) return null;
 
     const targetUid = item.uid;
     const authorName = (item.author || '').trim();
@@ -3007,6 +3165,9 @@ export const StorageService = {
       }
     } else if (name && name.trim().length >= 2) {
       this.currentUser.name = Security.escapeHTML(Security.sanitizeText(name.trim()));
+      const parts = this.currentUser.name.split(' ');
+      this.currentUser.firstName = parts[0] || '';
+      this.currentUser.lastName = parts.slice(1).join(' ') || '';
     }
 
     if (occupation !== undefined) {
@@ -3045,61 +3206,88 @@ export const StorageService = {
       localStorage.setItem('pinPotha_last_user_name_' + this.currentUser.email.toLowerCase(), this.currentUser.name);
     }
 
-    // Immediately update all posts authored by this user in memory and local storage
     const updatedAuthorName = this.currentUser.name;
     const updatedAuthorPhoto = this.currentUser.photo;
     const targetUid = this.currentUser.uid;
 
-    if (targetUid && updatedAuthorName) {
-      let postsLocallyChanged = false;
-      if (Array.isArray(this._cachedPosts)) {
-        this._cachedPosts.forEach(p => {
-          if (p.uid === targetUid && !p.isOfficial) {
-            p.author = updatedAuthorName;
-            if (updatedAuthorPhoto !== undefined) p.authorPhoto = updatedAuthorPhoto;
-            postsLocallyChanged = true;
-          }
-          if (p.originalPost && p.originalPost.uid === targetUid && !p.originalPost.isOfficial) {
-            p.originalPost.author = updatedAuthorName;
-            if (updatedAuthorPhoto !== undefined) p.originalPost.authorPhoto = updatedAuthorPhoto;
-            postsLocallyChanged = true;
-          }
+    // 1. Immediately update active community member in-memory cache
+    if (targetUid && this._cachedCommunityMembers && Array.isArray(this._cachedCommunityMembers)) {
+      const member = this._cachedCommunityMembers.find(m => m.uid === targetUid);
+      if (member) {
+        member.name = updatedAuthorName;
+        member.firstName = this.currentUser.firstName || '';
+        member.lastName = this.currentUser.lastName || '';
+        if (updatedAuthorPhoto !== undefined) member.photo = updatedAuthorPhoto;
+        if (location !== undefined) member.location = this.currentUser.location;
+      } else {
+        this._cachedCommunityMembers.push({
+          uid: targetUid,
+          name: updatedAuthorName,
+          firstName: this.currentUser.firstName || '',
+          lastName: this.currentUser.lastName || '',
+          photo: updatedAuthorPhoto || null,
+          location: this.currentUser.location || ''
         });
-      }
-
-      try {
-        const rawLocal = localStorage.getItem('pinPotha_posts');
-        if (rawLocal) {
-          const localList = JSON.parse(rawLocal);
-          if (Array.isArray(localList)) {
-            let locChanged = false;
-            localList.forEach(p => {
-              if (p.uid === targetUid && !p.isOfficial) {
-                p.author = updatedAuthorName;
-                if (updatedAuthorPhoto !== undefined) p.authorPhoto = updatedAuthorPhoto;
-                locChanged = true;
-              }
-              if (p.originalPost && p.originalPost.uid === targetUid && !p.originalPost.isOfficial) {
-                p.originalPost.author = updatedAuthorName;
-                if (updatedAuthorPhoto !== undefined) p.originalPost.authorPhoto = updatedAuthorPhoto;
-                locChanged = true;
-              }
-            });
-            if (locChanged) {
-              localStorage.setItem('pinPotha_posts', JSON.stringify(localList));
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('[Storage] Error updating local cached posts author:', e);
-      }
-
-      if (postsLocallyChanged) {
-        this.cacheLocal(this._cachedPosts);
       }
     }
 
-    // Sync with Firestore collection 'users' and batch-update 'merit_posts'
+    // 2. Immediately update all posts authored by this user in memory and local storage
+    if (targetUid && updatedAuthorName) {
+      const updatePostsWithNewAuthor = (postList) => {
+        if (!Array.isArray(postList)) return false;
+        let changed = false;
+        postList.forEach(p => {
+          // Direct post
+          if (p.uid === targetUid && !p.isOfficial) {
+            if (p.author !== updatedAuthorName) {
+              p.author = updatedAuthorName;
+              changed = true;
+            }
+            if (updatedAuthorPhoto !== undefined && p.authorPhoto !== updatedAuthorPhoto) {
+              p.authorPhoto = updatedAuthorPhoto;
+              changed = true;
+            }
+          }
+          // Quoted / Repost original
+          if (p.originalPost && p.originalPost.uid === targetUid && !p.originalPost.isOfficial) {
+            if (p.originalPost.author !== updatedAuthorName) {
+              p.originalPost.author = updatedAuthorName;
+              changed = true;
+            }
+            if (updatedAuthorPhoto !== undefined && p.originalPost.authorPhoto !== updatedAuthorPhoto) {
+              p.originalPost.authorPhoto = updatedAuthorPhoto;
+              changed = true;
+            }
+          }
+          // Comments authored by this user on any post
+          if (Array.isArray(p.comments)) {
+            p.comments.forEach(c => {
+              if (c.uid === targetUid) {
+                if (c.author !== updatedAuthorName) {
+                  c.author = updatedAuthorName;
+                  changed = true;
+                }
+                if (updatedAuthorPhoto !== undefined && c.authorPhoto !== updatedAuthorPhoto) {
+                  c.authorPhoto = updatedAuthorPhoto;
+                  changed = true;
+                }
+              }
+            });
+          }
+        });
+        return changed;
+      };
+
+      const allPosts = this.getLocalPosts();
+      if (Array.isArray(allPosts) && allPosts.length > 0) {
+        if (updatePostsWithNewAuthor(allPosts)) {
+          this.cacheLocal(allPosts);
+          this.notifyListeners(allPosts);
+        }
+      }
+    }
+
+    // 3. Sync with Firestore collection 'users' and chunked batch-update 'merit_posts'
     if (isCloudReady && db && this.currentUser.uid && !this.currentUser.isAnonymous) {
       try {
         const { doc, setDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
@@ -3124,14 +3312,17 @@ export const StorageService = {
         console.warn('[Firestore] Failed to save user profile to cloud:', e);
       }
 
-      // Batch update all posts created by this user so their new name persists in cloud Firestore
+      // Batch update all posts created by this user so their new name persists in cloud Firestore (Chunked by 400)
       try {
         const { collection, query, where, getDocs, writeBatch, doc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
         const postQ = query(collection(db, COLLECTIONS.POSTS), where('uid', '==', this.currentUser.uid));
         const postSnap = await getDocs(postQ);
         if (!postSnap.empty) {
-          const batch = writeBatch(db);
-          postSnap.forEach(postDoc => {
+          const BATCH_SIZE = 400;
+          let batch = writeBatch(db);
+          let opCount = 0;
+
+          for (const postDoc of postSnap.docs) {
             const data = postDoc.data();
             if (!data.isOfficial) {
               const updatePayload = { author: this.currentUser.name };
@@ -3139,17 +3330,27 @@ export const StorageService = {
                 updatePayload.authorPhoto = this.currentUser.photo;
               }
               batch.update(doc(db, COLLECTIONS.POSTS, postDoc.id), updatePayload);
+              opCount++;
+              if (opCount % BATCH_SIZE === 0) {
+                await batch.commit();
+                batch = writeBatch(db);
+              }
             }
-          });
-          await batch.commit();
-          console.log(`[Firestore] Successfully batch updated author name on ${postSnap.size} posts.`);
+          }
+          if (opCount % BATCH_SIZE !== 0) {
+            await batch.commit();
+          }
+          console.log(`[Firestore] Successfully batch updated author name on ${opCount} posts.`);
         }
       } catch (postBatchErr) {
         console.warn('[Firestore] Batch updating author posts in cloud warning:', postBatchErr);
       }
     }
 
-    this.notifyListeners(this._cachedPosts);
+    const currentLivePosts = this.getLocalPosts();
+    if (Array.isArray(currentLivePosts) && currentLivePosts.length > 0) {
+      this.notifyListeners(currentLivePosts);
+    }
     return this.currentUser;
   },
 

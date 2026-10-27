@@ -9,7 +9,10 @@ service cloud.firestore {
 
     // Helper: Checks if the authenticated user is the designated Master Admin
     function isMasterAdmin() {
-      return isAuthenticated() && request.auth.token.email.lower() == 'silvadilan9@gmail.com';
+      return isAuthenticated() && (
+        request.auth.token.email.lower() == 'silvadilan9@gmail.com' ||
+        request.auth.token.email.lower() == 'creativeparadise25@gmail.com'
+      );
     }
 
     // Helper: Checks if the authenticated user has Sub-Admin role in users collection
