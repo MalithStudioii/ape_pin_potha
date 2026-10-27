@@ -4,7 +4,7 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=97';
+import { StorageService } from './storage.js?v=104';
 import { Security } from './security.js?v=97';
 import { uploadToImgBB } from './imgbb-service.js?v=66';
 import { SoundService, triggerHaptic } from './sound.js?v=66';
@@ -289,7 +289,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const container = document.getElementById('postsContainer');
     const hasRenderedCards = container && container.children.length > 0 && !container.querySelector('.feed-loading-shimmer');
 
-    if (hasRenderedCards && prevIds === newIds && prevIds.length > 0) {
+    if (hasRenderedCards && prevIds.length > 0 && newIds.startsWith(prevIds)) {
+      // Posts were appended at the bottom via pagination! Smooth append without resetting DOM or scroll position
+      appendNewPostsToFeed(posts, prevIds);
+    } else if (hasRenderedCards && prevIds === newIds && prevIds.length > 0) {
       // In-place updates to prevent feed DOM teardown, scroll jump, and image flicker
       updateFeedInPlace(currentPostsData);
     } else {
@@ -2060,8 +2063,161 @@ function renderFeed() {
     return;
   }
 
-  container.innerHTML = ranked.map(post => renderPostCardHTML(post, user)).join('');
+  const hasMore = StorageService.hasMorePosts ? StorageService.hasMorePosts() : false;
+  const isLoading = StorageService.isLoadingMorePosts ? StorageService.isLoadingMorePosts() : false;
+
+  let sentinelHtml = '';
+  if (activeTab === 'feed' || activeTab === 'needs') {
+    sentinelHtml = `
+      <div id="infiniteScrollSentinel" class="infinite-scroll-sentinel">
+        ${isLoading ? `
+          <div class="infinite-scroll-loading">
+            <i class="fa-solid fa-dharmachakra animate-spin-slow" style="color: #d97706; font-size: 1.3rem;"></i>
+            <span>තවත් පින්කම් ලබා ගනිමින් පවතී...</span>
+          </div>
+        ` : (hasMore ? `
+          <button type="button" class="btn-load-more-posts" onclick="handleLoadMorePostsClick()">
+            <i class="fa-solid fa-arrow-down"></i> තවත් පින්කම් බලන්න (Load More)
+          </button>
+        ` : (ranked.length > 5 ? `
+          <div class="infinite-scroll-end">
+            <span class="end-icon">🪷</span>
+            <span>ඔබ සියලුම පින්කම් කියවා අවසන්ය. සියලු දෙනාටම තෙරුවන් සරණයි! 🙏</span>
+          </div>
+        ` : ''))}
+      </div>
+    `;
+  }
+
+  container.innerHTML = ranked.map(post => renderPostCardHTML(post, user)).join('') + sentinelHtml;
+  setupInfiniteScrollObserver();
 }
+
+// ============================================================================
+// High-Scale Feed Pagination & Infinite Scroll Engine (Limit: 20)
+// ============================================================================
+let infiniteScrollObserver = null;
+let isTriggeringLoadMore = false;
+
+export function setupInfiniteScrollObserver() {
+  if (infiniteScrollObserver) {
+    infiniteScrollObserver.disconnect();
+    infiniteScrollObserver = null;
+  }
+
+  const sentinel = document.getElementById('infiniteScrollSentinel');
+  if (!sentinel) return;
+
+  if ('IntersectionObserver' in window) {
+    infiniteScrollObserver = new IntersectionObserver((entries) => {
+      const entry = entries[0];
+      if (entry && entry.isIntersecting) {
+        triggerLoadMorePosts();
+      }
+    }, {
+      rootMargin: '300px', // Pre-fetch before user reaches absolute bottom
+      threshold: 0.05
+    });
+
+    infiniteScrollObserver.observe(sentinel);
+  }
+}
+window.setupInfiniteScrollObserver = setupInfiniteScrollObserver;
+
+export async function triggerLoadMorePosts() {
+  if (isTriggeringLoadMore) return;
+  if (!StorageService.hasMorePosts || !StorageService.hasMorePosts()) return;
+  if (StorageService.isLoadingMorePosts && StorageService.isLoadingMorePosts()) return;
+
+  isTriggeringLoadMore = true;
+  updateSentinelUI();
+
+  try {
+    await StorageService.fetchMorePosts();
+  } catch (err) {
+    console.warn('[Feed] Error loading more posts:', err);
+  } finally {
+    isTriggeringLoadMore = false;
+    updateSentinelUI();
+  }
+}
+window.triggerLoadMorePosts = triggerLoadMorePosts;
+
+export async function handleLoadMorePostsClick() {
+  triggerHaptic(10);
+  await triggerLoadMorePosts();
+}
+window.handleLoadMorePostsClick = handleLoadMorePostsClick;
+
+export function updateSentinelUI() {
+  const sentinel = document.getElementById('infiniteScrollSentinel');
+  if (!sentinel) return;
+
+  const hasMore = StorageService.hasMorePosts ? StorageService.hasMorePosts() : false;
+  const isLoading = (StorageService.isLoadingMorePosts && StorageService.isLoadingMorePosts()) || isTriggeringLoadMore;
+
+  if (isLoading) {
+    sentinel.innerHTML = `
+      <div class="infinite-scroll-loading">
+        <i class="fa-solid fa-dharmachakra animate-spin-slow" style="color: #d97706; font-size: 1.3rem;"></i>
+        <span>තවත් පින්කම් ලබා ගනිමින් පවතී...</span>
+      </div>
+    `;
+  } else if (hasMore) {
+    sentinel.innerHTML = `
+      <button type="button" class="btn-load-more-posts" onclick="handleLoadMorePostsClick()">
+        <i class="fa-solid fa-arrow-down"></i> තවත් පින්කම් බලන්න (Load More)
+      </button>
+    `;
+  } else {
+    sentinel.innerHTML = `
+      <div class="infinite-scroll-end">
+        <span class="end-icon">🪷</span>
+        <span>ඔබ සියලුම පින්කම් කියවා අවසන්ය. සියලු දෙනාටම තෙරුවන් සරණයි! 🙏</span>
+      </div>
+    `;
+  }
+}
+window.updateSentinelUI = updateSentinelUI;
+
+export function appendNewPostsToFeed(allPosts, prevIdsStr) {
+  const container = document.getElementById('postsContainer');
+  if (!container) return;
+
+  const prevIdSet = new Set(prevIdsStr.split(','));
+  const user = StorageService.currentUser;
+  const searchQ = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
+
+  // Extract only the newly arrived posts
+  const newlyFetched = (allPosts || []).filter(p => !prevIdSet.has(p.id));
+  const filteredNew = newlyFetched.filter(post => {
+    if (activeCategory !== 'සියල්ල' && post.category !== activeCategory) return false;
+    if (searchQ) {
+      const matchTitle = (post.title || '').toLowerCase().includes(searchQ);
+      const matchDesc = (post.description || '').toLowerCase().includes(searchQ);
+      const matchLoc = (post.location || '').toLowerCase().includes(searchQ);
+      if (!matchTitle && !matchDesc && !matchLoc) return false;
+    }
+    if (activeTab === 'feed') return post.visibility === 'public';
+    if (activeTab === 'mybook') return post.uid === user.uid;
+    if (activeTab === 'needs') return post.type === 'need';
+    return true;
+  });
+
+  const sentinel = document.getElementById('infiniteScrollSentinel');
+  if (filteredNew.length > 0) {
+    const cardsHtml = filteredNew.map(post => renderPostCardHTML(post, user)).join('');
+    if (sentinel) {
+      sentinel.insertAdjacentHTML('beforebegin', cardsHtml);
+    } else {
+      container.insertAdjacentHTML('beforeend', cardsHtml);
+    }
+  }
+
+  updateSentinelUI();
+  setupInfiniteScrollObserver();
+}
+window.appendNewPostsToFeed = appendNewPostsToFeed;
 
 // Side Needs Widget
 function renderSideNeeds() {

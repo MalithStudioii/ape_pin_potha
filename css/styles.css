@@ -9189,6 +9189,81 @@ body.drawer-open {
   color: #d6d3d1;
 }
 
+/* ==========================================================================
+   Infinite Scroll & High-Scale Feed Pagination (Limit: 20 Engine)
+   ========================================================================== */
+.infinite-scroll-sentinel {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px 36px 16px;
+  margin-top: 10px;
+}
+
+.infinite-scroll-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1.5px solid rgba(217, 119, 6, 0.25);
+  border-radius: 9999px;
+  box-shadow: 0 4px 16px rgba(217, 119, 6, 0.12);
+  color: #78350f;
+  font-size: 0.88rem;
+  font-weight: 600;
+  animation: fadeIn 0.3s ease;
+}
+
+.btn-load-more-posts {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 28px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #fef3c7, #fffbeb);
+  border: 1.5px solid rgba(217, 119, 6, 0.35);
+  color: #92400e;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(217, 119, 6, 0.1);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-load-more-posts:hover {
+  background: linear-gradient(135deg, #fde68a, #fef3c7);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(217, 119, 6, 0.18);
+  border-color: #d97706;
+}
+
+.btn-load-more-posts:active {
+  transform: scale(0.97);
+}
+
+.infinite-scroll-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: rgba(254, 243, 199, 0.4);
+  border: 1px dashed rgba(217, 119, 6, 0.3);
+  border-radius: 9999px;
+  color: #78350f;
+  font-size: 0.84rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.infinite-scroll-end .end-icon {
+  font-size: 1.15rem;
+}
+
+
 
 
 

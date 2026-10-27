@@ -167,6 +167,11 @@ const SEED_NOTIFICATIONS = [
 
 export const StorageService = {
   _cachedPosts: null,
+  FEED_PAGE_SIZE: 20,
+  _lastVisibleDoc: null,
+  _hasMorePosts: true,
+  _isLoadingMore: false,
+  _loadedPosts: [],
   currentUser: {
     uid: "user_malith",
     name: "මලිත් දුෂාන්ත හපුතන්ත්‍රි",
@@ -376,7 +381,7 @@ export const StorageService = {
       try {
         console.log('[Storage] Initializing Firebase Modular SDK...');
         const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js');
-        const { getFirestore, collection, onSnapshot, query, orderBy } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const { getFirestore, collection, onSnapshot, query, orderBy, limit, startAfter, getDocs } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
         const { getAuth, onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js');
 
         const app = initializeApp(firebaseConfig);
@@ -415,17 +420,17 @@ export const StorageService = {
           }
         });
 
-        // Real-time Firestore Feed Subscription
-        const q = query(collection(db, COLLECTIONS.POSTS), orderBy("timestamp", "desc"));
+        // Real-time Firestore Feed Subscription (Initial Page Limit: 20)
+        const q = query(collection(db, COLLECTIONS.POSTS), orderBy("timestamp", "desc"), limit(this.FEED_PAGE_SIZE));
         onSnapshot(q, (snapshot) => {
           const deletedIds = this.getDeletedPostIds();
-          const posts = [];
+          const firstPagePosts = [];
           snapshot.forEach((doc) => {
             const data = doc.data();
             if (!deletedIds.includes(doc.id) && data.isDeleted !== true) {
               const rawSadhu = typeof data.sadhuCount === 'number' ? data.sadhuCount : 0;
               const sanitizedSadhu = Math.max(0, rawSadhu);
-              posts.push({
+              firstPagePosts.push({
                 id: doc.id,
                 ...data,
                 sadhuCount: sanitizedSadhu,
@@ -433,9 +438,32 @@ export const StorageService = {
               });
             }
           });
-          this.syncPostsWithUserSadhus(posts);
-          this.cacheLocal(posts);
-          this.notifyListeners(posts);
+
+          const docsCount = snapshot.docs.length;
+          if (docsCount > 0) {
+            // Update _lastVisibleDoc for pagination anchor if deeper pages are not yet loaded
+            if (this._loadedPosts.length <= this.FEED_PAGE_SIZE) {
+              this._lastVisibleDoc = snapshot.docs[docsCount - 1];
+            }
+            this._hasMorePosts = docsCount >= this.FEED_PAGE_SIZE;
+          } else {
+            this._hasMorePosts = false;
+          }
+
+          // Merge real-time first page with any existing deeper pages without losing scroll items
+          const existingDeeperPosts = (this._loadedPosts || []).slice(this.FEED_PAGE_SIZE);
+          const mergedMap = new Map();
+          firstPagePosts.forEach(p => mergedMap.set(p.id, p));
+          existingDeeperPosts.forEach(p => {
+            if (!mergedMap.has(p.id) && !deletedIds.includes(p.id) && p.isDeleted !== true) {
+              mergedMap.set(p.id, p);
+            }
+          });
+
+          this._loadedPosts = Array.from(mergedMap.values());
+          this.syncPostsWithUserSadhus(this._loadedPosts);
+          this.cacheLocal(this._loadedPosts);
+          this.notifyListeners(this._loadedPosts);
         }, (error) => {
           console.warn('[Firestore] Realtime error, falling back to local cache', error);
           const localPosts = this.getLocalPosts();
@@ -628,8 +656,13 @@ export const StorageService = {
 
   getLocalPosts() {
     const deletedIds = this.getDeletedPostIds();
+    if (this._loadedPosts && Array.isArray(this._loadedPosts) && this._loadedPosts.length > 0) {
+      const clean = this._loadedPosts.filter(p => !deletedIds.includes(p.id) && p.isDeleted !== true);
+      return this.syncPostsWithUserSadhus(clean);
+    }
     if (this._cachedPosts && Array.isArray(this._cachedPosts) && this._cachedPosts.length > 0) {
       const clean = this._cachedPosts.filter(p => !deletedIds.includes(p.id) && p.isDeleted !== true);
+      this._loadedPosts = clean;
       return this.syncPostsWithUserSadhus(clean);
     }
     try {
@@ -637,6 +670,7 @@ export const StorageService = {
       const posts = data ? JSON.parse(data) : SEED_POSTS;
       const clean = (Array.isArray(posts) ? posts : SEED_POSTS).filter(p => !deletedIds.includes(p.id) && p.isDeleted !== true);
       this._cachedPosts = clean;
+      this._loadedPosts = clean;
       return this.syncPostsWithUserSadhus(clean);
     } catch {
       return this.syncPostsWithUserSadhus(SEED_POSTS.filter(p => !deletedIds.includes(p.id) && p.isDeleted !== true));
@@ -647,9 +681,12 @@ export const StorageService = {
     const deletedIds = this.getDeletedPostIds();
     const cleanPosts = (posts || []).filter(p => !deletedIds.includes(p.id));
     this._cachedPosts = cleanPosts;
+    this._loadedPosts = cleanPosts;
 
     try {
-      localStorage.setItem('pinPotha_sandbox_posts', JSON.stringify(cleanPosts));
+      // Store top 30 in localStorage so initial paint is instantaneous and quota never exceeds 5MB
+      const topCache = cleanPosts.slice(0, 30);
+      localStorage.setItem('pinPotha_sandbox_posts', JSON.stringify(topCache));
     } catch (e) {
       console.warn('[Storage] LocalStorage quota reached, storing lightweight cache:', e);
       try {
@@ -663,6 +700,88 @@ export const StorageService = {
       } catch (err2) {
         console.warn('[Storage] Lightweight cache fallback also failed:', err2);
       }
+    }
+  },
+
+  /**
+   * High-Scale Feed Pagination Helpers
+   */
+  hasMorePosts() {
+    return this._hasMorePosts;
+  },
+
+  isLoadingMorePosts() {
+    return this._isLoadingMore;
+  },
+
+  resetFeedPagination() {
+    this._lastVisibleDoc = null;
+    this._hasMorePosts = true;
+    this._isLoadingMore = false;
+  },
+
+  async fetchMorePosts() {
+    if (this._isLoadingMore || !this._hasMorePosts) {
+      return { success: false, hasMore: this._hasMorePosts, count: 0 };
+    }
+
+    if (!isCloudReady || !db || !this._lastVisibleDoc) {
+      this._hasMorePosts = false;
+      return { success: false, hasMore: false, count: 0 };
+    }
+
+    this._isLoadingMore = true;
+    try {
+      const { collection, getDocs, query, orderBy, limit, startAfter } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+      const qNext = query(
+        collection(db, COLLECTIONS.POSTS),
+        orderBy("timestamp", "desc"),
+        startAfter(this._lastVisibleDoc),
+        limit(this.FEED_PAGE_SIZE)
+      );
+
+      const snap = await getDocs(qNext);
+      const docsCount = snap.docs.length;
+      if (docsCount === 0) {
+        this._hasMorePosts = false;
+        this._isLoadingMore = false;
+        return { success: true, hasMore: false, count: 0 };
+      }
+
+      this._lastVisibleDoc = snap.docs[docsCount - 1];
+      if (docsCount < this.FEED_PAGE_SIZE) {
+        this._hasMorePosts = false;
+      }
+
+      const deletedIds = this.getDeletedPostIds();
+      const newBatch = [];
+      snap.forEach(docSnap => {
+        const data = docSnap.data();
+        if (!deletedIds.includes(docSnap.id) && data.isDeleted !== true) {
+          const rawSadhu = typeof data.sadhuCount === 'number' ? data.sadhuCount : 0;
+          newBatch.push({
+            id: docSnap.id,
+            ...data,
+            sadhuCount: Math.max(0, rawSadhu),
+            sadhuUsers: Array.isArray(data.sadhuUsers) ? data.sadhuUsers : []
+          });
+        }
+      });
+
+      const currentIds = new Set(this._loadedPosts.map(p => p.id));
+      const filteredNew = newBatch.filter(p => !currentIds.has(p.id));
+      this._loadedPosts = [...this._loadedPosts, ...filteredNew];
+
+      this.syncPostsWithUserSadhus(this._loadedPosts);
+      this.cacheLocal(this._loadedPosts);
+      this.notifyListeners(this._loadedPosts);
+
+      this._isLoadingMore = false;
+      return { success: true, hasMore: this._hasMorePosts, count: filteredNew.length };
+    } catch (err) {
+      console.error('[Storage] fetchMorePosts error:', err);
+      this._isLoadingMore = false;
+      return { success: false, error: err.message, hasMore: this._hasMorePosts };
     }
   },
 
