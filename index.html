@@ -51,12 +51,12 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=102">
+    <link rel="stylesheet" href="css/styles.css?v=103">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
       (function() {
-        var v = 'v102';
+        var v = 'v103';
         if (localStorage.getItem('pinPotha_active_build') !== v) {
           localStorage.setItem('pinPotha_active_build', v);
           if ('caches' in window) {
@@ -501,6 +501,9 @@
                 <div class="profile-identity-info">
                     <div class="profile-title-row">
                         <h1 class="profile-full-name" id="profFullName">මලිත් දුෂාන්ත හපුතන්ත්‍රි</h1>
+                        <button type="button" class="btn-inline-name-edit" onclick="openInlineNameEditModal()" title="නම සංස්කරණය කරන්න (Edit Name)" aria-label="නම සංස්කරණය කරන්න">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
                         <span class="verified-pill" id="profVerifiedBadge">
                             <i class="fa-solid fa-circle-check"></i>
                             <span>Google සත්‍යාපිත කල්‍යාණ මිත්‍ර</span>
@@ -518,9 +521,11 @@
                             <i class="fa-solid fa-location-dot" style="color: #ea580c;"></i>
                             <span id="profLocationText">ශ්‍රී ලංකා</span>
                         </span>
-                        <span id="profMetaEmail">
+                        <span id="profMetaEmail" class="profile-meta-email-trust" title="ඔබගේ Gmail ලිපිනය රහස්‍යව සහ සුරක්ෂිතව පවතී (Private & Encrypted)">
+                            <i class="fa-solid fa-lock" style="color: #059669; font-size: 0.82rem;" title="පුද්ගලික සහ සුරක්ෂිතයි"></i>
                             <i class="fa-solid fa-envelope" style="color: #2563eb;"></i>
                             <span id="profEmailText">supportnexiapro@gmail.com</span>
+                            <span class="trust-badge-pill"><i class="fa-solid fa-shield-halved"></i> පුද්ගලිකයි</span>
                         </span>
                         <span>
                             <i class="fa-solid fa-calendar-days" style="color: #059669;"></i>
@@ -1364,6 +1369,36 @@
                 <p style="font-size: 0.68rem; color: #94a3b8; text-align: center; margin-top: 8px;">
                     නම පමණක් ඇතුළත් කර හෝ Google Sign-In මඟින් සත්‍යාපනය වී පින්කම් එක් කළ හැක.
                 </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Inline Name Edit Modal -->
+    <div id="quickNameEditModal" class="modal-overlay hidden" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="quickNameEditTitle">
+        <div class="modal-box" style="max-width: 440px;">
+            <div class="modal-header">
+                <div class="modal-title" id="quickNameEditTitle" style="display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-pen-to-square" style="color: #d97706; font-size: 1.15rem;"></i>
+                    <span>නම සංස්කරණය කරන්න</span>
+                </div>
+                <button type="button" class="modal-close-btn" onclick="closeQuickNameEditModal()" aria-label="වසන්න">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body" style="padding: 16px 20px;">
+                <p style="font-size: 0.8rem; color: #78716c; margin-bottom: 14px; line-height: 1.45;">
+                    පිං පොතෙහි ඔබගේ සටහන්, ප්‍රතිචාර සහ පැතිකඩෙහි දිස්වන නම මෙතැනින් පහසුවෙන්ම වෙනස් කළ හැක.
+                </p>
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label for="quickNameInput" style="display: block; font-size: 0.78rem; font-weight: 700; color: #451a03; margin-bottom: 6px;">පූර්ණ නම (Full Name):</label>
+                    <input type="text" id="quickNameInput" class="form-input" maxlength="50" placeholder="ඔබගේ නම ඇතුළත් කරන්න" style="width: 100%; padding: 10px 14px; font-size: 0.95rem; border: 1.5px solid #fcd34d; border-radius: 10px; outline: none; background: #fffdf8;">
+                </div>
+                <div style="display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 18px;">
+                    <button type="button" class="btn-profile-secondary" onclick="closeQuickNameEditModal()" style="padding: 8px 16px;">අවලංගු කරන්න</button>
+                    <button type="button" class="btn-profile-primary" id="btnSaveQuickName" onclick="saveQuickNameEdit()" style="padding: 8px 18px; background: linear-gradient(135deg, #f59e0b, #d97706); color: #ffffff; border: none; font-weight: 700;">
+                        <i class="fa-solid fa-check"></i> සුරකින්න
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -2866,6 +2901,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=102"></script>
+    <script type="module" src="js/app.js?v=103"></script>
 </body>
 </html>

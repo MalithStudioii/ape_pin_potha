@@ -888,6 +888,38 @@ body {
   border: 2px solid #f59e0b !important;
 }
 
+/* Post card targeted from notification */
+.notif-target-indicator {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #78350f;
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-bottom: 1.5px solid #fbbf24;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: slideDown 0.25s ease-out;
+}
+
+/* Notification post title preview in notification item */
+.notif-post-title-preview {
+  margin-top: 4px;
+  font-size: 0.72rem;
+  color: #92400e;
+  background: rgba(254, 243, 199, 0.7);
+  padding: 2px 8px;
+  border-radius: 6px;
+  border-left: 2px solid #f59e0b;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 
 .user-profile-btn {
   background: rgba(26, 10, 2, 0.45);
@@ -1591,23 +1623,24 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 8px 4px;
+  gap: 7px;
+  padding: 8px 6px;
   border-radius: var(--radius-md);
   border: none;
   background: transparent;
-  font-size: 0.75rem;
+  font-size: 0.88rem;
   font-weight: 700;
-  color: var(--color-text-muted);
+  color: #475569;
   cursor: pointer;
   position: relative;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .post-btn:hover {
-  background: var(--color-primary-50);
-  color: var(--color-primary-900);
+  background: #f1f5f9;
+  color: #0f172a;
 }
 
 .post-btn.liked {
@@ -1615,6 +1648,20 @@ body {
   color: #92400e;
   border-color: rgba(245, 158, 11, 0.45);
   font-weight: 700;
+}
+
+.post-btn i {
+  font-size: 1.05rem;
+}
+
+.post-btn .sadhu-icon {
+  font-size: 1.15rem;
+}
+
+.post-btn .post-btn-count {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: inherit;
 }
 
 .post-btn.call-action {
@@ -2647,6 +2694,58 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+/* Inline Name Edit Button next to profFullName */
+.btn-inline-name-edit {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #b45309;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+  margin-left: 2px;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-inline-name-edit:hover {
+  background: #f59e0b;
+  color: #ffffff;
+  border-color: #f59e0b;
+  transform: translateY(-1px) scale(1.06);
+  box-shadow: 0 3px 8px rgba(245, 158, 11, 0.28);
+}
+
+.btn-inline-name-edit:active {
+  transform: scale(0.92);
+}
+
+/* Trust badge next to email */
+.profile-meta-email-trust {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.trust-badge-pill {
+  font-size: 0.64rem;
+  color: #047857;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  padding: 1px 7px;
+  border-radius: 9999px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 2px;
 }
 
 .profile-dhamma-bio {
@@ -5025,20 +5124,24 @@ html, body {
 
   .post-btn {
     min-width: 0 !important;
-    padding: 7px 2px !important;
-    font-size: 0.64rem !important;
-    gap: 3px !important;
+    padding: 8px 3px !important;
+    font-size: 0.85rem !important;
+    gap: 5px !important;
     border-radius: 8px !important;
     justify-content: center !important;
-    overflow: hidden !important;
   }
 
-  .post-btn span {
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    white-space: nowrap !important;
-    font-size: 0.63rem !important;
-    max-width: 100% !important;
+  .post-btn i {
+    font-size: 1rem !important;
+  }
+
+  .post-btn .sadhu-icon {
+    font-size: 1.15rem !important;
+  }
+
+  .post-btn .post-btn-count {
+    font-size: 0.82rem !important;
+    font-weight: 700 !important;
   }
 
   .post-btn:active {

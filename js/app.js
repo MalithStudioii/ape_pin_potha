@@ -1847,38 +1847,38 @@ function renderPostCardHTML(post, user) {
       ${post.isOfficial ? `
         <div class="post-actions-grid official-actions-single">
           <button class="post-btn official-sadhu-only-btn ${hasGivenSadhu ? 'liked' : ''}" id="sadhu-btn-${post.id}" onclick="handleSadhuClick('${post.id}', this)" title="${hasGivenSadhu ? 'සාදුකාරය ඉවත් කරන්න' : 'සාදුකාරයක් ලබා දෙන්න'}">
-            <span style="font-size: 1.15rem;">🙏</span>
-            <span style="font-weight: 700;">සාදුකාර දෙන්න (<strong id="count-btn-${post.id}">${Math.max(0, parseInt(post.sadhuCount, 10) || 0)}</strong>)</span>
+            <span class="post-btn-icon sadhu-icon" style="font-size: 1.15rem;">🙏</span>
+            <span class="post-btn-count" style="font-weight: 700;">සාදුකාර (<strong id="count-btn-${post.id}">${Math.max(0, parseInt(post.sadhuCount, 10) || 0)}</strong>)</span>
           </button>
         </div>
       ` : `
         <div class="post-actions-grid">
           <button class="post-btn ${hasGivenSadhu ? 'liked' : ''}" id="sadhu-btn-${post.id}" onclick="handleSadhuClick('${post.id}', this)" title="${hasGivenSadhu ? 'සාදුකාරය ඉවත් කරන්න' : 'සාදුකාරයක් ලබා දෙන්න'}">
-            <span style="font-size: 1rem;">🙏</span>
-            <span>සාදු! (<strong id="count-btn-${post.id}">${Math.max(0, parseInt(post.sadhuCount, 10) || 0)}</strong>)</span>
+            <span class="post-btn-icon sadhu-icon">🙏</span>
+            <span class="post-btn-count"><strong id="count-btn-${post.id}">${Math.max(0, parseInt(post.sadhuCount, 10) || 0)}</strong></span>
           </button>
 
-          <button class="post-btn" onclick="toggleCommentsSection('${post.id}')" title="ප්‍රාර්ථනා බලන්න හෝ එක් කරන්න">
+          <button class="post-btn" onclick="toggleCommentsSection('${post.id}')" title="${isGeneral ? 'සුබපැතුම්' : 'ප්‍රාර්ථනා'} බලන්න හෝ එක් කරන්න">
             <i class="fa-regular fa-comment-dots" style="color: #d97706;"></i>
-            <span>${isGeneral ? 'සුබපැතුම්' : 'ප්‍රාර්ථනා'} (<strong id="comments-btn-${post.id}">${comments.length}</strong>)</span>
+            <span class="post-btn-count"><strong id="comments-btn-${post.id}">${comments.length}</strong></span>
           </button>
 
           ${!isNeed && post.visibility !== 'private' ? `
-            <button class="post-btn" onclick="openRepostModal('${isRepost && orig ? orig.id : post.id}')" title="පවුරට Repost කරන්න">
+            <button class="post-btn" onclick="openRepostModal('${isRepost && orig ? orig.id : post.id}')" title="පවුරට යළි බෙදාගන්න (Repost)">
               <i class="fa-solid fa-repeat" style="color: #059669;"></i>
-              <span>යළි බෙදාගන්න (<strong id="reposts-btn-${post.id}">${post.repostCount || 0}</strong>)</span>
+              <span class="post-btn-count"><strong id="reposts-btn-${post.id}">${post.repostCount || 0}</strong></span>
             </button>
           ` : ''}
 
           ${isNeed && post.contact ? `
-            <a href="tel:${Security.sanitizePhone(post.contact)}" class="post-btn call-action">
+            <a href="tel:${Security.sanitizePhone(post.contact)}" class="post-btn call-action" title="සෘජුව අමතන්න">
               <i class="fa-solid fa-phone"></i>
-              <span>අමතන්න</span>
+              <span class="post-btn-count">අමතන්න</span>
             </a>
           ` : `
-            <button class="post-btn" onclick="handleShare('${post.id}')" title="බාහිරව බෙදාගන්න">
+            <button class="post-btn" onclick="handleShare('${post.id}')" title="බාහිරව බෙදාගන්න (Share)">
               <i class="fa-solid fa-share-nodes" style="color: #94a3b8;"></i>
-              <span>බෙදාගන්න (<strong id="shares-btn-${post.id}">${post.shareCount || 0}</strong>)</span>
+              <span class="post-btn-count"><strong id="shares-btn-${post.id}">${post.shareCount || 0}</strong></span>
             </button>
           `}
         </div>
@@ -6441,7 +6441,7 @@ window.renderNotificationsList = function() {
     }
 
     return `
-      <div class="notif-item ${isUnread ? 'unread' : ''}" onclick="handleNotificationClick('${n.id}', '${n.senderUid || n.postId || ''}', '${n.type || ''}')">
+      <div class="notif-item ${isUnread ? 'unread' : ''}" onclick="handleNotificationClick('${n.id}', '${n.postId || ''}', '${n.type || ''}', '${n.senderUid || ''}')">
         <div class="notif-avatar-wrap">
           <div class="notif-avatar">
             ${photo ? `<img src="${Security.sanitizeUrl(photo)}" alt="${Security.escapeHTML(n.senderName)}" onerror="this.parentElement.innerText = '${initial}';">` : initial}
@@ -6451,6 +6451,12 @@ window.renderNotificationsList = function() {
         <div class="notif-body">
           <div class="notif-body-text">
             ${notifBodyText}
+            ${n.postTitle ? `
+              <div class="notif-post-title-preview" title="${Security.escapeHTML(n.postTitle)}">
+                <i class="fa-solid fa-file-pen" style="color: #d97706; font-size: 0.72rem;"></i>
+                <span>"${Security.escapeHTML(n.postTitle)}"</span>
+              </div>
+            ` : ''}
           </div>
           ${mithraActionHtml}
           <div class="notif-time">
@@ -6463,7 +6469,7 @@ window.renderNotificationsList = function() {
   }).join('');
 };
 
-window.handleNotificationClick = async function(notifId, postId, postType) {
+window.handleNotificationClick = async function(notifId, postId, postType, senderUid) {
   // Mark as read
   if (notifId) {
     try {
@@ -6476,43 +6482,75 @@ window.handleNotificationClick = async function(notifId, postId, postType) {
   // Close dropdown
   closeNotificationDropdown();
 
+  // If friend request or acceptance, open member profile
   if (postType === 'mithra_request' || postType === 'mithra_accepted' || postType === 'mithra_rejected') {
-    if (postId) {
-      openMemberProfileModal(postId);
+    const targetUid = senderUid || postId;
+    if (targetUid) {
+      openMemberProfileModal(targetUid);
     }
     return;
   }
 
   if (!postId) return;
 
-  // Switch to correct tab
-  if (postType === 'sathkara') {
-    switchTab('needs');
-  } else {
-    // Check if post is in feed or needs
-    const post = currentPostsData.find(p => p.id === postId);
-    if (post && post.type === 'need') {
-      switchTab('needs');
-    } else {
-      switchTab('feed');
-    }
+  // Determine if post belongs to needs or feed
+  const post = (currentPostsData || []).find(p => p.id === postId) || 
+               (StorageService.getLocalPosts() || []).find(p => p.id === postId);
+
+  const targetTab = (postType === 'sathkara' || (post && post.type === 'need')) ? 'needs' : 'feed';
+  
+  // Switch to target tab
+  switchTab(targetTab);
+
+  // If a filter is currently active in the feed, reset to 'all' so the post is visible
+  if (targetTab === 'feed' && typeof currentCategoryFilter !== 'undefined' && currentCategoryFilter !== 'all') {
+    filterCategory('all', false);
   }
 
-  // Scroll to post and highlight with golden glow
-  setTimeout(() => {
+  // Function to perform scroll & highlight
+  const focusAndHighlight = () => {
     const elem = document.getElementById(`post-elem-${postId}`);
     if (elem) {
       elem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      elem.classList.remove('highlight-post-pulse');
+      // Trigger reflow for clean re-trigger
+      void elem.offsetWidth;
       elem.classList.add('highlight-post-pulse');
+
+      // If it was a comment or mention notification, automatically expand comments box
       if (postType === 'comment' || postType === 'mention') {
         const box = document.getElementById(`comments-box-${postId}`);
         if (box) box.style.display = 'block';
       }
+
+      // Add temporary reaction notice tag if not already added
+      let noticeTag = elem.querySelector('.notif-target-indicator');
+      if (!noticeTag) {
+        noticeTag = document.createElement('div');
+        noticeTag.className = 'notif-target-indicator';
+        noticeTag.innerHTML = `<i class="fa-solid fa-bell" style="color: #d97706;"></i> <span>ඔබගේ මෙම පින්කම සඳහා ප්‍රතිචාරයක් ලැබුණි</span>`;
+        elem.insertBefore(noticeTag, elem.firstChild);
+        setTimeout(() => {
+          noticeTag?.remove();
+        }, 5000);
+      }
+
       setTimeout(() => {
         elem.classList.remove('highlight-post-pulse');
-      }, 3000);
+      }, 3500);
+      return true;
     }
-  }, 220);
+    return false;
+  };
+
+  // Try immediately, or retry after DOM renders
+  if (!focusAndHighlight()) {
+    setTimeout(() => {
+      if (!focusAndHighlight()) {
+        setTimeout(focusAndHighlight, 350);
+      }
+    }, 180);
+  }
 };
 
 window.markAllNotificationsAsRead = async function(e) {
@@ -8061,7 +8099,7 @@ function initPWAEngine() {
   const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()) && !window.MSStream;
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v102';
+  const ACTIVE_BUILD = 'v103';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
@@ -8429,15 +8467,101 @@ export function toggleMobileMenuDrawer() {
 }
 window.toggleMobileMenuDrawer = toggleMobileMenuDrawer;
 
-// Keyboard Escape listener to dismiss drawer
+// Keyboard Escape listener to dismiss drawer & modals
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     const drawer = document.getElementById('mobileDrawer');
     if (drawer && drawer.classList.contains('open')) {
       closeMobileMenuDrawer();
     }
+    const nameModal = document.getElementById('quickNameEditModal');
+    if (nameModal && !nameModal.classList.contains('hidden')) {
+      closeQuickNameEditModal();
+    }
   }
 });
+
+// ============================================================================
+// Quick Inline Name Edit Modal Controller
+// ============================================================================
+export function openInlineNameEditModal() {
+  triggerHaptic(10);
+  const user = StorageService.currentUser;
+  const input = document.getElementById('quickNameInput');
+  if (input) {
+    input.value = user?.name || '';
+  }
+  const modal = document.getElementById('quickNameEditModal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+    setTimeout(() => {
+      input?.focus();
+      input?.select();
+    }, 100);
+  }
+}
+window.openInlineNameEditModal = openInlineNameEditModal;
+
+export function closeQuickNameEditModal() {
+  triggerHaptic(8);
+  const modal = document.getElementById('quickNameEditModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
+}
+window.closeQuickNameEditModal = closeQuickNameEditModal;
+
+export async function saveQuickNameEdit() {
+  const input = document.getElementById('quickNameInput');
+  const newName = (input?.value || '').trim();
+  if (!newName) {
+    showToast("කරුණාකර වලංගු නමක් ඇතුළත් කරන්න.", "warning");
+    input?.focus();
+    return;
+  }
+  if (newName.length < 2) {
+    showToast("නම සඳහා අවම වශයෙන් අකුරු 2ක් වත් තිබිය යුතුය.", "warning");
+    input?.focus();
+    return;
+  }
+
+  const saveBtn = document.getElementById('btnSaveQuickName');
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> සුරකිමින්...';
+  }
+
+  try {
+    const parts = newName.split(' ');
+    const firstName = parts[0] || newName;
+    const lastName = parts.slice(1).join(' ') || '';
+
+    await StorageService.updateUserProfile({
+      name: newName,
+      firstName: firstName,
+      lastName: lastName
+    });
+
+    // Update UI across header, drawer, and profile
+    updateUserInfoUI();
+    loadProfilePage();
+    
+    closeQuickNameEditModal();
+    showToast("ඔබගේ නම සාර්ථකව යාවත්කාලීන විය! 🙏", "success");
+    triggerHaptic(15);
+  } catch (err) {
+    console.error("Error updating name:", err);
+    showToast("නම යාවත්කාලීන කිරීමේදී දෝෂයක් සිදුවිය: " + (err.message || ''), "error");
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = '<i class="fa-solid fa-check"></i> සුරකින්න';
+    }
+  }
+}
+window.saveQuickNameEdit = saveQuickNameEdit;
 
 // =========================================================================
 // Sidebar Daily Dhamma Verse & Poya Calendar Admin Modals
