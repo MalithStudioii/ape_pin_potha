@@ -51,12 +51,12 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=137">
+    <link rel="stylesheet" href="css/styles.css?v=138">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
       (function() {
-        var v = 'v137';
+        var v = 'v138';
         if (localStorage.getItem('pinPotha_active_build') !== v) {
           localStorage.setItem('pinPotha_active_build', v);
           try {
@@ -2072,6 +2072,40 @@
                             </span>
                         </div>
                     </div>
+                    <!-- 1. Spiritual Avatars Grid -->
+                    <div class="spiritual-avatars-section">
+                        <div class="spiritual-avatars-header">
+                            <span class="spiritual-avatars-title">
+                                <i class="fa-solid fa-dharmachakra" style="color: #d97706;"></i>
+                                ධාර්මික සංකේත එකතුව (Spiritual Avatars)
+                            </span>
+                            <span class="spiritual-avatars-sub">එක් ක්ලික් එකකින් තෝරන්න</span>
+                        </div>
+                        <div class="spiritual-avatars-grid" id="editProfSpiritualAvatarsGrid">
+                            <!-- Rendered dynamically by spiritual-avatars.js -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Privacy Alias Toggle Card -->
+                <div class="privacy-alias-card" style="margin-top: 10px; margin-bottom: 12px;">
+                    <div class="privacy-alias-header">
+                        <div class="privacy-alias-info">
+                            <span class="privacy-alias-icon">🔒</span>
+                            <div style="text-align: left;">
+                                <div class="privacy-alias-title">නිර්නාමික කල්‍යාණ මිත්‍ර ප්‍රකාරය (Privacy Alias)</div>
+                                <div class="privacy-alias-label">මගේ නම වෙනුවට 'කල්‍යාණ මිත්‍ර සාමාජික' ලෙස පොදු පවුරේ පෙන්වන්න</div>
+                            </div>
+                        </div>
+                        <label class="alias-toggle-switch">
+                            <input type="checkbox" id="editProfUseAliasToggle">
+                            <span class="alias-toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="privacy-alias-subtext">
+                        <i class="fa-solid fa-shield-halved" style="color: #059669; margin-right: 4px;"></i>
+                        මෙය සක්‍රීය කළ විට, පොදු පවුරෙහි ඔබගේ සටහන් සහ ප්‍රතිචාර වල නම <strong>'කල්‍යාණ මිත්‍ර සාමාජික'</strong> ලෙස දිස්වන අතර ඔබගේ සැබෑ නම ඔබට පමණක් පෞද්ගලිකව පෙනේ.
+                    </div>
                 </div>
 
                 <button type="submit" class="btn-submit-merit" style="margin-top: 8px;">
@@ -2326,6 +2360,55 @@
                         <div class="form-group">
                             <label class="form-label">ධර්ම පාඨය / හැඳින්වීම (Dharmic Bio)</label>
                             <textarea id="setBioInput" class="form-textarea" rows="2" maxlength="250" placeholder="ඔබ ප්‍රිය කරන ධර්ම පාඨයක් හෝ කුඩා හැඳින්වීමක්..."></textarea>
+                        </div>
+
+                        <!-- Spiritual Avatar Picker in Settings -->
+                        <div class="form-group" style="background: #fffbeb; border: 1px dashed #fcd34d; border-radius: 12px; padding: 12px; margin-top: 12px;">
+                            <div style="display: flex; gap: 14px; align-items: center; margin-bottom: 10px;">
+                                <div class="user-avatar-circle" id="setPhotoPreview" style="width: 50px; height: 50px; font-size: 1.3rem; overflow: hidden; border: 2px solid #f59e0b; flex-shrink: 0; background: #fef3c7;">
+                                    <!-- Live Avatar Preview -->
+                                </div>
+                                <div style="flex: 1;">
+                                    <span style="font-size: 0.82rem; font-weight: 700; color: #78350f; display: block;">ප්‍රොෆයිල් ඡායාරූපය / ධාර්මික සංකේතය</span>
+                                    <input type="hidden" id="setProfPhotoInput">
+                                    <span id="setPhotoUploadStatus" style="font-size: 0.68rem; color: #78350f; display: block; margin-top: 2px;">
+                                        පහත ධාර්මික සංකේතයක් ක්ලික් කර තෝරාගන්න.
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="spiritual-avatars-section" style="margin-top: 6px; padding-top: 8px;">
+                                <div class="spiritual-avatars-header">
+                                    <span class="spiritual-avatars-title">
+                                        <i class="fa-solid fa-dharmachakra" style="color: #d97706;"></i>
+                                        ධාර්මික සංකේත එකතුව (Spiritual Avatars)
+                                    </span>
+                                    <span class="spiritual-avatars-sub">එක් ක්ලික් එකකින් තෝරන්න</span>
+                                </div>
+                                <div class="spiritual-avatars-grid" id="setSpiritualAvatarsGrid">
+                                    <!-- Rendered dynamically -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Privacy Alias Toggle Card in Settings -->
+                        <div class="privacy-alias-card" style="margin-top: 10px; margin-bottom: 12px;">
+                            <div class="privacy-alias-header">
+                                <div class="privacy-alias-info">
+                                    <span class="privacy-alias-icon">🔒</span>
+                                    <div style="text-align: left;">
+                                        <div class="privacy-alias-title">නිර්නාමික කල්‍යාණ මිත්‍ර ප්‍රකාරය (Privacy Alias)</div>
+                                        <div class="privacy-alias-label">මගේ නම වෙනුවට 'කල්‍යාණ මිත්‍ර සාමාජික' ලෙස පොදු පවුරේ පෙන්වන්න</div>
+                                    </div>
+                                </div>
+                                <label class="alias-toggle-switch">
+                                    <input type="checkbox" id="setUseAliasToggle">
+                                    <span class="alias-toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="privacy-alias-subtext">
+                                <i class="fa-solid fa-shield-halved" style="color: #059669; margin-right: 4px;"></i>
+                                මෙය සක්‍රීය කළ විට, පොදු පවුරෙහි ඔබගේ සටහන් සහ ප්‍රතිචාර වල නම <strong>'කල්‍යාණ මිත්‍ර සාමාජික'</strong> ලෙස දිස්වන අතර ඔබගේ සැබෑ නම ඔබට පමණක් පෞද්ගලිකව පෙනේ.
+                            </div>
                         </div>
 
                         <!-- Sound & Haptic Preferences -->
@@ -3513,6 +3596,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=137"></script>
+    <script type="module" src="js/app.js?v=138"></script>
 </body>
 </html>

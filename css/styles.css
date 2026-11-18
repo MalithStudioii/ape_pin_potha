@@ -10589,3 +10589,213 @@ body.drawer-open {
   color: var(--color-charity-800, #065f46);
   font-weight: 700;
 }
+
+
+/* ==========================================================================
+   Spiritual Avatars & Privacy Alias Mode Design
+   ========================================================================== */
+.spiritual-avatars-section {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(217, 119, 6, 0.22);
+}
+
+.spiritual-avatars-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.spiritual-avatars-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-primary-800, #78350f);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.spiritual-avatars-sub {
+  font-size: 0.7rem;
+  color: var(--color-charity-600, #059669);
+  font-weight: 600;
+}
+
+.spiritual-avatars-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  margin-top: 6px;
+}
+
+@media (max-width: 480px) {
+  .spiritual-avatars-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+}
+
+.spiritual-avatar-btn {
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 8px 4px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: center;
+  user-select: none;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.spiritual-avatar-btn:hover {
+  transform: translateY(-2px);
+  border-color: #f59e0b;
+  box-shadow: 0 4px 10px rgba(217, 119, 6, 0.12);
+}
+
+.spiritual-avatar-btn.active {
+  border-color: #d97706;
+  background: #fffbeb;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.25), 0 2px 8px rgba(217, 119, 6, 0.15);
+  transform: scale(1.04);
+}
+
+.spiritual-avatar-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.45rem;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.6), 0 2px 6px rgba(0,0,0,0.06);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.spiritual-avatar-btn:hover .spiritual-avatar-circle {
+  transform: scale(1.08);
+}
+
+.spiritual-avatar-name {
+  font-size: 0.67rem;
+  font-weight: 600;
+  color: #475569;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.spiritual-avatar-btn.active .spiritual-avatar-name {
+  color: #78350f;
+  font-weight: 700;
+}
+
+/* Privacy Alias Toggle Card */
+.privacy-alias-card {
+  margin-top: 16px;
+  padding: 13px 15px;
+  background: linear-gradient(135deg, #f0fdf4 0%, #fffdf5 100%);
+  border: 1.5px solid rgba(5, 150, 105, 0.25);
+  border-left: 4px solid var(--color-charity-600, #059669);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.05);
+}
+
+.privacy-alias-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.privacy-alias-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.privacy-alias-icon {
+  font-size: 1.3rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.privacy-alias-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #065f46;
+  margin-bottom: 2px;
+}
+
+.privacy-alias-label {
+  font-size: 0.74rem;
+  color: #334155;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.privacy-alias-subtext {
+  font-size: 0.71rem;
+  color: #64748b;
+  line-height: 1.45;
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px dashed rgba(5, 150, 105, 0.2);
+}
+
+/* Toggle Switch Slider */
+.alias-toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.alias-toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.alias-toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #cbd5e1;
+  transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 24px;
+}
+
+.alias-toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+}
+
+.alias-toggle-switch input:checked + .alias-toggle-slider {
+  background: linear-gradient(135deg, #059669, #047857);
+}
+
+.alias-toggle-switch input:checked + .alias-toggle-slider:before {
+  transform: translateX(20px);
+}

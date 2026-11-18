@@ -4,11 +4,12 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=131';
-import { Security } from './security.js?v=131';
+import { StorageService } from './storage.js?v=138';
+import { Security } from './security.js?v=138';
 import { uploadToImgBB } from './imgbb-service.js?v=66';
 import { SoundService, triggerHaptic } from './sound.js?v=66';
-import { FeedAlgorithm } from './algorithm.js?v=132';
+import { FeedAlgorithm } from './algorithm.js?v=138';
+import { SPIRITUAL_AVATARS, renderSpiritualAvatarPicker, selectSpiritualAvatar } from './spiritual-avatars.js?v=138';
 let allCommunityMembersCache = [];
 let infiniteScrollObserver = null;
 let isTriggeringLoadMore = false;
@@ -736,6 +737,12 @@ window.openMemberProfileModal = async function(uid, authorName, authorPhoto = nu
   }
   if (coverImage && (!member.coverImage || member.coverImage === 'assets/banner.jpg')) {
     member.coverImage = coverImage;
+  }
+
+  // Privacy Alias Mode: If user has enabled useAlias and viewer is not this user, display 'කල්‍යාණ මිත්‍ර සාමාජික'
+  const isSelf = Boolean(StorageService.currentUser && StorageService.currentUser.uid && StorageService.currentUser.uid === member.uid);
+  if (!isSelf && member.useAlias) {
+    member.name = 'කල්‍යාණ මිත්‍ර සාමාජික';
   }
 
   currentViewingMember = member;
@@ -5888,7 +5895,8 @@ function setupEventListeners() {
       location = city;
     }
 
-    await StorageService.updateProfile({ firstName, lastName, occupation, location, district, province, city, bio, photo });
+    const useAlias = Boolean(document.getElementById('editProfUseAliasToggle')?.checked);
+    await StorageService.updateProfile({ firstName, lastName, occupation, location, district, province, city, bio, photo, useAlias });
     closeEditProfileModal();
     updateUserInfoUI();
     renderProfileView();
@@ -6086,6 +6094,7 @@ function renderProfileView() {
   if (nameEl) {
     nameEl.innerHTML = `
       ${Security.escapeHTML(user.name || 'කල්‍යාණ මිත්‍ර')}
+      ${user.useAlias ? `<span class="alias-active-badge" style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.72rem; color: #047857; background: #ecfdf5; border: 1.5px solid #a7f3d0; padding: 3px 10px; border-radius: 9999px; margin-left: 8px; font-weight: 700; vertical-align: middle;"><i class="fa-solid fa-user-shield"></i> ප්‍රසිද්ධියේ: කල්‍යාණ මිත්‍ර සාමාජික</span>` : ''}
       ${isMaster ? `<span class="badge-crown" style="font-size: 1.15rem;" title="කල්‍යාණ මිත්‍ර">👑</span>` : (isSub ? `<span class="badge-shield" style="font-size: 1.05rem;" title="කල්‍යාණ මිත්‍ර">🛡️</span>` : '')}
     `;
   }
@@ -6678,8 +6687,17 @@ window.openEditProfileModal = function() {
 
   const uploadStatus = document.getElementById('profPhotoUploadStatus');
   if (uploadStatus) {
-    uploadStatus.innerText = "පැහැදිලි ඡායාරූපයක් තෝරාගන්න.";
+    uploadStatus.innerText = "පැහැදිලි ඡායාරූපයක් හෝ පහත ධාර්මික සංකේතයක් තෝරාගන්න.";
     uploadStatus.style.color = "#78350f";
+  }
+
+  // Initialize Privacy Alias Toggle & Spiritual Avatar Picker
+  const aliasToggle = document.getElementById('editProfUseAliasToggle');
+  if (aliasToggle) {
+    aliasToggle.checked = Boolean(user.useAlias);
+  }
+  if (typeof renderSpiritualAvatarPicker === 'function') {
+    renderSpiritualAvatarPicker('editProfSpiritualAvatarsGrid', 'editProf', user.photo || '');
   }
 
   document.getElementById('editProfileModal')?.classList.remove('hidden');
@@ -8552,6 +8570,25 @@ window.openSettingsModal = function(initialTab = 'profile') {
   populateDistrictSelect('set', setDist, setProv);
   if (setCityInp) setCityInp.value = setCity;
 
+  // Initialize Privacy Alias Toggle & Spiritual Avatar Picker in Settings
+  const setAliasToggle = document.getElementById('setUseAliasToggle');
+  if (setAliasToggle) {
+    setAliasToggle.checked = Boolean(user.useAlias);
+  }
+  const setPhotoInp = document.getElementById('setProfPhotoInput');
+  if (setPhotoInp) setPhotoInp.value = user.photo || '';
+  const setPhotoPreview = document.getElementById('setPhotoPreview');
+  if (setPhotoPreview) {
+    if (user.photo) {
+      setPhotoPreview.innerHTML = `<img src="${user.photo}" alt="${user.name}" style="width: 100%; height: 100%; object-fit: cover;">`;
+    } else {
+      setPhotoPreview.innerText = (user.name || 'අ').trim().charAt(0);
+    }
+  }
+  if (typeof renderSpiritualAvatarPicker === 'function') {
+    renderSpiritualAvatarPicker('setSpiritualAvatarsGrid', 'set', user.photo || '');
+  }
+
   switchSettingsTab(initialTab);
   modal.classList.remove('hidden');
 };
@@ -8603,7 +8640,11 @@ window.saveSettingsProfile = async function(e) {
     location = city;
   }
 
-  await StorageService.updateProfile({ firstName, lastName, occupation, location, district, province, city, bio });
+  const useAlias = Boolean(document.getElementById('setUseAliasToggle')?.checked);
+  const photo = document.getElementById('setProfPhotoInput')?.value;
+  const updatePayload = { firstName, lastName, occupation, location, district, province, city, bio, useAlias };
+  if (photo) updatePayload.photo = photo;
+  await StorageService.updateProfile(updatePayload);
   updateUserInfoUI();
   if (activeTab === 'profile') renderProfileView();
   renderFeed();
@@ -9469,7 +9510,7 @@ function initPWAEngine() {
   const isIos = (typeof window !== 'undefined' && window.navigator && /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase())) && !window.MSStream;
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v137';
+  const ACTIVE_BUILD = 'v138';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
@@ -9486,7 +9527,7 @@ function initPWAEngine() {
   // Register Service Worker safely
   if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
     const registerSW = () => {
-      navigator.serviceWorker.register('./sw.js?v=137', { updateViaCache: 'none' });
+      navigator.serviceWorker.register('./sw.js?v=138', { updateViaCache: 'none' });
     };
     if (document.readyState === 'complete') {
       registerSW();
@@ -9494,7 +9535,7 @@ function initPWAEngine() {
       window.addEventListener('load', registerSW);
     }
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=137', { updateViaCache: 'none' })
+      navigator.serviceWorker.register('./sw.js?v=138', { updateViaCache: 'none' })
         .then((registration) => {
           // Immediately check for service worker updates
           try { registration.update(); } catch (e) {}

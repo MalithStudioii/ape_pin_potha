@@ -4,10 +4,10 @@
  * ============================================================================
  */
 
-import { firebaseConfig, isFirebaseConfigured, COLLECTIONS } from './firebase-config.js?v=22';
-import { Security } from './security.js?v=131';
+import { firebaseConfig, isFirebaseConfigured, COLLECTIONS } from './firebase-config.js?v=138';
+import { Security } from './security.js?v=138';
 import { INITIAL_ARANYA_LIST, SRI_LANKA_DISTRICTS } from './aranya-data.js';
-import { SEED_POSTS } from './initial-seed.js?v=131';
+import { SEED_POSTS } from './initial-seed.js?v=138';
 
 let db = null;
 let auth = null;
@@ -2369,13 +2369,14 @@ export const StorageService = {
     }
 
     const cleanData = validation.sanitized;
-    const authorName = isOfficial ? 'අපේ පිං පොත' : (this.currentUser?.name || 'කල්‍යාණ මිත්‍ර');
+    const authorName = isOfficial ? 'අපේ පිං පොත' : (this.currentUser?.useAlias ? 'කල්‍යාණ මිත්‍ර සාමාජික' : (this.currentUser?.name || 'කල්‍යාණ මිත්‍ර'));
     const authorPhoto = isOfficial ? null : (this.currentUser?.photo || null);
 
     const postPayload = {
       uid: this.currentUser?.uid || 'user_guest',
       author: authorName,
       authorPhoto: authorPhoto,
+      useAlias: Boolean(this.currentUser?.useAlias),
       type: cleanData.type,
       visibility: cleanData.visibility,
       title: cleanData.title || safeTitle,
@@ -2495,7 +2496,8 @@ export const StorageService = {
 
     const repostPayload = {
       uid: this.currentUser.uid || 'anonymous',
-      author: this.currentUser.name || 'කල්‍යාණ මිත්‍ර',
+      author: this.currentUser?.useAlias ? 'කල්‍යාණ මිත්‍ර සාමාජික' : (this.currentUser.name || 'කල්‍යාණ මිත්‍ර'),
+      useAlias: Boolean(this.currentUser?.useAlias),
       type: 'merit',
       isRepost: true,
       visibility: 'public',
@@ -2739,7 +2741,8 @@ export const StorageService = {
     const commentObj = {
       id: commentId,
       uid: this.currentUser?.uid || '',
-      author: this.currentUser?.name || 'සාමාජිකයෙක්',
+      author: this.currentUser?.useAlias ? 'කල්‍යාණ මිත්‍ර සාමාජික' : (this.currentUser?.name || 'සාමාජිකයෙක්'),
+      useAlias: Boolean(this.currentUser?.useAlias),
       authorPhoto: this.currentUser?.photo || '',
       text: val.text,
       time: "දැන්",
@@ -4101,14 +4104,18 @@ export const StorageService = {
 
     // 1. Current user active session check
     if (this.currentUser && this.currentUser.uid && targetUid && targetUid === this.currentUser.uid) {
+      if (this.currentUser.useAlias) return 'කල්‍යාණ මිත්‍ර සාමාජික';
       return this.currentUser.name || item.author || 'කල්‍යාණ මිත්‍ර';
     }
 
     // 2. Cached community members check (live synced users from Firestore)
     if (targetUid && this._cachedCommunityMembers && Array.isArray(this._cachedCommunityMembers)) {
       const member = this._cachedCommunityMembers.find(m => m.uid === targetUid);
-      if (member && member.name && member.name.trim().length > 0) {
-        return member.name;
+      if (member) {
+        if (member.useAlias) return 'කල්‍යාණ මිත්‍ර සාමාජික';
+        if (member.name && member.name.trim().length > 0) {
+          return member.name;
+        }
       }
     }
 
@@ -4118,14 +4125,18 @@ export const StorageService = {
         const cached = localStorage.getItem('pinPotha_profile_' + targetUid);
         if (cached) {
           const parsed = JSON.parse(cached);
-          if (parsed && parsed.name && parsed.name.trim().length > 0) {
-            return parsed.name;
+          if (parsed) {
+            if (parsed.useAlias) return 'කල්‍යාණ මිත්‍ර සාමාජික';
+            if (parsed.name && parsed.name.trim().length > 0) {
+              return parsed.name;
+            }
           }
         }
       } catch (e) {}
     }
 
-    // 4. Fallback to item stored author
+    // 4. Fallback to item stored author or alias
+    if (item.useAlias) return 'කල්‍යාණ මිත්‍ර සාමාජික';
     return item.author || 'කල්‍යාණ මිත්‍ර';
   },
 
@@ -4192,7 +4203,10 @@ export const StorageService = {
   /**
    * Update full user profile details (First & Last Name, Occupation, Location/Address, Bio, Photo, Cover Image)
    */
-  async updateProfile({ firstName, lastName, name, bio, location, district, province, city, occupation, coverImage, photo }) {
+  async updateProfile({ firstName, lastName, name, bio, location, district, province, city, occupation, coverImage, photo, useAlias }) {
+    if (useAlias !== undefined) {
+      this.currentUser.useAlias = Boolean(useAlias);
+    }
     if (firstName !== undefined || lastName !== undefined) {
       if (firstName !== undefined) {
         this.currentUser.firstName = Security.escapeHTML(Security.sanitizeText(firstName.trim()));
@@ -4247,7 +4261,7 @@ export const StorageService = {
       localStorage.setItem('pinPotha_last_user_name_' + this.currentUser.email.toLowerCase(), this.currentUser.name);
     }
 
-    const updatedAuthorName = this.currentUser.name;
+    const updatedAuthorName = this.currentUser.useAlias ? "කල්‍යාණ මිත්‍ර සාමාජික" : this.currentUser.name;
     const updatedAuthorPhoto = this.currentUser.photo;
     const targetUid = this.currentUser.uid;
 
@@ -4282,6 +4296,10 @@ export const StorageService = {
           if (p.uid === targetUid && !p.isOfficial) {
             if (p.author !== updatedAuthorName) {
               p.author = updatedAuthorName;
+              changed = true;
+            }
+            if (p.useAlias !== Boolean(this.currentUser.useAlias)) {
+              p.useAlias = Boolean(this.currentUser.useAlias);
               changed = true;
             }
             if (updatedAuthorPhoto !== undefined && p.authorPhoto !== updatedAuthorPhoto) {
@@ -4346,6 +4364,7 @@ export const StorageService = {
           province: this.currentUser.province || '',
           city: this.currentUser.city || '',
           occupation: this.currentUser.occupation || '',
+          useAlias: Boolean(this.currentUser.useAlias),
           joinedDate: this.currentUser.joinedDate || '2026 ඔක්තෝබර්',
           updatedAt: Date.now()
         }, { merge: true });
@@ -4366,7 +4385,7 @@ export const StorageService = {
           for (const postDoc of postSnap.docs) {
             const data = postDoc.data();
             if (!data.isOfficial) {
-              const updatePayload = { author: this.currentUser.name };
+              const updatePayload = { author: this.currentUser.useAlias ? "කල්‍යාණ මිත්‍ර සාමාජික" : this.currentUser.name, useAlias: Boolean(this.currentUser.useAlias) };
               if (this.currentUser.photo) {
                 updatePayload.authorPhoto = this.currentUser.photo;
               }
