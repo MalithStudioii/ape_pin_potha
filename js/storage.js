@@ -7,7 +7,7 @@
 import { firebaseConfig, isFirebaseConfigured, COLLECTIONS } from './firebase-config.js?v=139';
 import { Security } from './security.js?v=139';
 import { INITIAL_ARANYA_LIST, SRI_LANKA_DISTRICTS } from './aranya-data.js';
-import { SEED_POSTS } from './initial-seed.js?v=139';
+import { SEED_POSTS } from './initial-seed.js?v=141';
 
 let db = null;
 let auth = null;
@@ -813,12 +813,33 @@ export const StorageService = {
         });
 
         // Real-time Firestore Feed Subscription - Paginated Stream (Top 20 Posts for ultra-fast startup)
-        const q = query(
-          collection(db, COLLECTIONS.POSTS),
-          orderBy("timestamp", "desc"),
-          limit(this.FEED_PAGE_SIZE)
-        );
-        onSnapshot(q, (snapshot) => {
+        try {
+          const q = query(
+            collection(db, COLLECTIONS.POSTS),
+            orderBy("timestamp", "desc"),
+            limit(this.FEED_PAGE_SIZE)
+          );
+
+          let initialSnapshotReceived = false;
+          // Safety timeout (2.5s): unblocks UI if Firestore query hangs or permissions delayed
+          const feedTimeoutId = setTimeout(() => {
+            if (!initialSnapshotReceived) {
+              console.warn('[Firestore] Feed query timed out (2.5s), unblocking with cached/fallback posts...');
+              const fallback = this.getLocalPosts() || [];
+              this.notifyListeners(fallback);
+            }
+          }, 2500);
+
+          onSnapshot(q, (snapshot) => {
+            initialSnapshotReceived = true;
+            clearTimeout(feedTimeoutId);
+
+            if (snapshot.empty) {
+              console.warn('[Firestore] Feed snapshot returned empty, rendering fallback/community posts...');
+              const fallback = this.getLocalPosts() || [];
+              this.notifyListeners(fallback.length > 0 ? fallback : []);
+              return;
+            }
           const deletedIds = this.getDeletedPostIds();
           const posts = [];
           snapshot.forEach((doc) => {
@@ -900,9 +921,17 @@ export const StorageService = {
           this.cacheLocal(this._loadedPosts);
           this.notifyListeners(this._loadedPosts);
         }, (error) => {
-          console.warn('[Firestore] Realtime error, falling back to local cache & REST:', error);
-          this.fallbackFastFetch();
-        });
+            clearTimeout(feedTimeoutId);
+            console.warn('[Firestore] Realtime feed query error, unblocking UI with fallback:', error);
+            const fallback = this.getLocalPosts() || [];
+            this.notifyListeners(fallback);
+            this.fallbackFastFetch().catch(() => {});
+          });
+        } catch (qSetupErr) {
+          console.warn('[Firestore] Realtime query setup error:', qSetupErr);
+          const fallback = this.getLocalPosts() || [];
+          this.notifyListeners(fallback);
+        }
 
         // Real-time Firestore Subscription for Official Platform Announcements
         try {

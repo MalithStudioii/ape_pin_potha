@@ -79,28 +79,32 @@ export function findSpiritualAvatarByDataUrl(url) {
 }
 
 export function renderSpiritualAvatarPicker(containerId, formPrefix = 'editProf', currentPhotoUrl = '') {
-  const container = document.getElementById(containerId);
-  if (!container) return;
+  try {
+    const container = document.getElementById(containerId);
+    if (!container) return;
 
-  const currentMatch = findSpiritualAvatarByDataUrl(currentPhotoUrl);
+    const currentMatch = findSpiritualAvatarByDataUrl(currentPhotoUrl);
 
-  const html = SPIRITUAL_AVATARS.map(av => {
-    const isActive = currentMatch && currentMatch.id === av.id;
-    return `
-      <button type="button" 
-              class="spiritual-avatar-btn ${isActive ? 'active' : ''}" 
-              id="sp-avatar-${formPrefix}-${av.id}" 
-              onclick="selectSpiritualAvatar('${av.id}', '${formPrefix}')" 
-              title="${av.name} තෝරන්න">
-        <div class="spiritual-avatar-circle" style="background: ${av.gradient}; border: 1.5px solid ${av.border};">
-          <span>${av.symbol}</span>
-        </div>
-        <span class="spiritual-avatar-name">${av.name}</span>
-      </button>
-    `;
-  }).join('');
+    const html = SPIRITUAL_AVATARS.map(av => {
+      const isActive = currentMatch && currentMatch.id === av.id;
+      return `
+        <button type="button" 
+                class="spiritual-avatar-btn ${isActive ? 'active' : ''}" 
+                id="sp-avatar-${formPrefix}-${av.id}" 
+                onclick="selectSpiritualAvatar('${av.id}', '${formPrefix}')" 
+                title="${av.name} තෝරන්න">
+          <div class="spiritual-avatar-circle" style="background: ${av.gradient}; border: 1.5px solid ${av.border};">
+            <span>${av.symbol}</span>
+          </div>
+          <span class="spiritual-avatar-name">${av.name}</span>
+        </button>
+      `;
+    }).join('');
 
-  container.innerHTML = html;
+    container.innerHTML = html;
+  } catch (err) {
+    console.warn('[renderSpiritualAvatarPicker] caught safely:', err);
+  }
 }
 
 export function selectSpiritualAvatar(avatarId, formPrefix = 'editProf') {

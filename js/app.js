@@ -4,12 +4,12 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=139';
-import { Security } from './security.js?v=139';
+import { StorageService } from './storage.js?v=141';
+import { Security } from './security.js?v=141';
 import { uploadToImgBB } from './imgbb-service.js?v=66';
 import { SoundService, triggerHaptic } from './sound.js?v=66';
-import { FeedAlgorithm } from './algorithm.js?v=139';
-import { SPIRITUAL_AVATARS, renderSpiritualAvatarPicker, selectSpiritualAvatar } from './spiritual-avatars.js?v=139';
+import { FeedAlgorithm } from './algorithm.js?v=141';
+import { SPIRITUAL_AVATARS, renderSpiritualAvatarPicker, selectSpiritualAvatar } from './spiritual-avatars.js?v=141';
 let allCommunityMembersCache = [];
 let infiniteScrollObserver = null;
 let isTriggeringLoadMore = false;
@@ -261,109 +261,131 @@ const COVER_PRESETS = [
 // Initialize Application
 function bootApp() {
   try {
-    initSmartHeaderScroll();
-    initMobileBottomBarLock();
+    try { initSmartHeaderScroll(); } catch (e) {}
+    try { initMobileBottomBarLock(); } catch (e) {}
 
     // 1. INSTANT ZERO-LATENCY PAINT:
-    // Render immediately from localStorage so users see the feed instantaneously in <50ms!
-    StorageService.purgeDummyPostsFromStorage();
+    // Render immediately from localStorage/seed so users see the feed instantaneously in <50ms!
+    try {
+      StorageService.purgeDummyPostsFromStorage();
+    } catch (e) {}
+
     currentPostsData = (StorageService.getLocalPosts() || []).filter(p => !StorageService.isDummyTestPost || !StorageService.isDummyTestPost(p));
     window.currentPostsData = currentPostsData;
-    if (currentPostsData.length > 0) {
-      renderFeed();
+
+    try {
+      if (currentPostsData.length > 0) {
+        renderFeed();
+      }
+    } catch (feedInitErr) {
+      console.warn('[Feed] Initial renderFeed note:', feedInitErr);
     }
-    updateUserInfoUI();
-    updateUserStats();
-    renderSideNeeds();
-    renderPcSidebarMembers().catch(() => {});
+
+    // Wrap each UI initialization in separate safe try/catch blocks
+    try { updateUserInfoUI(); } catch (e) { console.warn('[App] updateUserInfoUI error caught safely:', e); }
+    try { updateUserStats(); } catch (e) { console.warn('[App] updateUserStats error caught safely:', e); }
+    try { renderSideNeeds(); } catch (e) {}
+    try { renderPcSidebarMembers().catch(() => {}); } catch (e) {}
 
     // Load initial global announcement, daily verse, and Poya calendar from storage
-    const initialAnnounce = StorageService.getAdminAnnouncement();
-    if (initialAnnounce) renderGlobalAnnouncementUI(initialAnnounce);
+    try {
+      const initialAnnounce = StorageService.getAdminAnnouncement();
+      if (initialAnnounce) renderGlobalAnnouncementUI(initialAnnounce);
+    } catch (e) {}
 
-    const initialVerse = StorageService.getDailyDhammaVerse();
-    if (initialVerse) renderDailyVerseUI(initialVerse);
+    try {
+      const initialVerse = StorageService.getDailyDhammaVerse();
+      if (initialVerse) renderDailyVerseUI(initialVerse);
+    } catch (e) {}
 
-    const initialPoya = StorageService.getPoyaEvent();
-    if (initialPoya) renderPoyaUI(initialPoya);
+    try {
+      const initialPoya = StorageService.getPoyaEvent();
+      if (initialPoya) renderPoyaUI(initialPoya);
+    } catch (e) {
+      console.warn('[App] renderPoyaUI error caught safely:', e);
+    }
 
     // Subscribe to real-time database updates
     StorageService.onPostsUpdate((posts) => {
-      const cleanPosts = (posts || []).filter(p => !StorageService.isDummyTestPost || !StorageService.isDummyTestPost(p));
-      const prevIds = (currentPostsData || []).map(p => p.id).join(',');
-      const newIds = cleanPosts.map(p => p.id).join(',');
-      currentPostsData = cleanPosts;
-      window.currentPostsData = currentPostsData;
+      try {
+        const cleanPosts = (posts || []).filter(p => !StorageService.isDummyTestPost || !StorageService.isDummyTestPost(p));
+        const prevIds = (currentPostsData || []).map(p => p.id).join(',');
+        const newIds = cleanPosts.map(p => p.id).join(',');
+        currentPostsData = cleanPosts;
+        window.currentPostsData = currentPostsData;
 
-      const container = document.getElementById('postsContainer');
-      const hasRenderedCards = container && container.children.length > 0 && !container.querySelector('.feed-loading-shimmer');
+        const container = document.getElementById('postsContainer');
+        const hasRenderedCards = container && container.children.length > 0 && !container.querySelector('.feed-loading-shimmer');
 
-      const feedHasImages = Boolean(container && container.querySelector('.photo-collage-container'));
-      const incomingHasImages = cleanPosts.some(p => Boolean(p.image || (Array.isArray(p.images) && p.images.length > 0)));
+        const feedHasImages = Boolean(container && container.querySelector('.photo-collage-container'));
+        const incomingHasImages = cleanPosts.some(p => Boolean(p.image || (Array.isArray(p.images) && p.images.length > 0)));
 
-      if (hasRenderedCards && prevIds.length > 0 && prevIds === newIds) {
-        if (!feedHasImages && incomingHasImages) {
-          renderFeed();
-        } else {
+        if (hasRenderedCards && prevIds.length > 0 && prevIds === newIds) {
+          if (!feedHasImages && incomingHasImages) {
+            renderFeed();
+          } else {
+            updateFeedInPlace(currentPostsData);
+          }
+        } else if (hasRenderedCards && prevIds.length > 0 && isTriggeringLoadMore && newIds.startsWith(prevIds)) {
+          // Posts were appended at the bottom via pagination! Smooth append without resetting DOM or scroll position
+          appendNewPostsToFeed(posts, prevIds);
           updateFeedInPlace(currentPostsData);
+        } else {
+          renderFeed();
         }
-      } else if (hasRenderedCards && prevIds.length > 0 && isTriggeringLoadMore && newIds.startsWith(prevIds)) {
-        // Posts were appended at the bottom via pagination! Smooth append without resetting DOM or scroll position
-        appendNewPostsToFeed(posts, prevIds);
-        updateFeedInPlace(currentPostsData);
-      } else {
-        renderFeed();
-      }
-      updateUserInfoUI();
-      renderSideNeeds();
-      updateUserStats();
-      renderPcSidebarMembers().catch(() => {});
-      if (activeTab === 'profile') {
-        renderProfileView();
-      }
-      // Refresh admin stats if admin modal is open
-      const adminPanel = document.getElementById('settingsContentAdmin');
-      if (adminPanel && !adminPanel.classList.contains('hidden')) {
-        if (typeof window.renderAdminDashboard === 'function') window.renderAdminDashboard();
+
+        try { updateUserInfoUI(); } catch (e) {}
+        try { renderSideNeeds(); } catch (e) {}
+        try { updateUserStats(); } catch (e) {}
+        try { renderPcSidebarMembers().catch(() => {}); } catch (e) {}
+        if (activeTab === 'profile') {
+          try { renderProfileView(); } catch (e) {}
+        }
+        // Refresh admin stats if admin modal is open
+        const adminPanel = document.getElementById('settingsContentAdmin');
+        if (adminPanel && !adminPanel.classList.contains('hidden')) {
+          if (typeof window.renderAdminDashboard === 'function') window.renderAdminDashboard();
+        }
+      } catch (onPostsErr) {
+        console.warn('[App] Error in onPostsUpdate handler:', onPostsErr);
+        try { renderFeed(); } catch (e) {}
       }
     });
 
     // Subscribe to real-time notifications
     StorageService.onNotificationsUpdate((notifs) => {
-      currentNotifications = notifs || [];
-      renderNotificationsList();
+      try {
+        currentNotifications = notifs || [];
+        renderNotificationsList();
+      } catch (e) {}
     });
 
     // Subscribe to real-time global announcement updates
     StorageService.onAnnouncementUpdate((announcement) => {
-      renderGlobalAnnouncementUI(announcement);
+      try { renderGlobalAnnouncementUI(announcement); } catch (e) {}
     });
 
     // Subscribe to real-time daily verse updates
     StorageService.onVerseUpdate((verse) => {
-      renderDailyVerseUI(verse);
+      try { renderDailyVerseUI(verse); } catch (e) {}
     });
 
     // Subscribe to real-time Poya calendar updates
     StorageService.onPoyaEventUpdate((poya) => {
-      renderPoyaUI(poya);
+      try { renderPoyaUI(poya); } catch (e) {}
     });
 
-    setupEventListeners();
-    try {
-      initPWAEngine();
-    } catch (pwaErr) {
-      console.warn('[PWA] Init error caught safely:', pwaErr);
-    }
+    try { setupEventListeners(); } catch (e) { console.warn('[App] setupEventListeners error:', e); }
+    try { initPWAEngine(); } catch (pwaErr) { console.warn('[PWA] Init error caught safely:', pwaErr); }
 
     // 2. ASYNC BACKGROUND CLOUD BOOTSTRAP:
     // Connect to Firestore asynchronously in background without freezing UI or delay
     StorageService.init().then(async (initResult) => {
-      updateCloudBanner(initResult.isCloud);
-      updateUserInfoUI();
-      updateCommunityMemberCount();
-      initPresenceEngine();
-      await renderPcSidebarMembers('', true);
+      try { updateCloudBanner(initResult.isCloud); } catch (e) {}
+      try { updateUserInfoUI(); } catch (e) {}
+      try { updateCommunityMemberCount(); } catch (e) {}
+      try { initPresenceEngine(); } catch (e) {}
+      await renderPcSidebarMembers('', true).catch(() => {});
     }).catch((err) => {
       console.warn('[Storage] Background init error:', err);
     });
@@ -374,59 +396,89 @@ function bootApp() {
     } catch (e) {}
 
     // Sync sound preference toggle
-    const soundChk = document.getElementById('chkSoundEffects');
-    if (soundChk) {
-      soundChk.checked = SoundService.getSoundEnabled();
-    }
+    try {
+      const soundChk = document.getElementById('chkSoundEffects');
+      if (soundChk) {
+        soundChk.checked = SoundService.getSoundEnabled();
+      }
+    } catch (e) {}
+
+    // Critical Safety Timeout: If for ANY reason the loader shimmer is still present after 1.8s, remove it
+    setTimeout(() => {
+      const container = document.getElementById('postsContainer');
+      const shimmer = container?.querySelector('.feed-loading-shimmer');
+      if (shimmer) {
+        console.warn('[Feed] Feed shimmer safety timeout reached (1.8s), removing loader and rendering feed...');
+        const local = StorageService.getLocalPosts() || [];
+        if (local.length > 0) {
+          currentPostsData = local.filter(p => !StorageService.isDummyTestPost || !StorageService.isDummyTestPost(p));
+          window.currentPostsData = currentPostsData;
+        }
+        try {
+          renderFeed();
+        } catch (rfErr) {
+          console.warn('[Feed] Timeout renderFeed error:', rfErr);
+          container.innerHTML = `
+            <div class="card" style="padding: 40px 20px; text-align: center; border-radius: 20px; background: #fffdf8; border: 1.5px dashed rgba(217, 119, 6, 0.35);">
+              <i class="fa-solid fa-dharmachakra animate-spin-slow" style="font-size: 2rem; color: #d97706; margin-bottom: 12px;"></i>
+              <h3 style="font-size: 1.05rem; font-weight: 700; color: #78350f; margin-bottom: 6px;">පුණ්‍ය පවුර පූරණය විය</h3>
+              <p style="font-size: 0.8rem; color: #92400e; margin: 0 0 16px 0;">නව පින්කම් එක්කරමින් හෝ පිටුව refresh කරමින් පින්කම් මිතුරු පවුර සමඟ සම්බන්ධ වන්න. 🙏</p>
+              <button type="button" onclick="location.reload()" class="btn-profile-primary" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 9999px; font-size: 0.82rem; background: #d97706; color: #fff; border: none; cursor: pointer;">
+                <i class="fa-solid fa-rotate-right"></i> නැවත පූරණය කරන්න
+              </button>
+            </div>
+          `;
+        }
+      }
+    }, 1800);
 
     // Handle native hardware/browser Back Button & gesture
     window.addEventListener('popstate', (e) => {
-      triggerHaptic(25);
-      SoundService.playClick();
+      try {
+        triggerHaptic(25);
+        SoundService.playClick();
 
-      // 1. If any modal overlay is visible, close the top modal
-      const openModals = Array.from(document.querySelectorAll('.modal-overlay:not(.hidden)'));
-      if (openModals.length > 0) {
-        const topModal = openModals[openModals.length - 1];
-        topModal.classList.add('hidden');
-        if (topModal.id === 'cropAvatarModal' && window.cropperInstance) {
-          window.cropperInstance.destroy();
-          window.cropperInstance = null;
+        const openModals = Array.from(document.querySelectorAll('.modal-overlay:not(.hidden)'));
+        if (openModals.length > 0) {
+          const topModal = openModals[openModals.length - 1];
+          topModal.classList.add('hidden');
+          if (topModal.id === 'cropAvatarModal' && window.cropperInstance) {
+            window.cropperInstance.destroy();
+            window.cropperInstance = null;
+          }
+          return;
         }
-        return;
-      }
 
-      // 2. If photo lightbox is open, close it
-      const lightbox = document.getElementById('photoLightboxModal');
-      if (lightbox && !lightbox.classList.contains('hidden')) {
-        closeLightbox();
-        return;
-      }
+        const lightbox = document.getElementById('photoLightboxModal');
+        if (lightbox && !lightbox.classList.contains('hidden')) {
+          closeLightbox();
+          return;
+        }
 
-      // 2.1. If Dharma Reels modal is open, close it
-      const reelsModal = document.getElementById('reelsModal');
-      if (reelsModal && !reelsModal.classList.contains('hidden')) {
-        closeReelsViewer();
-        return;
-      }
+        const reelsModal = document.getElementById('reelsModal');
+        if (reelsModal && !reelsModal.classList.contains('hidden')) {
+          closeReelsViewer();
+          return;
+        }
 
-      // 3. If notifications dropdown is open, close it
-      const notifDropdown = document.getElementById('notificationsDropdown');
-      if (notifDropdown && !notifDropdown.classList.contains('hidden')) {
-        notifDropdown.classList.add('hidden');
-        return;
-      }
+        const notifDropdown = document.getElementById('notificationsDropdown');
+        if (notifDropdown && !notifDropdown.classList.contains('hidden')) {
+          notifDropdown.classList.add('hidden');
+          return;
+        }
 
-      // 4. Tab navigation history
-      if (e.state && e.state.type === 'tab') {
-        switchTab(e.state.tab, false);
-      } else if (activeTab !== 'feed') {
-        switchTab('feed', false);
+        if (e.state && e.state.type === 'tab') {
+          switchTab(e.state.tab, false);
+        } else if (activeTab !== 'feed') {
+          switchTab('feed', false);
+        }
+      } catch (popErr) {
+        console.warn('[popstate] error:', popErr);
       }
     });
 
     // Check URL query params for direct post sharing (?post=POST_ID)
-    checkUrlDirectPost();
+    try { checkUrlDirectPost(); } catch (e) {}
   } catch (bootErr) {
     console.warn('[App] bootApp error caught safely:', bootErr);
   }
@@ -470,173 +522,181 @@ function updateCloudBanner(isConnected) {
 }
 
 function updateUserInfoUI() {
-  const user = StorageService.currentUser;
-  const isMalith = Boolean(user && (
-    user.uid === "user_malith" ||
-    user.uid === "o2pWiAX7SXTHiMfSiphI8Ln5HAM2" ||
-    (user.email && user.email.toLowerCase() === "silvadilan9@gmail.com") ||
-    (user.name && user.name.trim().startsWith("මලිත්"))
-  ));
-  const isMaster = StorageService.isMasterAdmin() || isMalith;
-  const isSub = !isMaster && StorageService.isSubAdmin(user);
-  const isAdminUser = isMaster || isSub;
-  const activeName = isMalith ? "මලිත් දුෂාන්ත" : (user.name || "අමුත්තා");
-  const activePhoto = user.photo || (isMalith ? "https://i.ibb.co/k6wJFJnH/avatar-1792084050862.webp" : null);
-  const firstLetter = (activeName || "අ").trim().charAt(0);
+  try {
+    const user = StorageService.currentUser || {};
+    const isMalith = Boolean(user && (
+      user.uid === "user_malith" ||
+      user.uid === "o2pWiAX7SXTHiMfSiphI8Ln5HAM2" ||
+      (user.email && typeof user.email === 'string' && user.email.toLowerCase() === "silvadilan9@gmail.com") ||
+      (user.name && typeof user.name === 'string' && user.name.trim().startsWith("මලිත්"))
+    ));
+    const isMaster = StorageService.isMasterAdmin() || isMalith;
+    const isSub = !isMaster && StorageService.isSubAdmin(user);
+    const isAdminUser = isMaster || isSub;
+    const activeName = isMalith ? "මලිත් දුෂාන්ත" : (user.name || "අමුත්තා");
+    const activePhoto = user.photo || (isMalith ? "https://i.ibb.co/k6wJFJnH/avatar-1792084050862.webp" : null);
+    const firstLetter = (activeName || "අ").trim().charAt(0);
 
-  const displayEl = document.getElementById('userNameDisplay');
-  const sideNameEl = document.getElementById('sideUserName');
-  const navAvatarEl = document.getElementById('navAvatar');
-  const sideAvatarEl = document.getElementById('sideAvatar');
-  const composerAvatarEl = document.getElementById('composerAvatar');
-  const crownBtn = document.getElementById('headerAdminCrownBtn');
+    const displayEl = document.getElementById('userNameDisplay');
+    const sideNameEl = document.getElementById('sideUserName');
+    const navAvatarEl = document.getElementById('navAvatar');
+    const sideAvatarEl = document.getElementById('sideAvatar');
+    const composerAvatarEl = document.getElementById('composerAvatar');
+    const crownBtn = document.getElementById('headerAdminCrownBtn');
 
-  if (displayEl) displayEl.innerText = activeName;
-  if (sideNameEl) sideNameEl.innerText = activeName;
+    if (displayEl) displayEl.innerText = activeName;
+    if (sideNameEl) sideNameEl.innerText = activeName;
 
-  // Discreet Badge (Crown / Shield) next to Left Sidebar Name (No role text displayed)
-  const sideBadgeEl = document.getElementById('sideUserRoleBadge');
-  if (sideBadgeEl) {
-    if (isMaster) {
-      sideBadgeEl.innerHTML = '<span class="badge-crown" style="font-size: 0.85rem;" title="කල්‍යාණ මිත්‍ර">👑</span>';
-    } else if (isSub) {
-      sideBadgeEl.innerHTML = '<span class="badge-shield" style="font-size: 0.85rem;" title="කල්‍යාණ මිත්‍ර">🛡️</span>';
-    } else {
-      sideBadgeEl.innerHTML = '';
-    }
-  }
-
-  // Toggle Header Crown Button for Master Admin & Sub-Admins
-  if (crownBtn) {
-    if (isAdminUser) {
-      crownBtn.classList.remove('hidden');
-      crownBtn.style.display = 'inline-flex';
-      crownBtn.onclick = () => { window.location.href = 'admin.html'; };
+    // Discreet Badge (Crown / Shield) next to Left Sidebar Name (No role text displayed)
+    const sideBadgeEl = document.getElementById('sideUserRoleBadge');
+    if (sideBadgeEl) {
       if (isMaster) {
-        crownBtn.innerHTML = '<i class="fa-solid fa-crown"></i><span>Admin</span>';
-        crownBtn.title = "👑 Master Admin Dashboard";
-        crownBtn.classList.remove('header-admin-shield-btn');
+        sideBadgeEl.innerHTML = '<span class="badge-crown" style="font-size: 0.85rem;" title="කල්‍යාණ මිත්‍ර">👑</span>';
+      } else if (isSub) {
+        sideBadgeEl.innerHTML = '<span class="badge-shield" style="font-size: 0.85rem;" title="කල්‍යාණ මිත්‍ර">🛡️</span>';
       } else {
-        crownBtn.innerHTML = '<i class="fa-solid fa-shield-halved"></i><span>Admin</span>';
-        crownBtn.title = "🛡️ පිං පොත පරිපාලක Dashboard";
-        crownBtn.classList.add('header-admin-shield-btn');
+        sideBadgeEl.innerHTML = '';
       }
-    } else {
-      crownBtn.classList.add('hidden');
-      crownBtn.style.display = 'none';
-      crownBtn.onclick = null;
     }
-  }
 
-  // Toggle Admin Edit buttons on Sidebar Widgets
-  const btnEditVerse = document.getElementById('btnEditDailyVerse');
-  if (btnEditVerse) {
-    btnEditVerse.style.display = isAdminUser ? 'inline-flex' : 'none';
-  }
-  const btnEditPoya = document.getElementById('btnEditPoyaCalendar');
-  if (btnEditPoya) {
-    btnEditPoya.style.display = isAdminUser ? 'inline-flex' : 'none';
-  }
-
-  // Toggle Admin Tab Button in Settings Modal
-  const adminTabBtn = document.getElementById('set-tab-admin');
-  if (adminTabBtn) {
-    if (isAdminUser) {
-      adminTabBtn.classList.remove('hidden');
-      adminTabBtn.style.display = 'inline-flex';
-    } else {
-      adminTabBtn.classList.add('hidden');
-      adminTabBtn.style.display = 'none';
+    // Toggle Header Crown Button for Master Admin & Sub-Admins
+    if (crownBtn) {
+      if (isAdminUser) {
+        crownBtn.classList.remove('hidden');
+        crownBtn.style.display = 'inline-flex';
+        crownBtn.onclick = () => { window.location.href = 'admin.html'; };
+        if (isMaster) {
+          crownBtn.innerHTML = '<i class="fa-solid fa-crown"></i><span>Admin</span>';
+          crownBtn.title = "👑 Master Admin Dashboard";
+          crownBtn.classList.remove('header-admin-shield-btn');
+        } else {
+          crownBtn.innerHTML = '<i class="fa-solid fa-shield-halved"></i><span>Admin</span>';
+          crownBtn.title = "🛡️ පිං පොත පරිපාලක Dashboard";
+          crownBtn.classList.add('header-admin-shield-btn');
+        }
+      } else {
+        crownBtn.classList.add('hidden');
+        crownBtn.style.display = 'none';
+        crownBtn.onclick = null;
+      }
     }
-  }
 
-  const applyAvatar = (el) => {
-    if (!el) return;
-    if (activePhoto) {
-      el.innerHTML = `<img src="${activePhoto}" alt="${activeName}" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover; display: block;" onerror="this.parentElement.innerText='${firstLetter}';">`;
-    } else {
-      el.innerText = firstLetter;
+    // Toggle Admin Edit buttons on Sidebar Widgets
+    const btnEditVerse = document.getElementById('btnEditDailyVerse');
+    if (btnEditVerse) {
+      btnEditVerse.style.display = isAdminUser ? 'inline-flex' : 'none';
     }
-  };
+    const btnEditPoya = document.getElementById('btnEditPoyaCalendar');
+    if (btnEditPoya) {
+      btnEditPoya.style.display = isAdminUser ? 'inline-flex' : 'none';
+    }
 
-  applyAvatar(navAvatarEl);
-  applyAvatar(sideAvatarEl);
-  applyAvatar(composerAvatarEl);
+    // Toggle Admin Tab Button in Settings Modal
+    const adminTabBtn = document.getElementById('set-tab-admin');
+    if (adminTabBtn) {
+      if (isAdminUser) {
+        adminTabBtn.classList.remove('hidden');
+        adminTabBtn.style.display = 'inline-flex';
+      } else {
+        adminTabBtn.classList.add('hidden');
+        adminTabBtn.style.display = 'none';
+      }
+    }
 
-  // Sync Left Sidebar User Role Bio (Display standard friendly bio, never broadcast Admin/Master Admin text)
-  const sideBioEl = document.getElementById('sideUserBio');
-  if (sideBioEl) {
-    if (user.role === 'monk' || user.isMonk) sideBioEl.textContent = 'පූජනීය මහා සංඝරත්නය';
-    else sideBioEl.textContent = user.bio || 'කල්‍යාණ මිත්‍ර සාමාජික';
+    const applyAvatar = (el) => {
+      if (!el) return;
+      if (activePhoto) {
+        el.innerHTML = `<img src="${activePhoto}" alt="${activeName}" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover; display: block;" onerror="this.parentElement.innerText='${firstLetter}';">`;
+      } else {
+        el.innerText = firstLetter;
+      }
+    };
+
+    applyAvatar(navAvatarEl);
+    applyAvatar(sideAvatarEl);
+    applyAvatar(composerAvatarEl);
+
+    // Sync Left Sidebar User Role Bio
+    const sideBioEl = document.getElementById('sideUserBio');
+    if (sideBioEl) {
+      if (user.role === 'monk' || user.isMonk) sideBioEl.textContent = 'පූජනීය මහා සංඝරත්නය';
+      else sideBioEl.textContent = user.bio || 'කල්‍යාණ මිත්‍ර සාමාජික';
+    }
+
+    // Sync User Info inside Mobile Slide Drawer
+    const drawerAvatarEl = document.getElementById('drawerNavAvatar');
+    const drawerNameEl = document.getElementById('drawerUserName');
+    const drawerStatusEl = document.getElementById('drawerUserStatus');
+    if (drawerNameEl) drawerNameEl.innerText = user.name || 'කල්‍යාණ මිතුරා';
+    applyAvatar(drawerAvatarEl);
+    if (drawerStatusEl) {
+      if (user.role === 'monk' || user.isMonk) drawerStatusEl.textContent = 'පූජනීය මහා සංඝරත්නය';
+      else drawerStatusEl.textContent = user.bio || 'කල්‍යාණ මිත්‍ර සාමාජික';
+    }
+
+    // Update Kalyana Mithra pending request badges
+    const notifs = StorageService.getLocalNotifications() || [];
+    const pendingMithraReqs = notifs.filter(n =>
+      n && n.type === 'mithra_request' &&
+      Boolean(user.uid && n.recipientUid === user.uid) &&
+      !StorageService.isRequestAccepted(n.id, n.senderUid) &&
+      !StorageService.isRequestDeclined(n.id, n.senderUid) &&
+      (!user.mithrayan || !user.mithrayan.includes(n.senderUid)) &&
+      (!n.status || n.status === 'pending')
+    );
+    const pCount = pendingMithraReqs.length;
+    const mobFriendsBadge = document.getElementById('mobFriendsBadge');
+    const headerFriendsBadge = document.getElementById('headerFriendsBadge');
+    if (mobFriendsBadge) {
+      mobFriendsBadge.innerText = pCount;
+      mobFriendsBadge.style.display = pCount > 0 ? 'inline-flex' : 'none';
+    }
+    if (headerFriendsBadge) {
+      headerFriendsBadge.innerText = pCount;
+      headerFriendsBadge.style.display = pCount > 0 ? 'inline-flex' : 'none';
+    }
+
+    // Keep sidebar user stats synchronized
+    try { updateUserStats(); } catch (e) {}
+  } catch (err) {
+    console.warn('[updateUserInfoUI] caught safely:', err);
   }
-
-  // Sync User Info inside Mobile Slide Drawer (Display standard friendly status, never broadcast Admin/Master Admin text)
-  const drawerAvatarEl = document.getElementById('drawerNavAvatar');
-  const drawerNameEl = document.getElementById('drawerUserName');
-  const drawerStatusEl = document.getElementById('drawerUserStatus');
-  if (drawerNameEl) drawerNameEl.innerText = user.name || 'කල්‍යාණ මිතුරා';
-  applyAvatar(drawerAvatarEl);
-  if (drawerStatusEl) {
-    if (user.role === 'monk' || user.isMonk) drawerStatusEl.textContent = 'පූජනීය මහා සංඝරත්නය';
-    else drawerStatusEl.textContent = user.bio || 'කල්‍යාණ මිත්‍ර සාමාජික';
-  }
-
-  // Update Kalyana Mithra pending request badges
-  const notifs = StorageService.getLocalNotifications() || [];
-  const pendingMithraReqs = notifs.filter(n =>
-    n.type === 'mithra_request' &&
-    n.recipientUid === user.uid &&
-    !StorageService.isRequestAccepted(n.id, n.senderUid) &&
-    !StorageService.isRequestDeclined(n.id, n.senderUid) &&
-    (!user.mithrayan || !user.mithrayan.includes(n.senderUid)) &&
-    (!n.status || n.status === 'pending')
-  );
-  const pCount = pendingMithraReqs.length;
-  const mobFriendsBadge = document.getElementById('mobFriendsBadge');
-  const headerFriendsBadge = document.getElementById('headerFriendsBadge');
-  if (mobFriendsBadge) {
-    mobFriendsBadge.innerText = pCount;
-    mobFriendsBadge.style.display = pCount > 0 ? 'inline-flex' : 'none';
-  }
-  if (headerFriendsBadge) {
-    headerFriendsBadge.innerText = pCount;
-    headerFriendsBadge.style.display = pCount > 0 ? 'inline-flex' : 'none';
-  }
-
-  // Keep sidebar user stats synchronized
-  updateUserStats();
 }
 
 function updateUserStats() {
-  const user = StorageService.currentUser;
-  const isMalithUser = Boolean(user && (
-    user.uid === 'user_malith' ||
-    user.uid === 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2' ||
-    (user.email && user.email.toLowerCase() === 'silvadilan9@gmail.com') ||
-    (user.name && user.name.trim().startsWith('මලිත්'))
-  ));
-  const myPosts = currentPostsData.filter(p => {
-    if (!p) return false;
-    if (user && user.uid && p.uid === user.uid) return true;
-    if (user && user.email && p.authorEmail && p.authorEmail.toLowerCase() === user.email.toLowerCase()) return true;
-    if (user && user.name && p.author && p.author.trim().toLowerCase() === user.name.trim().toLowerCase()) return true;
-    if (isMalithUser && (
-      p.uid === 'user_malith' ||
-      p.uid === 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2' ||
-      (p.author && (p.author.includes('මලිත්') || p.author === 'අපේ පිං පොත' || p.author === 'පිං පොත පරිපාලනය'))
-    )) return true;
-    return false;
-  });
-  const totalSadhu = myPosts.reduce((acc, p) => acc + (p.sadhuCount || 0), 0);
+  try {
+    const user = StorageService.currentUser || {};
+    const isMalithUser = Boolean(user && (
+      user.uid === 'user_malith' ||
+      user.uid === 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2' ||
+      (user.email && typeof user.email === 'string' && user.email.toLowerCase() === 'silvadilan9@gmail.com') ||
+      (user.name && typeof user.name === 'string' && user.name.trim().startsWith('මලිත්'))
+    ));
+    const myPosts = currentPostsData.filter(p => {
+      if (!p) return false;
+      if (user && user.uid && p.uid === user.uid) return true;
+      if (user && user.email && p.authorEmail && p.authorEmail.toLowerCase() === user.email.toLowerCase()) return true;
+      if (user && user.name && p.author && p.author.trim().toLowerCase() === user.name.trim().toLowerCase()) return true;
+      if (isMalithUser && (
+        p.uid === 'user_malith' ||
+        p.uid === 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2' ||
+        (p.author && (p.author.includes('මලිත්') || p.author === 'අපේ පිං පොත' || p.author === 'පිං පොත පරිපාලනය'))
+      )) return true;
+      return false;
+    });
+    const totalSadhu = myPosts.reduce((acc, p) => acc + (p.sadhuCount || 0), 0);
 
-  const statPostsEl = document.getElementById('statMyPosts');
-  const statSadhuEl = document.getElementById('statMySadhu');
+    const statPostsEl = document.getElementById('statMyPosts');
+    const statSadhuEl = document.getElementById('statMySadhu');
 
-  const finalPosts = isMalithUser ? Math.max(myPosts.length, 17) : myPosts.length;
-  const finalSadhu = isMalithUser ? Math.max(totalSadhu, 146) : totalSadhu;
+    const finalPosts = isMalithUser ? Math.max(myPosts.length, 17) : myPosts.length;
+    const finalSadhu = isMalithUser ? Math.max(totalSadhu, 146) : totalSadhu;
 
-  if (statPostsEl) statPostsEl.innerText = finalPosts;
-  if (statSadhuEl) statSadhuEl.innerText = finalSadhu;
+    if (statPostsEl) statPostsEl.innerText = finalPosts;
+    if (statSadhuEl) statSadhuEl.innerText = finalSadhu;
+  } catch (err) {
+    console.warn('[updateUserStats] caught safely:', err);
+  }
 }
 
 // Member Profile Modal Controllers (Facebook-Style Profile Viewer)
@@ -6048,8 +6108,16 @@ export function calculateProfileCompleteness(user) {
   if (!user) return { percent: 0, hasAvatar: false, hasBio: false, hasLocation: false, hasSpiritual: false, isComplete: false };
   const hasAvatar = Boolean(user.photo && typeof user.photo === 'string' && user.photo.trim().length > 0);
   const hasBio = Boolean(user.bio && typeof user.bio === 'string' && user.bio.trim().length > 0);
-  const hasLocation = Boolean((user.district && user.district.trim().length > 0) || (user.location && user.location.trim().length > 0) || (user.province && user.province.trim().length > 0));
-  const hasSpiritual = Boolean((user.spiritualInterest && user.spiritualInterest.trim().length > 0) || (user.occupation && user.occupation.trim().length > 0) || (user.temple && user.temple.trim().length > 0));
+  const hasLocation = Boolean(
+    (typeof user.district === 'string' && user.district.trim().length > 0) ||
+    (typeof user.location === 'string' && user.location.trim().length > 0) ||
+    (typeof user.province === 'string' && user.province.trim().length > 0)
+  );
+  const hasSpiritual = Boolean(
+    (typeof user.spiritualInterest === 'string' && user.spiritualInterest.trim().length > 0) ||
+    (typeof user.occupation === 'string' && user.occupation.trim().length > 0) ||
+    (typeof user.temple === 'string' && user.temple.trim().length > 0)
+  );
 
   let percent = 0;
   if (hasAvatar) percent += 25;
@@ -6069,65 +6137,72 @@ export function calculateProfileCompleteness(user) {
 window.calculateProfileCompleteness = calculateProfileCompleteness;
 
 export function renderProfileCompletenessUI(user) {
-  const completeness = calculateProfileCompleteness(user);
-  const percentEl = document.getElementById('profCompletenessPercent');
-  const barEl = document.getElementById('profCompletenessBar');
-  const checklistEl = document.getElementById('profCompletenessChecklist');
-  const bannerEl = document.getElementById('profCompletenessUnlockedBanner');
-  const badgeEl = document.getElementById('profCompletenessBadge');
-
-  if (percentEl) percentEl.innerText = `${completeness.percent}%`;
-  if (barEl) barEl.style.width = `${completeness.percent}%`;
-
-  if (badgeEl) {
-    if (completeness.isComplete) {
-      badgeEl.classList.remove('hidden');
-      badgeEl.style.display = 'inline-flex';
-    } else {
-      badgeEl.classList.add('hidden');
-      badgeEl.style.display = 'none';
+  try {
+    if (!user) {
+      user = StorageService.currentUser || {};
     }
-  }
+    const completeness = calculateProfileCompleteness(user);
+    const percentEl = document.getElementById('profCompletenessPercent');
+    const barEl = document.getElementById('profCompletenessBar');
+    const checklistEl = document.getElementById('profCompletenessChecklist');
+    const bannerEl = document.getElementById('profCompletenessUnlockedBanner');
+    const badgeEl = document.getElementById('profCompletenessBadge');
 
-  if (bannerEl) {
-    if (completeness.isComplete) {
-      bannerEl.classList.remove('hidden');
-    } else {
-      bannerEl.classList.add('hidden');
+    if (percentEl) percentEl.innerText = `${completeness.percent}%`;
+    if (barEl) barEl.style.width = `${completeness.percent}%`;
+
+    if (badgeEl) {
+      if (completeness.isComplete) {
+        badgeEl.classList.remove('hidden');
+        badgeEl.style.display = 'inline-flex';
+      } else {
+        badgeEl.classList.add('hidden');
+        badgeEl.style.display = 'none';
+      }
     }
-  }
 
-  if (checklistEl) {
-    checklistEl.innerHTML = `
-      <div class="completeness-item ${completeness.hasAvatar ? 'done' : ''}">
-        <span class="completeness-item-label">
-          <span class="completeness-item-icon">${completeness.hasAvatar ? '✅' : '⚪'}</span>
-          <span>පැතිකඩ ඡායාරූපය / ධාර්මික සංකේතය</span>
-        </span>
-        <span class="completeness-item-status">${completeness.hasAvatar ? '+25%' : 'අවශ්‍යයි'}</span>
-      </div>
-      <div class="completeness-item ${completeness.hasBio ? 'done' : ''}">
-        <span class="completeness-item-label">
-          <span class="completeness-item-icon">${completeness.hasBio ? '✅' : '⚪'}</span>
-          <span>ධර්ම පාඨය / Bio හැඳින්වීම</span>
-        </span>
-        <span class="completeness-item-status">${completeness.hasBio ? '+25%' : 'අවශ්‍යයි'}</span>
-      </div>
-      <div class="completeness-item ${completeness.hasLocation ? 'done' : ''}">
-        <span class="completeness-item-label">
-          <span class="completeness-item-icon">${completeness.hasLocation ? '✅' : '⚪'}</span>
-          <span>පළාත සහ දිස්ත්‍රික්කය</span>
-        </span>
-        <span class="completeness-item-status">${completeness.hasLocation ? '+25%' : 'අවශ්‍යයි'}</span>
-      </div>
-      <div class="completeness-item ${completeness.hasSpiritual ? 'done' : ''}">
-        <span class="completeness-item-label">
-          <span class="completeness-item-icon">${completeness.hasSpiritual ? '✅' : '⚪'}</span>
-          <span>දායක විහාරය / ප්‍රියතම පුණ්‍ය ක්ෂේත්‍රය</span>
-        </span>
-        <span class="completeness-item-status">${completeness.hasSpiritual ? '+25%' : 'අවශ්‍යයි'}</span>
-      </div>
-    `;
+    if (bannerEl) {
+      if (completeness.isComplete) {
+        bannerEl.classList.remove('hidden');
+      } else {
+        bannerEl.classList.add('hidden');
+      }
+    }
+
+    if (checklistEl) {
+      checklistEl.innerHTML = `
+        <div class="completeness-item ${completeness.hasAvatar ? 'done' : ''}">
+          <span class="completeness-item-label">
+            <span class="completeness-item-icon">${completeness.hasAvatar ? '✅' : '⚪'}</span>
+            <span>පැතිකඩ ඡායාරූපය / ධාර්මික සංකේතය</span>
+          </span>
+          <span class="completeness-item-status">${completeness.hasAvatar ? '+25%' : 'අවශ්‍යයි'}</span>
+        </div>
+        <div class="completeness-item ${completeness.hasBio ? 'done' : ''}">
+          <span class="completeness-item-label">
+            <span class="completeness-item-icon">${completeness.hasBio ? '✅' : '⚪'}</span>
+            <span>ධර්ම පාඨය / Bio හැඳින්වීම</span>
+          </span>
+          <span class="completeness-item-status">${completeness.hasBio ? '+25%' : 'අවශ්‍යයි'}</span>
+        </div>
+        <div class="completeness-item ${completeness.hasLocation ? 'done' : ''}">
+          <span class="completeness-item-label">
+            <span class="completeness-item-icon">${completeness.hasLocation ? '✅' : '⚪'}</span>
+            <span>පළාත සහ දිස්ත්‍රික්කය</span>
+          </span>
+          <span class="completeness-item-status">${completeness.hasLocation ? '+25%' : 'අවශ්‍යයි'}</span>
+        </div>
+        <div class="completeness-item ${completeness.hasSpiritual ? 'done' : ''}">
+          <span class="completeness-item-label">
+            <span class="completeness-item-icon">${completeness.hasSpiritual ? '✅' : '⚪'}</span>
+            <span>දායක විහාරය / ප්‍රියතම පුණ්‍ය ක්ෂේත්‍රය</span>
+          </span>
+          <span class="completeness-item-status">${completeness.hasSpiritual ? '+25%' : 'අවශ්‍යයි'}</span>
+        </div>
+      `;
+    }
+  } catch (err) {
+    console.warn('[renderProfileCompletenessUI] caught safely:', err);
   }
 }
 window.renderProfileCompletenessUI = renderProfileCompletenessUI;
@@ -8958,26 +9033,30 @@ window.submitRepost = async function() {
 // ============================================================================
 
 function renderGlobalAnnouncementUI(announcement) {
-  const banner = document.getElementById('globalAnnouncementBanner');
-  if (!banner) return;
-  const text = announcement?.text || announcement?.message || '';
-  if (announcement && announcement.active && text.trim()) {
-    banner.innerHTML = `
-      <div class="global-announcement-content" style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-        <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;">
-          <i class="fa-solid fa-bullhorn" style="font-size: 0.95rem; color: #b45309; animation: pulse 2s infinite; flex-shrink: 0;"></i>
-          <div class="global-announcement-marquee" style="flex: 1; min-width: 0;">
-            <span>${Security.escapeHTML(text)}</span>
+  try {
+    const banner = document.getElementById('globalAnnouncementBanner');
+    if (!banner) return;
+    const text = announcement?.text || announcement?.message || '';
+    if (announcement && announcement.active && text.trim()) {
+      banner.innerHTML = `
+        <div class="global-announcement-content" style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;">
+            <i class="fa-solid fa-bullhorn" style="font-size: 0.95rem; color: #b45309; animation: pulse 2s infinite; flex-shrink: 0;"></i>
+            <div class="global-announcement-marquee" style="flex: 1; min-width: 0;">
+              <span>${Security.escapeHTML(text)}</span>
+            </div>
           </div>
+          <button type="button" onclick="dismissGlobalAnnouncement()" title="වසන්න" style="background: none; border: none; font-size: 1.15rem; color: #92400e; cursor: pointer; padding: 0 4px; line-height: 1; flex-shrink: 0;">&times;</button>
         </div>
-        <button type="button" onclick="dismissGlobalAnnouncement()" title="වසන්න" style="background: none; border: none; font-size: 1.15rem; color: #92400e; cursor: pointer; padding: 0 4px; line-height: 1; flex-shrink: 0;">&times;</button>
-      </div>
-    `;
-    banner.classList.remove('hidden');
-    banner.style.display = 'block';
-  } else {
-    banner.classList.add('hidden');
-    banner.style.display = 'none';
+      `;
+      banner.classList.remove('hidden');
+      banner.style.display = 'block';
+    } else {
+      banner.classList.add('hidden');
+      banner.style.display = 'none';
+    }
+  } catch (err) {
+    console.warn('[renderGlobalAnnouncementUI] caught safely:', err);
   }
 }
 
@@ -8990,27 +9069,35 @@ window.dismissGlobalAnnouncement = function() {
 };
 
 function renderDailyVerseUI(verse) {
-  if (!verse) return;
-  const paliEl = document.getElementById('dailyDhammaPali');
-  const sinhalaEl = document.getElementById('dailyDhammaSinhala');
-  if (paliEl && verse.pali) {
-    paliEl.innerText = `"${verse.pali}"`;
-  }
-  if (sinhalaEl && verse.sinhala) {
-    sinhalaEl.innerText = verse.sinhala;
+  try {
+    if (!verse) return;
+    const paliEl = document.getElementById('dailyDhammaPali');
+    const sinhalaEl = document.getElementById('dailyDhammaSinhala');
+    if (paliEl && verse.pali) {
+      paliEl.innerText = `"${verse.pali}"`;
+    }
+    if (sinhalaEl && verse.sinhala) {
+      sinhalaEl.innerText = verse.sinhala;
+    }
+  } catch (err) {
+    console.warn('[renderDailyVerseUI] caught safely:', err);
   }
 }
 
 function renderPoyaUI(poya) {
-  if (!poya) return;
-  const mEl = document.getElementById('poyaMonthBadge');
-  const dEl = document.getElementById('poyaDayBadge');
-  const tEl = document.getElementById('poyaEventTitle');
-  const descEl = document.getElementById('poyaEventDesc');
-  if (mEl && poya.month) mEl.innerText = poya.month;
-  if (dEl && poya.day) dEl.innerText = poya.day;
-  if (tEl && poya.title) tEl.innerText = poya.title;
-  if (descEl && poya.desc) descEl.innerText = poya.desc;
+  try {
+    if (!poya) return;
+    const mEl = document.getElementById('poyaMonthBadge');
+    const dEl = document.getElementById('poyaDayBadge');
+    const tEl = document.getElementById('poyaEventTitle');
+    const descEl = document.getElementById('poyaEventDesc');
+    if (mEl && poya.month) mEl.innerText = poya.month;
+    if (dEl && poya.day) dEl.innerText = poya.day;
+    if (tEl && poya.title) tEl.innerText = poya.title;
+    if (descEl && poya.desc) descEl.innerText = poya.desc;
+  } catch (err) {
+    console.warn('[renderPoyaUI] caught safely:', err);
+  }
 }
 
 window.renderAdminDashboard = async function() {
