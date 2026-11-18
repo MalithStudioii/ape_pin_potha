@@ -10799,3 +10799,143 @@ body.drawer-open {
 .alias-toggle-switch input:checked + .alias-toggle-slider:before {
   transform: translateX(20px);
 }
+
+
+/* ==========================================================================
+   Profile Completeness Progress Bar & Badges
+   ========================================================================== */
+.profile-completeness-card {
+  background: linear-gradient(135deg, #fffdf7 0%, #f7faf8 100%);
+  border: 1.5px solid rgba(217, 119, 6, 0.22);
+  border-left: 4px solid var(--color-primary-600, #d97706);
+  border-radius: var(--radius-md, 14px);
+  padding: 14px 16px;
+  box-shadow: 0 2px 10px rgba(217, 119, 6, 0.05);
+  margin-bottom: 14px;
+}
+
+.completeness-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.completeness-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-primary-800, #78350f);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.completeness-percent {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: var(--color-primary-700, #b45309);
+  font-family: var(--font-sans);
+}
+
+.completeness-bar-track {
+  width: 100%;
+  height: 9px;
+  background: #f1ebd8;
+  border-radius: 9999px;
+  overflow: hidden;
+  margin-bottom: 12px;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.06);
+}
+
+.completeness-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f59e0b 0%, #10b981 100%);
+  border-radius: 9999px;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.completeness-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.completeness-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.74rem;
+  color: #475569;
+  line-height: 1.4;
+  padding: 3px 0;
+}
+
+.completeness-item.done {
+  color: #065f46;
+  font-weight: 600;
+}
+
+.completeness-item-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.completeness-item-icon {
+  font-size: 0.85rem;
+  width: 16px;
+  text-align: center;
+}
+
+.completeness-item-status {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 9999px;
+}
+
+.completeness-item.done .completeness-item-status {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.completeness-item:not(.done) .completeness-item-status {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.completeness-unlocked-banner {
+  margin-top: 10px;
+  padding: 9px 12px;
+  background: linear-gradient(135deg, #fef3c7 0%, #d1fae5 100%);
+  border: 1.5px solid #10b981;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 0.76rem;
+  line-height: 1.4;
+  color: #065f46;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.15);
+}
+
+.completeness-unlocked-banner .unlocked-icon {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.complete-profile-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #92400e;
+  border: 1.5px solid #f59e0b;
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.2);
+  vertical-align: middle;
+}

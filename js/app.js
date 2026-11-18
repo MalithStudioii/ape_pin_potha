@@ -4,12 +4,12 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=138';
-import { Security } from './security.js?v=138';
+import { StorageService } from './storage.js?v=139';
+import { Security } from './security.js?v=139';
 import { uploadToImgBB } from './imgbb-service.js?v=66';
 import { SoundService, triggerHaptic } from './sound.js?v=66';
-import { FeedAlgorithm } from './algorithm.js?v=138';
-import { SPIRITUAL_AVATARS, renderSpiritualAvatarPicker, selectSpiritualAvatar } from './spiritual-avatars.js?v=138';
+import { FeedAlgorithm } from './algorithm.js?v=139';
+import { SPIRITUAL_AVATARS, renderSpiritualAvatarPicker, selectSpiritualAvatar } from './spiritual-avatars.js?v=139';
 let allCommunityMembersCache = [];
 let infiniteScrollObserver = null;
 let isTriggeringLoadMore = false;
@@ -745,7 +745,20 @@ window.openMemberProfileModal = async function(uid, authorName, authorPhoto = nu
     member.name = 'කල්‍යාණ මිත්‍ර සාමාජික';
   }
 
-  currentViewingMember = member;
+    // Profile Completeness 100% Badge for viewed member
+  const memCompleteness = calculateProfileCompleteness(member);
+  const memBadgeEl = document.getElementById('memCompletenessBadge');
+  if (memBadgeEl) {
+    if (memCompleteness.isComplete) {
+      memBadgeEl.classList.remove('hidden');
+      memBadgeEl.style.display = 'inline-flex';
+    } else {
+      memBadgeEl.classList.add('hidden');
+      memBadgeEl.style.display = 'none';
+    }
+  }
+
+currentViewingMember = member;
 
   if (coverImg) coverImg.src = member.coverImage || 'assets/banner.jpg';
 
@@ -6028,6 +6041,107 @@ function setupEventListeners() {
 // Facebook-Style Premium Profile Controllers
 // ============================================================================
 
+// ============================================================================
+// Profile Completeness Calculator & Quick Quote Preset Handlers
+// ============================================================================
+export function calculateProfileCompleteness(user) {
+  if (!user) return { percent: 0, hasAvatar: false, hasBio: false, hasLocation: false, hasSpiritual: false, isComplete: false };
+  const hasAvatar = Boolean(user.photo && typeof user.photo === 'string' && user.photo.trim().length > 0);
+  const hasBio = Boolean(user.bio && typeof user.bio === 'string' && user.bio.trim().length > 0);
+  const hasLocation = Boolean((user.district && user.district.trim().length > 0) || (user.location && user.location.trim().length > 0) || (user.province && user.province.trim().length > 0));
+  const hasSpiritual = Boolean((user.spiritualInterest && user.spiritualInterest.trim().length > 0) || (user.occupation && user.occupation.trim().length > 0) || (user.temple && user.temple.trim().length > 0));
+
+  let percent = 0;
+  if (hasAvatar) percent += 25;
+  if (hasBio) percent += 25;
+  if (hasLocation) percent += 25;
+  if (hasSpiritual) percent += 25;
+
+  return {
+    percent,
+    hasAvatar,
+    hasBio,
+    hasLocation,
+    hasSpiritual,
+    isComplete: percent === 100
+  };
+}
+window.calculateProfileCompleteness = calculateProfileCompleteness;
+
+export function renderProfileCompletenessUI(user) {
+  const completeness = calculateProfileCompleteness(user);
+  const percentEl = document.getElementById('profCompletenessPercent');
+  const barEl = document.getElementById('profCompletenessBar');
+  const checklistEl = document.getElementById('profCompletenessChecklist');
+  const bannerEl = document.getElementById('profCompletenessUnlockedBanner');
+  const badgeEl = document.getElementById('profCompletenessBadge');
+
+  if (percentEl) percentEl.innerText = `${completeness.percent}%`;
+  if (barEl) barEl.style.width = `${completeness.percent}%`;
+
+  if (badgeEl) {
+    if (completeness.isComplete) {
+      badgeEl.classList.remove('hidden');
+      badgeEl.style.display = 'inline-flex';
+    } else {
+      badgeEl.classList.add('hidden');
+      badgeEl.style.display = 'none';
+    }
+  }
+
+  if (bannerEl) {
+    if (completeness.isComplete) {
+      bannerEl.classList.remove('hidden');
+    } else {
+      bannerEl.classList.add('hidden');
+    }
+  }
+
+  if (checklistEl) {
+    checklistEl.innerHTML = `
+      <div class="completeness-item ${completeness.hasAvatar ? 'done' : ''}">
+        <span class="completeness-item-label">
+          <span class="completeness-item-icon">${completeness.hasAvatar ? '✅' : '⚪'}</span>
+          <span>පැතිකඩ ඡායාරූපය / ධාර්මික සංකේතය</span>
+        </span>
+        <span class="completeness-item-status">${completeness.hasAvatar ? '+25%' : 'අවශ්‍යයි'}</span>
+      </div>
+      <div class="completeness-item ${completeness.hasBio ? 'done' : ''}">
+        <span class="completeness-item-label">
+          <span class="completeness-item-icon">${completeness.hasBio ? '✅' : '⚪'}</span>
+          <span>ධර්ම පාඨය / Bio හැඳින්වීම</span>
+        </span>
+        <span class="completeness-item-status">${completeness.hasBio ? '+25%' : 'අවශ්‍යයි'}</span>
+      </div>
+      <div class="completeness-item ${completeness.hasLocation ? 'done' : ''}">
+        <span class="completeness-item-label">
+          <span class="completeness-item-icon">${completeness.hasLocation ? '✅' : '⚪'}</span>
+          <span>පළාත සහ දිස්ත්‍රික්කය</span>
+        </span>
+        <span class="completeness-item-status">${completeness.hasLocation ? '+25%' : 'අවශ්‍යයි'}</span>
+      </div>
+      <div class="completeness-item ${completeness.hasSpiritual ? 'done' : ''}">
+        <span class="completeness-item-label">
+          <span class="completeness-item-icon">${completeness.hasSpiritual ? '✅' : '⚪'}</span>
+          <span>දායක විහාරය / ප්‍රියතම පුණ්‍ය ක්ෂේත්‍රය</span>
+        </span>
+        <span class="completeness-item-status">${completeness.hasSpiritual ? '+25%' : 'අවශ්‍යයි'}</span>
+      </div>
+    `;
+  }
+}
+window.renderProfileCompletenessUI = renderProfileCompletenessUI;
+
+window.handleQuickQuoteSelect = function(quoteText, targetTextareaId) {
+  if (!quoteText) return;
+  const textarea = document.getElementById(targetTextareaId);
+  if (textarea) {
+    textarea.value = quoteText;
+    if (typeof triggerHaptic === 'function') triggerHaptic(15);
+    if (typeof SoundService !== 'undefined' && SoundService.playClick) SoundService.playClick();
+  }
+};
+
 function renderProfileView() {
   const user = StorageService.currentUser || {};
   const isMalithUser = Boolean(user && (
@@ -6167,6 +6281,8 @@ function renderProfileView() {
   const widgetOccRow = document.getElementById('profWidgetOccRow');
   if (occEl) occEl.innerText = occText;
   if (widgetOccEl) widgetOccEl.innerText = occText;
+  // Render Profile Completeness Progress Bar & Badges
+  renderProfileCompletenessUI(user);
   if (metaOccWrap) metaOccWrap.style.display = occText ? 'inline-flex' : 'none';
   if (widgetOccRow) widgetOccRow.style.display = occText ? 'flex' : 'none';
 
@@ -9510,7 +9626,7 @@ function initPWAEngine() {
   const isIos = (typeof window !== 'undefined' && window.navigator && /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase())) && !window.MSStream;
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v138';
+  const ACTIVE_BUILD = 'v139';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
@@ -9527,7 +9643,7 @@ function initPWAEngine() {
   // Register Service Worker safely
   if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
     const registerSW = () => {
-      navigator.serviceWorker.register('./sw.js?v=138', { updateViaCache: 'none' });
+      navigator.serviceWorker.register('./sw.js?v=139', { updateViaCache: 'none' });
     };
     if (document.readyState === 'complete') {
       registerSW();
@@ -9535,7 +9651,7 @@ function initPWAEngine() {
       window.addEventListener('load', registerSW);
     }
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=138', { updateViaCache: 'none' })
+      navigator.serviceWorker.register('./sw.js?v=139', { updateViaCache: 'none' })
         .then((registration) => {
           // Immediately check for service worker updates
           try { registration.update(); } catch (e) {}

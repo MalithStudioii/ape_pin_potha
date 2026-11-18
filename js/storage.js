@@ -4,10 +4,10 @@
  * ============================================================================
  */
 
-import { firebaseConfig, isFirebaseConfigured, COLLECTIONS } from './firebase-config.js?v=138';
-import { Security } from './security.js?v=138';
+import { firebaseConfig, isFirebaseConfigured, COLLECTIONS } from './firebase-config.js?v=139';
+import { Security } from './security.js?v=139';
 import { INITIAL_ARANYA_LIST, SRI_LANKA_DISTRICTS } from './aranya-data.js';
-import { SEED_POSTS } from './initial-seed.js?v=138';
+import { SEED_POSTS } from './initial-seed.js?v=139';
 
 let db = null;
 let auth = null;
@@ -4203,7 +4203,7 @@ export const StorageService = {
   /**
    * Update full user profile details (First & Last Name, Occupation, Location/Address, Bio, Photo, Cover Image)
    */
-  async updateProfile({ firstName, lastName, name, bio, location, district, province, city, occupation, coverImage, photo, useAlias }) {
+  async updateProfile({ firstName, lastName, name, bio, location, district, province, city, occupation, spiritualInterest, temple, coverImage, photo, useAlias }) {
     if (useAlias !== undefined) {
       this.currentUser.useAlias = Boolean(useAlias);
     }
@@ -4225,8 +4225,11 @@ export const StorageService = {
       this.currentUser.lastName = parts.slice(1).join(' ') || '';
     }
 
-    if (occupation !== undefined) {
-      this.currentUser.occupation = Security.escapeHTML(Security.sanitizeText(occupation.trim()));
+    const finalSpiritual = spiritualInterest !== undefined ? spiritualInterest : (temple !== undefined ? temple : occupation);
+    if (finalSpiritual !== undefined) {
+      const sanitizedOcc = Security.escapeHTML(Security.sanitizeText(finalSpiritual.trim()));
+      this.currentUser.occupation = sanitizedOcc;
+      this.currentUser.spiritualInterest = sanitizedOcc;
     }
     if (location !== undefined) {
       this.currentUser.location = Security.escapeHTML(Security.sanitizeText(location.trim()));
@@ -4364,6 +4367,7 @@ export const StorageService = {
           province: this.currentUser.province || '',
           city: this.currentUser.city || '',
           occupation: this.currentUser.occupation || '',
+          spiritualInterest: this.currentUser.spiritualInterest || this.currentUser.occupation || '',
           useAlias: Boolean(this.currentUser.useAlias),
           joinedDate: this.currentUser.joinedDate || '2026 ඔක්තෝබර්',
           updatedAt: Date.now()

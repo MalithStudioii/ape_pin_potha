@@ -51,12 +51,12 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=138">
+    <link rel="stylesheet" href="css/styles.css?v=139">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
       (function() {
-        var v = 'v138';
+        var v = 'v139';
         if (localStorage.getItem('pinPotha_active_build') !== v) {
           localStorage.setItem('pinPotha_active_build', v);
           try {
@@ -576,6 +576,9 @@
                         <button type="button" class="btn-inline-name-edit" onclick="openInlineNameEditModal()" title="නම සංස්කරණය කරන්න (Edit Name)" aria-label="නම සංස්කරණය කරන්න">
                             <i class="fa-solid fa-pen"></i>
                         </button>
+                        <span class="complete-profile-badge hidden" id="profCompletenessBadge" title="පැතිකඩ 100% සම්පූර්ණයි">
+                            <span>🌟 පූර්ණ කල්‍යාණ මිත්‍ර</span>
+                        </span>
                         <span class="verified-pill" id="profVerifiedBadge">
                             <i class="fa-solid fa-circle-check"></i>
                             <span>Google සත්‍යාපිත කල්‍යාණ මිත්‍ර</span>
@@ -586,8 +589,8 @@
                     </p>
                     <div class="profile-meta-tags">
                         <span id="profMetaOccupation" style="display: none;">
-                            <i class="fa-solid fa-briefcase" style="color: #6366f1;"></i>
-                            <span id="profOccupationText">වෘත්තිය</span>
+                            <i class="fa-solid fa-vihara" style="color: #d97706;"></i>
+                            <span id="profOccupationText">විහාරය / ක්ෂේත්‍රය</span>
                         </span>
                         <span id="profMetaLocation" style="display: none;">
                             <i class="fa-solid fa-location-dot" style="color: #ea580c;"></i>
@@ -659,7 +662,30 @@
         <!-- Facebook 2-Column Content Layout Below Header -->
         <div class="profile-content-grid subtab-timeline" id="profileContentGrid">
             <!-- Left Column: Intro, Badges, Photo preview -->
-            <div class="profile-sidebar-col">
+                        <div class="profile-sidebar-col">
+                <!-- Profile Completeness Card -->
+                <div class="profile-widget-card profile-completeness-card" id="profileCompletenessCard">
+                    <div class="completeness-head">
+                        <div class="completeness-title">
+                            <i class="fa-solid fa-circle-notch" style="color: #d97706;"></i>
+                            <span>පැතිකඩ සම්පූර්ණත්වය</span>
+                        </div>
+                        <span class="completeness-percent" id="profCompletenessPercent">0%</span>
+                    </div>
+                    <div class="completeness-bar-track">
+                        <div class="completeness-bar-fill" id="profCompletenessBar" style="width: 0%;"></div>
+                    </div>
+                    <div class="completeness-checklist" id="profCompletenessChecklist">
+                        <!-- Dynamic checklist items -->
+                    </div>
+                    <div class="completeness-unlocked-banner hidden" id="profCompletenessUnlockedBanner">
+                        <span class="unlocked-icon">🌟</span>
+                        <div>
+                            <strong>පූර්ණ කල්‍යාණ මිත්‍ර ලාංඡනය හිමිවිය!</strong>
+                            <p style="margin: 0; font-size: 0.7rem; color: #047857;">ඔබගේ පැතිකඩ 100% ක් සම්පූර්ණ කර ඇත.</p>
+                        </div>
+                    </div>
+                </div>
                 <!-- Intro Card -->
                 <div class="profile-widget-card">
                     <h3 class="widget-head-title">
@@ -677,8 +703,8 @@
                             <span>ගිණුම: <strong id="profWidgetAccount">Google සත්‍යාපිත</strong></span>
                         </div>
                         <div class="prof-detail-item" id="profWidgetOccRow" style="display: none;">
-                            <i class="fa-solid fa-briefcase" style="color: #6366f1;"></i>
-                            <span>රැකියාව: <strong id="profWidgetOccupation">-</strong></span>
+                            <i class="fa-solid fa-vihara" style="color: #d97706;"></i>
+                            <span>විහාරය / ක්ෂේත්‍රය: <strong id="profWidgetOccupation">-</strong></span>
                         </div>
                         <div class="prof-detail-item" id="profWidgetLocRow" style="display: none;">
                             <i class="fa-solid fa-location-dot" style="color: #ea580c;"></i>
@@ -2006,8 +2032,8 @@
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">රැකියාව / වෘත්තිය (Occupation - Optional)</label>
-                    <input type="text" id="editProfOccupationInput" class="form-input" maxlength="60" placeholder="උදා: ගුරුවරයෙක් / ඉංජිනේරු / ව්‍යාපාරික / ශිෂ්‍ය...">
+                    <label class="form-label"><i class="fa-solid fa-vihara" style="color: #d97706; margin-right: 4px;"></i> දායක විහාරස්ථානය / ප්‍රියතම පුණ්‍ය ක්ෂේත්‍රය</label>
+                    <input type="text" id="editProfOccupationInput" class="form-input" maxlength="60" placeholder="උදා: මිරිසවැටිය / දානමය පින්කම් / භාවනා / ධර්ම දාන / සමාජ සත්කාර...">>
                 </div>
 
                 <div class="form-group">
@@ -2049,7 +2075,18 @@
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">ධර්ම පාඨය / හැඳින්වීම (Dharmic Bio)</label>
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                        <label class="form-label" style="margin: 0;"><i class="fa-solid fa-quote-left" style="color: #d97706; margin-right: 4px;"></i> ධර්ම පාඨය / හැඳින්වීම (Dharmic Bio)</label>
+                        <span style="font-size: 0.7rem; color: #059669; font-weight: 600;">පහසුවෙන් තෝරන්න 👇</span>
+                    </div>
+                    <select id="editProfQuoteSelect" class="form-select" onchange="handleQuickQuoteSelect(this.value, 'editProfBioInput')" style="margin-bottom: 8px; font-size: 0.8rem; background: #fffdf8; border: 1.5px solid #fde68a;">
+                        <option value="">-- ප්‍රකට ධර්ම පාඨයකින් තෝරන්න (Quick Select) --</option>
+                        <option value="සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏">🙏 සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා</option>
+                        <option value="ආරෝග්‍යා පරමා ලාභා - සන්තුට්ඨි පරමං ධනං 🪷">🪷 ආරෝග්‍යා පරමා ලාභා - සන්තුට්ඨි පරමං ධනං</option>
+                        <option value="සබ්බදානං ධම්මදානං ජිනාති ✨">✨ සබ්බදානං ධම්මදානං ජිනාති</option>
+                        <option value="නත්ථි සන්ති පරං සුඛං 🌿">🌿 නත්ථි සන්ති පරං සුඛං</option>
+                        <option value="චිත්තං දන්තං සුඛාවහං 🙏">🙏 චිත්තං දන්තං සුඛාවහං</option>
+                    </select>
                     <textarea id="editProfBioInput" class="form-textarea" rows="3" maxlength="250" placeholder="ඔබ ප්‍රිය කරන ධර්ම පාඨයක් හෝ කුඩා හැඳින්වීමක් (උදා: සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා)"></textarea>
                     <span style="font-size: 0.68rem; color: #94a3b8; display: block; text-align: right; margin-top: 2px;">උපරිම අකුරු 250</span>
                 </div>
@@ -2315,8 +2352,8 @@
                         </div>
 
                         <div class="form-group">
-                            <label class="form-label">රැකියාව / වෘත්තිය (Occupation - Optional)</label>
-                            <input type="text" id="setOccupationInput" class="form-input" maxlength="60" placeholder="උදා: ගුරුවරයෙක් / ව්‍යාපාරික / ඉංජිනේරු...">
+                            <label class="form-label"><i class="fa-solid fa-vihara" style="color: #d97706; margin-right: 4px;"></i> දායක විහාරස්ථානය / ප්‍රියතම පුණ්‍ය ක්ෂේත්‍රය</label>
+                            <input type="text" id="setOccupationInput" class="form-input" maxlength="60" placeholder="උදා: මිරිසවැටිය / දානමය පින්කම් / භාවනා / ධර්ම දාන / සමාජ සත්කාර...">
                         </div>
 
                         <div class="form-group">
@@ -2358,7 +2395,18 @@
                         </div>
 
                         <div class="form-group">
-                            <label class="form-label">ධර්ම පාඨය / හැඳින්වීම (Dharmic Bio)</label>
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                                <label class="form-label" style="margin: 0;"><i class="fa-solid fa-quote-left" style="color: #d97706; margin-right: 4px;"></i> ධර්ම පාඨය / හැඳින්වීම (Dharmic Bio)</label>
+                                <span style="font-size: 0.7rem; color: #059669; font-weight: 600;">පහසුවෙන් තෝරන්න 👇</span>
+                            </div>
+                            <select id="setQuoteSelect" class="form-select" onchange="handleQuickQuoteSelect(this.value, 'setBioInput')" style="margin-bottom: 8px; font-size: 0.8rem; background: #fffdf8; border: 1.5px solid #fde68a;">
+                                <option value="">-- ප්‍රකට ධර්ම පාඨයකින් තෝරන්න (Quick Select) --</option>
+                                <option value="සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏">🙏 සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා</option>
+                                <option value="ආරෝග්‍යා පරමා ලාභා - සන්තුට්ඨි පරමං ධනං 🪷">🪷 ආරෝග්‍යා පරමා ලාභා - සන්තුට්ඨි පරමං ධනං</option>
+                                <option value="සබ්බදානං ධම්මදානං ජිනාති ✨">✨ සබ්බදානං ධම්මදානං ජිනාති</option>
+                                <option value="නත්ථි සන්ති පරං සුඛං 🌿">🌿 නත්ථි සන්ති පරං සුඛං</option>
+                                <option value="චිත්තං දන්තං සුඛාවහං 🙏">🙏 චිත්තං දන්තං සුඛාවහං</option>
+                            </select>
                             <textarea id="setBioInput" class="form-textarea" rows="2" maxlength="250" placeholder="ඔබ ප්‍රිය කරන ධර්ම පාඨයක් හෝ කුඩා හැඳින්වීමක්..."></textarea>
                         </div>
 
@@ -2818,6 +2866,9 @@
                     <div class="member-info-col">
                         <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                             <h2 class="member-name-text" id="memFullName">කල්‍යාණ මිත්‍ර</h2>
+                            <span class="complete-profile-badge hidden" id="memCompletenessBadge" title="පැතිකඩ 100% සම්පූර්ණයි">
+                                <span>🌟 පූර්ණ කල්‍යාණ මිත්‍ර</span>
+                            </span>
                             <span class="verified-pill" id="memVerifiedBadge">
                                 <i class="fa-solid fa-circle-check"></i>
                                 <span>Google සත්‍යාපිත කල්‍යාණ මිත්‍ර</span>
@@ -2826,7 +2877,7 @@
                         <p class="member-bio-text" id="memBio">"සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏"</p>
                         <div class="member-meta-row" id="memMetaRow">
                             <span id="memMetaOccupation" style="display: none;">
-                                <i class="fa-solid fa-briefcase" style="color: #6366f1;"></i>
+                                <i class="fa-solid fa-vihara" style="color: #d97706;"></i>
                                 <span id="memOccupationText">-</span>
                             </span>
                             <span id="memMetaLocation" style="display: none;">
@@ -3596,6 +3647,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=138"></script>
+    <script type="module" src="js/app.js?v=139"></script>
 </body>
 </html>
