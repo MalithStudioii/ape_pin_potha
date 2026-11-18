@@ -51,12 +51,12 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=136">
+    <link rel="stylesheet" href="css/styles.css?v=137">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
       (function() {
-        var v = 'v136';
+        var v = 'v137';
         if (localStorage.getItem('pinPotha_active_build') !== v) {
           localStorage.setItem('pinPotha_active_build', v);
           try {
@@ -1914,6 +1914,34 @@
                     <span>ගිණුමෙන් ඉවත් වන්න (Sign Out)</span>
                 </button>
                 <div id="authStatusAlert" class="hidden" style="margin-top: 12px; font-size: 0.75rem; padding: 12px; border-radius: 8px; line-height: 1.5;"></div>
+
+                <!-- Trust & Privacy Guarantee Box -->
+                <div id="profileTrustBox" class="auth-trust-box">
+                    <div class="auth-trust-header">
+                        <span class="auth-trust-shield">🛡️</span>
+                        <span class="auth-trust-title">විශ්වාසය සහ පෞද්ගලිකත්ව සහතිකය (Trust & Privacy Guarantee)</span>
+                    </div>
+                    <ul class="auth-trust-list">
+                        <li class="auth-trust-item">
+                            <span class="auth-trust-item-icon">🔒</span>
+                            <div class="auth-trust-item-text">
+                                <strong>100% ආරක්ෂිත පිවිසුම:</strong> Google නිල ආරක්ෂණ පද්ධතිය හරහා ක්‍රියාත්මක වන බැවින් ඔබගේ මුරපද (Passwords) අප සතුව තැන්පත් නොවේ.
+                            </div>
+                        </li>
+                        <li class="auth-trust-item">
+                            <span class="auth-trust-item-icon">👁️</span>
+                            <div class="auth-trust-item-text">
+                                <strong>පෞද්ගලිකත්වය සුරක්ෂිතයි:</strong> ඔබගේ Gmail ලිපිනය හෝ පෞද්ගලික තොරතුරු කිසිදු සාමාජිකයෙකුට ප්‍රසිද්ධියේ නොපෙනේ.
+                            </div>
+                        </li>
+                        <li class="auth-trust-item">
+                            <span class="auth-trust-item-icon">✨</span>
+                            <div class="auth-trust-item-text">
+                                <strong>නිදහස් භාවිතය:</strong> ඔබට කැමති නම් ඔබගේ සැබෑ ඡායාරූපය වෙනුවට ධාර්මික සංකේතයක් (Spiritual Avatar) භාවිතා කළ හැක.
+                            </div>
+                        </li>
+                    </ul>
+                </div>
                 <p style="font-size: 0.68rem; color: #94a3b8; text-align: center; margin-top: 8px;">
                     නම පමණක් ඇතුළත් කර හෝ Google Sign-In මඟින් සත්‍යාපනය වී පින්කම් එක් කළ හැක.
                 </p>
@@ -3009,6 +3037,34 @@
                 <i class="fa-brands fa-google" style="color: #ea4335; font-size: 1.1rem;"></i>
                 <span>Google ගිණුමෙන් Login වන්න</span>
             </button>
+
+            <!-- Trust & Privacy Guarantee Box -->
+            <div class="auth-trust-box">
+                <div class="auth-trust-header">
+                    <span class="auth-trust-shield">🛡️</span>
+                    <span class="auth-trust-title">විශ්වාසය සහ පෞද්ගලිකත්ව සහතිකය (Trust & Privacy Guarantee)</span>
+                </div>
+                <ul class="auth-trust-list">
+                    <li class="auth-trust-item">
+                        <span class="auth-trust-item-icon">🔒</span>
+                        <div class="auth-trust-item-text">
+                            <strong>100% ආරක්ෂිත පිවිසුම:</strong> Google නිල ආරක්ෂණ පද්ධතිය හරහා ක්‍රියාත්මක වන බැවින් ඔබගේ මුරපද (Passwords) අප සතුව තැන්පත් නොවේ.
+                        </div>
+                    </li>
+                    <li class="auth-trust-item">
+                        <span class="auth-trust-item-icon">👁️</span>
+                        <div class="auth-trust-item-text">
+                            <strong>පෞද්ගලිකත්වය සුරක්ෂිතයි:</strong> ඔබගේ Gmail ලිපිනය හෝ පෞද්ගලික තොරතුරු කිසිදු සාමාජිකයෙකුට ප්‍රසිද්ධියේ නොපෙනේ.
+                        </div>
+                    </li>
+                    <li class="auth-trust-item">
+                        <span class="auth-trust-item-icon">✨</span>
+                        <div class="auth-trust-item-text">
+                            <strong>නිදහස් භාවිතය:</strong> ඔබට කැමති නම් ඔබගේ සැබෑ ඡායාරූපය වෙනුවට ධාර්මික සංකේතයක් (Spiritual Avatar) භාවිතා කළ හැක.
+                        </div>
+                    </li>
+                </ul>
+            </div>
             <button type="button" onclick="closeAuthRequiredModal()" style="margin-top: 12px; background: transparent; border: none; color: #94a3b8; font-size: 0.78rem; cursor: pointer; padding: 6px 12px;">
                 පසුව කරන්න (Cancel)
             </button>
@@ -3457,6 +3513,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=136"></script>
+    <script type="module" src="js/app.js?v=137"></script>
 </body>
 </html>

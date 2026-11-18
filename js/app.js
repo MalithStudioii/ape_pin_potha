@@ -7092,12 +7092,15 @@ window.openProfileModal = function() {
   }
 
   // Toggle login vs logout buttons
+  const profileTrustBox = document.getElementById('profileTrustBox');
   if (user.email && !user.isAnonymous) {
     if (googleLoginBtn) googleLoginBtn.classList.add('hidden');
     if (googleLogoutBtn) googleLogoutBtn.classList.remove('hidden');
+    if (profileTrustBox) profileTrustBox.classList.add('hidden');
   } else {
     if (googleLoginBtn) googleLoginBtn.classList.remove('hidden');
     if (googleLogoutBtn) googleLogoutBtn.classList.add('hidden');
+    if (profileTrustBox) profileTrustBox.classList.remove('hidden');
   }
 };
 
@@ -9466,7 +9469,7 @@ function initPWAEngine() {
   const isIos = (typeof window !== 'undefined' && window.navigator && /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase())) && !window.MSStream;
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v131';
+  const ACTIVE_BUILD = 'v137';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
@@ -9483,7 +9486,7 @@ function initPWAEngine() {
   // Register Service Worker safely
   if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
     const registerSW = () => {
-      navigator.serviceWorker.register('./sw.js?v=131', { updateViaCache: 'none' });
+      navigator.serviceWorker.register('./sw.js?v=137', { updateViaCache: 'none' });
     };
     if (document.readyState === 'complete') {
       registerSW();
@@ -9491,7 +9494,7 @@ function initPWAEngine() {
       window.addEventListener('load', registerSW);
     }
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=131', { updateViaCache: 'none' })
+      navigator.serviceWorker.register('./sw.js?v=137', { updateViaCache: 'none' })
         .then((registration) => {
           // Immediately check for service worker updates
           try { registration.update(); } catch (e) {}
