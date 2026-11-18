@@ -26,10 +26,10 @@ export const MASTER_ADMIN_EMAILS = [
 ];
 
 const DEFAULT_POYA_EVENT = {
-  month: 'ඔක්',
-  day: '25',
-  title: 'වප් පුර පසළොස්වක පොහොය',
-  desc: 'කඨින චීවර මාසයේ ආරම්භය'
+  month: 'නොවැ',
+  day: '24',
+  title: 'ඉල් පුර පසළොස්වක පොහොය',
+  desc: 'කඨින චීවර පූජා මහා පින්කම් සමයේ අවසානය'
 };
 
 const DEFAULT_BANNED_WORDS = [
@@ -697,8 +697,7 @@ export const StorageService = {
           lastActiveAt: now
         }).catch(() => {});
       } catch (e) {}
-    }
-  },
+    },
 
   /**
    * Initializes the storage engine (Firestore or Sandbox)
@@ -1878,7 +1877,14 @@ export const StorageService = {
   getPoyaEvent() {
     try {
       const raw = localStorage.getItem('pinKetha_poya_event');
-      return raw ? JSON.parse(raw) : DEFAULT_POYA_EVENT;
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.month === 'ඔක්' && (parsed.day === '25' || parsed.title?.includes('වප්'))) {
+          return DEFAULT_POYA_EVENT;
+        }
+        return parsed;
+      }
+      return DEFAULT_POYA_EVENT;
     } catch {
       return DEFAULT_POYA_EVENT;
     }

@@ -51,7 +51,7 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=139">
+    <link rel="stylesheet" href="css/styles.css?v=140">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
@@ -200,10 +200,8 @@
                 </button>
 
                 <button onclick="switchTab('profile')" id="userProfileBtn" class="user-profile-btn" title="මගේ ප්‍රොෆයිලය බලන්න">
-                    <div class="user-avatar-circle" id="navAvatar">
-                        <img src="https://i.ibb.co/k6wJFJnH/avatar-1792084050862.webp" alt="මලිත්" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover; display: block;" onerror="this.parentElement.innerText='ම';">
-                    </div>
-                    <span id="userNameDisplay">මලිත් දුෂාන්ත</span>
+                    <div class="user-avatar-circle" id="navAvatar">ක</div>
+                    <span id="userNameDisplay">ගිණුමට පිවිසෙන්න</span>
                 </button>
 
                 <!-- Mobile 3-Lines Hamburger Menu Button (To the right of profile) -->
@@ -234,25 +232,23 @@
             <!-- User Mini Profile Card -->
             <div class="card">
                 <div class="profile-card-cover" onclick="switchTab('profile')" style="cursor: pointer;">
-                    <div class="profile-card-avatar" id="sideAvatar">
-                        <img src="https://i.ibb.co/k6wJFJnH/avatar-1792084050862.webp" alt="මලිත්" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover; display: block;" onerror="this.parentElement.innerText='ම';">
-                    </div>
+                    <div class="profile-card-avatar" id="sideAvatar">ක</div>
                 </div>
                 <div class="profile-card-body">
                     <div class="profile-name" onclick="switchTab('profile')" style="cursor: pointer;">
-                        <span id="sideUserName">මලිත් දුෂාන්ත</span>
-                        <span id="sideUserRoleBadge"><span class="badge-crown" style="font-size: 0.85rem;" title="කල්‍යාණ මිත්‍ර">👑</span></span>
+                        <span id="sideUserName">කල්යාණ මිත්ර අමුත්තෙක්</span>
+                        <span id="sideUserRoleBadge"></span>
                     </div>
                     <p class="profile-role" id="sideUserBio">කල්‍යාණ මිත්‍ර සාමාජික</p>
 
                     <!-- Personal Stats -->
                     <div class="stats-grid">
                         <div class="stat-box merits">
-                            <span class="stat-number amber" id="statMyPosts">17</span>
+                            <span class="stat-number amber" id="statMyPosts">0</span>
                             <span class="stat-label">මගේ පින්කම්</span>
                         </div>
                         <div class="stat-box sadhu">
-                            <span class="stat-number green" id="statMySadhu">146</span>
+                            <span class="stat-number green" id="statMySadhu">0</span>
                             <span class="stat-label">ලැබුණු සාදුකාර</span>
                         </div>
                     </div>
@@ -320,9 +316,7 @@
             <!-- "Create Post" Composer Box -->
             <div class="card composer-card">
                 <div class="composer-top">
-                    <div class="user-avatar-circle" id="composerAvatar" style="width: 38px; height: 38px; font-size: 0.95rem;">
-                        <img src="https://i.ibb.co/k6wJFJnH/avatar-1792084050862.webp" alt="මලිත්" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover; display: block;" onerror="this.parentElement.innerText='ම';">
-                    </div>
+                    <div class="user-avatar-circle" id="composerAvatar" style="width: 38px; height: 38px; font-size: 0.95rem;">ක</div>
                     <button onclick="openModal('merit')" class="composer-input-btn">
                         අද ඔබ සිදුකළ පින්කම කුමක්ද? සටහන් කරන්න...
                     </button>
@@ -534,12 +528,12 @@
                 </div>
                 <div style="display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 12px; background: #fffbeb; border: 1px solid #fef3c7;">
                     <div style="background: #d97706; color: #fff; font-weight: 800; padding: 4px 10px; border-radius: 8px; text-align: center; line-height: 1.1;">
-                        <span id="poyaMonthBadge" style="font-size: 0.65rem; display: block;">ඔක්</span>
-                        <span id="poyaDayBadge" style="font-size: 0.95rem;">25</span>
+                        <span id="poyaMonthBadge" style="font-size: 0.65rem; display: block;">නොවැ</span>
+                        <span id="poyaDayBadge" style="font-size: 0.95rem;">24</span>
                     </div>
                     <div>
-                        <h4 id="poyaEventTitle" style="font-size: 0.78rem; font-weight: 700; color: #1e293b;">වප් පුර පසළොස්වක පොහොය</h4>
-                        <p id="poyaEventDesc" style="font-size: 0.68rem; color: #64748b;">කඨින චීවර මාසයේ ආරම්භය</p>
+                        <h4 id="poyaEventTitle" style="font-size: 0.78rem; font-weight: 700; color: #1e293b;">ඉල් පුර පසළොස්වක පොහොය</h4>
+                        <p id="poyaEventDesc" style="font-size: 0.68rem; color: #64748b;">කඨින චීවර පූජා මහා පින්කම් සමයේ අවසානය</p>
                     </div>
                 </div>
             </div>
@@ -572,7 +566,7 @@
 
                 <div class="profile-identity-info">
                     <div class="profile-title-row">
-                        <h1 class="profile-full-name" id="profFullName">මලිත් දුෂාන්ත හපුතන්ත්‍රි</h1>
+                        <h1 class="profile-full-name" id="profFullName">කල්යාණ මිත්ර අමුත්තෙක්</h1>
                         <button type="button" class="btn-inline-name-edit" onclick="openInlineNameEditModal()" title="නම සංස්කරණය කරන්න (Edit Name)" aria-label="නම සංස්කරණය කරන්න">
                             <i class="fa-solid fa-pen"></i>
                         </button>
@@ -599,7 +593,7 @@
                         <span id="profMetaEmail" class="profile-meta-email-trust" title="ඔබගේ Gmail ලිපිනය රහස්‍යව සහ සුරක්ෂිතව පවතී (Private & Encrypted)">
                             <i class="fa-solid fa-lock" style="color: #059669; font-size: 0.82rem;" title="පුද්ගලික සහ සුරක්ෂිතයි"></i>
                             <i class="fa-solid fa-envelope" style="color: #2563eb;"></i>
-                            <span id="profEmailText">supportnexiapro@gmail.com</span>
+                            <span id="profEmailText">ගිණුමට පිවිසෙන්න</span>
                             <span class="trust-badge-pill"><i class="fa-solid fa-shield-halved"></i> පුද්ගලිකයි</span>
                         </span>
                         <span>
@@ -1914,8 +1908,8 @@
             </div>
 
             <div style="text-align: center; padding: 10px 0 16px 0;">
-                <div class="user-avatar-circle" id="modalUserAvatar" style="width: 60px; height: 60px; font-size: 1.6rem; margin: 0 auto 10px auto;">ම</div>
-                <h4 style="font-size: 1rem; font-weight: 700; color: #1e293b;" id="modalUserDisplay">මලිත්</h4>
+                <div class="user-avatar-circle" id="modalUserAvatar" style="width: 60px; height: 60px; font-size: 1.6rem; margin: 0 auto 10px auto;">ක</div>
+                <h4 style="font-size: 1rem; font-weight: 700; color: #1e293b;" id="modalUserDisplay">කල්‍යාණ මිත්‍ර</h4>
                 <span style="font-size: 0.72rem; color: #64748b;" id="modalUserStatus">කල්‍යාණ මිත්‍ර පුණ්‍ය සාමාජික</span>
             </div>
 
@@ -3519,9 +3513,9 @@
         <!-- Drawer Header -->
         <div class="mobile-drawer-header">
             <div class="drawer-user-info" onclick="closeMobileMenuDrawer(); switchTab('profile');">
-                <div class="drawer-avatar-circle" id="drawerNavAvatar">ම</div>
+                <div class="drawer-avatar-circle" id="drawerNavAvatar">ක</div>
                 <div class="drawer-user-meta">
-                    <div class="drawer-user-name" id="drawerUserName">මලිත්</div>
+                    <div class="drawer-user-name" id="drawerUserName">කල්‍යාණ මිත්‍ර</div>
                     <span class="drawer-user-status" id="drawerUserStatus">සාමාජික</span>
                 </div>
             </div>
@@ -3647,6 +3641,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=139"></script>
+    <script type="module" src="js/app.js?v=140"></script>
 </body>
 </html>
