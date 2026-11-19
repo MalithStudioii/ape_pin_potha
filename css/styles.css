@@ -3429,11 +3429,14 @@ body {
 
 .settings-tabs-bar {
   display: flex;
-  gap: 4px;
+  gap: 6px;
   background: #fdfaf2;
-  border-bottom: 1px solid #fde68a;
-  padding: 0 16px;
+  border-bottom: 1.5px solid #fde68a;
+  padding: 6px 16px;
+  min-height: 48px;
+  align-items: center;
   overflow-x: auto;
+  flex-shrink: 0;
   scrollbar-width: none;
   -ms-overflow-style: none;
   -webkit-overflow-scrolling: touch;
@@ -3449,17 +3452,21 @@ body {
   position: relative;
   background: transparent;
   border: none;
-  padding: 11px 14px;
-  font-size: 0.78rem;
+  padding: 8px 14px;
+  min-height: 38px;
+  font-size: 0.82rem;
+  line-height: 1.5;
   font-weight: 600;
   color: #78350f;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   white-space: nowrap;
   transition: all 0.2s ease;
   flex-shrink: 0;
+  border-radius: 8px;
 }
 
 .settings-tab-btn:hover {

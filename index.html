@@ -256,7 +256,7 @@
                     <button type="button" id="sideViewProfileBtn" onclick="openProfileModal()" class="category-item" style="margin-top: 14px; background: linear-gradient(135deg, #fef3c7, #fde68a); border: 1.5px solid #f59e0b; justify-content: center; font-weight: 800; color: #78350f; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25); transition: all 0.2s ease;" title="ගිණුමට පිවිසෙන්න">
                         <i class="fa-solid fa-right-to-bracket" style="color: #b45309; margin-right: 6px;"></i> ගිණුමට පිවිසෙන්න
                     </button>
-                    <button onclick="switchTab('policies')" class="category-item" style="margin-top: 6px; background: #fffdf8; border: 1px solid #fde68a; justify-content: center; font-weight: 700; color: #92400e; font-size: 0.76rem;">
+                    <button onclick="openPoliciesModal('about')" class="category-item" style="margin-top: 6px; background: #fffdf8; border: 1px solid #fde68a; justify-content: center; font-weight: 700; color: #92400e; font-size: 0.76rem;" title="ප්‍රතිපත්ති සහ පිං පොත">
                         <i class="fa-solid fa-shield-halved" style="color: #d97706; margin-right: 6px;"></i> ප්‍රතිපත්ති සහ පිං පොත
                     </button>
                 </div>
@@ -302,9 +302,9 @@
 
             <!-- Privacy & Terms Footer Links in Sidebar -->
             <div style="padding: 10px 14px; text-align: center; font-size: 0.72rem; color: #94a3b8; line-height: 1.6;">
-                <a href="javascript:void(0)" onclick="switchTab('policies', true, 'privacy')" style="color: #78350f; text-decoration: none; font-weight: 600;">රහස්‍යතා ප්‍රතිපත්තිය</a> • 
-                <a href="javascript:void(0)" onclick="switchTab('policies', true, 'terms')" style="color: #78350f; text-decoration: none; font-weight: 600;">භාවිත කොන්දේසි</a> • 
-                <a href="javascript:void(0)" onclick="switchTab('policies', true, 'about')" style="color: #78350f; text-decoration: none; font-weight: 600;">පිං පොත ගැන</a>
+                <a href="javascript:void(0)" onclick="openPoliciesModal('privacy')" style="color: #78350f; text-decoration: none; font-weight: 600;">රහස්‍යතා ප්‍රතිපත්තිය</a> • 
+                <a href="javascript:void(0)" onclick="openPoliciesModal('terms')" style="color: #78350f; text-decoration: none; font-weight: 600;">භාවිත කොන්දේසි</a> • 
+                <a href="javascript:void(0)" onclick="openPoliciesModal('about')" style="color: #78350f; text-decoration: none; font-weight: 600;">පිං පොත ගැන</a>
                 <div style="margin-top: 5px; font-size: 0.68rem; color: #64748b;">© 2026 පිං පොත • A Digital Initiative by <strong style="color: #0284c7; font-weight: 700;">NexiaProLanka</strong></div>
             </div>
 
@@ -613,9 +613,9 @@
                         <i class="fa-solid fa-plus"></i>
                         <span>පින්කමක්</span>
                     </button>
-                    <button onclick="openSettingsModal('profile')" class="btn-profile-secondary">
+                    <button onclick="openSettingsModal('profile')" class="btn-profile-secondary" title="පැතිකඩ සහ පද්ධති සැකසුම්">
                         <i class="fa-solid fa-gear"></i>
-                        <span>සැකසුම් සහ විස්තර</span>
+                        <span>සැකසුම්</span>
                     </button>
                     <button id="profAuthActionBtn" onclick="handleProfileAuthAction()" class="btn-profile-danger" title="ගිණුමෙන් ඉවත් වන්න">
                         <i class="fa-solid fa-right-from-bracket"></i>
@@ -2312,20 +2312,20 @@
     <!-- ========================================================================= -->
     <!-- Settings & Policies Modal Dialog                                         -->
     <!-- ========================================================================= -->
-    <div id="settingsModal" class="modal-overlay hidden">
+    <div id="settingsModal" class="modal-overlay hidden" onclick="if(event.target === this) closeSettingsModal()">
         <div class="modal-box settings-modal-box">
             <div class="modal-header">
-                <h3 class="modal-title">
-                    <i class="fa-solid fa-gear" style="color: #d97706;"></i>
-                    පද්ධති සැකසුම් සහ ප්‍රතිපත්ති
+                <h3 class="modal-title" id="settingsModalTitle">
+                    <i class="fa-solid fa-gear" id="settingsModalTitleIcon" style="color: #d97706;"></i>
+                    <span id="settingsModalTitleText">පැතිකඩ සහ පද්ධති සැකසුම්</span>
                 </h3>
-                <button onclick="closeSettingsModal()" class="modal-close-btn">
+                <button onclick="closeSettingsModal()" class="modal-close-btn" title="වසන්න">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
 
             <!-- Settings Tabs Bar -->
-            <div class="settings-tabs-bar">
+            <div class="settings-tabs-bar" id="settingsTabsBar">
                 <button type="button" class="settings-tab-btn active" id="set-tab-profile" onclick="switchSettingsTab('profile')">
                     <i class="fa-solid fa-user-pen"></i>
                     <span>ප්‍රොෆයිල් තොරතුරු</span>
@@ -3633,13 +3633,13 @@
                     </button>
 
                     <!-- Settings & Policies -->
-                    <button type="button" class="drawer-list-btn" onclick="closeMobileMenuDrawer(); switchTab('policies');">
+                    <button type="button" class="drawer-list-btn" onclick="closeMobileMenuDrawer(); openPoliciesModal('about');">
                         <div class="drawer-btn-icon" style="background: rgba(217, 119, 6, 0.12); color: #d97706;">
                             <i class="fa-solid fa-shield-halved"></i>
                         </div>
                         <div class="drawer-btn-text">
                             <span class="drawer-btn-title">ප්‍රතිපත්ති සහ පිං පොත</span>
-                            <span class="drawer-btn-sub">රහස්‍යතාව, භාවිත කොන්දේසි & අපේ අරමුණ</span>
+                            <span class="drawer-btn-sub">රහස්‍යතාව, භාවිත කොන්දේසි සහ අපේ අරමුණ</span>
                         </div>
                         <i class="fa-solid fa-chevron-right drawer-chevron-mini"></i>
                     </button>
@@ -3669,6 +3669,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=153"></script>
+    <script type="module" src="js/app.js?v=154"></script>
 </body>
 </html>

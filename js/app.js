@@ -9146,54 +9146,109 @@ window.removeKalyanaMithra = window.handleRemoveMithra;
 // Settings & Policy System Controller
 // ============================================================================
 
-window.openSettingsModal = function(initialTab = 'profile') {
+window.openSettingsModal = function(initialTab = 'profile', mode = null) {
   try {
     history.pushState({ type: 'modal', id: 'settingsModal' }, '');
   } catch (e) {}
   const modal = document.getElementById('settingsModal');
-  const user = StorageService.currentUser;
   if (!modal) return;
 
-  // Pre-fill profile settings fields
-  const firstInput = document.getElementById('setFirstNameInput');
-  const lastInput = document.getElementById('setLastNameInput');
-  const occInput = document.getElementById('setOccupationInput');
-  const bioInput = document.getElementById('setBioInput');
+  const isPolicyMode = mode === 'policies' || (mode === null && (initialTab === 'privacy' || initialTab === 'terms' || initialTab === 'about'));
+  const targetMode = isPolicyMode ? 'policies' : 'settings';
 
-  if (firstInput) firstInput.value = user.firstName || '';
-  if (lastInput) lastInput.value = user.lastName || '';
-  if (occInput) occInput.value = user.occupation || '';
-  if (bioInput) bioInput.value = user.bio || '';
+  const modalTitleIcon = document.getElementById('settingsModalTitleIcon');
+  const modalTitleText = document.getElementById('settingsModalTitleText');
+  const tabsBar = document.getElementById('settingsTabsBar') || document.querySelector('.settings-tabs-bar');
+  const profTabBtn = document.getElementById('set-tab-profile');
+  const adminTabBtn = document.getElementById('set-tab-admin');
 
-  // Pre-fill Province and District dropdowns
-  const { district: setDist, province: setProv, city: setCity } = resolveUserLocationFields(user);
-  const setProvSelect = document.getElementById('setProvinceSelect');
-  const setCityInp = document.getElementById('setCityInput');
-  if (setProvSelect) setProvSelect.value = setProv;
-  populateDistrictSelect('set', setDist, setProv);
-  if (setCityInp) setCityInp.value = setCity;
-
-  // Initialize Privacy Alias Toggle & Spiritual Avatar Picker in Settings
-  const setAliasToggle = document.getElementById('setUseAliasToggle');
-  if (setAliasToggle) {
-    setAliasToggle.checked = Boolean(user && (user.isAnonymous || user.useAlias));
-  }
-  const setPhotoInp = document.getElementById('setProfPhotoInput');
-  if (setPhotoInp) setPhotoInp.value = user.photo || '';
-  const setPhotoPreview = document.getElementById('setPhotoPreview');
-  if (setPhotoPreview) {
-    if (user.photo) {
-      setPhotoPreview.innerHTML = `<img src="${user.photo}" alt="${user.name}" style="width: 100%; height: 100%; object-fit: cover;">`;
-    } else {
-      setPhotoPreview.innerText = (user.name || 'අ').trim().charAt(0);
+  if (targetMode === 'settings') {
+    // 1. Settings Only Mode (Profile Page)
+    if (modalTitleIcon) {
+      modalTitleIcon.className = 'fa-solid fa-gear';
+      modalTitleIcon.style.color = '#d97706';
     }
-  }
-  if (typeof renderSpiritualAvatarPicker === 'function') {
-    renderSpiritualAvatarPicker('setSpiritualAvatarsGrid', 'set', user.photo || '');
+    if (modalTitleText) {
+      modalTitleText.textContent = 'පැතිකඩ සහ පද්ධති සැකසුම්';
+    }
+    // Completely hide tab bar
+    if (tabsBar) {
+      tabsBar.style.display = 'none';
+    }
+    if (profTabBtn) profTabBtn.style.display = 'none';
+    if (adminTabBtn) adminTabBtn.style.display = 'none';
+
+    // Pre-fill profile settings fields
+    const user = StorageService.currentUser || {};
+    const firstInput = document.getElementById('setFirstNameInput');
+    const lastInput = document.getElementById('setLastNameInput');
+    const occInput = document.getElementById('setOccupationInput');
+    const bioInput = document.getElementById('setBioInput');
+
+    if (firstInput) firstInput.value = user.firstName || '';
+    if (lastInput) lastInput.value = user.lastName || '';
+    if (occInput) occInput.value = user.occupation || '';
+    if (bioInput) bioInput.value = user.bio || '';
+
+    // Pre-fill Province and District dropdowns
+    const { district: setDist, province: setProv, city: setCity } = resolveUserLocationFields(user);
+    const setProvSelect = document.getElementById('setProvinceSelect');
+    const setCityInp = document.getElementById('setCityInput');
+    if (setProvSelect) setProvSelect.value = setProv;
+    populateDistrictSelect('set', setDist, setProv);
+    if (setCityInp) setCityInp.value = setCity;
+
+    // Initialize Privacy Alias Toggle & Spiritual Avatar Picker in Settings
+    const setAliasToggle = document.getElementById('setUseAliasToggle');
+    if (setAliasToggle) {
+      setAliasToggle.checked = Boolean(user && (user.isAnonymous || user.useAlias));
+    }
+    const setPhotoInp = document.getElementById('setProfPhotoInput');
+    if (setPhotoInp) setPhotoInp.value = user.photo || '';
+    const setPhotoPreview = document.getElementById('setPhotoPreview');
+    if (setPhotoPreview) {
+      if (user.photo) {
+        setPhotoPreview.innerHTML = `<img src="${user.photo}" alt="${user.name}" style="width: 100%; height: 100%; object-fit: cover;">`;
+      } else {
+        setPhotoPreview.innerText = (user.name || 'අ').trim().charAt(0);
+      }
+    }
+    if (typeof renderSpiritualAvatarPicker === 'function') {
+      renderSpiritualAvatarPicker('setSpiritualAvatarsGrid', 'set', user.photo || '');
+    }
+
+    // Switch to profile content panel
+    switchSettingsTab('profile', 'settings');
+  } else {
+    // 2. Policies Only Mode (Side Menu / Footer Links)
+    if (modalTitleIcon) {
+      modalTitleIcon.className = 'fa-solid fa-shield-halved';
+      modalTitleIcon.style.color = '#059669';
+    }
+    if (modalTitleText) {
+      modalTitleText.textContent = 'ප්‍රතිපත්ති සහ පිං පොත';
+    }
+    // Show tab bar with only policy tabs
+    if (tabsBar) {
+      tabsBar.style.display = 'flex';
+    }
+    if (profTabBtn) profTabBtn.style.display = 'none';
+    if (adminTabBtn) adminTabBtn.style.display = 'none';
+
+    ['privacy', 'terms', 'about'].forEach(t => {
+      const btn = document.getElementById(`set-tab-${t}`);
+      if (btn) btn.style.display = 'inline-flex';
+    });
+
+    const activePolicyTab = (initialTab && ['privacy', 'terms', 'about'].includes(initialTab)) ? initialTab : 'privacy';
+    switchSettingsTab(activePolicyTab, 'policies');
   }
 
-  switchSettingsTab(initialTab);
   modal.classList.remove('hidden');
+};
+
+window.openPoliciesModal = function(initialTab = 'privacy') {
+  window.openSettingsModal(initialTab, 'policies');
 };
 
 window.closeSettingsModal = function() {
@@ -9201,7 +9256,7 @@ window.closeSettingsModal = function() {
   if (modal) modal.classList.add('hidden');
 };
 
-window.switchSettingsTab = function(tabName) {
+window.switchSettingsTab = function(tabName, mode = null) {
   ['profile', 'privacy', 'terms', 'about', 'admin'].forEach(t => {
     const btn = document.getElementById(`set-tab-${t}`);
     const panel = document.getElementById(`settingsContent${t.charAt(0).toUpperCase() + t.slice(1)}`);
