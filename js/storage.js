@@ -7,7 +7,7 @@
 import { firebaseConfig, isFirebaseConfigured, COLLECTIONS } from './firebase-config.js?v=139';
 import { Security } from './security.js?v=139';
 import { INITIAL_ARANYA_LIST, SRI_LANKA_DISTRICTS } from './aranya-data.js';
-import { SEED_POSTS } from './initial-seed.js?v=142';
+import { SEED_POSTS } from './initial-seed.js?v=143';
 
 let db = null;
 let auth = null;
@@ -822,6 +822,9 @@ export const StorageService = {
 
           if (typeof window !== 'undefined') {
             window.isStrictMasterAdmin = isStrictAdmin;
+            if (typeof window.updateUserInfoUI === 'function') {
+              try { window.updateUserInfoUI(); } catch (e) {}
+            }
             const crownBtn = document.getElementById('headerAdminCrownBtn');
             if (crownBtn) {
               if (isStrictAdmin) {

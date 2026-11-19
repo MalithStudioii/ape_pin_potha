@@ -4,12 +4,12 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=142';
-import { Security } from './security.js?v=142';
+import { StorageService } from './storage.js?v=143';
+import { Security } from './security.js?v=143';
 import { uploadToImgBB } from './imgbb-service.js?v=66';
 import { SoundService, triggerHaptic } from './sound.js?v=66';
-import { FeedAlgorithm } from './algorithm.js?v=142';
-import { SPIRITUAL_AVATARS, renderSpiritualAvatarPicker, selectSpiritualAvatar } from './spiritual-avatars.js?v=142';
+import { FeedAlgorithm } from './algorithm.js?v=143';
+import { SPIRITUAL_AVATARS, renderSpiritualAvatarPicker, selectSpiritualAvatar } from './spiritual-avatars.js?v=143';
 let allCommunityMembersCache = [];
 let infiniteScrollObserver = null;
 let isTriggeringLoadMore = false;
@@ -521,7 +521,9 @@ function updateCloudBanner(isConnected) {
   }
 }
 
-function updateUserInfoUI() {
+export function updateUserInfoUI() {
+  // Exposed globally
+  window.updateUserInfoUI = updateUserInfoUI;
   try {
     const user = StorageService.currentUser || {};
     const isMalith = Boolean(user && (
@@ -544,8 +546,71 @@ function updateUserInfoUI() {
     const composerAvatarEl = document.getElementById('composerAvatar');
     const crownBtn = document.getElementById('headerAdminCrownBtn');
 
-    if (displayEl) displayEl.innerText = activeName;
-    if (sideNameEl) sideNameEl.innerText = activeName;
+    const isGuest = !user || !user.email || user.isAnonymous === true;
+    const userProfileBtn = document.getElementById('userProfileBtn');
+    const sideViewProfileBtn = document.getElementById('sideViewProfileBtn');
+
+    if (isGuest) {
+      // 1. Top Navbar Button for Guest (Open Sign-In Modal)
+      if (userProfileBtn) {
+        userProfileBtn.onclick = () => {
+          if (typeof triggerHaptic === 'function') triggerHaptic(15);
+          if (typeof SoundService !== 'undefined' && SoundService.playClick) SoundService.playClick();
+          openProfileModal();
+        };
+        userProfileBtn.title = "ගිණුමට පිවිසෙන්න (Sign In)";
+      }
+      if (displayEl) {
+        displayEl.innerText = "ගිණුමට පිවිසෙන්න";
+      }
+      if (navAvatarEl) {
+        navAvatarEl.innerHTML = '<i class="fa-solid fa-right-to-bracket" style="font-size: 0.88rem; color: #d97706;"></i>';
+      }
+
+      // 2. Left Sidebar Button for Guest (Gold/Amber Highlight & Open Sign-In Modal)
+      if (sideViewProfileBtn) {
+        sideViewProfileBtn.onclick = () => {
+          if (typeof triggerHaptic === 'function') triggerHaptic(15);
+          if (typeof SoundService !== 'undefined' && SoundService.playClick) SoundService.playClick();
+          openProfileModal();
+        };
+        sideViewProfileBtn.title = "ගිණුමට පිවිසෙන්න (Sign In)";
+        sideViewProfileBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket" style="color: #b45309; margin-right: 6px;"></i> ගිණුමට පිවිසෙන්න';
+        sideViewProfileBtn.style.background = 'linear-gradient(135deg, #fef3c7, #fde68a)';
+        sideViewProfileBtn.style.border = '1.5px solid #f59e0b';
+        sideViewProfileBtn.style.color = '#78350f';
+        sideViewProfileBtn.style.fontWeight = '800';
+        sideViewProfileBtn.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.25)';
+      }
+      if (sideNameEl) {
+        sideNameEl.innerText = "කල්‍යාණ මිත්‍ර අමුත්තෙක්";
+      }
+    } else {
+      // 1. Top Navbar Button for Logged-In User (Revert to User Profile View)
+      if (userProfileBtn) {
+        userProfileBtn.onclick = () => switchTab('profile');
+        userProfileBtn.title = "මගේ ප්‍රොෆයිලය බලන්න";
+      }
+      if (displayEl) {
+        displayEl.innerText = activeName;
+      }
+      applyAvatar(navAvatarEl);
+
+      // 2. Left Sidebar Button for Logged-In User (Revert to Standard Profile View button)
+      if (sideViewProfileBtn) {
+        sideViewProfileBtn.onclick = () => switchTab('profile');
+        sideViewProfileBtn.title = "මගේ ප්‍රොෆයිලය බලන්න";
+        sideViewProfileBtn.innerHTML = '<i class="fa-solid fa-circle-user" style="color: #d97706; margin-right: 6px;"></i> මගේ ප්‍රොෆයිලය බලන්න';
+        sideViewProfileBtn.style.background = '#fffbeb';
+        sideViewProfileBtn.style.border = '1px solid #fef3c7';
+        sideViewProfileBtn.style.color = '#b45309';
+        sideViewProfileBtn.style.fontWeight = '700';
+        sideViewProfileBtn.style.boxShadow = 'none';
+      }
+      if (sideNameEl) {
+        sideNameEl.innerText = activeName;
+      }
+    }
 
     // Discreet Badge (Crown / Shield) next to Left Sidebar Name (No role text displayed)
     const sideBadgeEl = document.getElementById('sideUserRoleBadge');
@@ -622,7 +687,7 @@ function updateUserInfoUI() {
       }
     };
 
-    applyAvatar(navAvatarEl);
+    if (!isGuest) applyAvatar(navAvatarEl);
     applyAvatar(sideAvatarEl);
     applyAvatar(composerAvatarEl);
 
