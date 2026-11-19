@@ -19,9 +19,9 @@ let verseListeners = [];
 let poyaListeners = [];
 let bannedWordsListeners = [];
 
-export const MASTER_ADMIN_EMAIL = "supportnexiapro@gmail.com";
+export const MASTER_ADMIN_EMAIL = "silvadilan9@gmail.com";
 export const MASTER_ADMIN_EMAILS = [
-  "supportnexiapro@gmail.com"
+  "silvadilan9@gmail.com"
 ];
 
 const DEFAULT_POYA_EVENT = {
@@ -288,7 +288,7 @@ export const StorageService = {
     isMasterAdmin(userOrEmailOrUid) {
     const isMasterEmail = (email) => {
       if (!email || typeof email !== 'string') return false;
-      return email.trim().toLowerCase() === 'supportnexiapro@gmail.com';
+      return email.trim().toLowerCase() === 'silvadilan9@gmail.com';
     };
 
     if (!userOrEmailOrUid) {
@@ -765,11 +765,12 @@ export const StorageService = {
             this.notifyNotificationListeners();
           }
 
-          // Strict Master Admin check: Only supportnexiapro@gmail.com
+          // Strict Master Admin check: silvadilan9@gmail.com or role === 'admin'
           const isStrictAdmin = Boolean(
-            user &&
-            user.email &&
-            user.email.trim().toLowerCase() === 'supportnexiapro@gmail.com'
+            user && (
+              (user.email && user.email.trim().toLowerCase() === 'silvadilan9@gmail.com') ||
+              (this.currentUser && (this.currentUser.role === 'admin' || this.currentUser.role === 'master_admin'))
+            )
           );
 
           if (typeof window !== 'undefined') {
@@ -791,7 +792,7 @@ export const StorageService = {
             adminOptions.forEach(el => {
               if (isStrictAdmin) {
                 el.classList.remove('hidden');
-                el.style.display = '';
+                el.style.display = el.tagName === 'BUTTON' ? 'inline-flex' : 'block';
               } else {
                 el.classList.add('hidden');
                 el.style.display = 'none';

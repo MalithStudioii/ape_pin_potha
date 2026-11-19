@@ -526,11 +526,16 @@ export function updateUserInfoUI() {
   try {
     const user = StorageService.currentUser;
     const isGuest = !user || !user.email || user.isAnonymous === true;
-    const isMaster = Boolean(!isGuest && user && StorageService.isMasterAdmin(user));
+    const isMaster = Boolean(!isGuest && user && (
+      StorageService.isMasterAdmin(user) ||
+      (user.email && user.email.trim().toLowerCase() === 'silvadilan9@gmail.com') ||
+      user.role === 'admin' ||
+      user.role === 'master_admin'
+    ));
     const isSub = Boolean(!isGuest && !isMaster && user && StorageService.isSubAdmin(user));
     const isAdminUser = isMaster || isSub;
-    const activeName = isGuest ? "කල්‍යාණ මිත්‍ර අමුත්තෙක්" : (user.name || "කල්‍යාණ මිත්‍ර සාමාජික");
-    const activePhoto = isGuest ? null : (user.photo || null);
+    const activeName = isGuest ? "කල්‍යාණ මිත්‍ර අමුත්තෙක්" : (user.name || user.displayName || "කල්‍යාණ මිත්‍ර සාමාජික");
+    const activePhoto = isGuest ? null : (user.photo || user.photoURL || null);
     const firstLetter = (activeName || "අ").trim().charAt(0);
 
     const displayEl = document.getElementById('userNameDisplay');
@@ -539,9 +544,18 @@ export function updateUserInfoUI() {
     const sideAvatarEl = document.getElementById('sideAvatar');
     const composerAvatarEl = document.getElementById('composerAvatar');
     const crownBtn = document.getElementById('headerAdminCrownBtn');
-
     const userProfileBtn = document.getElementById('userProfileBtn');
     const sideViewProfileBtn = document.getElementById('sideViewProfileBtn');
+
+    // Safe Avatar Renderer: supports photoURL, Spiritual Avatar SVG dataUrl, or initial letter
+    const applyAvatar = (el) => {
+      if (!el) return;
+      if (activePhoto) {
+        el.innerHTML = `<img src="${activePhoto}" alt="${activeName}" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover; display: block;" onerror="this.parentElement.innerText='${firstLetter}';">`;
+      } else {
+        el.innerText = firstLetter;
+      }
+    };
 
     if (isGuest) {
       // 1. Top Navbar Button for Guest (Open Sign-In Modal)
@@ -578,6 +592,12 @@ export function updateUserInfoUI() {
       if (sideNameEl) {
         sideNameEl.innerText = "කල්‍යාණ මිත්‍ර අමුත්තෙක්";
       }
+      if (sideAvatarEl) {
+        sideAvatarEl.innerText = "ක";
+      }
+      if (composerAvatarEl) {
+        composerAvatarEl.innerText = "ක";
+      }
     } else {
       // 1. Top Navbar Button for Logged-In User (Revert to User Profile View)
       if (userProfileBtn) {
@@ -603,6 +623,8 @@ export function updateUserInfoUI() {
       if (sideNameEl) {
         sideNameEl.innerText = activeName;
       }
+      applyAvatar(sideAvatarEl);
+      applyAvatar(composerAvatarEl);
     }
 
     // Discreet Badge (Crown / Shield) next to Left Sidebar Name (No role text displayed)
@@ -617,10 +639,15 @@ export function updateUserInfoUI() {
       }
     }
 
-    // Toggle Header Crown Button: Only strictly for supportnexiapro@gmail.com
+    // Toggle Header Crown Button: Only strictly for silvadilan9@gmail.com or role === 'admin'
     const isStrictMasterAdmin = Boolean(
-      (user && user.email && user.email.trim().toLowerCase() === 'supportnexiapro@gmail.com') ||
-      (typeof window !== 'undefined' && window.isStrictMasterAdmin === true)
+      !isGuest &&
+      user && (
+        (user.email && user.email.trim().toLowerCase() === 'silvadilan9@gmail.com') ||
+        user.role === 'admin' ||
+        user.role === 'master_admin' ||
+        (typeof window !== 'undefined' && window.isStrictMasterAdmin === true)
+      )
     );
 
     if (crownBtn) {
@@ -642,7 +669,7 @@ export function updateUserInfoUI() {
     adminOptions.forEach(el => {
       if (isStrictMasterAdmin) {
         el.classList.remove('hidden');
-        el.style.display = '';
+        el.style.display = el.tagName === 'BUTTON' ? 'inline-flex' : 'block';
       } else {
         el.classList.add('hidden');
         el.style.display = 'none';
@@ -671,45 +698,36 @@ export function updateUserInfoUI() {
       }
     }
 
-    const applyAvatar = (el) => {
-      if (!el) return;
-      if (activePhoto) {
-        el.innerHTML = `<img src="${activePhoto}" alt="${activeName}" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover; display: block;" onerror="this.parentElement.innerText='${firstLetter}';">`;
-      } else {
-        el.innerText = firstLetter;
-      }
-    };
-
-    if (!isGuest) applyAvatar(navAvatarEl);
-    applyAvatar(sideAvatarEl);
-    applyAvatar(composerAvatarEl);
-
     // Sync Left Sidebar User Role Bio
     const sideBioEl = document.getElementById('sideUserBio');
     if (sideBioEl) {
-      if (user.role === 'monk' || user.isMonk) sideBioEl.textContent = 'පූජනීය මහා සංඝරත්නය';
-      else sideBioEl.textContent = user.bio || 'කල්‍යාණ මිත්‍ර සාමාජික';
+      if (user?.role === 'monk' || user?.isMonk) sideBioEl.textContent = 'පූජනීය මහා සංඝරත්නය';
+      else sideBioEl.textContent = user?.bio || 'කල්‍යාණ මිත්‍ර සාමාජික';
     }
 
     // Sync User Info inside Mobile Slide Drawer
     const drawerAvatarEl = document.getElementById('drawerNavAvatar');
     const drawerNameEl = document.getElementById('drawerUserName');
     const drawerStatusEl = document.getElementById('drawerUserStatus');
-    if (drawerNameEl) drawerNameEl.innerText = user.name || 'කල්‍යාණ මිතුරා';
-    applyAvatar(drawerAvatarEl);
+    if (drawerNameEl) drawerNameEl.innerText = activeName;
+    if (isGuest) {
+      if (drawerAvatarEl) drawerAvatarEl.innerText = "ක";
+    } else {
+      applyAvatar(drawerAvatarEl);
+    }
     if (drawerStatusEl) {
-      if (user.role === 'monk' || user.isMonk) drawerStatusEl.textContent = 'පූජනීය මහා සංඝරත්නය';
-      else drawerStatusEl.textContent = user.bio || 'කල්‍යාණ මිත්‍ර සාමාජික';
+      if (user?.role === 'monk' || user?.isMonk) drawerStatusEl.textContent = 'පූජනීය මහා සංඝරත්නය';
+      else drawerStatusEl.textContent = user?.bio || 'කල්‍යාණ මිත්‍ර සාමාජික';
     }
 
     // Update Kalyana Mithra pending request badges
     const notifs = StorageService.getLocalNotifications() || [];
     const pendingMithraReqs = notifs.filter(n =>
       n && n.type === 'mithra_request' &&
-      Boolean(user.uid && n.recipientUid === user.uid) &&
+      Boolean(user?.uid && n.recipientUid === user.uid) &&
       !StorageService.isRequestAccepted(n.id, n.senderUid) &&
       !StorageService.isRequestDeclined(n.id, n.senderUid) &&
-      (!user.mithrayan || !user.mithrayan.includes(n.senderUid)) &&
+      (!user?.mithrayan || !user.mithrayan.includes(n.senderUid)) &&
       (!n.status || n.status === 'pending')
     );
     const pCount = pendingMithraReqs.length;
@@ -745,7 +763,7 @@ export function updateUserStats() {
       return;
     }
 
-    const isMasterUser = Boolean(user && user.email && user.email.trim().toLowerCase() === 'supportnexiapro@gmail.com');
+    const isMasterUser = Boolean(user && user.email && user.email.trim().toLowerCase() === 'silvadilan9@gmail.com');
     const myPosts = currentPostsData.filter(p => {
       if (!p) return false;
       if (user && user.uid && p.uid === user.uid) return true;
@@ -6291,7 +6309,7 @@ window.handleQuickQuoteSelect = function(quoteText, targetTextareaId) {
 function renderProfileView() {
   const user = StorageService.currentUser;
   const isGuest = !user || !user.email || user.isAnonymous === true;
-  const isMasterUser = Boolean(!isGuest && user && user.email && user.email.trim().toLowerCase() === 'supportnexiapro@gmail.com');
+  const isMasterUser = Boolean(!isGuest && user && user.email && user.email.trim().toLowerCase() === 'silvadilan9@gmail.com');
   const isMyPost = (p) => {
     if (!p) return false;
     if (isGuest) return false;
@@ -6379,7 +6397,7 @@ function renderProfileView() {
   const profAdminIcon = document.getElementById('profAdminDashboardIcon');
   const profAdminText = document.getElementById('profAdminDashboardText');
   const isStrictMasterAdmin = Boolean(
-    (user && user.email && user.email.trim().toLowerCase() === 'supportnexiapro@gmail.com') ||
+    (user && user.email && user.email.trim().toLowerCase() === 'silvadilan9@gmail.com') ||
     (typeof window !== 'undefined' && window.isStrictMasterAdmin === true)
   );
   if (profAdminBtn) {
