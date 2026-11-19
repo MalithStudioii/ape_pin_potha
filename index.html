@@ -2865,7 +2865,10 @@
                 <!-- Cover Banner -->
                 <div class="member-profile-cover" id="memCoverWrap" onclick="viewMemberCoverPhoto(event)" title="කවරයේ ඡායාරූපය බලන්න">
                     <img id="memCoverImg" src="assets/banner.jpg" alt="Cover Photo">
-                    <button type="button" onclick="closeMemberProfileModal()" class="member-modal-close-btn" title="වසන්න">
+                    <button type="button" onclick="event.stopPropagation(); closeMemberProfileModal()" class="member-modal-back-btn" title="ආපසු">
+                        <i class="fa-solid fa-arrow-left"></i> <span>ආපසු</span>
+                    </button>
+                    <button type="button" onclick="event.stopPropagation(); closeMemberProfileModal()" class="member-modal-close-btn" title="වසන්න">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 </div>
@@ -3666,6 +3669,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=149"></script>
+    <script type="module" src="js/app.js?v=150"></script>
 </body>
 </html>

@@ -789,6 +789,75 @@ export function updateUserStats() {
   }
 }
 
+// Global Floating Toast Notification System
+window.showCustomToast = function(msg, type = 'info') {
+  let toastEl = document.getElementById('globalAppToast');
+  if (!toastEl) {
+    toastEl = document.createElement('div');
+    toastEl.id = 'globalAppToast';
+    toastEl.style.cssText = 'position: fixed; bottom: 85px; left: 50%; transform: translateX(-50%) translateY(20px); background: rgba(30, 41, 59, 0.95); backdrop-filter: blur(8px); color: #ffffff; padding: 10px 20px; border-radius: 9999px; font-size: 0.82rem; font-weight: 600; box-shadow: 0 10px 25px rgba(0,0,0,0.25); z-index: 99999; display: flex; align-items: center; gap: 8px; opacity: 0; pointer-events: none; transition: opacity 0.25s ease, transform 0.25s ease; border: 1px solid rgba(255,255,255,0.15); max-width: 90vw; text-align: center;';
+    document.body.appendChild(toastEl);
+  }
+  const icon = type === 'warning' ? '⚠️' : (type === 'error' ? '❌' : (type === 'success' ? '✅' : '🌿'));
+  toastEl.innerHTML = `<span>${icon}</span> <span>${Security.escapeHTML(msg)}</span>`;
+  toastEl.style.opacity = '1';
+  toastEl.style.transform = 'translateX(-50%) translateY(0)';
+  clearTimeout(window._globalAppToastTimer);
+  window._globalAppToastTimer = setTimeout(() => {
+    if (toastEl) {
+      toastEl.style.opacity = '0';
+      toastEl.style.transform = 'translateX(-50%) translateY(20px)';
+    }
+  }, 3200);
+};
+window.showToast = window.showCustomToast;
+window.showToastNotification = window.showCustomToast;
+
+// Public Profile Navigation Handler (Handles Self vs Other Member vs Anonymous)
+window.openPublicProfile = async function(targetUid, optName = null, optPhoto = null, optCover = null) {
+  triggerHaptic(15);
+  SoundService.playClick();
+
+  if (!targetUid || targetUid === 'undefined' || targetUid === 'null') {
+    return;
+  }
+
+  const currentUser = StorageService.currentUser;
+  const isMe = Boolean(currentUser && currentUser.uid && String(currentUser.uid) === String(targetUid));
+
+  // If clicked own profile card, route to personal editable profile view
+  if (isMe) {
+    if (typeof switchTab === 'function') {
+      switchTab('profile');
+    }
+    return;
+  }
+
+  // Look up in in-memory member caches first
+  let cached = (typeof kmpMembersCache !== 'undefined' && Array.isArray(kmpMembersCache) && kmpMembersCache.find(m => String(m.uid) === String(targetUid))) ||
+               null;
+
+  // Anonymous Protection Check:
+  const isAnon = Boolean(
+    cached && (
+      cached.isAnonymous === true ||
+      cached.useAlias === true ||
+      cached.name === 'කල්‍යාණ මිත්‍ර සාමාජික'
+    )
+  );
+
+  if (isAnon) {
+    window.showCustomToast("මෙම සාමාජිකයා නිර්නාමිකව සිටින බැවින් පැතිකඩ විවෘත කළ නොහැක.", "info");
+    return;
+  }
+
+  const memberName = optName || cached?.name || null;
+  const memberPhoto = optPhoto || cached?.photo || null;
+  const coverImage = optCover || cached?.coverImage || null;
+
+  await openMemberProfileModal(targetUid, memberName, memberPhoto, coverImage);
+};
+
 // Member Profile Modal Controllers (Facebook-Style Profile Viewer)
 window.viewUserProfile = async function(uid, authorName, authorPhoto = null, coverImage = null) {
   triggerHaptic(15);
@@ -811,7 +880,7 @@ window.viewUserProfile = async function(uid, authorName, authorPhoto = null, cov
     return;
   }
 
-  await openMemberProfileModal(uid, authorName, authorPhoto, coverImage);
+  await openPublicProfile(uid, authorName, authorPhoto, coverImage);
 };
 
 let currentViewingMember = null;
@@ -836,18 +905,37 @@ window.openMemberProfileModal = async function(uid, authorName, authorPhoto = nu
   if (!modal) return;
 
   if (uid === 'undefined' || uid === 'null' || !uid) uid = null;
-  const initialName = (authorName || 'කල්‍යාණ මිත්‍ර').trim();
+  if (!uid && !authorName) return;
+
+  // Self check: If viewing own profile, redirect to editable profile tab
+  const currentUser = StorageService.currentUser;
+  if (currentUser && ((uid && currentUser.uid && uid === currentUser.uid) || (!uid && authorName && currentUser.name && authorName.trim().toLowerCase() === currentUser.name.trim().toLowerCase()))) {
+    if (typeof switchTab === 'function') {
+      switchTab('profile');
+    }
+    return;
+  }
+
+  // Pre-check anonymous state from cache
+  const cached = (typeof kmpMembersCache !== 'undefined' && Array.isArray(kmpMembersCache) && kmpMembersCache.find(m => String(m.uid) === String(uid))) || null;
+  if (cached && (cached.isAnonymous === true || cached.useAlias === true || cached.name === 'කල්‍යාණ මිත්‍ර සාමාජික')) {
+    window.showCustomToast("මෙම සාමාජිකයා නිර්නාමිකව සිටින බැවින් පැතිකඩ විවෘත කළ නොහැක.", "info");
+    return;
+  }
+
+  const initialName = (authorName || cached?.name || 'කල්‍යාණ මිත්‍ර').trim();
   const initialChar = initialName.charAt(0) || 'ක';
 
   // 1. Immediately reset previous modal content to prevent cross-profile flicker
   const coverImg = document.getElementById('memCoverImg');
-  if (coverImg) coverImg.src = coverImage || 'assets/banner.jpg';
+  if (coverImg) coverImg.src = coverImage || cached?.coverImage || 'assets/banner.jpg';
 
   const avatarWrap = document.getElementById('memAvatarWrap');
   if (avatarWrap) {
     avatarWrap.classList.remove('sangha-framed-avatar');
-    if (authorPhoto) {
-      avatarWrap.innerHTML = `<img src="${Security.sanitizeUrl(authorPhoto)}" alt="${Security.escapeHTML(initialName)}" onerror="this.parentElement.innerHTML = '<span>${initialChar}</span>';">`;
+    const photoSrc = authorPhoto || cached?.photo;
+    if (photoSrc) {
+      avatarWrap.innerHTML = `<img src="${Security.sanitizeUrl(photoSrc)}" alt="${Security.escapeHTML(initialName)}" onerror="this.parentElement.innerHTML = '<span>${initialChar}</span>';">`;
     } else {
       avatarWrap.innerHTML = `<span>${initialChar}</span>`;
     }
@@ -856,6 +944,7 @@ window.openMemberProfileModal = async function(uid, authorName, authorPhoto = nu
   const nameEl = document.getElementById('memFullName');
   if (nameEl) nameEl.innerHTML = Security.escapeHTML(initialName);
 
+  const bioEl = document.getElementById('memBio');
   if (bioEl) bioEl.innerText = `"සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏"`;
 
   const postsFeedEl = document.getElementById('memPostsFeed');
@@ -873,13 +962,28 @@ window.openMemberProfileModal = async function(uid, authorName, authorPhoto = nu
   const member = await StorageService.getUserProfile(uid, authorName) || {
     uid: uid || null,
     name: initialName,
-    photo: authorPhoto || null,
-    coverImage: coverImage || 'assets/banner.jpg',
+    photo: authorPhoto || cached?.photo || null,
+    coverImage: coverImage || cached?.coverImage || 'assets/banner.jpg',
     bio: "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏",
     location: '',
     occupation: '',
     joinedDate: '2026 ඔක්තෝබර්'
   };
+
+  // If target member is anonymous, strictly close modal and notify
+  const isSelf = Boolean(currentUser && currentUser.uid && currentUser.uid === member.uid);
+  if (!isSelf && (member.useAlias === true || member.isAnonymous === true || member.name === 'කල්‍යාණ මිත්‍ර සාමාජික')) {
+    modal.classList.add('hidden');
+    document.body.style.overflow = '';
+    window.showCustomToast("මෙම සාමාජිකයා නිර්නාමිකව සිටින බැවින් පැතිකඩ විවෘත කළ නොහැක.", "info");
+    return;
+  }
+  if (isSelf) {
+    modal.classList.add('hidden');
+    document.body.style.overflow = '';
+    switchTab('profile');
+    return;
+  }
 
   // If caller had specific photo or cover and member object doesn't have it, preserve it
   if (authorPhoto && (!member.photo || member.photo.trim().length === 0)) {
@@ -887,12 +991,6 @@ window.openMemberProfileModal = async function(uid, authorName, authorPhoto = nu
   }
   if (coverImage && (!member.coverImage || member.coverImage === 'assets/banner.jpg')) {
     member.coverImage = coverImage;
-  }
-
-  // Privacy Alias Mode: If user has enabled useAlias and viewer is not this user, display 'කල්‍යාණ මිත්‍ර සාමාජික'
-  const isSelf = Boolean(StorageService.currentUser && StorageService.currentUser.uid && StorageService.currentUser.uid === member.uid);
-  if (!isSelf && member.useAlias) {
-    member.name = 'කල්‍යාණ මිත්‍ර සාමාජික';
   }
 
     // Profile Completeness 100% Badge for viewed member
@@ -963,9 +1061,10 @@ currentViewingMember = member;
 
   const occEl = document.getElementById('memOccupationText');
   const occWrap = document.getElementById('memMetaOccupation');
+  const templeOrOcc = member.temple || member.spiritualInterest || member.occupation;
   if (occEl && occWrap) {
-    if (member.occupation) {
-      occEl.innerText = member.occupation;
+    if (templeOrOcc) {
+      occEl.innerText = templeOrOcc;
       occWrap.style.display = 'inline-flex';
     } else {
       occWrap.style.display = 'none';
@@ -974,9 +1073,10 @@ currentViewingMember = member;
 
   const locEl = document.getElementById('memLocationText');
   const locWrap = document.getElementById('memMetaLocation');
+  const memberLoc = member.location || member.district || member.city || '';
   if (locEl && locWrap) {
-    if (member.location) {
-      locEl.innerText = member.location;
+    if (memberLoc) {
+      locEl.innerText = memberLoc;
       locWrap.style.display = 'inline-flex';
     } else {
       locWrap.style.display = 'none';
@@ -984,14 +1084,26 @@ currentViewingMember = member;
   }
 
   const joinedEl = document.getElementById('memJoinedText');
-  if (joinedEl) joinedEl.innerText = `${member.joinedDate || '2026 ඔක්තෝබර්'} සිට සාමාජික`;
+  if (joinedEl) {
+    const rawJoined = member.joinedDate || '2026 ඔක්තෝබර්';
+    joinedEl.innerText = rawJoined.includes('සිට') ? rawJoined : `${rawJoined} සිට සාමාජික`;
+  }
 
-  // Filter public posts for this member
-  const memberPosts = currentPostsData.filter(p => {
-    const matchUid = uid && p.uid && p.uid === uid;
-    const resolvedName = StorageService.resolveAuthorName(p);
-    const matchAuthor = (member.name && resolvedName === member.name) || (authorName && resolvedName === authorName);
-    return (matchUid || matchAuthor) && p.visibility !== 'private';
+  // Filter public posts for this member (strictly non-private and not deleted)
+  const allPosts = (Array.isArray(currentPostsData) && currentPostsData.length > 0)
+    ? currentPostsData
+    : (StorageService.getLocalPosts() || []);
+
+  const memberPosts = allPosts.filter(p => {
+    if (!p || p.isDeleted || p.deleted) return false;
+    if (p.visibility === 'private') return false;
+    const matchUid = Boolean(uid && p.uid && String(p.uid) === String(uid));
+    const resolvedName = StorageService.resolveAuthorName ? StorageService.resolveAuthorName(p) : (p.author || p.authorName);
+    const matchAuthor = Boolean(
+      (member.name && resolvedName === member.name) ||
+      (authorName && resolvedName === authorName)
+    );
+    return matchUid || matchAuthor;
   });
 
   const totalSadhu = memberPosts.reduce((acc, p) => acc + (p.sadhuCount || 0), 0);
@@ -8015,7 +8127,7 @@ window.renderCommunityDirectory = async function(filtered = null) {
     }
 
     return `
-      <div class="mithra-card directory-member-card" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}', '${m.photo ? Security.sanitizeUrl(m.photo) : ''}', '${m.coverImage ? Security.sanitizeUrl(m.coverImage) : ''}')">
+      <div class="mithra-card directory-member-card" onclick="openPublicProfile('${m.uid}')" style="cursor: pointer;">
         <div class="mithra-card-avatar ${isMemberSangha ? 'sangha-framed-avatar' : ''}" style="cursor: pointer;">
           ${m.photo ? `<img src="${Security.sanitizeUrl(m.photo)}" alt="${Security.escapeHTML(m.name)}" onerror="this.parentElement.innerText = '${initial}';">` : `<span>${initial}</span>`}
           ${isMemberSangha ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
@@ -8033,7 +8145,7 @@ window.renderCommunityDirectory = async function(filtered = null) {
         </div>
         <div class="mithra-card-actions" onclick="event.stopPropagation()">
           ${actionBtnHtml}
-          <button type="button" class="btn-mithra-view" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}', '${m.photo ? Security.sanitizeUrl(m.photo) : ''}', '${m.coverImage ? Security.sanitizeUrl(m.coverImage) : ''}')" title="සම්පූර්ණ පැතිකඩ බලන්න">
+          <button type="button" class="btn-mithra-view" onclick="openPublicProfile('${m.uid}')" title="සම්පූර්ණ පැතිකඩ බලන්න">
             <i class="fa-solid fa-eye"></i>
           </button>
         </div>
@@ -8134,7 +8246,7 @@ export async function renderPcSidebarMembers(filterQuery = '', forceRefresh = fa
 
         const isMemberSangha = StorageService.isSangha(m);
         return `
-          <div class="sidebar-member-item ${isMemberAnon ? 'sidebar-member-anon' : ''}" ${isMemberAnon && !isMe ? 'style="cursor: default;"' : `onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(displayName)}', '${displayPhoto ? Security.sanitizeUrl(displayPhoto) : ''}', '${m.coverImage ? Security.sanitizeUrl(m.coverImage) : ''}')" style="cursor: pointer;" title="${Security.escapeHTML(displayName)} ගේ පැතිකඩ බලන්න"`}>
+          <div class="sidebar-member-item ${isMemberAnon ? 'sidebar-member-anon' : ''}" onclick="openPublicProfile('${m.uid}')" style="cursor: pointer;" title="${Security.escapeHTML(displayName)} ගේ පැතිකඩ බලන්න">
             <div class="sidebar-member-avatar ${isMemberSangha && !isMemberAnon ? 'sangha-framed-avatar' : ''}">
               ${displayPhoto ? `<img src="${Security.sanitizeUrl(displayPhoto)}" alt="${Security.escapeHTML(displayName)}" onerror="this.parentElement.innerText = '${initial}';">` : `<span>${initial}</span>`}
               ${isMemberSangha && !isMemberAnon ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
@@ -8612,20 +8724,16 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
       `;
     }
 
-    const clickCardHandler = isMemberAnon && !isMe
-      ? ''
-      : `openMemberProfileModal('${m.uid}', '${Security.escapeHTML(displayName)}', '${displayPhoto ? Security.sanitizeUrl(displayPhoto) : ''}', '${m.coverImage ? Security.sanitizeUrl(m.coverImage) : ''}')`;
-
     return `
-      <div class="kmp-card ${isMemberAnon ? 'kmp-card-anon' : ''}" ${clickCardHandler ? `onclick="${clickCardHandler}"` : 'style="cursor: default;"'}>
+      <div class="kmp-card ${isMemberAnon ? 'kmp-card-anon' : ''}" onclick="openPublicProfile('${m.uid}')" style="cursor: pointer;">
         <div class="kmp-card-top">
-          <div class="kmp-avatar-wrap ${isMemberSangha && !isMemberAnon ? 'kmp-sangha-avatar' : ''}">
+          <div class="kmp-avatar-wrap ${isMemberSangha && !isMemberAnon ? 'kmp-sangha-avatar' : ''}" onclick="event.stopPropagation(); openPublicProfile('${m.uid}')" style="cursor: pointer;" title="පැතිකඩ බලන්න">
             ${displayPhoto ? `<img src="${Security.sanitizeUrl(displayPhoto)}" alt="${Security.escapeHTML(displayName)}" class="kmp-avatar-img" onerror="this.parentElement.innerHTML = '<div class=\\\'kmp-avatar-initial\\\'>${initial}</div>';">` : `<div class="kmp-avatar-initial">${initial}</div>`}
             ${m.isOnline ? `<span class="kmp-online-dot" title="දැන් සජීවීව Online"></span>` : ''}
             ${isMemberSangha && !isMemberAnon ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
           </div>
           <div class="kmp-card-meta">
-            <div class="kmp-name-row">
+            <div class="kmp-name-row" onclick="event.stopPropagation(); openPublicProfile('${m.uid}')" style="cursor: pointer;" title="පැතිකඩ බලන්න">
               <span class="kmp-member-name">${Security.escapeHTML(displayName)}</span>
               ${!isMemberAnon && isMemberMaster ? `<span class="badge-crown" title="කල්‍යාණ මිත්‍ර">👑</span>` : (!isMemberAnon && isMemberSubAdmin ? `<span class="badge-shield" title="කල්‍යාණ මිත්‍ර">🛡️</span>` : '')}
               ${!isMemberAnon && isMemberSangha ? `<span class="sangha-author-badge" style="margin-left: 3px; padding: 1px 6px; font-size: 0.6rem;"><i class="fa-solid fa-dharmachakra"></i> පූජනීය සංඝරත්නය</span>` : ''}
@@ -8648,11 +8756,9 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
 
         <div class="kmp-card-actions" onclick="event.stopPropagation()">
           ${actionBtnHtml}
-          ${!isMemberAnon || isMe ? `
-            <button type="button" class="kmp-btn-view-profile" onclick="${clickCardHandler || `switchTab('profile')`}" title="සම්පූර්ණ පැතිකඩ (Profile) බලන්න">
-              <i class="fa-solid fa-user"></i>
-            </button>
-          ` : ''}
+          <button type="button" class="kmp-btn-view-profile" onclick="event.stopPropagation(); openPublicProfile('${m.uid}')" title="සම්පූර්ණ පැතිකඩ (Profile) බලන්න">
+            <i class="fa-solid fa-user"></i>
+          </button>
         </div>
       </div>
     `;
