@@ -7,7 +7,7 @@
 import { firebaseConfig, isFirebaseConfigured, COLLECTIONS } from './firebase-config.js?v=139';
 import { Security } from './security.js?v=139';
 import { INITIAL_ARANYA_LIST, SRI_LANKA_DISTRICTS } from './aranya-data.js';
-import { SEED_POSTS } from './initial-seed.js?v=143';
+import { SEED_POSTS } from './initial-seed.js?v=144';
 
 let db = null;
 let auth = null;
@@ -19,11 +19,9 @@ let verseListeners = [];
 let poyaListeners = [];
 let bannedWordsListeners = [];
 
-export const MASTER_ADMIN_EMAIL = "silvadilan9@gmail.com";
+export const MASTER_ADMIN_EMAIL = "supportnexiapro@gmail.com";
 export const MASTER_ADMIN_EMAILS = [
-  "supportnexiapro@gmail.com",
-  "silvadilan9@gmail.com",
-  "creativeparadise25@gmail.com"
+  "supportnexiapro@gmail.com"
 ];
 
 const DEFAULT_POYA_EVENT = {
@@ -50,47 +48,9 @@ export const StorageService = {
   _isLoadingMore: false,
   _isInitialSyncDone: false,
   _loadedPosts: [],
-  currentUser: (() => {
-    try {
-      const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('pinPotha_currentUser') : null;
-      if (saved) {
-        const u = JSON.parse(saved);
-        if (u && u.name) {
-          if (u.name.trim().startsWith('මලිත්') || u.uid === 'user_malith' || u.uid === 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2' || (u.email && u.email.toLowerCase() === 'silvadilan9@gmail.com')) {
-            u.uid = 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2';
-            u.email = 'silvadilan9@gmail.com';
-            u.role = 'master_admin';
-            u.isAdmin = true;
-            u.isAnonymous = false;
-            if (!u.photo || u.photo.includes('data:image')) {
-              u.photo = 'https://i.ibb.co/k6wJFJnH/avatar-1792084050862.webp';
-            }
-          }
-          return u;
-        }
-      }
-    } catch (e) {}
-    return {
-      uid: "o2pWiAX7SXTHiMfSiphI8Ln5HAM2",
-      name: "මලිත් දුෂාන්ත",
-      firstName: "මලිත්",
-      lastName: "දුෂාන්ත",
-      email: "silvadilan9@gmail.com",
-      photo: "https://i.ibb.co/k6wJFJnH/avatar-1792084050862.webp",
-      coverImage: "assets/banner.jpg",
-      bio: "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏",
-      location: "වැලිමඩ, බදුල්ල",
-      district: "බදුල්ල",
-      city: "වැලිමඩ",
-      occupation: "ව්‍යාපාරික",
-      role: "master_admin",
-      isAdmin: true,
-      isAnonymous: false,
-      joinedDate: "2026 ඔක්තෝබර්"
-    };
-  })(),
+  currentUser: null,
 
-  _knownAdminUids: new Set(['user_malith', 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2']),
+  _knownAdminUids: new Set(),
   _knownSanghaUids: new Set(),
   _cachedOfficialPosts: [],
 
@@ -325,38 +285,20 @@ export const StorageService = {
   /**
    * Checks whether a user/email/post is Master Admin (silvadilan9@gmail.com, creativeparadise25@gmail.com, user_malith, o2pWiAX7SXTHiMfSiphI8Ln5HAM2)
    */
-  isMasterAdmin(userOrEmailOrUid) {
+    isMasterAdmin(userOrEmailOrUid) {
     const isMasterEmail = (email) => {
-      if (!email) return false;
-      const clean = email.trim().toLowerCase();
-      return MASTER_ADMIN_EMAILS.some(adm => adm.toLowerCase() === clean);
+      if (!email || typeof email !== 'string') return false;
+      return email.trim().toLowerCase() === 'supportnexiapro@gmail.com';
     };
 
     if (!userOrEmailOrUid) {
-      if (!this.currentUser) return false;
-      return isMasterEmail(this.currentUser.email) ||
-             this.currentUser.uid === 'user_malith' ||
-             this.currentUser.uid === 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2' ||
-             Boolean(this.currentUser.name && this.currentUser.name.trim().startsWith('මලිත්'));
+      return Boolean(this.currentUser && isMasterEmail(this.currentUser.email));
     }
     if (typeof userOrEmailOrUid === 'string') {
-      const s = userOrEmailOrUid.trim().toLowerCase();
-      return isMasterEmail(userOrEmailOrUid) ||
-             s === 'user_malith' ||
-             userOrEmailOrUid.trim() === 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2' ||
-             s.startsWith('මලිත්') ||
-             s === 'අපේ පිං පොත' ||
-             s === 'පිං පොත පරිපාලනය';
+      return isMasterEmail(userOrEmailOrUid);
     }
-    const email = (userOrEmailOrUid.email || userOrEmailOrUid.authorEmail || '').trim().toLowerCase();
-    const uid = userOrEmailOrUid.uid || '';
-    const name = (userOrEmailOrUid.name || userOrEmailOrUid.author || '').trim();
-    return isMasterEmail(email) ||
-           uid === 'user_malith' ||
-           uid === 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2' ||
-           name.startsWith('මලිත්') ||
-           name === 'අපේ පිං පොත' ||
-           name === 'පිං පොත පරිපාලනය';
+    const email = (userOrEmailOrUid.email || userOrEmailOrUid.authorEmail || '');
+    return isMasterEmail(email);
   },
 
   /**
@@ -468,7 +410,7 @@ export const StorageService = {
     if (this.currentUser && this.currentUser.uid && !map.has(this.currentUser.uid)) {
       map.set(this.currentUser.uid, {
         uid: this.currentUser.uid,
-        name: this.currentUser.name || 'මලිත්',
+        name: this.currentUser.name || 'කල්‍යාණ මිත්‍ර සාමාජික',
         photo: this.currentUser.photo || '',
         bio: this.currentUser.bio || '',
         location: this.currentUser.location || '',
@@ -615,7 +557,7 @@ export const StorageService = {
       if (this.currentUser && this.currentUser.uid && !map.has(this.currentUser.uid)) {
         map.set(this.currentUser.uid, {
           uid: this.currentUser.uid,
-          name: this.currentUser.name || 'මලිත්',
+          name: this.currentUser.name || 'කල්‍යාණ මිත්‍ර සාමාජික',
           photo: this.currentUser.photo || '',
           bio: this.currentUser.bio || '',
           location: this.currentUser.location || '',
@@ -706,32 +648,24 @@ export const StorageService = {
    */
   async init() {
     this.purgeDummyPostsFromStorage();
-    // Load local user profile if present
-    const savedUser = localStorage.getItem('pinPotha_currentUser');
-    if (savedUser) {
-      try {
-        this.currentUser = JSON.parse(savedUser);
-      } catch (e) {
-        console.error('Failed to parse saved user', e);
-      }
-    }
-    if (this.currentUser) {
-      if (this.currentUser.name && (this.currentUser.name.trim().startsWith('මලිත්') || this.currentUser.uid === 'user_malith' || this.currentUser.uid === 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2')) {
-        this.currentUser.name = 'මලිත් දුෂාන්ත';
-        this.currentUser.firstName = 'මලිත්';
-        this.currentUser.lastName = 'දුෂාන්ත';
-        this.currentUser.uid = 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2';
-        this.currentUser.email = 'silvadilan9@gmail.com';
-        this.currentUser.role = 'master_admin';
-        this.currentUser.isAdmin = true;
-        this.currentUser.isAnonymous = false;
-        if (!this.currentUser.photo || this.currentUser.photo.includes('data:image')) {
-          this.currentUser.photo = 'https://i.ibb.co/k6wJFJnH/avatar-1792084050862.webp';
+    // Strictly initialize as null (Guest mode). No fallback or auto-promoted mock admin.
+    this.currentUser = null;
+    try {
+      localStorage.removeItem('pinPotha_admin_uids');
+      const savedUser = localStorage.getItem('pinPotha_currentUser');
+      if (savedUser) {
+        const parsed = JSON.parse(savedUser);
+        if (parsed && parsed.uid && parsed.email && !parsed.uid.startsWith('user_malith') && parsed.uid !== 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2' && parsed.email.toLowerCase() !== 'silvadilan9@gmail.com') {
+          this.currentUser = parsed;
+          this.currentUser.isAdmin = this.isMasterAdmin(this.currentUser);
+        } else {
+          localStorage.removeItem('pinPotha_currentUser');
+          localStorage.removeItem('pinPotha_current_profile');
+          this.currentUser = null;
         }
       }
-      if (!Array.isArray(this.currentUser.mithrayan)) this.currentUser.mithrayan = [];
-      if (!Array.isArray(this.currentUser.pendingMithraSent)) this.currentUser.pendingMithraSent = [];
-      this.currentUser.isAdmin = this.isMasterAdmin();
+    } catch (e) {
+      this.currentUser = null;
     }
 
     try {
@@ -807,10 +741,28 @@ export const StorageService = {
 
         // Listen for Auth changes
         onAuthStateChanged(auth, async (user) => {
-          await this.restoreUserProfile(user);
-          if (user?.uid) {
+          if (user && user.uid) {
+            await this.restoreUserProfile(user);
             this.initUserNotificationsSubscription(user.uid);
             this.initUserPostsSubscription(user.uid);
+          } else {
+            // Strictly guest mode when unauthenticated
+            this.currentUser = null;
+            try {
+              localStorage.removeItem('pinPotha_currentUser');
+              localStorage.removeItem('pinPotha_current_profile');
+              sessionStorage.clear();
+            } catch (e) {}
+            if (this._notifUnsubscribe) {
+              try { this._notifUnsubscribe(); } catch (e) {}
+              this._notifUnsubscribe = null;
+            }
+            if (this._userPostsUnsubscribe) {
+              try { this._userPostsUnsubscribe(); } catch (e) {}
+              this._userPostsUnsubscribe = null;
+            }
+            this.notifyListeners();
+            this.notifyNotificationListeners();
           }
 
           // Strict Master Admin check: Only supportnexiapro@gmail.com
@@ -822,9 +774,6 @@ export const StorageService = {
 
           if (typeof window !== 'undefined') {
             window.isStrictMasterAdmin = isStrictAdmin;
-            if (typeof window.updateUserInfoUI === 'function') {
-              try { window.updateUserInfoUI(); } catch (e) {}
-            }
             const crownBtn = document.getElementById('headerAdminCrownBtn');
             if (crownBtn) {
               if (isStrictAdmin) {
@@ -858,6 +807,13 @@ export const StorageService = {
                 profAdminBtn.classList.add('hidden');
                 profAdminBtn.style.display = 'none';
               }
+            }
+
+            if (typeof window.updateUserInfoUI === 'function') {
+              try { window.updateUserInfoUI(); } catch (e) {}
+            }
+            if (typeof window.updateUserStats === 'function') {
+              try { window.updateUserStats(); } catch (e) {}
             }
           }
         });
@@ -3327,62 +3283,21 @@ export const StorageService = {
   /**
    * Restore and auto-fill user profile upon login or auth state change
    */
-  async restoreUserProfile(user) {
+    async restoreUserProfile(user) {
     if (!user) {
-      let saved = null;
+      this.currentUser = null;
       try {
-        const raw = localStorage.getItem('pinPotha_currentUser');
-        if (raw) saved = JSON.parse(raw);
+        localStorage.removeItem('pinPotha_currentUser');
+        localStorage.removeItem('pinPotha_current_profile');
+        localStorage.removeItem('pinPotha_admin_uids');
+        sessionStorage.clear();
       } catch (e) {}
-
-      if (saved && saved.uid && saved.name && saved.name !== 'අමුත්තා') {
-        const sName = (saved.name || '').trim();
-        if (sName.startsWith('මලිත්') || saved.uid === 'user_malith' || saved.uid === 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2') {
-          saved.name = 'මලිත් දුෂාන්ත';
-          saved.firstName = 'මලිත්';
-          saved.lastName = 'දුෂාන්ත';
-          saved.uid = 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2';
-          saved.email = 'silvadilan9@gmail.com';
-          saved.photo = 'https://i.ibb.co/k6wJFJnH/avatar-1792084050862.webp';
-          saved.role = 'master_admin';
-          saved.isAdmin = true;
-        }
-        this.currentUser = {
-          ...this.currentUser,
-          ...saved,
-          isAdmin: this.isMasterAdmin(saved),
-          isSubAdmin: this.isSubAdmin(saved)
-        };
-        this.notifyListeners();
-        this.notifyNotificationListeners();
-        return this.currentUser;
-      }
-
-      // Default to Malith's verified administrator profile
-      this.currentUser = {
-        uid: "o2pWiAX7SXTHiMfSiphI8Ln5HAM2",
-        name: "මලිත් දුෂාන්ත",
-        firstName: "මලිත්",
-        lastName: "දුෂාන්ත",
-        email: "silvadilan9@gmail.com",
-        photo: "https://i.ibb.co/k6wJFJnH/avatar-1792084050862.webp",
-        coverImage: "assets/banner.jpg",
-        bio: "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏",
-        location: "වැලිමඩ, බදුල්ල",
-        district: "බදුල්ල",
-        city: "වැලිමඩ",
-        occupation: "ව්‍යාපාරික",
-        role: "master_admin",
-        isAdmin: true,
-        isAnonymous: false,
-        needsNameConfirmation: false,
-        joinedDate: "2026 ඔක්තෝබර්"
-      };
-      localStorage.setItem('pinPotha_currentUser', JSON.stringify(this.currentUser));
       this.notifyListeners();
       this.notifyNotificationListeners();
-      return this.currentUser;
+      return null;
     }
+
+
 
     // 1. Check local profile cached by UID
     let savedProfile = {};
@@ -3429,7 +3344,7 @@ export const StorageService = {
     const lName = savedProfile.lastName || (nameParts.length > 1 ? nameParts.slice(1).join(' ') : "");
     const fullName = confirmedName || `${fName} ${lName}`.trim() || "";
 
-    const isMaster = this.isMasterAdmin(user) || this.isMasterAdmin({ name: fullName });
+    const isMaster = this.isMasterAdmin(user);
     const isSub = !isMaster && (savedProfile.role === 'admin' || savedProfile.isAdmin === true || savedProfile.isSubAdmin === true || (this._knownAdminUids && this._knownAdminUids.has(user.uid)));
 
     this.currentUser = {
@@ -3494,7 +3409,7 @@ export const StorageService = {
           if (Array.isArray(cloudData.pendingMithraSent)) this.currentUser.pendingMithraSent = cloudData.pendingMithraSent;
 
           // CRITICAL: Sync role and admin privileges from Cloud Firestore!
-          const isCloudMaster = this.isMasterAdmin(user) || this.isMasterAdmin({ name: this.currentUser.name });
+          const isCloudMaster = this.isMasterAdmin(user);
           const isCloudSub = !isCloudMaster && (cloudData.role === 'admin' || cloudData.isSubAdmin === true);
           this.currentUser.role = cloudData.role || (isCloudMaster ? 'master_admin' : (isCloudSub ? 'admin' : 'member'));
           this.currentUser.isAdmin = isCloudMaster;
@@ -4289,6 +4204,7 @@ export const StorageService = {
    * Update full user profile details (First & Last Name, Occupation, Location/Address, Bio, Photo, Cover Image)
    */
   async updateProfile({ firstName, lastName, name, bio, location, district, province, city, occupation, spiritualInterest, temple, coverImage, photo, useAlias }) {
+    if (!this.currentUser) return;
     if (useAlias !== undefined) {
       this.currentUser.useAlias = Boolean(useAlias);
     }
@@ -4563,19 +4479,22 @@ export const StorageService = {
         console.warn('Sign out warning:', e);
       }
     }
-    this.currentUser = {
-      uid: "user_guest_" + Math.random().toString(36).substring(2, 7),
-      firstName: "අමුත්තා",
-      lastName: "",
-      name: "අමුත්තා",
-      photo: null,
-      email: null,
-      isAdmin: false,
-      isAnonymous: true,
-      needsNameConfirmation: false
-    };
-    localStorage.setItem('pinPotha_currentUser', JSON.stringify(this.currentUser));
+    this.currentUser = null;
+    try {
+      localStorage.removeItem('pinPotha_currentUser');
+      localStorage.removeItem('pinPotha_current_profile');
+      localStorage.removeItem('pinPotha_admin_uids');
+      localStorage.removeItem('pinPotha_last_presence');
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('pinPotha_profile_') || key.startsWith('pinPotha_last_user_name_'))) {
+          localStorage.removeItem(key);
+        }
+      }
+      sessionStorage.clear();
+    } catch (e) {}
     this.notifyListeners();
+    this.notifyNotificationListeners();
   },
 
   /**

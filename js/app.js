@@ -4,12 +4,12 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=143';
-import { Security } from './security.js?v=143';
+import { StorageService } from './storage.js?v=144';
+import { Security } from './security.js?v=144';
 import { uploadToImgBB } from './imgbb-service.js?v=66';
 import { SoundService, triggerHaptic } from './sound.js?v=66';
-import { FeedAlgorithm } from './algorithm.js?v=143';
-import { SPIRITUAL_AVATARS, renderSpiritualAvatarPicker, selectSpiritualAvatar } from './spiritual-avatars.js?v=143';
+import { FeedAlgorithm } from './algorithm.js?v=144';
+import { SPIRITUAL_AVATARS, renderSpiritualAvatarPicker, selectSpiritualAvatar } from './spiritual-avatars.js?v=144';
 let allCommunityMembersCache = [];
 let infiniteScrollObserver = null;
 let isTriggeringLoadMore = false;
@@ -153,9 +153,8 @@ window.toggleSoundPreference = function(e) {
 
 export function isGuestUser() {
   const user = StorageService.currentUser;
-  if (!user) return true;
-  if (typeof StorageService.isMasterAdmin === 'function' && StorageService.isMasterAdmin(user)) return false;
-  return user.isAnonymous === true && !user.email;
+  if (!user || !user.email || user.isAnonymous === true) return true;
+  return false;
 }
 window.isGuestUser = isGuestUser;
 
@@ -525,18 +524,13 @@ export function updateUserInfoUI() {
   // Exposed globally
   window.updateUserInfoUI = updateUserInfoUI;
   try {
-    const user = StorageService.currentUser || {};
-    const isMalith = Boolean(user && (
-      user.uid === "user_malith" ||
-      user.uid === "o2pWiAX7SXTHiMfSiphI8Ln5HAM2" ||
-      (user.email && typeof user.email === 'string' && user.email.toLowerCase() === "silvadilan9@gmail.com") ||
-      (user.name && typeof user.name === 'string' && user.name.trim().startsWith("මලිත්"))
-    ));
-    const isMaster = StorageService.isMasterAdmin() || isMalith;
-    const isSub = !isMaster && StorageService.isSubAdmin(user);
+    const user = StorageService.currentUser;
+    const isGuest = !user || !user.email || user.isAnonymous === true;
+    const isMaster = Boolean(!isGuest && user && StorageService.isMasterAdmin(user));
+    const isSub = Boolean(!isGuest && !isMaster && user && StorageService.isSubAdmin(user));
     const isAdminUser = isMaster || isSub;
-    const activeName = isMalith ? "මලිත් දුෂාන්ත" : (user.name || "අමුත්තා");
-    const activePhoto = user.photo || (isMalith ? "https://i.ibb.co/k6wJFJnH/avatar-1792084050862.webp" : null);
+    const activeName = isGuest ? "කල්‍යාණ මිත්‍ර අමුත්තෙක්" : (user.name || "කල්‍යාණ මිත්‍ර සාමාජික");
+    const activePhoto = isGuest ? null : (user.photo || null);
     const firstLetter = (activeName || "අ").trim().charAt(0);
 
     const displayEl = document.getElementById('userNameDisplay');
@@ -615,9 +609,9 @@ export function updateUserInfoUI() {
     // Discreet Badge (Crown / Shield) next to Left Sidebar Name (No role text displayed)
     const sideBadgeEl = document.getElementById('sideUserRoleBadge');
     if (sideBadgeEl) {
-      if (isMaster) {
+      if (isMaster && !isGuest) {
         sideBadgeEl.innerHTML = '<span class="badge-crown" style="font-size: 0.85rem;" title="කල්‍යාණ මිත්‍ර">👑</span>';
-      } else if (isSub) {
+      } else if (isSub && !isGuest) {
         sideBadgeEl.innerHTML = '<span class="badge-shield" style="font-size: 0.85rem;" title="කල්‍යාණ මිත්‍ර">🛡️</span>';
       } else {
         sideBadgeEl.innerHTML = '';
@@ -738,21 +732,27 @@ export function updateUserInfoUI() {
   }
 }
 
-function updateUserStats() {
+export function updateUserStats() {
+  window.updateUserStats = updateUserStats;
   try {
-    const user = StorageService.currentUser || {};
-    const isMalithUser = Boolean(user && (
-      user.uid === 'user_malith' ||
-      user.uid === 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2' ||
-      (user.email && typeof user.email === 'string' && user.email.toLowerCase() === 'silvadilan9@gmail.com') ||
-      (user.name && typeof user.name === 'string' && user.name.trim().startsWith('මලිත්'))
-    ));
+    const user = StorageService.currentUser;
+    const isGuest = !user || !user.email || user.isAnonymous === true;
+    const statPostsEl = document.getElementById('statMyPosts');
+    const statSadhuEl = document.getElementById('statMySadhu');
+
+    if (isGuest) {
+      if (statPostsEl) statPostsEl.innerText = "0";
+      if (statSadhuEl) statSadhuEl.innerText = "0";
+      return;
+    }
+
+    const isMasterUser = Boolean(user && user.email && user.email.trim().toLowerCase() === 'supportnexiapro@gmail.com');
     const myPosts = currentPostsData.filter(p => {
       if (!p) return false;
       if (user && user.uid && p.uid === user.uid) return true;
       if (user && user.email && p.authorEmail && p.authorEmail.toLowerCase() === user.email.toLowerCase()) return true;
       if (user && user.name && p.author && p.author.trim().toLowerCase() === user.name.trim().toLowerCase()) return true;
-      if (isMalithUser && (
+      if (isMasterUser && (
         p.uid === 'user_malith' ||
         p.uid === 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2' ||
         (p.author && (p.author.includes('මලිත්') || p.author === 'අපේ පිං පොත' || p.author === 'පිං පොත පරිපාලනය'))
@@ -761,11 +761,8 @@ function updateUserStats() {
     });
     const totalSadhu = myPosts.reduce((acc, p) => acc + (p.sadhuCount || 0), 0);
 
-    const statPostsEl = document.getElementById('statMyPosts');
-    const statSadhuEl = document.getElementById('statMySadhu');
-
-    const finalPosts = isMalithUser ? Math.max(myPosts.length, 17) : myPosts.length;
-    const finalSadhu = isMalithUser ? Math.max(totalSadhu, 146) : totalSadhu;
+    const finalPosts = isMasterUser ? Math.max(myPosts.length, 17) : myPosts.length;
+    const finalSadhu = isMasterUser ? Math.max(totalSadhu, 146) : totalSadhu;
 
     if (statPostsEl) statPostsEl.innerText = finalPosts;
     if (statSadhuEl) statSadhuEl.innerText = finalSadhu;
@@ -6293,19 +6290,16 @@ window.handleQuickQuoteSelect = function(quoteText, targetTextareaId) {
 };
 
 function renderProfileView() {
-  const user = StorageService.currentUser || {};
-  const isMalithUser = Boolean(user && (
-    user.uid === 'user_malith' ||
-    user.uid === 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2' ||
-    (user.email && user.email.toLowerCase() === 'silvadilan9@gmail.com') ||
-    (user.name && user.name.trim().startsWith('මලිත්'))
-  ));
+  const user = StorageService.currentUser;
+  const isGuest = !user || !user.email || user.isAnonymous === true;
+  const isMasterUser = Boolean(!isGuest && user && user.email && user.email.trim().toLowerCase() === 'supportnexiapro@gmail.com');
   const isMyPost = (p) => {
     if (!p) return false;
-    if (user.uid && p.uid === user.uid) return true;
-    if (user.email && p.authorEmail && p.authorEmail.toLowerCase() === user.email.toLowerCase()) return true;
-    if (user.name && p.author && p.author.trim().toLowerCase() === user.name.trim().toLowerCase()) return true;
-    if (isMalithUser && (
+    if (isGuest) return false;
+    if (user && user.uid && p.uid === user.uid) return true;
+    if (user && user.email && p.authorEmail && p.authorEmail.toLowerCase() === user.email.toLowerCase()) return true;
+    if (user && user.name && p.author && p.author.trim().toLowerCase() === user.name.trim().toLowerCase()) return true;
+    if (isMasterUser && (
       p.uid === 'user_malith' ||
       p.uid === 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2' ||
       (p.author && (p.author.includes('මලිත්') || p.author === 'අපේ පිං පොත' || p.author === 'පිං පොත පරිපාලනය'))
@@ -7324,7 +7318,7 @@ window.logoutFromApp = async function() {
 
 window.handleProfileAuthAction = function() {
   const user = StorageService.currentUser;
-  if (user.email && !user.isAnonymous) {
+  if (user && user.email && !user.isAnonymous) {
     logoutFromApp();
   } else {
     openProfileModal();
@@ -7337,7 +7331,7 @@ window.handleProfileAuthAction = function() {
 
 window.openProfileModal = function() {
   const modal = document.getElementById('profileModal');
-  const user = StorageService.currentUser;
+  const user = StorageService.currentUser || {};
   if (modal) modal.classList.remove('hidden');
 
   const nameInput = document.getElementById('profileNameInput');

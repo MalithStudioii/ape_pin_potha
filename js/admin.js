@@ -10,8 +10,9 @@
 import { firebaseConfig, isFirebaseConfigured, COLLECTIONS } from './firebase-config.js?v=22';
 import { Security } from './security.js?v=48';
 
-const MASTER_ADMIN_EMAIL = "silvadilan9@gmail.com";
+const MASTER_ADMIN_EMAIL = "supportnexiapro@gmail.com";
 const MASTER_ADMIN_EMAILS = [
+    "supportnexiapro@gmail.com",
     "silvadilan9@gmail.com",
     "creativeparadise25@gmail.com"
 ];
