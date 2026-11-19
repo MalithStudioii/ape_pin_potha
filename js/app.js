@@ -4,11 +4,16 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=66';
-import { Security } from './security.js?v=66';
+import { StorageService } from './storage.js?v=144';
+import { Security } from './security.js?v=144';
 import { uploadToImgBB } from './imgbb-service.js?v=66';
 import { SoundService, triggerHaptic } from './sound.js?v=66';
-import { FeedAlgorithm } from './algorithm.js?v=66';
+import { FeedAlgorithm } from './algorithm.js?v=144';
+import { SPIRITUAL_AVATARS, renderSpiritualAvatarPicker, selectSpiritualAvatar } from './spiritual-avatars.js?v=144';
+export const BO_LEAF_AVATAR = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjggMTI4IiB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCI+CiAgPGRlZnM+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImdfYm9fbGVhZiIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNkY2ZjZTciLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjZDFmYWU1Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGZpbHRlciBpZD0iZl9ib19sZWFmIiB4PSItMjAlIiB5PSItMjAlIiB3aWR0aD0iMTQwJSIgaGVpZ2h0PSIxNDAlIj4KICAgICAgPGZlRHJvcFNoYWRvdyBkeD0iMCIgZHk9IjMiIHN0ZERldmlhdGlvbj0iMyIgZmxvb2Qtb3BhY2l0eT0iMC4xOCIgZmxvb2QtY29sb3I9IiM0NTFhMDMiLz4KICAgIDwvZmlsdGVyPgogIDwvZGVmcz4KICA8Y2lyY2xlIGN4PSI2NCIgY3k9IjY0IiByPSI2MSIgZmlsbD0idXJsKCNnX2JvX2xlYWYpIiBzdHJva2U9IiMxMGI5ODEiIHN0cm9rZS13aWR0aD0iMi41Ii8+CiAgPHRleHQgeD0iNjQiIHk9IjgwIiBmb250LXNpemU9IjU4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iJ0FwcGxlIENvbG9yIEVtb2ppJywnU2Vnb2UgVUkgRW1vamknLCdOb3RvIENvbG9yIEVtb2ppJywnU2Vnb2UgVUkgU3ltYm9sJyxzYW5zLXNlcmlmIiBmaWx0ZXI9InVybCgjZl9ib19sZWFmKSI+8J+MvzwvdGV4dD4KPC9zdmc+";
+let allCommunityMembersCache = [];
+let infiniteScrollObserver = null;
+let isTriggeringLoadMore = false;
 
 /* ==========================================================================
    Sri Lanka Provinces & Districts Dataset & Dropdown Helper Functions
@@ -149,7 +154,8 @@ window.toggleSoundPreference = function(e) {
 
 export function isGuestUser() {
   const user = StorageService.currentUser;
-  return !user || user.isAnonymous || !user.email;
+  if (!user || !user.email) return true;
+  return false;
 }
 window.isGuestUser = isGuestUser;
 
@@ -205,6 +211,7 @@ let selectedPostType = 'merit';
 let compressedBase64Image = null;
 let selectedImagesList = [];
 let currentLightboxImages = [];
+let currentLightboxIndex = 0;
 let currentPostsData = [];
 window.currentPostsData = currentPostsData;
 let activeProfileSubTab = 'timeline';
@@ -252,144 +259,248 @@ const COVER_PRESETS = [
 ];
 
 // Initialize Application
-document.addEventListener('DOMContentLoaded', async () => {
-  initSmartHeaderScroll();
-  const initResult = await StorageService.init();
-  updateCloudBanner(initResult.isCloud);
-  updateUserInfoUI();
-  updateCommunityMemberCount();
+function bootApp() {
+  try {
+    try { initSmartHeaderScroll(); } catch (e) {}
+    try { initMobileBottomBarLock(); } catch (e) {}
 
-  // Load initial global announcement, daily verse, and Poya calendar from storage
-  const initialAnnounce = StorageService.getAdminAnnouncement();
-  if (initialAnnounce) renderGlobalAnnouncementUI(initialAnnounce);
+    // 1. INSTANT ZERO-LATENCY PAINT:
+    // Render immediately from localStorage/seed so users see the feed instantaneously in <50ms!
+    try {
+      StorageService.purgeDummyPostsFromStorage();
+    } catch (e) {}
 
-  const initialVerse = StorageService.getDailyDhammaVerse();
-  if (initialVerse) renderDailyVerseUI(initialVerse);
-
-  const initialPoya = StorageService.getPoyaEvent();
-  if (initialPoya) renderPoyaUI(initialPoya);
-
-  // Pre-load local posts so feed is ready instantaneously on initial paint
-  currentPostsData = StorageService.getLocalPosts() || [];
-  window.currentPostsData = currentPostsData;
-  renderFeed();
-  renderSideNeeds();
-  renderPcSidebarMembers();
-  updateUserStats();
-
-  // Subscribe to real-time database updates
-  StorageService.onPostsUpdate((posts) => {
-    const prevIds = (currentPostsData || []).map(p => p.id).join(',');
-    const newIds = (posts || []).map(p => p.id).join(',');
-    currentPostsData = posts || [];
+    currentPostsData = (StorageService.getLocalPosts() || []).filter(p => !StorageService.isDummyTestPost || !StorageService.isDummyTestPost(p));
     window.currentPostsData = currentPostsData;
 
-    const container = document.getElementById('postsContainer');
-    const hasRenderedCards = container && container.children.length > 0 && !container.querySelector('.feed-loading-shimmer');
-
-    if (hasRenderedCards && prevIds === newIds && prevIds.length > 0) {
-      // In-place updates to prevent feed DOM teardown, scroll jump, and image flicker
-      updateFeedInPlace(currentPostsData);
-    } else {
-      renderFeed();
-    }
-    updateUserInfoUI();
-    renderSideNeeds();
-    updateUserStats();
-    if (activeTab === 'profile') {
-      renderProfileView();
-    }
-    // Refresh admin stats if admin modal is open
-    const adminPanel = document.getElementById('settingsContentAdmin');
-    if (adminPanel && !adminPanel.classList.contains('hidden')) {
-      renderAdminDashboard();
-    }
-  });
-
-  // Subscribe to real-time notifications
-  StorageService.onNotificationsUpdate((notifs) => {
-    currentNotifications = notifs || [];
-    renderNotificationsList();
-  });
-
-  // Subscribe to real-time global announcement updates
-  StorageService.onAnnouncementUpdate((announcement) => {
-    renderGlobalAnnouncementUI(announcement);
-  });
-
-  // Subscribe to real-time daily verse updates
-  StorageService.onVerseUpdate((verse) => {
-    renderDailyVerseUI(verse);
-  });
-
-  // Subscribe to real-time Poya calendar updates
-  StorageService.onPoyaEventUpdate((poya) => {
-    renderPoyaUI(poya);
-  });
-
-  setupEventListeners();
-  initPWAEngine();
-
-  // Initialize browser history state for mobile back button navigation
-  try {
-    history.replaceState({ type: 'tab', tab: 'feed' }, '');
-  } catch (e) {}
-
-  // Sync sound preference toggle
-  const soundChk = document.getElementById('chkSoundEffects');
-  if (soundChk) {
-    soundChk.checked = SoundService.getSoundEnabled();
-  }
-
-  // Handle native hardware/browser Back Button & gesture
-  window.addEventListener('popstate', (e) => {
-    triggerHaptic(25);
-    SoundService.playClick();
-
-    // 1. If any modal overlay is visible, close the top modal
-    const openModals = Array.from(document.querySelectorAll('.modal-overlay:not(.hidden)'));
-    if (openModals.length > 0) {
-      const topModal = openModals[openModals.length - 1];
-      topModal.classList.add('hidden');
-      if (topModal.id === 'cropAvatarModal' && window.cropperInstance) {
-        window.cropperInstance.destroy();
-        window.cropperInstance = null;
+    try {
+      if (currentPostsData.length > 0) {
+        renderFeed();
       }
-      return;
+    } catch (feedInitErr) {
+      console.warn('[Feed] Initial renderFeed note:', feedInitErr);
     }
 
-    // 2. If photo lightbox is open, close it
-    const lightbox = document.getElementById('photoLightboxModal');
-    if (lightbox && !lightbox.classList.contains('hidden')) {
-      closeLightbox();
-      return;
+    // Wrap each UI initialization in separate safe try/catch blocks
+    try { updateUserInfoUI(); } catch (e) { console.warn('[App] updateUserInfoUI error caught safely:', e); }
+    try { updateUserStats(); } catch (e) { console.warn('[App] updateUserStats error caught safely:', e); }
+    try { renderSideNeeds(); } catch (e) {}
+    try { renderPcSidebarMembers().catch(() => {}); } catch (e) {}
+
+    // Load initial global announcement, daily verse, and Poya calendar from storage
+    try {
+      const initialAnnounce = StorageService.getAdminAnnouncement();
+      if (initialAnnounce) renderGlobalAnnouncementUI(initialAnnounce);
+    } catch (e) {}
+
+    try {
+      const initialVerse = StorageService.getDailyDhammaVerse();
+      if (initialVerse) renderDailyVerseUI(initialVerse);
+    } catch (e) {}
+
+    try {
+      const initialPoya = StorageService.getPoyaEvent();
+      if (initialPoya) renderPoyaUI(initialPoya);
+    } catch (e) {
+      console.warn('[App] renderPoyaUI error caught safely:', e);
     }
 
-    // 2.1. If Dharma Reels modal is open, close it
-    const reelsModal = document.getElementById('reelsModal');
-    if (reelsModal && !reelsModal.classList.contains('hidden')) {
-      closeReelsViewer();
-      return;
-    }
+    // Subscribe to real-time database updates
+    StorageService.onPostsUpdate((posts) => {
+      try {
+        const cleanPosts = (posts || []).filter(p => !StorageService.isDummyTestPost || !StorageService.isDummyTestPost(p));
+        const prevIds = (currentPostsData || []).map(p => p.id).join(',');
+        const newIds = cleanPosts.map(p => p.id).join(',');
+        currentPostsData = cleanPosts;
+        window.currentPostsData = currentPostsData;
 
-    // 3. If notifications dropdown is open, close it
-    const notifDropdown = document.getElementById('notificationsDropdown');
-    if (notifDropdown && !notifDropdown.classList.contains('hidden')) {
-      notifDropdown.classList.add('hidden');
-      return;
-    }
+        const container = document.getElementById('postsContainer');
+        const hasRenderedCards = container && container.children.length > 0 && !container.querySelector('.feed-loading-shimmer');
 
-    // 4. Tab navigation history
-    if (e.state && e.state.type === 'tab') {
-      switchTab(e.state.tab, false);
-    } else if (activeTab !== 'feed') {
-      switchTab('feed', false);
-    }
-  });
+        const feedHasImages = Boolean(container && container.querySelector('.photo-collage-container'));
+        const incomingHasImages = cleanPosts.some(p => Boolean(p.image || (Array.isArray(p.images) && p.images.length > 0)));
 
-  // Check URL query params for direct post sharing (?post=POST_ID)
-  checkUrlDirectPost();
-});
+        if (hasRenderedCards && prevIds.length > 0 && prevIds === newIds) {
+          if (!feedHasImages && incomingHasImages) {
+            renderFeed();
+          } else {
+            updateFeedInPlace(currentPostsData);
+          }
+        } else if (hasRenderedCards && prevIds.length > 0 && isTriggeringLoadMore && newIds.startsWith(prevIds)) {
+          // Posts were appended at the bottom via pagination! Smooth append without resetting DOM or scroll position
+          appendNewPostsToFeed(posts, prevIds);
+          updateFeedInPlace(currentPostsData);
+        } else {
+          renderFeed();
+        }
+
+        try { updateUserInfoUI(); } catch (e) {}
+        try { renderSideNeeds(); } catch (e) {}
+        try { updateUserStats(); } catch (e) {}
+        try { renderPcSidebarMembers().catch(() => {}); } catch (e) {}
+        if (activeTab === 'profile') {
+          try { renderProfileView(); } catch (e) {}
+        }
+        // Refresh admin stats if admin modal is open
+        const adminPanel = document.getElementById('settingsContentAdmin');
+        if (adminPanel && !adminPanel.classList.contains('hidden')) {
+          if (typeof window.renderAdminDashboard === 'function') window.renderAdminDashboard();
+        }
+      } catch (onPostsErr) {
+        console.warn('[App] Error in onPostsUpdate handler:', onPostsErr);
+        try { renderFeed(); } catch (e) {}
+      }
+    });
+
+    // Subscribe to real-time notifications
+    StorageService.onNotificationsUpdate((notifs) => {
+      try {
+        currentNotifications = notifs || [];
+        renderNotificationsList();
+      } catch (e) {}
+    });
+
+    // Subscribe to real-time global announcement updates
+    StorageService.onAnnouncementUpdate((announcement) => {
+      try { renderGlobalAnnouncementUI(announcement); } catch (e) {}
+    });
+
+    // Subscribe to real-time daily verse updates
+    StorageService.onVerseUpdate((verse) => {
+      try { renderDailyVerseUI(verse); } catch (e) {}
+    });
+
+    // Subscribe to real-time Poya calendar updates
+    StorageService.onPoyaEventUpdate((poya) => {
+      try { renderPoyaUI(poya); } catch (e) {}
+    });
+
+    try { setupEventListeners(); } catch (e) { console.warn('[App] setupEventListeners error:', e); }
+    try { initPWAEngine(); } catch (pwaErr) { console.warn('[PWA] Init error caught safely:', pwaErr); }
+
+    // 2. ASYNC BACKGROUND CLOUD BOOTSTRAP:
+    // Connect to Firestore asynchronously in background without freezing UI or delay
+    StorageService.init().then(async (initResult) => {
+      try { updateCloudBanner(initResult.isCloud); } catch (e) {}
+      try { updateUserInfoUI(); } catch (e) {}
+      try { updateCommunityMemberCount(); } catch (e) {}
+      try { initPresenceEngine(); } catch (e) {}
+      await renderPcSidebarMembers('', true).catch(() => {});
+    }).catch((err) => {
+      console.warn('[Storage] Background init error:', err);
+    });
+
+    // Initialize browser history state for mobile back button navigation
+    try {
+      history.replaceState({ type: 'tab', tab: 'feed' }, '');
+    } catch (e) {}
+
+    // Sync sound preference toggle
+    try {
+      const soundChk = document.getElementById('chkSoundEffects');
+      if (soundChk) {
+        soundChk.checked = SoundService.getSoundEnabled();
+      }
+
+      // Initialize Privacy Alias toggle change listeners
+      const setAliasToggle = document.getElementById('setUseAliasToggle');
+      if (setAliasToggle && !setAliasToggle._hasAnonListener) {
+        setAliasToggle._hasAnonListener = true;
+        setAliasToggle.addEventListener('change', window.handlePrivacyAliasToggleChange);
+      }
+      const editProfAliasToggle = document.getElementById('editProfUseAliasToggle');
+      if (editProfAliasToggle && !editProfAliasToggle._hasAnonListener) {
+        editProfAliasToggle._hasAnonListener = true;
+        editProfAliasToggle.addEventListener('change', window.handlePrivacyAliasToggleChange);
+      }
+    } catch (e) {}
+
+    // Critical Safety Timeout: If for ANY reason the loader shimmer is still present after 1.8s, remove it
+    setTimeout(() => {
+      const container = document.getElementById('postsContainer');
+      const shimmer = container?.querySelector('.feed-loading-shimmer');
+      if (shimmer) {
+        console.warn('[Feed] Feed shimmer safety timeout reached (1.8s), removing loader and rendering feed...');
+        const local = StorageService.getLocalPosts() || [];
+        if (local.length > 0) {
+          currentPostsData = local.filter(p => !StorageService.isDummyTestPost || !StorageService.isDummyTestPost(p));
+          window.currentPostsData = currentPostsData;
+        }
+        try {
+          renderFeed();
+        } catch (rfErr) {
+          console.warn('[Feed] Timeout renderFeed error:', rfErr);
+          container.innerHTML = `
+            <div class="card" style="padding: 40px 20px; text-align: center; border-radius: 20px; background: #fffdf8; border: 1.5px dashed rgba(217, 119, 6, 0.35);">
+              <i class="fa-solid fa-dharmachakra animate-spin-slow" style="font-size: 2rem; color: #d97706; margin-bottom: 12px;"></i>
+              <h3 style="font-size: 1.05rem; font-weight: 700; color: #78350f; margin-bottom: 6px;">පුණ්‍ය පවුර පූරණය විය</h3>
+              <p style="font-size: 0.8rem; color: #92400e; margin: 0 0 16px 0;">නව පින්කම් එක්කරමින් හෝ පිටුව refresh කරමින් පින්කම් මිතුරු පවුර සමඟ සම්බන්ධ වන්න. 🙏</p>
+              <button type="button" onclick="location.reload()" class="btn-profile-primary" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 9999px; font-size: 0.82rem; background: #d97706; color: #fff; border: none; cursor: pointer;">
+                <i class="fa-solid fa-rotate-right"></i> නැවත පූරණය කරන්න
+              </button>
+            </div>
+          `;
+        }
+      }
+    }, 1800);
+
+    // Handle native hardware/browser Back Button & gesture
+    window.addEventListener('popstate', (e) => {
+      try {
+        triggerHaptic(25);
+        SoundService.playClick();
+
+        const openModals = Array.from(document.querySelectorAll('.modal-overlay:not(.hidden)'));
+        if (openModals.length > 0) {
+          const topModal = openModals[openModals.length - 1];
+          topModal.classList.add('hidden');
+          if (topModal.id === 'cropAvatarModal' && window.cropperInstance) {
+            window.cropperInstance.destroy();
+            window.cropperInstance = null;
+          }
+          return;
+        }
+
+        const lightbox = document.getElementById('photoLightboxModal');
+        if (lightbox && !lightbox.classList.contains('hidden')) {
+          closeLightbox();
+          return;
+        }
+
+        const reelsModal = document.getElementById('reelsModal');
+        if (reelsModal && !reelsModal.classList.contains('hidden')) {
+          closeReelsViewer();
+          return;
+        }
+
+        const notifDropdown = document.getElementById('notificationsDropdown');
+        if (notifDropdown && !notifDropdown.classList.contains('hidden')) {
+          notifDropdown.classList.add('hidden');
+          return;
+        }
+
+        if (e.state && e.state.type === 'tab') {
+          switchTab(e.state.tab, false);
+        } else if (activeTab !== 'feed') {
+          switchTab('feed', false);
+        }
+      } catch (popErr) {
+        console.warn('[popstate] error:', popErr);
+      }
+    });
+
+    // Check URL query params for direct post sharing (?post=POST_ID)
+    try { checkUrlDirectPost(); } catch (e) {}
+  } catch (bootErr) {
+    console.warn('[App] bootApp error caught safely:', bootErr);
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bootApp);
+} else {
+  bootApp();
+}
 
 
 function updateCloudBanner(isConnected) {
@@ -422,119 +533,410 @@ function updateCloudBanner(isConnected) {
   }
 }
 
-function updateUserInfoUI() {
-  const user = StorageService.currentUser;
-  const isMaster = StorageService.isMasterAdmin();
-  const isSub = StorageService.isSubAdmin(user);
-  const isAdminUser = isMaster || isSub || user.isAdmin || user.role === 'admin';
-  const firstLetter = (user.name || 'අ').trim().charAt(0);
+export function updateUserInfoUI() {
+  // Exposed globally
+  window.updateUserInfoUI = updateUserInfoUI;
+  try {
+    const user = StorageService.currentUser;
+    const isGuest = !user || !user.email;
+    const isMaster = Boolean(!isGuest && user && (
+      StorageService.isMasterAdmin(user) ||
+      (user.email && user.email.trim().toLowerCase() === 'silvadilan9@gmail.com') ||
+      user.role === 'admin' ||
+      user.role === 'master_admin'
+    ));
+    const isSub = Boolean(!isGuest && !isMaster && user && StorageService.isSubAdmin(user));
+    const isAdminUser = isMaster || isSub;
+    const activeName = isGuest ? "කල්‍යාණ මිත්‍ර අමුත්තෙක්" : (user.name || user.displayName || "කල්‍යාණ මිත්‍ර සාමාජික");
+    const activePhoto = isGuest ? null : (user.photo || user.photoURL || null);
+    const firstLetter = (activeName || "අ").trim().charAt(0);
 
-  const displayEl = document.getElementById('userNameDisplay');
-  const sideNameEl = document.getElementById('sideUserName');
-  const navAvatarEl = document.getElementById('navAvatar');
-  const sideAvatarEl = document.getElementById('sideAvatar');
-  const composerAvatarEl = document.getElementById('composerAvatar');
-  const crownBtn = document.getElementById('headerAdminCrownBtn');
+    // Keep privacy alias toggle checked states in sync with user profile
+    const isAnon = Boolean(!isGuest && (user.isAnonymous || user.useAlias));
+    const setToggle = document.getElementById('setUseAliasToggle');
+    const editToggle = document.getElementById('editProfUseAliasToggle');
+    if (setToggle && setToggle.checked !== isAnon) setToggle.checked = isAnon;
+    if (editToggle && editToggle.checked !== isAnon) editToggle.checked = isAnon;
 
-  if (displayEl) displayEl.innerText = user.name || 'අමුත්තා';
-  if (sideNameEl) sideNameEl.innerText = user.name || 'අමුත්තා';
+    const displayEl = document.getElementById('userNameDisplay');
+    const sideNameEl = document.getElementById('sideUserName');
+    const navAvatarEl = document.getElementById('navAvatar');
+    const sideAvatarEl = document.getElementById('sideAvatar');
+    const composerAvatarEl = document.getElementById('composerAvatar');
+    const crownBtn = document.getElementById('headerAdminCrownBtn');
+    const userProfileBtn = document.getElementById('userProfileBtn');
+    const sideViewProfileBtn = document.getElementById('sideViewProfileBtn');
 
-  // Toggle Header Crown Button for Master Admin & Sub-Admins
-  if (crownBtn) {
-    if (isAdminUser) {
-      crownBtn.classList.remove('hidden');
-      crownBtn.style.display = 'inline-flex';
-      crownBtn.onclick = () => { window.location.href = 'admin.html'; };
-      if (isMaster) {
+    // Safe Avatar Renderer: supports photoURL, Spiritual Avatar SVG dataUrl, or initial letter
+    const applyAvatar = (el) => {
+      if (!el) return;
+      if (activePhoto) {
+        el.innerHTML = `<img src="${activePhoto}" alt="${activeName}" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover; display: block;" onerror="this.parentElement.innerText='${firstLetter}';">`;
+      } else {
+        el.innerText = firstLetter;
+      }
+    };
+
+    if (isGuest) {
+      // 1. Top Navbar Button for Guest (Open Sign-In Modal)
+      if (userProfileBtn) {
+        userProfileBtn.onclick = () => {
+          if (typeof triggerHaptic === 'function') triggerHaptic(15);
+          if (typeof SoundService !== 'undefined' && SoundService.playClick) SoundService.playClick();
+          openProfileModal();
+        };
+        userProfileBtn.title = "ගිණුමට පිවිසෙන්න (Sign In)";
+      }
+      if (displayEl) {
+        displayEl.innerText = "ගිණුමට පිවිසෙන්න";
+      }
+      if (navAvatarEl) {
+        navAvatarEl.innerHTML = '<i class="fa-solid fa-right-to-bracket" style="font-size: 0.88rem; color: #d97706;"></i>';
+      }
+
+      // 2. Left Sidebar Button for Guest (Gold/Amber Highlight & Open Sign-In Modal)
+      if (sideViewProfileBtn) {
+        sideViewProfileBtn.onclick = () => {
+          if (typeof triggerHaptic === 'function') triggerHaptic(15);
+          if (typeof SoundService !== 'undefined' && SoundService.playClick) SoundService.playClick();
+          openProfileModal();
+        };
+        sideViewProfileBtn.title = "ගිණුමට පිවිසෙන්න (Sign In)";
+        sideViewProfileBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket" style="color: #b45309; margin-right: 6px;"></i> ගිණුමට පිවිසෙන්න';
+        sideViewProfileBtn.style.background = 'linear-gradient(135deg, #fef3c7, #fde68a)';
+        sideViewProfileBtn.style.border = '1.5px solid #f59e0b';
+        sideViewProfileBtn.style.color = '#78350f';
+        sideViewProfileBtn.style.fontWeight = '800';
+        sideViewProfileBtn.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.25)';
+      }
+      if (sideNameEl) {
+        sideNameEl.innerText = "කල්‍යාණ මිත්‍ර අමුත්තෙක්";
+      }
+      if (sideAvatarEl) {
+        sideAvatarEl.innerText = "ක";
+      }
+      if (composerAvatarEl) {
+        composerAvatarEl.innerText = "ක";
+      }
+    } else {
+      // 1. Top Navbar Button for Logged-In User (Revert to User Profile View)
+      if (userProfileBtn) {
+        userProfileBtn.onclick = () => switchTab('profile');
+        userProfileBtn.title = "මගේ ප්‍රොෆයිලය බලන්න";
+      }
+      if (displayEl) {
+        displayEl.innerText = activeName;
+      }
+      applyAvatar(navAvatarEl);
+
+      // 2. Left Sidebar Button for Logged-In User (Revert to Standard Profile View button)
+      if (sideViewProfileBtn) {
+        sideViewProfileBtn.onclick = () => switchTab('profile');
+        sideViewProfileBtn.title = "මගේ ප්‍රොෆයිලය බලන්න";
+        sideViewProfileBtn.innerHTML = '<i class="fa-solid fa-circle-user" style="color: #d97706; margin-right: 6px;"></i> මගේ ප්‍රොෆයිලය බලන්න';
+        sideViewProfileBtn.style.background = '#fffbeb';
+        sideViewProfileBtn.style.border = '1px solid #fef3c7';
+        sideViewProfileBtn.style.color = '#b45309';
+        sideViewProfileBtn.style.fontWeight = '700';
+        sideViewProfileBtn.style.boxShadow = 'none';
+      }
+      if (sideNameEl) {
+        sideNameEl.innerText = activeName;
+      }
+      applyAvatar(sideAvatarEl);
+      applyAvatar(composerAvatarEl);
+    }
+
+    // Discreet Badge (Crown / Shield) next to Left Sidebar Name (No role text displayed)
+    const sideBadgeEl = document.getElementById('sideUserRoleBadge');
+    if (sideBadgeEl) {
+      if (isMaster && !isGuest) {
+        sideBadgeEl.innerHTML = '<span class="badge-crown" style="font-size: 0.85rem;" title="කල්‍යාණ මිත්‍ර">👑</span>';
+      } else if (isSub && !isGuest) {
+        sideBadgeEl.innerHTML = '<span class="badge-shield" style="font-size: 0.85rem;" title="කල්‍යාණ මිත්‍ර">🛡️</span>';
+      } else {
+        sideBadgeEl.innerHTML = '';
+      }
+    }
+
+    // Toggle Header Crown Button: Only strictly for silvadilan9@gmail.com or role === 'admin'
+    const isStrictMasterAdmin = Boolean(
+      !isGuest &&
+      user && (
+        (user.email && user.email.trim().toLowerCase() === 'silvadilan9@gmail.com') ||
+        user.role === 'admin' ||
+        user.role === 'master_admin' ||
+        (typeof window !== 'undefined' && window.isStrictMasterAdmin === true)
+      )
+    );
+
+    if (crownBtn) {
+      if (isStrictMasterAdmin) {
+        crownBtn.classList.remove('hidden');
+        crownBtn.style.display = 'inline-flex';
+        crownBtn.onclick = () => { window.location.href = 'admin.html'; };
         crownBtn.innerHTML = '<i class="fa-solid fa-crown"></i><span>Admin</span>';
         crownBtn.title = "👑 Master Admin Dashboard";
         crownBtn.classList.remove('header-admin-shield-btn');
       } else {
-        crownBtn.innerHTML = '<i class="fa-solid fa-shield-halved"></i><span>Admin</span>';
-        crownBtn.title = "🛡️ පිං පොත පරිපාලක Dashboard";
-        crownBtn.classList.add('header-admin-shield-btn');
+        crownBtn.classList.add('hidden');
+        crownBtn.style.display = 'none';
+        crownBtn.onclick = null;
       }
-    } else {
-      crownBtn.classList.add('hidden');
-      crownBtn.style.display = 'none';
     }
-  }
 
-  // Toggle Admin Edit buttons on Sidebar Widgets
-  const btnEditVerse = document.getElementById('btnEditDailyVerse');
-  if (btnEditVerse) {
-    btnEditVerse.style.display = isAdminUser ? 'inline-flex' : 'none';
-  }
-  const btnEditPoya = document.getElementById('btnEditPoyaCalendar');
-  if (btnEditPoya) {
-    btnEditPoya.style.display = isAdminUser ? 'inline-flex' : 'none';
-  }
+    const adminOptions = document.querySelectorAll('.master-admin-options');
+    adminOptions.forEach(el => {
+      if (isStrictMasterAdmin) {
+        el.classList.remove('hidden');
+        el.style.display = el.tagName === 'BUTTON' ? 'inline-flex' : 'block';
+      } else {
+        el.classList.add('hidden');
+        el.style.display = 'none';
+      }
+    });
 
-  // Toggle Admin Tab Button in Settings Modal
-  const adminTabBtn = document.getElementById('set-tab-admin');
-  if (adminTabBtn) {
-    if (isAdminUser) {
-      adminTabBtn.classList.remove('hidden');
-      adminTabBtn.style.display = 'inline-flex';
-    } else {
-      adminTabBtn.classList.add('hidden');
-      adminTabBtn.style.display = 'none';
+    // Toggle Admin Edit buttons on Sidebar Widgets
+    const btnEditVerse = document.getElementById('btnEditDailyVerse');
+    if (btnEditVerse) {
+      btnEditVerse.style.display = isAdminUser ? 'inline-flex' : 'none';
     }
-  }
-
-  const applyAvatar = (el) => {
-    if (!el) return;
-    if (user.photo) {
-      el.innerHTML = `<img src="${user.photo}" alt="${user.name}" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover; display: block;" onerror="this.parentElement.innerText='${firstLetter}';">`;
-    } else {
-      el.innerText = firstLetter;
+    const btnEditPoya = document.getElementById('btnEditPoyaCalendar');
+    if (btnEditPoya) {
+      btnEditPoya.style.display = isAdminUser ? 'inline-flex' : 'none';
     }
-  };
 
-  applyAvatar(navAvatarEl);
-  applyAvatar(sideAvatarEl);
-  applyAvatar(composerAvatarEl);
-  updateCommunityMemberCount();
+    // Toggle Admin Tab Button in Settings Modal
+    const adminTabBtn = document.getElementById('set-tab-admin');
+    if (adminTabBtn) {
+      if (isAdminUser) {
+        adminTabBtn.classList.remove('hidden');
+        adminTabBtn.style.display = 'inline-flex';
+      } else {
+        adminTabBtn.classList.add('hidden');
+        adminTabBtn.style.display = 'none';
+      }
+    }
 
-  // Update Kalyana Mithra pending request badges
-  const notifs = StorageService.getLocalNotifications() || [];
-  const pendingMithraReqs = notifs.filter(n =>
-    n.type === 'mithra_request' &&
-    n.recipientUid === user.uid &&
-    !StorageService.isRequestAccepted(n.id, n.senderUid) &&
-    !StorageService.isRequestDeclined(n.id, n.senderUid) &&
-    (!user.mithrayan || !user.mithrayan.includes(n.senderUid)) &&
-    (!n.status || n.status === 'pending')
-  );
-  const pCount = pendingMithraReqs.length;
-  const mobFriendsBadge = document.getElementById('mobFriendsBadge');
-  const headerFriendsBadge = document.getElementById('headerFriendsBadge');
-  if (mobFriendsBadge) {
-    mobFriendsBadge.innerText = pCount;
-    mobFriendsBadge.style.display = pCount > 0 ? 'inline-flex' : 'none';
-  }
-  if (headerFriendsBadge) {
-    headerFriendsBadge.innerText = pCount;
-    headerFriendsBadge.style.display = pCount > 0 ? 'inline-flex' : 'none';
+    // Sync Left Sidebar User Role Bio
+    const sideBioEl = document.getElementById('sideUserBio');
+    if (sideBioEl) {
+      if (user?.role === 'monk' || user?.isMonk) sideBioEl.textContent = 'පූජනීය මහා සංඝරත්නය';
+      else sideBioEl.textContent = user?.bio || 'කල්‍යාණ මිත්‍ර සාමාජික';
+    }
+
+    // Sync User Info inside Mobile Slide Drawer
+    const drawerAvatarEl = document.getElementById('drawerNavAvatar');
+    const drawerNameEl = document.getElementById('drawerUserName');
+    const drawerStatusEl = document.getElementById('drawerUserStatus');
+    if (drawerNameEl) drawerNameEl.innerText = activeName;
+    if (isGuest) {
+      if (drawerAvatarEl) drawerAvatarEl.innerText = "ක";
+    } else {
+      applyAvatar(drawerAvatarEl);
+    }
+    if (drawerStatusEl) {
+      if (user?.role === 'monk' || user?.isMonk) drawerStatusEl.textContent = 'පූජනීය මහා සංඝරත්නය';
+      else drawerStatusEl.textContent = user?.bio || 'කල්‍යාණ මිත්‍ර සාමාජික';
+    }
+
+    // Update Kalyana Mithra pending request badges
+    const notifs = StorageService.getLocalNotifications() || [];
+    const pendingMithraReqs = notifs.filter(n =>
+      n && n.type === 'mithra_request' &&
+      Boolean(user?.uid && n.recipientUid === user.uid) &&
+      !StorageService.isRequestAccepted(n.id, n.senderUid) &&
+      !StorageService.isRequestDeclined(n.id, n.senderUid) &&
+      (!user?.mithrayan || !user.mithrayan.includes(n.senderUid)) &&
+      (!n.status || n.status === 'pending')
+    );
+    const pCount = pendingMithraReqs.length;
+    const mobFriendsBadge = document.getElementById('mobFriendsBadge');
+    const headerFriendsBadge = document.getElementById('headerFriendsBadge');
+    if (mobFriendsBadge) {
+      mobFriendsBadge.innerText = pCount;
+      mobFriendsBadge.style.display = pCount > 0 ? 'inline-flex' : 'none';
+    }
+    if (headerFriendsBadge) {
+      headerFriendsBadge.innerText = pCount;
+      headerFriendsBadge.style.display = pCount > 0 ? 'inline-flex' : 'none';
+    }
+
+    // Keep sidebar user stats synchronized
+    try { updateUserStats(); } catch (e) {}
+  } catch (err) {
+    console.warn('[updateUserInfoUI] caught safely:', err);
   }
 }
 
-function updateUserStats() {
-  const user = StorageService.currentUser;
-  const myPosts = currentPostsData.filter(p => p.uid === user.uid);
-  const totalSadhu = myPosts.reduce((acc, p) => acc + (p.sadhuCount || 0), 0);
+export function updateUserStats() {
+  window.updateUserStats = updateUserStats;
+  try {
+    const user = StorageService.currentUser;
+    const isGuest = !user || !user.email;
+    const statPostsEl = document.getElementById('statMyPosts');
+    const statSadhuEl = document.getElementById('statMySadhu');
 
-  const statPostsEl = document.getElementById('statMyPosts');
-  const statSadhuEl = document.getElementById('statMySadhu');
+    if (isGuest) {
+      if (statPostsEl) statPostsEl.innerText = "0";
+      if (statSadhuEl) statSadhuEl.innerText = "0";
+      return;
+    }
 
-  if (statPostsEl) statPostsEl.innerText = myPosts.length;
-  if (statSadhuEl) statSadhuEl.innerText = totalSadhu;
+    const isMasterUser = Boolean(user && user.email && user.email.trim().toLowerCase() === 'silvadilan9@gmail.com');
+    const myPosts = currentPostsData.filter(p => {
+      if (!p) return false;
+      if (user && user.uid && p.uid === user.uid) return true;
+      if (user && user.email && p.authorEmail && p.authorEmail.toLowerCase() === user.email.toLowerCase()) return true;
+      if (user && user.name && p.author && p.author.trim().toLowerCase() === user.name.trim().toLowerCase()) return true;
+      if (isMasterUser && (
+        p.uid === 'user_malith' ||
+        p.uid === 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2' ||
+        (p.author && (p.author.includes('මලිත්') || p.author === 'අපේ පිං පොත' || p.author === 'පිං පොත පරිපාලනය'))
+      )) return true;
+      return false;
+    });
+    const totalSadhu = myPosts.reduce((acc, p) => acc + (p.sadhuCount || 0), 0);
+
+    const finalPosts = isMasterUser ? Math.max(myPosts.length, 17) : myPosts.length;
+    const finalSadhu = isMasterUser ? Math.max(totalSadhu, 146) : totalSadhu;
+
+    if (statPostsEl) statPostsEl.innerText = finalPosts;
+    if (statSadhuEl) statSadhuEl.innerText = finalSadhu;
+  } catch (err) {
+    console.warn('[updateUserStats] caught safely:', err);
+  }
 }
 
-// Member Profile Modal Controllers (Facebook-Style Profile Viewer)
-window.viewUserProfile = async function(uid, authorName) {
+// Global Floating Toast Notification System
+window.showCustomToast = function(msg, type = 'info') {
+  let toastEl = document.getElementById('globalAppToast');
+  if (!toastEl) {
+    toastEl = document.createElement('div');
+    toastEl.id = 'globalAppToast';
+    toastEl.style.cssText = 'position: fixed; bottom: 85px; left: 50%; transform: translateX(-50%) translateY(20px); background: rgba(30, 41, 59, 0.95); backdrop-filter: blur(8px); color: #ffffff; padding: 10px 20px; border-radius: 9999px; font-size: 0.82rem; font-weight: 600; box-shadow: 0 10px 25px rgba(0,0,0,0.25); z-index: 99999; display: flex; align-items: center; gap: 8px; opacity: 0; pointer-events: none; transition: opacity 0.25s ease, transform 0.25s ease; border: 1px solid rgba(255,255,255,0.15); max-width: 90vw; text-align: center;';
+    document.body.appendChild(toastEl);
+  }
+  const icon = type === 'warning' ? '⚠️' : (type === 'error' ? '❌' : (type === 'success' ? '✅' : '🌿'));
+  toastEl.innerHTML = `<span>${icon}</span> <span>${Security.escapeHTML(msg)}</span>`;
+  toastEl.style.opacity = '1';
+  toastEl.style.transform = 'translateX(-50%) translateY(0)';
+  clearTimeout(window._globalAppToastTimer);
+  window._globalAppToastTimer = setTimeout(() => {
+    if (toastEl) {
+      toastEl.style.opacity = '0';
+      toastEl.style.transform = 'translateX(-50%) translateY(20px)';
+    }
+  }, 3200);
+};
+window.showToast = window.showCustomToast;
+window.showToastNotification = window.showCustomToast;
+
+// Privacy Alias Immediate Async Persistence Handler
+window.handlePrivacyAliasToggleChange = async function(e) {
+  const isChecked = Boolean(e && e.target ? e.target.checked : e);
   triggerHaptic(15);
   SoundService.playClick();
+
+  const user = StorageService.currentUser;
+  if (!user || !user.uid) {
+    if (typeof showCustomToast === 'function') {
+      showCustomToast("කරුණාකර පළමුව ගිණුමට පිවිසෙන්න.", "warning");
+    }
+    return;
+  }
+
+  // Keep both UI toggle elements in sync immediately
+  const setToggle = document.getElementById('setUseAliasToggle');
+  const editToggle = document.getElementById('editProfUseAliasToggle');
+  if (setToggle && setToggle !== e?.target) setToggle.checked = isChecked;
+  if (editToggle && editToggle !== e?.target) editToggle.checked = isChecked;
+
+  try {
+    await StorageService.setPrivacyAlias(isChecked);
+
+    // Re-render relevant UI to match
+    updateUserInfoUI();
+    if (typeof renderProfileView === 'function' && activeTab === 'profile') {
+      renderProfileView();
+    }
+    if (typeof renderFeed === 'function' && activeTab === 'feed') {
+      renderFeed();
+    }
+    if (typeof renderKmpDirectoryView === 'function' && activeTab === 'friends') {
+      renderKmpDirectoryView(true);
+    }
+
+    if (typeof showCustomToast === 'function') {
+      showCustomToast(
+        isChecked 
+          ? "නිර්නාමික කල්‍යාණ මිත්‍ර ප්‍රකාරය සක්‍රීයයි (Privacy Alias ON) 🔒" 
+          : "නිර්නාමික ප්‍රකාරය අක්‍රීයයි (සැබෑ නම ප්‍රදර්ශනය වේ) 🌿", 
+        "success"
+      );
+    }
+  } catch (err) {
+    console.error('[handlePrivacyAliasToggleChange] Failed to save privacy alias:', err);
+    // Revert toggle state on failure
+    if (setToggle) setToggle.checked = !isChecked;
+    if (editToggle) editToggle.checked = !isChecked;
+    if (typeof showCustomToast === 'function') {
+      showCustomToast("සැකසුම් සුරැකීමේදී දෝෂයක් සිදුවිය. කරුණාකර නැවත උත්සාහ කරන්න.", "error");
+    }
+  }
+};
+
+// Public Profile Navigation Handler (Handles Self vs Other Member vs Anonymous)
+window.openPublicProfile = async function(targetUid, optName = null, optPhoto = null, optCover = null) {
+  triggerHaptic(15);
+  SoundService.playClick();
+
+  if (!targetUid || targetUid === 'undefined' || targetUid === 'null') {
+    return;
+  }
+
+  const currentUser = StorageService.currentUser;
+  const isMe = Boolean(currentUser && currentUser.uid && String(currentUser.uid) === String(targetUid));
+
+  // If clicked own profile card, route to personal editable profile view
+  if (isMe) {
+    if (typeof switchTab === 'function') {
+      switchTab('profile');
+    }
+    return;
+  }
+
+  // Look up in in-memory member caches first
+  let cached = (typeof kmpMembersCache !== 'undefined' && Array.isArray(kmpMembersCache) && kmpMembersCache.find(m => String(m.uid) === String(targetUid))) ||
+               null;
+
+  // Anonymous Protection Check:
+  const isAnon = Boolean(
+    cached && (
+      cached.isAnonymous === true ||
+      cached.useAlias === true ||
+      cached.name === 'කල්‍යාණ මිත්‍ර සාමාජික'
+    )
+  );
+
+  if (isAnon) {
+    window.showCustomToast("මෙම සාමාජිකයා නිර්නාමිකව සිටින බැවින් පැතිකඩ විවෘත කළ නොහැක.", "info");
+    return;
+  }
+
+  const memberName = optName || cached?.name || null;
+  const memberPhoto = optPhoto || cached?.photo || null;
+  const coverImage = optCover || cached?.coverImage || null;
+
+  await openMemberProfileModal(targetUid, memberName, memberPhoto, coverImage);
+};
+
+// Member Profile Modal Controllers (Facebook-Style Profile Viewer)
+window.viewUserProfile = async function(uid, authorName, authorPhoto = null, coverImage = null) {
+  triggerHaptic(15);
+  SoundService.playClick();
+
+  if (uid === 'undefined' || uid === 'null' || !uid) uid = null;
 
   if (uid === 'official_pin_potha' || authorName === 'අපේ පිං පොත' || authorName === 'පිං පොත පරිපාලනය' || authorName === 'පිං පොත නිල නිවේදනය') {
     return;
@@ -546,12 +948,12 @@ window.viewUserProfile = async function(uid, authorName) {
   }
 
   const current = StorageService.currentUser;
-  if (current && ((uid && current.uid && uid === current.uid) || (!uid && authorName && current.name && authorName === current.name))) {
+  if (current && ((uid && current.uid && uid === current.uid) || (!uid && authorName && current.name && authorName.trim().toLowerCase() === current.name.trim().toLowerCase()))) {
     switchTab('profile');
     return;
   }
 
-  await openMemberProfileModal(uid, authorName);
+  await openPublicProfile(uid, authorName, authorPhoto, coverImage);
 };
 
 let currentViewingMember = null;
@@ -571,9 +973,57 @@ window.viewMemberCoverPhoto = function(e) {
   }
 };
 
-window.openMemberProfileModal = async function(uid, authorName) {
+window.openMemberProfileModal = async function(uid, authorName, authorPhoto = null, coverImage = null) {
   const modal = document.getElementById('memberProfileModal');
   if (!modal) return;
+
+  if (uid === 'undefined' || uid === 'null' || !uid) uid = null;
+  if (!uid && !authorName) return;
+
+  // Self check: If viewing own profile, redirect to editable profile tab
+  const currentUser = StorageService.currentUser;
+  if (currentUser && ((uid && currentUser.uid && uid === currentUser.uid) || (!uid && authorName && currentUser.name && authorName.trim().toLowerCase() === currentUser.name.trim().toLowerCase()))) {
+    if (typeof switchTab === 'function') {
+      switchTab('profile');
+    }
+    return;
+  }
+
+  // Pre-check anonymous state from cache
+  const cached = (typeof kmpMembersCache !== 'undefined' && Array.isArray(kmpMembersCache) && kmpMembersCache.find(m => String(m.uid) === String(uid))) || null;
+  if (cached && (cached.isAnonymous === true || cached.useAlias === true || cached.name === 'කල්‍යාණ මිත්‍ර සාමාජික')) {
+    window.showCustomToast("මෙම සාමාජිකයා නිර්නාමිකව සිටින බැවින් පැතිකඩ විවෘත කළ නොහැක.", "info");
+    return;
+  }
+
+  const initialName = (authorName || cached?.name || 'කල්‍යාණ මිත්‍ර').trim();
+  const initialChar = initialName.charAt(0) || 'ක';
+
+  // 1. Immediately reset previous modal content to prevent cross-profile flicker
+  const coverImg = document.getElementById('memCoverImg');
+  if (coverImg) coverImg.src = coverImage || cached?.coverImage || 'assets/banner.jpg';
+
+  const avatarWrap = document.getElementById('memAvatarWrap');
+  if (avatarWrap) {
+    avatarWrap.classList.remove('sangha-framed-avatar');
+    const photoSrc = authorPhoto || cached?.photo;
+    if (photoSrc) {
+      avatarWrap.innerHTML = `<img src="${Security.sanitizeUrl(photoSrc)}" alt="${Security.escapeHTML(initialName)}" onerror="this.parentElement.innerHTML = '<span>${initialChar}</span>';">`;
+    } else {
+      avatarWrap.innerHTML = `<span>${initialChar}</span>`;
+    }
+  }
+
+  const nameEl = document.getElementById('memFullName');
+  if (nameEl) nameEl.innerHTML = Security.escapeHTML(initialName);
+
+  const bioEl = document.getElementById('memBio');
+  if (bioEl) bioEl.innerText = `"සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏"`;
+
+  const postsFeedEl = document.getElementById('memPostsFeed');
+  if (postsFeedEl) {
+    postsFeedEl.innerHTML = '<div style="text-align: center; padding: 24px; color: #94a3b8;"><i class="fa-solid fa-spinner fa-spin" style="font-size: 1.2rem; color: #d97706; margin-bottom: 8px; display: block;"></i> <span>තොරතුරු පූරණය වෙමින් පවතී...</span></div>';
+  }
 
   try {
     history.pushState({ type: 'modal', id: 'memberProfileModal' }, '');
@@ -581,33 +1031,67 @@ window.openMemberProfileModal = async function(uid, authorName) {
   document.body.style.overflow = 'hidden';
   modal.classList.remove('hidden');
 
-  // Load profile from StorageService
-  const member = await StorageService.getUserProfile(uid) || {
-    uid,
-    name: authorName || 'කල්‍යාණ මිත්‍ර',
-    photo: null,
-    coverImage: 'assets/banner.jpg',
+  // 2. Load fresh profile from StorageService
+  const member = await StorageService.getUserProfile(uid, authorName) || {
+    uid: uid || null,
+    name: initialName,
+    photo: authorPhoto || cached?.photo || null,
+    coverImage: coverImage || cached?.coverImage || 'assets/banner.jpg',
     bio: "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏",
     location: '',
     occupation: '',
     joinedDate: '2026 ඔක්තෝබර්'
   };
 
-  currentViewingMember = member;
+  // If target member is anonymous, strictly close modal and notify
+  const isSelf = Boolean(currentUser && currentUser.uid && currentUser.uid === member.uid);
+  if (!isSelf && (member.useAlias === true || member.isAnonymous === true || member.name === 'කල්‍යාණ මිත්‍ර සාමාජික')) {
+    modal.classList.add('hidden');
+    document.body.style.overflow = '';
+    window.showCustomToast("මෙම සාමාජිකයා නිර්නාමිකව සිටින බැවින් පැතිකඩ විවෘත කළ නොහැක.", "info");
+    return;
+  }
+  if (isSelf) {
+    modal.classList.add('hidden');
+    document.body.style.overflow = '';
+    switchTab('profile');
+    return;
+  }
 
-  const coverImg = document.getElementById('memCoverImg');
+  // If caller had specific photo or cover and member object doesn't have it, preserve it
+  if (authorPhoto && (!member.photo || member.photo.trim().length === 0)) {
+    member.photo = authorPhoto;
+  }
+  if (coverImage && (!member.coverImage || member.coverImage === 'assets/banner.jpg')) {
+    member.coverImage = coverImage;
+  }
+
+    // Profile Completeness 100% Badge for viewed member
+  const memCompleteness = calculateProfileCompleteness(member);
+  const memBadgeEl = document.getElementById('memCompletenessBadge');
+  if (memBadgeEl) {
+    if (memCompleteness.isComplete) {
+      memBadgeEl.classList.remove('hidden');
+      memBadgeEl.style.display = 'inline-flex';
+    } else {
+      memBadgeEl.classList.add('hidden');
+      memBadgeEl.style.display = 'none';
+    }
+  }
+
+currentViewingMember = member;
+
   if (coverImg) coverImg.src = member.coverImage || 'assets/banner.jpg';
 
   const isSangha = StorageService.isSangha(member);
   const isMaster = StorageService.isMasterAdmin();
   const currentUid = StorageService.currentUser?.uid;
 
-  const avatarWrap = document.getElementById('memAvatarWrap');
   if (avatarWrap) {
-    const initialChar = (member.name || authorName || 'ක').trim().charAt(0);
+    const finalInitial = (member.name || initialName || 'ක').trim().charAt(0);
     const innerPhoto = member.photo 
-      ? `<img src="${member.photo}" alt="${Security.escapeHTML(member.name || '')}" onerror="this.parentElement.innerHTML = '<span>${initialChar}</span>';">`
-      : `<span>${initialChar}</span>`;
+      ? `<img src="${Security.sanitizeUrl(member.photo)}" alt="${Security.escapeHTML(member.name || '')}" onerror="this.parentElement.innerHTML = '<span>${finalInitial}</span>';">`
+      : `<span>${finalInitial}</span>`;
 
     if (isSangha) {
       avatarWrap.classList.add('sangha-framed-avatar');
@@ -624,11 +1108,10 @@ window.openMemberProfileModal = async function(uid, authorName) {
   const isProfileMaster = StorageService.isMasterAdmin(member);
   const isProfileSubAdmin = !isProfileMaster && StorageService.isSubAdmin(member);
 
-  const nameEl = document.getElementById('memFullName');
   if (nameEl) {
     nameEl.innerHTML = `
       ${Security.escapeHTML(member.name || authorName || 'කල්‍යාණ මිත්‍ර')}
-      ${isProfileMaster ? `<span class="badge-crown" style="font-size: 1.15rem;" title="Master Admin">👑</span>` : (isProfileSubAdmin ? `<span class="badge-shield" style="font-size: 1.05rem;" title="පරිපාලක (Admin)">🛡️</span>` : '')}
+      ${isProfileMaster ? `<span class="badge-crown" style="font-size: 1.15rem;" title="කල්‍යාණ මිත්‍ර">👑</span>` : (isProfileSubAdmin ? `<span class="badge-shield" style="font-size: 1.05rem;" title="කල්‍යාණ මිත්‍ර">🛡️</span>` : '')}
     `;
   }
 
@@ -637,12 +1120,6 @@ window.openMemberProfileModal = async function(uid, authorName) {
     if (isSangha) {
       badgeEl.className = 'sangha-verified-badge';
       badgeEl.innerHTML = `<i class="fa-solid fa-dharmachakra"></i> <span>පූජනීය මහා සංඝරත්නය</span>`;
-    } else if (isProfileMaster) {
-      badgeEl.className = 'official-author-badge';
-      badgeEl.innerHTML = `<span class="badge-crown">👑</span> <span>Master Admin</span>`;
-    } else if (isProfileSubAdmin) {
-      badgeEl.className = 'admin-shield-badge';
-      badgeEl.innerHTML = `<span class="badge-shield">🛡️</span> <span>පිං පොත පරිපාලක</span>`;
     } else if (member.email) {
       badgeEl.className = 'verified-pill';
       badgeEl.innerHTML = `<i class="fa-solid fa-circle-check"></i> <span>Google සත්‍යාපිත කල්‍යාණ මිත්‍ර</span>`;
@@ -652,14 +1129,14 @@ window.openMemberProfileModal = async function(uid, authorName) {
     }
   }
 
-  const bioEl = document.getElementById('memBio');
   if (bioEl) bioEl.innerText = `"${member.bio || "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏"}"`;
 
   const occEl = document.getElementById('memOccupationText');
   const occWrap = document.getElementById('memMetaOccupation');
+  const templeOrOcc = member.temple || member.spiritualInterest || member.occupation;
   if (occEl && occWrap) {
-    if (member.occupation) {
-      occEl.innerText = member.occupation;
+    if (templeOrOcc) {
+      occEl.innerText = templeOrOcc;
       occWrap.style.display = 'inline-flex';
     } else {
       occWrap.style.display = 'none';
@@ -668,9 +1145,10 @@ window.openMemberProfileModal = async function(uid, authorName) {
 
   const locEl = document.getElementById('memLocationText');
   const locWrap = document.getElementById('memMetaLocation');
+  const memberLoc = member.location || member.district || member.city || '';
   if (locEl && locWrap) {
-    if (member.location) {
-      locEl.innerText = member.location;
+    if (memberLoc) {
+      locEl.innerText = memberLoc;
       locWrap.style.display = 'inline-flex';
     } else {
       locWrap.style.display = 'none';
@@ -678,14 +1156,26 @@ window.openMemberProfileModal = async function(uid, authorName) {
   }
 
   const joinedEl = document.getElementById('memJoinedText');
-  if (joinedEl) joinedEl.innerText = `${member.joinedDate || '2026 ඔක්තෝබර්'} සිට සාමාජික`;
+  if (joinedEl) {
+    const rawJoined = member.joinedDate || '2026 ඔක්තෝබර්';
+    joinedEl.innerText = rawJoined.includes('සිට') ? rawJoined : `${rawJoined} සිට සාමාජික`;
+  }
 
-  // Filter public posts for this member
-  const memberPosts = currentPostsData.filter(p => {
-    const matchUid = uid && p.uid && p.uid === uid;
-    const resolvedName = StorageService.resolveAuthorName(p);
-    const matchAuthor = (member.name && resolvedName === member.name) || (authorName && resolvedName === authorName);
-    return (matchUid || matchAuthor) && p.visibility !== 'private';
+  // Filter public posts for this member (strictly non-private and not deleted)
+  const allPosts = (Array.isArray(currentPostsData) && currentPostsData.length > 0)
+    ? currentPostsData
+    : (StorageService.getLocalPosts() || []);
+
+  const memberPosts = allPosts.filter(p => {
+    if (!p || p.isDeleted || p.deleted) return false;
+    if (p.visibility === 'private') return false;
+    const matchUid = Boolean(uid && p.uid && String(p.uid) === String(uid));
+    const resolvedName = StorageService.resolveAuthorName ? StorageService.resolveAuthorName(p) : (p.author || p.authorName);
+    const matchAuthor = Boolean(
+      (member.name && resolvedName === member.name) ||
+      (authorName && resolvedName === authorName)
+    );
+    return matchUid || matchAuthor;
   });
 
   const totalSadhu = memberPosts.reduce((acc, p) => acc + (p.sadhuCount || 0), 0);
@@ -812,20 +1302,28 @@ window.openMemberProfileModal = async function(uid, authorName) {
           `;
           return;
         }
-        memFriendsGrid.innerHTML = friends.map(f => `
-          <div class="mem-fb-friend-card" onclick="openMemberProfileModal('${f.uid}', '${Security.escapeHTML(f.name)}')">
-            <div class="mem-fb-friend-thumb">
-              ${f.photo ? `<img src="${Security.sanitizeUrl(f.photo)}" alt="${Security.escapeHTML(f.name)}" onerror="this.parentElement.innerText = '${(f.name || 'ක').charAt(0)}';">` : (f.name || 'ක').charAt(0)}
+        memFriendsGrid.innerHTML = friends.map(f => {
+          const isFSangha = StorageService.isSangha(f);
+          const initial = (f.name || 'ක').charAt(0);
+          return `
+          <div class="mem-fb-friend-card" onclick="openMemberProfileModal('${f.uid}', '${Security.escapeHTML(f.name)}', '${f.photo ? Security.sanitizeUrl(f.photo) : ''}', '${f.coverImage ? Security.sanitizeUrl(f.coverImage) : ''}')">
+            <div class="mem-fb-friend-thumb ${isFSangha ? 'sangha-framed-avatar' : ''}">
+              ${f.photo ? `<img src="${Security.sanitizeUrl(f.photo)}" alt="${Security.escapeHTML(f.name)}" onerror="this.parentElement.innerText = '${initial}';">` : initial}
+              ${isFSangha ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත" style="position:absolute; inset:-3px; width:calc(100% + 6px); height:calc(100% + 6px); pointer-events:none;">' : ''}
             </div>
             <div class="mem-fb-friend-info">
-              <div class="mem-fb-friend-name" title="${Security.escapeHTML(f.name || 'කල්‍යාණ මිත්‍ර')}">${Security.escapeHTML(f.name || 'කල්‍යාණ මිත්‍ර')}</div>
+              <div class="mem-fb-friend-name" title="${Security.escapeHTML(f.name || 'කල්‍යාණ මිත්‍ර')}">
+                <span>${Security.escapeHTML(f.name || 'කල්‍යාණ මිත්‍ර')}</span>
+                ${isFSangha ? `<span class="sangha-author-badge" style="margin-left: 3px; padding: 1px 5px; font-size: 0.58rem;"><i class="fa-solid fa-dharmachakra"></i> සංඝරත්නය</span>` : ''}
+              </div>
               <div class="mem-fb-friend-loc">
                 <i class="fa-solid fa-location-dot" style="color: #ea580c; font-size: 0.6rem;"></i>
                 <span>${Security.escapeHTML(f.district || f.location || 'ශ්‍රී ලංකා')}</span>
               </div>
             </div>
           </div>
-        `).join('');
+        `;
+        }).join('');
       });
     }
   }
@@ -882,7 +1380,7 @@ window.switchTab = function(tab, pushHistory = true) {
   document.querySelector('.app-header')?.classList.remove('header-hidden');
 
   // Update navigation buttons (both desktop & mobile)
-  ['feed', 'profile', 'mybook', 'needs', 'friends'].forEach(t => {
+  ['feed', 'profile', 'mybook', 'needs', 'friends', 'aranya', 'policies'].forEach(t => {
     const dBtn = document.getElementById(`desk-tab-${t}`);
     const mBtn = document.getElementById(`mob-tab-${t}`);
     if (dBtn) {
@@ -895,6 +1393,18 @@ window.switchTab = function(tab, pushHistory = true) {
     }
   });
 
+  const sideAranyaBtn = document.getElementById('side-btn-aranya');
+  if (sideAranyaBtn) {
+    if (tab === 'aranya') sideAranyaBtn.classList.add('active');
+    else sideAranyaBtn.classList.remove('active');
+  }
+
+  const headerAranyaBtn = document.getElementById('headerAranyaBtn');
+  if (headerAranyaBtn) {
+    if (tab === 'aranya') headerAranyaBtn.classList.add('active');
+    else headerAranyaBtn.classList.remove('active');
+  }
+
   const userProfBtn = document.getElementById('userProfileBtn');
   if (userProfBtn) {
     if (tab === 'profile') userProfBtn.classList.add('active');
@@ -903,12 +1413,64 @@ window.switchTab = function(tab, pushHistory = true) {
 
   const feedLayout = document.getElementById('mainFeedLayout');
   const profileContainer = document.getElementById('profilePageContainer');
+  const aranyaContainer = document.getElementById('aranyaPageContainer');
+  const friendsContainer = document.getElementById('friendsPageContainer');
+  const policiesContainer = document.getElementById('policiesPageContainer');
   const banner = document.getElementById('tabHeaderBanner');
+
+  if (tab === 'policies') {
+    stopKmpLivePolling();
+    if (feedLayout) {
+      feedLayout.classList.add('hidden');
+      feedLayout.style.setProperty('display', 'none', 'important');
+    }
+    if (profileContainer) {
+      profileContainer.classList.add('hidden');
+      profileContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (aranyaContainer) {
+      aranyaContainer.classList.add('hidden');
+      aranyaContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (policiesContainer) {
+      policiesContainer.classList.add('hidden');
+      policiesContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (friendsContainer) {
+      friendsContainer.classList.add('hidden');
+      friendsContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (policiesContainer) {
+      policiesContainer.classList.remove('hidden');
+      policiesContainer.style.setProperty('display', 'block', 'important');
+    }
+    if (banner) banner.style.display = 'none';
+
+    const subTab = (arguments.length > 2 && arguments[2]) ? arguments[2] : 'about';
+    if (typeof window.switchPoliciesSubTab === 'function') {
+      window.switchPoliciesSubTab(subTab);
+    }
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
 
   if (tab === 'profile') {
     if (feedLayout) {
       feedLayout.classList.add('hidden');
       feedLayout.style.setProperty('display', 'none', 'important');
+    }
+    if (aranyaContainer) {
+      aranyaContainer.classList.add('hidden');
+      aranyaContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (friendsContainer) {
+      friendsContainer.classList.add('hidden');
+      friendsContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (policiesContainer) {
+      policiesContainer.classList.add('hidden');
+      policiesContainer.style.setProperty('display', 'none', 'important');
     }
     if (profileContainer) {
       profileContainer.classList.remove('hidden');
@@ -926,7 +1488,76 @@ window.switchTab = function(tab, pushHistory = true) {
     return;
   }
 
-  // Non-profile tabs: show main feed layout, hide profile container
+  if (tab === 'aranya') {
+    if (feedLayout) {
+      feedLayout.classList.add('hidden');
+      feedLayout.style.setProperty('display', 'none', 'important');
+    }
+    if (profileContainer) {
+      profileContainer.classList.add('hidden');
+      profileContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (friendsContainer) {
+      friendsContainer.classList.add('hidden');
+      friendsContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (policiesContainer) {
+      policiesContainer.classList.add('hidden');
+      policiesContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (aranyaContainer) {
+      aranyaContainer.classList.remove('hidden');
+      aranyaContainer.style.setProperty('display', 'block', 'important');
+    }
+    if (banner) banner.style.display = 'none';
+
+    try {
+      renderAranyaDirectoryView();
+    } catch (err) {
+      console.error('[Aranya] Error rendering aranya view:', err);
+    }
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+
+  if (tab === 'friends') {
+    startKmpLivePolling();
+    if (feedLayout) {
+      feedLayout.classList.add('hidden');
+      feedLayout.style.setProperty('display', 'none', 'important');
+    }
+    if (profileContainer) {
+      profileContainer.classList.add('hidden');
+      profileContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (aranyaContainer) {
+      aranyaContainer.classList.add('hidden');
+      aranyaContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (policiesContainer) {
+      policiesContainer.classList.add('hidden');
+      policiesContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (friendsContainer) {
+      friendsContainer.classList.remove('hidden');
+      friendsContainer.style.setProperty('display', 'block', 'important');
+    }
+    if (banner) banner.style.display = 'none';
+
+    try {
+      renderKmpDirectoryView(true);
+    } catch (err) {
+      console.error('[KMP] Error rendering friends view:', err);
+    }
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  } else {
+    stopKmpLivePolling();
+  }
+
+  // Non-profile, non-aranya, non-friends tabs: show main feed layout, hide special containers
   if (feedLayout) {
     feedLayout.classList.remove('hidden');
     feedLayout.style.removeProperty('display');
@@ -936,6 +1567,18 @@ window.switchTab = function(tab, pushHistory = true) {
     profileContainer.classList.add('hidden');
     profileContainer.style.setProperty('display', 'none', 'important');
   }
+  if (aranyaContainer) {
+    aranyaContainer.classList.add('hidden');
+    aranyaContainer.style.setProperty('display', 'none', 'important');
+  }
+  if (friendsContainer) {
+    friendsContainer.classList.add('hidden');
+    friendsContainer.style.setProperty('display', 'none', 'important');
+  }
+  if (policiesContainer) {
+    policiesContainer.classList.add('hidden');
+    policiesContainer.style.setProperty('display', 'none', 'important');
+  }
 
   // Context banner
   if (banner) {
@@ -944,7 +1587,7 @@ window.switchTab = function(tab, pushHistory = true) {
       banner.className = 'context-banner mybook';
       banner.innerHTML = `
         <h2>📖 මගේ පෞද්ගලික පිං පොත</h2>
-        <p>ඔබ පොදු පවුරට එක් කළ සහ ඔබට පමණක් පෙනෙන (Private) සියලුම කුසල සටහන් මෙහි සුරක්ෂිතව ඇත.</p>
+        <p>ඔබට පමණක් පෙනෙන (Private) ඔබගේ සියලුම පෞද්ගලික කුසල් සටහන් මෙහි සුරක්ෂිතව ඇත.</p>
       `;
     } else if (tab === 'needs') {
       banner.style.display = 'block';
@@ -1064,18 +1707,22 @@ function renderPostImagesCollage(post) {
 
   if (images.length === 0) return '';
 
-  const cleanImages = images.map(img => Security.sanitizeUrl(img)).filter(Boolean);
+  const cleanImages = images.map(img => Security.sanitizeUrl(img) || img).filter(Boolean);
   if (cleanImages.length === 0) return '';
 
-  const jsonStr = encodeURIComponent(JSON.stringify(cleanImages));
+  // Cache images globally by post ID for instant, 100% reliable click access without attribute size limits
+  if (typeof window !== 'undefined') {
+    window._postImagesMap = window._postImagesMap || {};
+    window._postImagesMap[String(post.id)] = cleanImages;
+  }
 
   // 1 Image (Full View)
   if (cleanImages.length === 1) {
     return `
-      <div class="photo-collage-container" onclick="openLightbox('${jsonStr}', 0)">
+      <div class="photo-collage-container" data-post-id="${post.id}" onclick="openPostLightbox('${post.id}', 0, this)" role="button" tabindex="0" style="cursor: pointer;">
         <div class="collage-grid collage-1">
-          <div class="collage-item">
-            <img src="${cleanImages[0]}" alt="${Security.escapeHTML(post.title || '')}" loading="lazy">
+          <div class="collage-item" data-index="0" onclick="event.stopPropagation(); openPostLightbox('${post.id}', 0, this)" role="button" tabindex="0" style="cursor: pointer;">
+            <img src="${cleanImages[0]}" alt="${Security.escapeHTML(post.title || '')}" onclick="event.stopPropagation(); openPostLightbox('${post.id}', 0, this)" loading="lazy" decoding="async" role="button" style="cursor: pointer;">
           </div>
         </div>
       </div>
@@ -1085,11 +1732,11 @@ function renderPostImagesCollage(post) {
   // 2 Images (Side by Side)
   if (cleanImages.length === 2) {
     return `
-      <div class="photo-collage-container">
+      <div class="photo-collage-container" data-post-id="${post.id}" onclick="openPostLightbox('${post.id}', 0, this)" role="button" tabindex="0" style="cursor: pointer;">
         <div class="collage-grid collage-2">
           ${cleanImages.map((img, i) => `
-            <div class="collage-item" onclick="openLightbox('${jsonStr}', ${i})">
-              <img src="${img}" alt="ඡායාරූපය ${i+1}" loading="lazy">
+            <div class="collage-item" data-index="${i}" onclick="event.stopPropagation(); openPostLightbox('${post.id}', ${i}, this)" role="button" tabindex="0" style="cursor: pointer;">
+              <img src="${img}" alt="ඡායාරූපය ${i+1}" onclick="event.stopPropagation(); openPostLightbox('${post.id}', ${i}, this)" loading="lazy" decoding="async" role="button" style="cursor: pointer;">
             </div>
           `).join('')}
         </div>
@@ -1100,11 +1747,11 @@ function renderPostImagesCollage(post) {
   // 3 Images (1 Large, 2 Stacked)
   if (cleanImages.length === 3) {
     return `
-      <div class="photo-collage-container">
+      <div class="photo-collage-container" data-post-id="${post.id}" onclick="openPostLightbox('${post.id}', 0, this)" role="button" tabindex="0" style="cursor: pointer;">
         <div class="collage-grid collage-3">
           ${cleanImages.map((img, i) => `
-            <div class="collage-item" onclick="openLightbox('${jsonStr}', ${i})">
-              <img src="${img}" alt="ඡායාරූපය ${i+1}" loading="lazy">
+            <div class="collage-item" data-index="${i}" onclick="event.stopPropagation(); openPostLightbox('${post.id}', ${i}, this)" role="button" tabindex="0" style="cursor: pointer;">
+              <img src="${img}" alt="ඡායාරූපය ${i+1}" onclick="event.stopPropagation(); openPostLightbox('${post.id}', ${i}, this)" loading="lazy" decoding="async" role="button" style="cursor: pointer;">
             </div>
           `).join('')}
         </div>
@@ -1115,11 +1762,11 @@ function renderPostImagesCollage(post) {
   // 4 Images (2x2 Grid)
   if (cleanImages.length === 4) {
     return `
-      <div class="photo-collage-container">
+      <div class="photo-collage-container" data-post-id="${post.id}" onclick="openPostLightbox('${post.id}', 0, this)" role="button" tabindex="0" style="cursor: pointer;">
         <div class="collage-grid collage-4">
           ${cleanImages.map((img, i) => `
-            <div class="collage-item" onclick="openLightbox('${jsonStr}', ${i})">
-              <img src="${img}" alt="ඡායාරූපය ${i+1}" loading="lazy">
+            <div class="collage-item" data-index="${i}" onclick="event.stopPropagation(); openPostLightbox('${post.id}', ${i}, this)" role="button" tabindex="0" style="cursor: pointer;">
+              <img src="${img}" alt="ඡායාරූපය ${i+1}" onclick="event.stopPropagation(); openPostLightbox('${post.id}', ${i}, this)" loading="lazy" decoding="async" role="button" style="cursor: pointer;">
             </div>
           `).join('')}
         </div>
@@ -1132,13 +1779,13 @@ function renderPostImagesCollage(post) {
   const remainingCount = cleanImages.length - 5;
 
   return `
-    <div class="photo-collage-container">
+    <div class="photo-collage-container" data-post-id="${post.id}" onclick="openPostLightbox('${post.id}', 0, this)" role="button" tabindex="0" style="cursor: pointer;">
       <div class="collage-grid collage-5">
         ${displayImages.map((img, i) => {
           const isLast = (i === 4 && remainingCount > 0);
           return `
-            <div class="collage-item" onclick="openLightbox('${jsonStr}', ${i})">
-              <img src="${img}" alt="ඡායාරූපය ${i+1}" loading="lazy">
+            <div class="collage-item" data-index="${i}" onclick="event.stopPropagation(); openPostLightbox('${post.id}', ${i}, this)" role="button" tabindex="0" style="cursor: pointer;">
+              <img src="${img}" alt="ඡායාරූපය ${i+1}" onclick="event.stopPropagation(); openPostLightbox('${post.id}', ${i}, this)" loading="lazy" decoding="async" role="button" style="cursor: pointer;">
               ${isLast ? `
                 <div class="collage-overlay">
                   <span>+${remainingCount + 1}</span>
@@ -1236,6 +1883,10 @@ window.openShortsUploadModal = function() {
     clearStandaloneShortsInput();
     const captionEl = document.getElementById('standaloneShortsCaption');
     if (captionEl) captionEl.value = '';
+    const anonCheck = document.getElementById('shortsAnonCheckbox');
+    if (anonCheck) {
+      anonCheck.checked = Boolean(StorageService.currentUser?.useAlias || StorageService.currentUser?.isAnonymous);
+    }
     const input = document.getElementById('standaloneShortsUrl');
     if (input) {
       setTimeout(() => input.focus(), 250);
@@ -1324,6 +1975,13 @@ window.handleShortsUploadSubmit = async function(e) {
     if (submitBtn) submitBtn.disabled = true;
     if (submitBtnText) submitBtnText.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> පළවෙමින් පවතී...';
 
+    const shortsAnonCheck = document.getElementById('shortsAnonCheckbox');
+    const isAnonymous = Boolean(
+      (shortsAnonCheck && shortsAnonCheck.checked) ||
+      StorageService.currentUser?.useAlias ||
+      StorageService.currentUser?.isAnonymous
+    );
+
     await StorageService.createPost({
       type: 'general',
       title: safeTitle,
@@ -1340,7 +1998,9 @@ window.handleShortsUploadSubmit = async function(e) {
       isShorts: true,
       videoThumbnail: parsed.videoThumbnail,
       isOfficial: false,
-      isPinned: false
+      isPinned: false,
+      isAnonymous: isAnonymous,
+      useAlias: isAnonymous
     });
 
     SoundService.playPublish();
@@ -1356,7 +2016,7 @@ window.handleShortsUploadSubmit = async function(e) {
     alert("දෝෂයකි: " + err.message);
   } finally {
     if (submitBtn) submitBtn.disabled = false;
-    if (submitBtnText) submitBtnText.innerHTML = 'පුණ්‍ය දැක්මට එක් කරන්න';
+    if (submitBtnText) submitBtnText.innerHTML = 'Reels වෙත එක් කරන්න';
   }
 };
 
@@ -1370,7 +2030,7 @@ function renderPostVideo(post) {
 
   return `
     <div class="post-video-container ${containerClass}" id="video-container-${post.id}">
-      <div class="video-facade" onclick="openReelsViewer('${post.id}')" style="cursor: pointer;" title="පුණ්‍ය දැක්ම තුළ නරඹන්න">
+      <div class="video-facade" onclick="openReelsViewer('${post.id}')" style="cursor: pointer;" title="Reels තුළ නරඹන්න">
         <img src="${thumbUrl}" class="video-facade-thumb" alt="${Security.escapeHTML(post.title || 'Video')}" loading="lazy">
         <div class="video-facade-overlay">
           <div class="video-facade-top-badge">
@@ -1379,15 +2039,15 @@ function renderPostVideo(post) {
           </div>
 
           <div class="video-facade-play-center">
-            <div class="glowing-play-btn" title="පුණ්‍ය දැක්මෙන් නරඹන්න">
+            <div class="glowing-play-btn" title="Reels ලෙස නරඹන්න">
               <i class="fa-solid fa-play"></i>
             </div>
           </div>
 
           <div class="video-facade-bottom-actions">
-            <button type="button" class="video-reels-btn" onclick="event.stopPropagation(); openReelsViewer('${post.id}')" title="පුණ්‍ය දැක්ම තුළ සම්පූර්ණ තිරයෙන් නරඹන්න">
+            <button type="button" class="video-reels-btn" onclick="event.stopPropagation(); openReelsViewer('${post.id}')" title="Reels ලෙස සම්පූර්ණ තිරයෙන් නරඹන්න">
               <i class="fa-solid fa-expand"></i>
-              <span>පුණ්‍ය දැක්මෙන් බලන්න</span>
+              <span>Reels ලෙස බලන්න</span>
             </button>
           </div>
         </div>
@@ -1405,6 +2065,80 @@ function escapeRegex(str) {
   return (str || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function formatPostContent(rawText) {
+  if (!rawText) return '';
+  const decoded = Security.unescapeHTML(rawText);
+  return decoded
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * Renders Post Description with smart 'See More' (තව කියවන්න...) toggle for long articles
+ */
+function renderPostDescriptionHTML(postId, rawDescription) {
+  if (!rawDescription) return '';
+  const trimmed = rawDescription.trim();
+  if (!trimmed) return '';
+
+  // Threshold: 160 characters or more than 3 lines
+  const lines = trimmed.split('\n');
+  const isLong = trimmed.length > 160 || lines.length > 3;
+
+  if (!isLong) {
+    return `<p class="post-desc" id="post-desc-${postId}">${formatPostContent(trimmed)}</p>`;
+  }
+
+  // Calculate clean preview text cutting gracefully at word boundary
+  let previewText = '';
+  if (lines.length > 3 && trimmed.length <= 160) {
+    previewText = lines.slice(0, 3).join('\n').trim();
+  } else {
+    const sliceTarget = trimmed.substring(0, 150);
+    const lastSpace = sliceTarget.lastIndexOf(' ');
+    previewText = (lastSpace > 110) ? sliceTarget.substring(0, lastSpace) : sliceTarget;
+  }
+
+  const formattedPreview = formatPostContent(previewText);
+  const formattedFull = formatPostContent(trimmed);
+
+  return `
+    <div class="post-desc-wrapper" id="post-desc-wrap-${postId}">
+      <p class="post-desc post-desc-collapsed" id="post-desc-collapsed-${postId}">
+        ${formattedPreview}... 
+        <button type="button" class="post-see-more-btn" onclick="togglePostContentExpansion('${postId}', event)">තව කියවන්න... <span class="see-more-en">(See more)</span></button>
+      </p>
+      <p class="post-desc post-desc-full" id="post-desc-full-${postId}" style="display: none;">
+        ${formattedFull}
+        <button type="button" class="post-see-more-btn see-less-btn" onclick="togglePostContentExpansion('${postId}', event)">අඩු කරන්න <span class="see-more-en">(See less)</span></button>
+      </p>
+    </div>
+  `;
+}
+
+window.togglePostContentExpansion = function(postId, event) {
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+  const collapsedEl = document.getElementById(`post-desc-collapsed-${postId}`);
+  const fullEl = document.getElementById(`post-desc-full-${postId}`);
+  if (!collapsedEl || !fullEl) return;
+
+  const isCollapsed = fullEl.style.display === 'none';
+  if (isCollapsed) {
+    collapsedEl.style.display = 'none';
+    fullEl.style.display = 'block';
+  } else {
+    fullEl.style.display = 'none';
+    collapsedEl.style.display = 'block';
+  }
+};
+
+
 function formatCommentTextWithMentions(rawText) {
   if (!rawText) return '';
   let escaped = Security.escapeHTML(rawText);
@@ -1417,7 +2151,7 @@ function formatCommentTextWithMentions(rawText) {
       if (!m.name || !m.name.trim()) return;
       const escName = Security.escapeHTML(m.name.trim());
       const pattern = new RegExp(`@${escapeRegex(escName)}(?=[\\s.,!?;:)]|$)`, 'g');
-      escaped = escaped.replace(pattern, `<span class="comment-mention-tag" onclick="event.stopPropagation(); viewUserProfile('${m.uid}', '${escName.replace(/'/g, "\\'")}')" title="${escName} ගේ Profile එක බලන්න">@${escName}</span>`);
+      escaped = escaped.replace(pattern, `<span class="comment-mention-tag" onclick="event.stopPropagation(); viewUserProfile('${m.uid || ''}', '${escName.replace(/'/g, "\\'")}', '${m.photo ? Security.sanitizeUrl(m.photo) : ''}')" title="${escName} ගේ Profile එක බලන්න">@${escName}</span>`);
     });
   }
 
@@ -1455,18 +2189,31 @@ function renderSingleCommentHTML(c, postId, user, index) {
 
   const reactions = (c.reactions && typeof c.reactions === 'object') ? c.reactions : {};
 
+  const isAnonComment = Boolean(
+    c.isAnonymous === true ||
+    c.author === 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' ||
+    c.authorName === 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' ||
+    (c.author && c.author.startsWith('නිර්නාමික'))
+  );
+  const safeAuthorName = isAnonComment ? 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' : cAuthorName;
+  const safeAuthorPhoto = isAnonComment ? null : cAuthorPhoto;
+
   return `
-    <div class="comment-bubble" id="comment-bubble-${commentKey}">
-      <div class="comment-avatar ${isCommentSangha ? 'sangha-framed-avatar' : ''}" onclick="viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(cAuthorName)}')" style="cursor: pointer;" title="${Security.escapeHTML(cAuthorName)} ගේ Profile එක බලන්න">
-        ${cAuthorPhoto ? `<img src="${Security.sanitizeUrl(cAuthorPhoto)}" alt="${Security.escapeHTML(cAuthorName)}" loading="lazy">` : `<span>${Security.escapeHTML(cAuthorName.charAt(0) || '👤')}</span>`}
-        ${isCommentSangha ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
+    <div class="comment-bubble ${isAnonComment ? 'comment-bubble-anon' : ''}" id="comment-bubble-${commentKey}">
+      <div class="comment-avatar ${isCommentSangha && !isAnonComment ? 'sangha-framed-avatar' : ''} ${isAnonComment ? 'comment-anon-avatar' : ''}" ${isAnonComment ? 'style="cursor: default; background: #f1f5f9;" title="නිර්නාමික කල්‍යාණ මිත්‍රයෙක්"' : `onclick="viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(safeAuthorName)}', '${safeAuthorPhoto ? Security.sanitizeUrl(safeAuthorPhoto) : ''}')" style="cursor: pointer;" title="${Security.escapeHTML(safeAuthorName)} ගේ Profile එක බලන්න"`}>
+        ${isAnonComment ? '<i class="fa-solid fa-user-secret" style="color: #64748b; font-size: 0.85rem;"></i>' : (safeAuthorPhoto ? `<img src="${Security.sanitizeUrl(safeAuthorPhoto)}" alt="${Security.escapeHTML(safeAuthorName)}" loading="lazy">` : `<span>${Security.escapeHTML(safeAuthorName.charAt(0) || '👤')}</span>`)}
+        ${isCommentSangha && !isAnonComment ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
       </div>
       <div class="comment-text-box">
         <div class="comment-author-row">
           <div class="comment-meta-left">
-            <span class="author-click-link" onclick="viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(cAuthorName)}')" style="cursor: pointer; font-weight: 700; color: #1e293b;" title="${Security.escapeHTML(cAuthorName)} ගේ Profile එක බලන්න">${Security.escapeHTML(cAuthorName)}</span>
-            ${isCommentMaster ? `<span class="badge-crown" title="Master Admin">👑</span>` : (isCommentSubAdmin ? `<span class="badge-shield" title="පරිපාලක (Admin)">🛡️</span>` : '')}
-            ${isCommentSangha ? '<span class="sangha-author-badge" style="padding: 1.5px 7px; font-size: 0.62rem; margin-left: 4px;"><i class="fa-solid fa-dharmachakra"></i> පූජනීය සංඝරත්නය</span>' : ''}
+            ${isAnonComment ? `
+              <span class="comment-anon-author" style="font-weight: 700; color: #475569; cursor: default;" title="නිර්නාමික කල්‍යාණ මිත්‍රයෙක්">${Security.escapeHTML(safeAuthorName)}</span>
+            ` : `
+              <span class="author-click-link" onclick="viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(safeAuthorName)}', '${safeAuthorPhoto ? Security.sanitizeUrl(safeAuthorPhoto) : ''}')" style="cursor: pointer; font-weight: 700; color: #1e293b;" title="${Security.escapeHTML(safeAuthorName)} ගේ Profile එක බලන්න">${Security.escapeHTML(safeAuthorName)}</span>
+              ${isCommentMaster ? `<span class="badge-crown" title="කල්‍යාණ මිත්‍ර">👑</span>` : (isCommentSubAdmin ? `<span class="badge-shield" title="කල්‍යාණ මිත්‍ර">🛡️</span>` : '')}
+              ${isCommentSangha ? '<span class="sangha-author-badge" style="padding: 1.5px 7px; font-size: 0.62rem; margin-left: 4px;"><i class="fa-solid fa-dharmachakra"></i> පූජනීය සංඝරත්නය</span>' : ''}
+            `}
             <span class="comment-time">${Security.escapeHTML(formatRelativeTimeSinhala(c.timestamp, c.time || 'දැන්'))}</span>
             ${c.isEdited ? '<span class="comment-edited-tag" title="මෙම ප්‍රාර්ථනාව සංස්කරණය කරන ලදී">(සංස්කරණය කළ)</span>' : ''}
           </div>
@@ -1504,7 +2251,7 @@ function renderSingleCommentHTML(c, postId, user, index) {
 
 function renderCommentsListHTML(postId, comments, user) {
   if (!Array.isArray(comments) || comments.length === 0) {
-    return '';
+    return '<div class="empty-comments-hint" style="text-align: center; padding: 10px 8px; color: #94a3b8; font-size: 0.76rem; font-style: italic;">තවම ප්‍රාර්ථනා එක් කර නැත. පළමු සටහන එක් කරන්න 🙏</div>';
   }
   return comments.map((c, idx) => renderSingleCommentHTML(c, postId, user, idx)).join('');
 }
@@ -1512,6 +2259,9 @@ function renderCommentsListHTML(postId, comments, user) {
 function appendCommentToDOM(postId, newComment) {
   const listEl = document.getElementById(`comments-list-${postId}`);
   if (!listEl) return;
+
+  const emptyHint = listEl.querySelector('.empty-comments-hint');
+  if (emptyHint) emptyHint.remove();
 
   const commentKey = newComment.id;
   // If the comment was already rendered by reactive in-place sync, don't duplicate it!
@@ -1544,11 +2294,14 @@ function renderCommentsListContent(postId, comments) {
   if (!listEl) return;
   const user = StorageService.currentUser;
   listEl.innerHTML = renderCommentsListHTML(postId, comments, user);
+  try {
+    listEl.scrollTop = listEl.scrollHeight;
+  } catch (e) {}
 }
 
 function updatePostCommentCountUI(postId) {
   const allPosts = StorageService.getLocalPosts() || [];
-  const targetPost = allPosts.find(p => p.id === postId);
+  const targetPost = allPosts.find(p => String(p.id) === String(postId)) || (window.currentPostsData || []).find(p => String(p.id) === String(postId));
   const count = (targetPost && Array.isArray(targetPost.comments)) ? targetPost.comments.length : 0;
 
   const btnC = document.getElementById(`comments-btn-${postId}`);
@@ -1558,9 +2311,12 @@ function updatePostCommentCountUI(postId) {
 }
 
 // Reusable Post Card HTML Generator
-function renderPostCardHTML(post, user) {
+export function renderPostCardHTML(post, user) {
+  if (!post) return '';
+  const isOfficial = Boolean(StorageService.isOfficialPost ? StorageService.isOfficialPost(post) : (post.isOfficial || post.author === 'අපේ පිං පොත'));
+  post.isOfficial = isOfficial;
   const isMaster = StorageService.isMasterAdmin();
-  const isOwner = post.uid === user.uid;
+  const isOwner = Boolean(user && user.uid && post.uid === user.uid);
   const canDelete = isOwner || isMaster;
   const canEditPost = isOwner || isMaster;
   const comments = post.comments || [];
@@ -1582,6 +2338,14 @@ function renderPostCardHTML(post, user) {
   const isAuthorSubAdmin = !isAuthorMaster && StorageService.isSubAdmin(post);
   const origAuthorName = orig ? StorageService.resolveAuthorName(orig) : '';
   const origAuthorPhoto = orig ? StorageService.resolveAuthorPhoto(orig) : null;
+  if (orig && typeof window !== 'undefined') {
+    const origImages = (orig.images && orig.images.length > 0) ? orig.images : (orig.image ? [orig.image] : []);
+    const cleanOrigImages = origImages.map(img => Security.sanitizeUrl(img)).filter(Boolean);
+    if (cleanOrigImages.length > 0) {
+      window._postImagesMap = window._postImagesMap || {};
+      window._postImagesMap[orig.id] = cleanOrigImages;
+    }
+  }
 
   return `
     <article class="post-card ${isNeed ? 'need-card' : ''} ${isRepost ? 'repost-card' : ''} ${post.isOfficial ? 'official-card' : ''} ${isAuthorSangha ? 'sangha-card' : ''}" id="post-elem-${post.id}">
@@ -1598,16 +2362,19 @@ function renderPostCardHTML(post, user) {
       ${isRepost ? `
         <div class="repost-header-tag">
           <div style="display: flex; align-items: center; gap: 8px;">
-            <div class="repost-icon-circle" onclick="viewUserProfile('${post.uid}', '${Security.escapeHTML(postAuthorName)}')" style="cursor: pointer;" title="${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න">
+            <div class="repost-icon-circle" onclick="viewUserProfile('${post.uid || ''}', '${Security.escapeHTML(postAuthorName)}', '${postAuthorPhoto ? Security.sanitizeUrl(postAuthorPhoto) : ''}')" style="cursor: pointer;" title="${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න">
               <i class="fa-solid fa-repeat"></i>
             </div>
             <div>
-              <span class="repost-actor-name ${post.isOfficial ? '' : 'author-click-link'}" ${post.isOfficial ? '' : `onclick="viewUserProfile('${post.uid}', '${Security.escapeHTML(postAuthorName)}')"`} title="${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න"><strong>${Security.escapeHTML(post.isOfficial ? 'අපේ පිං පොත' : postAuthorName)}</strong> විසින් යළි බෙදාගන්නා ලදී</span>
+              <span class="repost-actor-name ${post.isOfficial ? '' : 'author-click-link'}" ${post.isOfficial ? '' : `onclick="viewUserProfile('${post.uid || ''}', '${Security.escapeHTML(postAuthorName)}', '${postAuthorPhoto ? Security.sanitizeUrl(postAuthorPhoto) : ''}')"`} title="${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න"><strong>${Security.escapeHTML(post.isOfficial ? 'අපේ පිං පොත' : postAuthorName)}</strong> විසින් යළි බෙදාගන්නා ලදී</span>
               <span class="repost-time">${Security.escapeHTML(formatRelativeTimeSinhala(post.timestamp, post.date || 'දැන්'))}</span>
             </div>
           </div>
           <div style="display: flex; align-items: center; gap: 6px;">
             ${isMaster ? `
+              <button class="post-official-btn ${post.isOfficial ? 'is-official' : ''}" onclick="toggleOfficialPrompt('${post.id}')" title="${post.isOfficial ? 'නිල නිවේදන ලාංඡනය ඉවත් කරන්න' : 'නිල නිවේදනයක් (Official Post) බවට පත් කරන්න'}">
+                <i class="fa-solid fa-bullhorn"></i>
+              </button>
               <button class="post-pin-btn ${post.isPinned ? 'is-pinned' : ''}" onclick="togglePinPrompt('${post.id}')" title="${post.isPinned ? 'Pin ඉවත් කරන්න' : 'මුදුනටම Pin කරන්න'}">
                 <i class="fa-solid fa-thumbtack"></i>
               </button>
@@ -1630,9 +2397,9 @@ function renderPostCardHTML(post, user) {
           <div class="quoted-merit-box" onclick="viewOriginalPost('${orig.id}', '${post.id}')" title="සම්පූර්ණ මුල් සටහන බලන්න ක්ලික් කරන්න">
             <div class="quoted-merit-header">
               <div style="display: flex; align-items: center; gap: 8px;">
-                <div class="quoted-avatar" onclick="event.stopPropagation(); viewUserProfile('${orig.uid}', '${Security.escapeHTML(origAuthorName)}')" style="cursor: pointer;" title="${Security.escapeHTML(origAuthorName)} ගේ Profile එක බලන්න">${origAuthorPhoto ? `<img src="${Security.sanitizeUrl(origAuthorPhoto)}" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover;">` : Security.escapeHTML(origAuthorName.charAt(0))}</div>
+                <div class="quoted-avatar" onclick="event.stopPropagation(); viewUserProfile('${orig.uid || ''}', '${Security.escapeHTML(origAuthorName)}', '${origAuthorPhoto ? Security.sanitizeUrl(origAuthorPhoto) : ''}')" style="cursor: pointer;" title="${Security.escapeHTML(origAuthorName)} ගේ Profile එක බලන්න">${origAuthorPhoto ? `<img src="${Security.sanitizeUrl(origAuthorPhoto)}" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover;">` : Security.escapeHTML(origAuthorName.charAt(0))}</div>
                 <div>
-                  <div class="author-click-link" onclick="event.stopPropagation(); viewUserProfile('${orig.uid}', '${Security.escapeHTML(origAuthorName)}')" title="${Security.escapeHTML(origAuthorName)} ගේ Profile එක බලන්න" style="font-weight: 700; font-size: 0.82rem; color: #78350f;">${Security.escapeHTML(origAuthorName)}</div>
+                  <div class="author-click-link" onclick="event.stopPropagation(); viewUserProfile('${orig.uid || ''}', '${Security.escapeHTML(origAuthorName)}', '${origAuthorPhoto ? Security.sanitizeUrl(origAuthorPhoto) : ''}')" title="${Security.escapeHTML(origAuthorName)} ගේ Profile එක බලන්න" style="font-weight: 700; font-size: 0.82rem; color: #78350f;">${Security.escapeHTML(origAuthorName)}</div>
                   <div style="font-size: 0.68rem; color: #94a3b8;">${Security.escapeHTML(formatRelativeTimeSinhala(orig.timestamp, orig.date || 'මෑතකදී'))} ${orig.location ? '• ' + Security.escapeHTML(orig.location) : ''}</div>
                 </div>
               </div>
@@ -1646,15 +2413,15 @@ function renderPostCardHTML(post, user) {
             <h4 class="quoted-merit-title">${Security.escapeHTML(orig.title)}</h4>
             <p class="quoted-merit-desc">${Security.escapeHTML(orig.description || '')}</p>
             ${orig.videoId ? `
-              <div class="quoted-merit-video-wrap" style="position: relative; border-radius: 10px; overflow: hidden; margin-top: 8px; max-width: 340px; cursor: pointer;" onclick="event.stopPropagation(); openReelsViewer('${orig.id}')" title="පුණ්‍ය දැක්ම තුළ නරඹන්න">
+              <div class="quoted-merit-video-wrap" style="position: relative; border-radius: 10px; overflow: hidden; margin-top: 8px; max-width: 340px; cursor: pointer;" onclick="event.stopPropagation(); openReelsViewer('${orig.id}')" title="Reels තුළ නරඹන්න">
                 <img src="${Security.sanitizeUrl(orig.videoThumbnail || `https://img.youtube.com/vi/${orig.videoId}/hqdefault.jpg`)}" alt="${Security.escapeHTML(orig.title)}" loading="lazy" style="width: 100%; max-height: 200px; object-fit: cover;">
                 <div style="position: absolute; inset: 0; background: rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center;">
                   <div class="glowing-play-btn" style="width: 44px; height: 44px; font-size: 1rem;"><i class="fa-solid fa-play"></i></div>
                 </div>
               </div>
             ` : (orig.image || (orig.images && orig.images.length > 0) ? `
-              <div class="quoted-merit-image">
-                <img src="${Security.sanitizeUrl(orig.image || orig.images[0])}" alt="${Security.escapeHTML(orig.title)}" loading="lazy">
+              <div class="quoted-merit-image" onclick="event.stopPropagation(); openPostLightbox('${orig.id}', 0, this)" style="cursor: pointer;" title="ඡායාරූපය විශාල කර බලන්න" role="button" tabindex="0">
+                <img src="${Security.sanitizeUrl(orig.image || orig.images[0])}" alt="${Security.escapeHTML(orig.title)}" onclick="event.stopPropagation(); openPostLightbox('${orig.id}', 0, this)" loading="lazy" style="cursor: pointer;" role="button">
               </div>
             ` : '')}
           </div>
@@ -1679,14 +2446,14 @@ function renderPostCardHTML(post, user) {
                 </div>
               </div>
             ` : `
-              <div class="post-avatar ${isNeed ? 'need' : ''} ${isAuthorSangha ? 'sangha-framed-avatar' : ''}" onclick="viewUserProfile('${post.uid}', '${Security.escapeHTML(postAuthorName)}')" style="cursor: pointer;" title="${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න">
-                ${postAuthorPhoto ? `<img src="${Security.sanitizeUrl(postAuthorPhoto)}" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover;">` : `<span>${Security.escapeHTML(postAuthorName.charAt(0))}</span>`}
+              <div class="post-avatar ${isNeed ? 'need' : ''} ${isAuthorSangha ? 'sangha-framed-avatar' : ''}" onclick="viewUserProfile('${post.uid || ''}', '${Security.escapeHTML(postAuthorName)}', '${postAuthorPhoto ? Security.sanitizeUrl(postAuthorPhoto) : ''}')" style="cursor: pointer;" title="${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න">
+                ${postAuthorPhoto ? `<img src="${Security.sanitizeUrl(postAuthorPhoto)}" loading="lazy" decoding="async" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover;">` : `<span>${Security.escapeHTML(postAuthorName.charAt(0))}</span>`}
                 ${isAuthorSangha ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
               </div>
               <div>
                 <div class="post-badges-wrap">
-                  <span class="post-author-name author-click-link" onclick="viewUserProfile('${post.uid}', '${Security.escapeHTML(postAuthorName)}')" style="cursor: pointer;" title="${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න">${Security.escapeHTML(postAuthorName)}</span>
-                  ${isAuthorMaster ? `<span class="badge-crown" title="Master Admin">👑</span>` : (isAuthorSubAdmin ? `<span class="badge-shield" title="පරිපාලක (Admin)">🛡️</span>` : '')}
+                  <span class="post-author-name author-click-link" onclick="viewUserProfile('${post.uid || ''}', '${Security.escapeHTML(postAuthorName)}', '${postAuthorPhoto ? Security.sanitizeUrl(postAuthorPhoto) : ''}')" style="cursor: pointer;" title="${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න">${Security.escapeHTML(postAuthorName)}</span>
+                  ${isAuthorMaster ? `<span class="badge-crown" title="කල්‍යාණ මිත්‍ර">👑</span>` : (isAuthorSubAdmin ? `<span class="badge-shield" title="කල්‍යාණ මිත්‍ර">🛡️</span>` : '')}
                   ${isAuthorSangha ? `
                     <span class="sangha-author-badge" title="පූජනීය මහා සංඝරත්නය"><i class="fa-solid fa-dharmachakra"></i> පූජනීය සංඝරත්නය</span>
                   ` : ''}
@@ -1713,6 +2480,9 @@ function renderPostCardHTML(post, user) {
               </button>
             ` : ''}
             ${isMaster ? `
+              <button class="post-official-btn ${post.isOfficial ? 'is-official' : ''}" onclick="toggleOfficialPrompt('${post.id}')" title="${post.isOfficial ? 'නිල නිවේදන ලාංඡනය ඉවත් කරන්න' : 'නිල නිවේදනයක් (Official Post) බවට පත් කරන්න'}">
+                <i class="fa-solid fa-bullhorn"></i>
+              </button>
               <button class="post-pin-btn ${post.isPinned ? 'is-pinned' : ''}" onclick="togglePinPrompt('${post.id}')" title="${post.isPinned ? 'Pin ඉවත් කරන්න' : 'මුදුනටම Pin කරන්න'}">
                 <i class="fa-solid fa-thumbtack"></i>
               </button>
@@ -1749,11 +2519,11 @@ function renderPostCardHTML(post, user) {
               (normTitle === normDesc);
 
             if (!isDuplicate && (!post.isOfficial || cleanTitle !== 'පිං පොත නිල නිවේදනය')) {
-              return `<h3 class="post-title">${Security.escapeHTML(cleanTitle)}</h3>`;
+              return `<h3 class="post-title">${formatPostContent(cleanTitle)}</h3>`;
             }
             return '';
           })()}
-          <p class="post-desc">${Security.escapeHTML(post.description)}</p>
+          ${renderPostDescriptionHTML(post.id, post.description)}
         </div>
 
         <!-- Media Images or Video Player Facade Grid -->
@@ -1764,40 +2534,44 @@ function renderPostCardHTML(post, user) {
       ${post.isOfficial ? `
         <div class="post-actions-grid official-actions-single">
           <button class="post-btn official-sadhu-only-btn ${hasGivenSadhu ? 'liked' : ''}" id="sadhu-btn-${post.id}" onclick="handleSadhuClick('${post.id}', this)" title="${hasGivenSadhu ? 'සාදුකාරය ඉවත් කරන්න' : 'සාදුකාරයක් ලබා දෙන්න'}">
-            <span style="font-size: 1.15rem;">🙏</span>
-            <span style="font-weight: 700;">සාදුකාර දෙන්න (<strong id="count-btn-${post.id}">${Math.max(0, parseInt(post.sadhuCount, 10) || 0)}</strong>)</span>
+            <span class="post-btn-icon sadhu-icon" style="font-size: 1.15rem;">🙏</span>
+            <span class="post-btn-count" style="font-weight: 700;">${hasGivenSadhu ? 'සාදුකාර දුන්නා' : 'සාදුකාර දෙන්න'} (<strong id="count-btn-${post.id}">${Math.max(0, parseInt(post.sadhuCount, 10) || 0)}</strong>)</span>
           </button>
         </div>
       ` : `
-        <div class="post-actions-grid">
+        <div class="post-actions-grid ${isNeed && post.contact ? 'has-call-btn' : ''}">
+          <!-- 1. Sadhu Action -->
           <button class="post-btn ${hasGivenSadhu ? 'liked' : ''}" id="sadhu-btn-${post.id}" onclick="handleSadhuClick('${post.id}', this)" title="${hasGivenSadhu ? 'සාදුකාරය ඉවත් කරන්න' : 'සාදුකාරයක් ලබා දෙන්න'}">
-            <span style="font-size: 1rem;">🙏</span>
-            <span>සාදු! (<strong id="count-btn-${post.id}">${Math.max(0, parseInt(post.sadhuCount, 10) || 0)}</strong>)</span>
+            <span class="post-btn-icon sadhu-icon">🙏</span>
+            <span class="post-btn-count"><strong id="count-btn-${post.id}">${Math.max(0, parseInt(post.sadhuCount, 10) || 0)}</strong></span>
           </button>
 
-          <button class="post-btn" onclick="toggleCommentsSection('${post.id}')" title="ප්‍රාර්ථනා බලන්න හෝ එක් කරන්න">
+          <!-- 2. Comment / Prarthana Action -->
+          <button class="post-btn" onclick="toggleCommentsSection('${post.id}')" title="${isNeed ? 'ප්‍රාර්ථනා / අදහස්' : (isGeneral ? 'සුබපැතුම්' : 'ප්‍රාර්ථනා')} බලන්න හෝ එක් කරන්න">
             <i class="fa-regular fa-comment-dots" style="color: #d97706;"></i>
-            <span>${isGeneral ? 'සුබපැතුම්' : 'ප්‍රාර්ථනා'} (<strong id="comments-btn-${post.id}">${comments.length}</strong>)</span>
+            <span class="post-btn-count"><strong id="comments-btn-${post.id}">${comments.length}</strong></span>
           </button>
 
-          ${!isNeed && post.visibility !== 'private' ? `
-            <button class="post-btn" onclick="openRepostModal('${isRepost && orig ? orig.id : post.id}')" title="පවුරට Repost කරන්න">
+          <!-- 3. Repost Action (Enabled for both merits and Sathkara needs) -->
+          ${post.visibility !== 'private' ? `
+            <button class="post-btn" onclick="openRepostModal('${isRepost && orig ? orig.id : post.id}')" title="${isNeed ? 'සත්කාරය පවුරට යළි බෙදාගන්න (Repost)' : 'පවුරට යළි බෙදාගන්න (Repost)'}">
               <i class="fa-solid fa-repeat" style="color: #059669;"></i>
-              <span>යළි බෙදාගන්න (<strong id="reposts-btn-${post.id}">${post.repostCount || 0}</strong>)</span>
+              <span class="post-btn-count"><strong id="reposts-btn-${post.id}">${post.repostCount || 0}</strong></span>
             </button>
           ` : ''}
 
+          <!-- 4. Share Action (Facebook, Threads, WhatsApp, Copy Link) -->
+          <button class="post-btn" onclick="handleShare('${post.id}')" title="සමාජ මාධ්‍ය වෙත බෙදාගන්න (Facebook / WhatsApp / Share)">
+            <i class="fa-solid fa-share-nodes" style="color: #2563eb;"></i>
+            <span class="post-btn-count"><strong id="shares-btn-${post.id}">${post.shareCount || 0}</strong></span>
+          </button>
+
+          <!-- 5. Direct Phone Call Action (If contact provided for Sathkara need) -->
           ${isNeed && post.contact ? `
-            <a href="tel:${Security.sanitizePhone(post.contact)}" class="post-btn call-action">
+            <a href="tel:${Security.sanitizePhone(post.contact)}" class="post-btn call-action" title="අමතන්න: ${Security.escapeHTML(post.contact)}" aria-label="අමතන්න">
               <i class="fa-solid fa-phone"></i>
-              <span>අමතන්න</span>
             </a>
-          ` : `
-            <button class="post-btn" onclick="handleShare('${post.id}')" title="බාහිරව බෙදාගන්න">
-              <i class="fa-solid fa-share-nodes" style="color: #94a3b8;"></i>
-              <span>බෙදාගන්න (<strong id="shares-btn-${post.id}">${post.shareCount || 0}</strong>)</span>
-            </button>
-          `}
+          ` : ''}
         </div>
       `}
 
@@ -1835,12 +2609,20 @@ function renderPostCardHTML(post, user) {
           ${renderCommentsListHTML(post.id, comments, user)}
         </div>
 
-        <form class="comment-form" onsubmit="handleCommentSubmit(event, '${post.id}')" style="position: relative;">
-          <input type="text" id="comment-input-${post.id}" class="comment-input" required placeholder="${isGeneral ? 'සුබපැතුමක් හෝ සටහනක් එක් කරන්න...' : 'පුණ්‍යානුමෝදනා සටහනක් එක් කරන්න...'}" oninput="handleCommentInputMention(this, '${post.id}')" onkeydown="handleCommentInputKeydown(event, '${post.id}')" autocomplete="off">
-          <div id="mention-dropdown-${post.id}" class="mention-autocomplete-dropdown hidden"></div>
-          <button type="submit" class="comment-send-btn">
-            <i class="fa-solid fa-paper-plane"></i>
-          </button>
+        <form class="comment-form" onsubmit="handleCommentSubmit(event, '${post.id}')" style="position: relative; display: flex; flex-direction: column; gap: 4px;">
+          <div style="display: flex; align-items: center; gap: 6px; width: 100%; position: relative;">
+            <input type="text" id="comment-input-${post.id}" class="comment-input" required placeholder="${isGeneral ? 'සුබපැතුමක් හෝ සටහනක් එක් කරන්න...' : 'පුණ්‍යානුමෝදනා සටහනක් එක් කරන්න...'}" oninput="handleCommentInputMention(this, '${post.id}')" onkeydown="handleCommentInputKeydown(event, '${post.id}')" autocomplete="off" style="flex: 1;">
+            <div id="mention-dropdown-${post.id}" class="mention-autocomplete-dropdown hidden"></div>
+            <button type="submit" class="comment-send-btn" title="ප්‍රාර්ථනාව යවන්න">
+              <i class="fa-solid fa-paper-plane"></i>
+            </button>
+          </div>
+          <div class="comment-form-options" style="display: flex; align-items: center; justify-content: flex-end; padding: 0 4px;">
+            <label class="comment-anon-label" style="display: inline-flex; align-items: center; gap: 5px; font-size: 0.73rem; color: #64748b; cursor: pointer; user-select: none;">
+              <input type="checkbox" id="comment-anon-${post.id}" class="comment-anon-checkbox" style="width: 13px; height: 13px; accent-color: #059669; cursor: pointer;">
+              <span><i class="fa-solid fa-user-secret" style="color: #059669; font-size: 0.74rem;"></i> නිර්නාමිකව (Anonymous)</span>
+            </label>
+          </div>
         </form>
       </div>
       `}
@@ -1852,6 +2634,52 @@ function renderPostCardHTML(post, user) {
 function updateFeedInPlace(posts) {
   const user = StorageService.currentUser;
   (posts || []).forEach(post => {
+    if (!post || !post.id) return;
+    const postEl = document.getElementById(`post-elem-${post.id}`);
+    if (postEl) {
+      // 1. In-place Media injection & synchronization
+      const hasImages = (Array.isArray(post.images) && post.images.length > 0) || Boolean(post.image);
+      const existingCollage = postEl.querySelector('.photo-collage-container');
+      const existingVideo = postEl.querySelector('.post-video-container');
+
+      if (hasImages && !existingCollage && !post.videoId) {
+        const collageHtml = renderPostImagesCollage(post);
+        if (collageHtml) {
+          const actionsGrid = postEl.querySelector('.post-actions-grid');
+          if (actionsGrid) {
+            const temp = document.createElement('div');
+            temp.innerHTML = collageHtml.trim();
+            if (temp.firstElementChild) {
+              postEl.insertBefore(temp.firstElementChild, actionsGrid);
+            }
+          }
+        }
+      } else if (post.videoId && !existingVideo) {
+        const videoHtml = renderPostVideo(post);
+        if (videoHtml) {
+          const actionsGrid = postEl.querySelector('.post-actions-grid');
+          if (actionsGrid) {
+            const temp = document.createElement('div');
+            temp.innerHTML = videoHtml.trim();
+            if (temp.firstElementChild) {
+              postEl.insertBefore(temp.firstElementChild, actionsGrid);
+            }
+          }
+        }
+      } else if (hasImages && existingCollage) {
+        const rawImgs = (Array.isArray(post.images) && post.images.length > 0) ? post.images : (post.image ? [post.image] : []);
+        const cleanImgs = rawImgs.map(img => Security.sanitizeUrl(img) || img).filter(Boolean);
+        if (typeof window !== 'undefined') {
+          window._postImagesMap = window._postImagesMap || {};
+          window._postImagesMap[String(post.id)] = cleanImgs;
+        }
+        const firstImg = existingCollage.querySelector('img');
+        if (firstImg && cleanImgs[0] && firstImg.getAttribute('src') !== cleanImgs[0]) {
+          firstImg.src = cleanImgs[0];
+        }
+      }
+    }
+
     const confirmedCount = Math.max(0, parseInt(post.sadhuCount, 10) || 0);
     const countEl = document.getElementById(`count-${post.id}`);
     const btnCountEl = document.getElementById(`count-btn-${post.id}`);
@@ -1896,19 +2724,47 @@ function renderFeed() {
   const searchQ = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
   const user = StorageService.currentUser;
 
+  const isMaster = StorageService.isMasterAdmin();
+
   const filtered = currentPostsData.filter(post => {
-    if (activeCategory !== 'සියල්ල' && post.category !== activeCategory) return false;
+    if (!post) return false;
+    if (StorageService.isDummyTestPost && StorageService.isDummyTestPost(post)) return false;
 
     if (searchQ) {
       const matchTitle = (post.title || '').toLowerCase().includes(searchQ);
       const matchDesc = (post.description || '').toLowerCase().includes(searchQ);
       const matchLoc = (post.location || '').toLowerCase().includes(searchQ);
-      if (!matchTitle && !matchDesc && !matchLoc) return false;
+      const matchAuthor = (post.author || (StorageService.resolveAuthorName ? StorageService.resolveAuthorName(post) : '')).toLowerCase().includes(searchQ);
+      if (!matchTitle && !matchDesc && !matchLoc && !matchAuthor) return false;
     }
 
-    if (activeTab === 'feed') return post.visibility === 'public';
-    if (activeTab === 'mybook') return post.uid === user.uid;
-    if (activeTab === 'needs') return post.type === 'need';
+    const isOfficial = StorageService.isOfficialPost ? StorageService.isOfficialPost(post) : Boolean(post.isOfficial || post.author === 'අපේ පිං පොත');
+    post.isOfficial = isOfficial;
+
+    const isCategoryMatch = (activeCategory === 'සියල්ල') ||
+      (post.category === activeCategory) ||
+      (activeCategory === 'සුබපැතුම්' && (post.category === 'සිතුවිලි' || post.category === 'සාමාන්‍ය')) ||
+      (activeCategory === 'සමාජ සත්කාර' && post.type === 'need');
+
+    if (activeTab === 'feed') {
+      if (!isCategoryMatch && !post.isPinned && !isOfficial) return false;
+      return isOfficial || post.visibility !== 'private';
+    }
+
+    if (activeTab === 'mybook') {
+      if (post.visibility !== 'private') return false;
+      if (!isCategoryMatch) return false;
+      const isOwner = (user && post.uid === user.uid) ||
+                      (user && user.email && post.authorEmail && post.authorEmail.toLowerCase() === user.email.toLowerCase()) ||
+                      (isMaster && (post.uid === 'user_malith' || post.author === 'අපේ පිං පොත'));
+      return isOwner;
+    }
+
+    if (activeTab === 'needs') {
+      if (!isCategoryMatch) return false;
+      return post.type === 'need';
+    }
+
     return true;
   });
 
@@ -1932,14 +2788,14 @@ function renderFeed() {
       container.innerHTML = `
         <div class="card" style="padding: 48px 20px; text-align: center; border: 1.5px dashed rgba(217, 119, 6, 0.35); border-radius: 20px; background: linear-gradient(180deg, #fffdf8, #fff8ea);">
           <div style="width: 72px; height: 72px; border-radius: 50%; background: #fffbeb; border: 2px solid #fef3c7; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px; box-shadow: 0 4px 16px rgba(245, 158, 11, 0.18);">
-            <i class="fa-solid fa-dharmachakra animate-spin-slow" style="font-size: 2.2rem; color: #d97706;"></i>
+            <i class="fa-solid fa-book-bookmark animate-spin-slow" style="font-size: 2.2rem; color: #d97706;"></i>
           </div>
-          <h3 style="font-family: var(--font-serif); font-size: 1.15rem; font-weight: 700; color: #451a03; margin-bottom: 6px;">ඔබ තවම පින්කම් සටහන් කර නැත</h3>
+          <h3 style="font-family: var(--font-serif); font-size: 1.15rem; font-weight: 700; color: #451a03; margin-bottom: 6px;">ඔබ තවම පෞද්ගලික පින්කම් සටහන් කර නැත</h3>
           <p style="font-size: 0.82rem; color: #78350f; max-width: 440px; margin: 0 auto 20px auto; line-height: 1.6;">
-            ඔබ සිදුකරන පින්කම් සහ කුසල ක්‍රියා මෙහි සටහන් කර ඔබේ ජීවිතයේ පුණ්‍ය පොත සම්පූර්ණ කරගන්න!
+            ඔබට පමණක් පෙනෙන පරිදි (Private) ඔබ සිදුකරන පින්කම් මෙහි රහසිගතව සටහන් කර තබාගත හැක.
           </p>
-          <button type="button" onclick="openModal('merit')" class="btn-profile-primary" style="display: inline-flex; align-items: center; gap: 8px; padding: 11px 24px; font-weight: 700; font-size: 0.88rem; border-radius: 9999px; background: linear-gradient(135deg, #f59e0b, #d97706); color: #ffffff; border: none; cursor: pointer; box-shadow: 0 6px 18px rgba(217, 119, 6, 0.35);">
-            <i class="fa-solid fa-plus"></i> පළමු සටහන එක් කරන්න!
+          <button type="button" onclick="openPrivateMeritComposer()" class="btn-profile-primary" style="display: inline-flex; align-items: center; gap: 8px; padding: 11px 24px; font-weight: 700; font-size: 0.88rem; border-radius: 9999px; background: linear-gradient(135deg, #f59e0b, #d97706); color: #ffffff; border: none; cursor: pointer; box-shadow: 0 6px 18px rgba(217, 119, 6, 0.35);">
+            <i class="fa-solid fa-plus"></i> පළමු පෞද්ගලික සටහන එක් කරන්න!
           </button>
         </div>
       `;
@@ -1977,15 +2833,211 @@ function renderFeed() {
     return;
   }
 
-  container.innerHTML = ranked.map(post => renderPostCardHTML(post, user)).join('');
+  const hasMore = StorageService.hasMorePosts ? StorageService.hasMorePosts() : false;
+  const isLoading = StorageService.isLoadingMorePosts ? StorageService.isLoadingMorePosts() : false;
+
+  let sentinelHtml = '';
+  if (activeTab === 'feed' || activeTab === 'needs') {
+    sentinelHtml = `
+      <div id="infiniteScrollSentinel" class="infinite-scroll-sentinel">
+        ${isLoading ? `
+          <div class="infinite-scroll-loading">
+            <i class="fa-solid fa-dharmachakra animate-spin-slow" style="color: #d97706; font-size: 1.3rem;"></i>
+            <span>තවත් පින්කම් ලබා ගනිමින් පවතී...</span>
+          </div>
+        ` : (hasMore ? `
+          <button type="button" class="btn-load-more-posts" onclick="handleLoadMorePostsClick()">
+            <i class="fa-solid fa-arrow-down"></i> තවත් පින්කම් බලන්න (Load More)
+          </button>
+        ` : (ranked.length > 5 ? `
+          <div class="infinite-scroll-end">
+            <span class="end-icon">🪷</span>
+            <span>ඔබ සියලුම පින්කම් කියවා අවසන්ය. සියලු දෙනාටම තෙරුවන් සරණයි! 🙏</span>
+          </div>
+        ` : ''))}
+      </div>
+    `;
+  }
+
+  const cardsHtmlArr = [];
+  for (const post of ranked) {
+    try {
+      const cardHtml = renderPostCardHTML(post, user);
+      if (cardHtml) cardsHtmlArr.push(cardHtml);
+    } catch (cardErr) {
+      console.warn('[Feed] Error rendering card for post', post?.id, cardErr);
+    }
+  }
+  container.innerHTML = cardsHtmlArr.join('') + sentinelHtml;
+  setupInfiniteScrollObserver();
 }
+
+// ============================================================================
+// High-Scale Feed Pagination & Infinite Scroll Engine (Limit: 20)
+// ============================================================================
+
+export function setupInfiniteScrollObserver() {
+  if (infiniteScrollObserver) {
+    infiniteScrollObserver.disconnect();
+    infiniteScrollObserver = null;
+  }
+
+  const sentinel = document.getElementById('infiniteScrollSentinel');
+  if (!sentinel) return;
+
+  if ('IntersectionObserver' in window) {
+    infiniteScrollObserver = new IntersectionObserver((entries) => {
+      const entry = entries[0];
+      if (entry && entry.isIntersecting) {
+        triggerLoadMorePosts();
+      }
+    }, {
+      rootMargin: '300px', // Pre-fetch before user reaches absolute bottom
+      threshold: 0.05
+    });
+
+    infiniteScrollObserver.observe(sentinel);
+  }
+}
+window.setupInfiniteScrollObserver = setupInfiniteScrollObserver;
+
+export async function triggerLoadMorePosts() {
+  if (isTriggeringLoadMore) return;
+  if (!StorageService.hasMorePosts || !StorageService.hasMorePosts()) return;
+  if (StorageService.isLoadingMorePosts && StorageService.isLoadingMorePosts()) return;
+  if (currentPostsData.length < 5 && StorageService.isInitialSyncDone && !StorageService.isInitialSyncDone()) {
+    return;
+  }
+
+  isTriggeringLoadMore = true;
+  updateSentinelUI();
+
+  try {
+    await StorageService.fetchMorePosts();
+  } catch (err) {
+    console.warn('[Feed] Error loading more posts:', err);
+  } finally {
+    isTriggeringLoadMore = false;
+    updateSentinelUI();
+  }
+}
+window.triggerLoadMorePosts = triggerLoadMorePosts;
+
+export async function handleLoadMorePostsClick() {
+  triggerHaptic(10);
+  await triggerLoadMorePosts();
+}
+window.handleLoadMorePostsClick = handleLoadMorePostsClick;
+
+export function updateSentinelUI() {
+  const sentinel = document.getElementById('infiniteScrollSentinel');
+  if (!sentinel) return;
+
+  const hasMore = StorageService.hasMorePosts ? StorageService.hasMorePosts() : false;
+  const isLoading = (StorageService.isLoadingMorePosts && StorageService.isLoadingMorePosts()) || isTriggeringLoadMore;
+
+  const renderedCount = document.querySelectorAll('#postsContainer article.post-card').length;
+
+  if (isLoading) {
+    sentinel.innerHTML = `
+      <div class="infinite-scroll-loading">
+        <i class="fa-solid fa-dharmachakra animate-spin-slow" style="color: #d97706; font-size: 1.3rem;"></i>
+        <span>තවත් පින්කම් ලබා ගනිමින් පවතී...</span>
+      </div>
+    `;
+  } else if (hasMore) {
+    sentinel.innerHTML = `
+      <button type="button" class="btn-load-more-posts" onclick="handleLoadMorePostsClick()">
+        <i class="fa-solid fa-arrow-down"></i> තවත් පින්කම් බලන්න (Load More)
+      </button>
+    `;
+  } else if (renderedCount > 5) {
+    sentinel.innerHTML = `
+      <div class="infinite-scroll-end">
+        <span class="end-icon">🪷</span>
+        <span>ඔබ සියලුම පින්කම් කියවා අවසන්ය. සියලු දෙනාටම තෙරුවන් සරණයි! 🙏</span>
+      </div>
+    `;
+  } else {
+    sentinel.innerHTML = '';
+  }
+}
+window.updateSentinelUI = updateSentinelUI;
+
+export function appendNewPostsToFeed(allPosts, prevIdsStr) {
+  const container = document.getElementById('postsContainer');
+  if (!container) return;
+
+  const prevIdSet = new Set(prevIdsStr.split(','));
+  const user = StorageService.currentUser;
+  const searchQ = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
+
+  const isMaster = StorageService.isMasterAdmin();
+  // Extract only the newly arrived posts
+  const newlyFetched = (allPosts || []).filter(p => !prevIdSet.has(p.id));
+  const filteredNew = newlyFetched.filter(post => {
+    if (!post) return false;
+    if (StorageService.isDummyTestPost && StorageService.isDummyTestPost(post)) return false;
+
+    if (searchQ) {
+      const matchTitle = (post.title || '').toLowerCase().includes(searchQ);
+      const matchDesc = (post.description || '').toLowerCase().includes(searchQ);
+      const matchLoc = (post.location || '').toLowerCase().includes(searchQ);
+      const matchAuthor = (post.author || (StorageService.resolveAuthorName ? StorageService.resolveAuthorName(post) : '')).toLowerCase().includes(searchQ);
+      if (!matchTitle && !matchDesc && !matchLoc && !matchAuthor) return false;
+    }
+
+    const isOfficial = StorageService.isOfficialPost ? StorageService.isOfficialPost(post) : Boolean(post.isOfficial || post.author === 'අපේ පිං පොත');
+    post.isOfficial = isOfficial;
+
+    const isCategoryMatch = (activeCategory === 'සියල්ල') ||
+      (post.category === activeCategory) ||
+      (activeCategory === 'සුබපැතුම්' && (post.category === 'සිතුවිලි' || post.category === 'සාමාන්‍ය')) ||
+      (activeCategory === 'සමාජ සත්කාර' && post.type === 'need');
+
+    if (activeTab === 'feed') {
+      if (!isCategoryMatch && !post.isPinned && !isOfficial) return false;
+      return isOfficial || post.visibility !== 'private';
+    }
+
+    if (activeTab === 'mybook') {
+      if (post.visibility !== 'private') return false;
+      if (!isCategoryMatch) return false;
+      const isOwner = (user && post.uid === user.uid) ||
+                      (user && user.email && post.authorEmail && post.authorEmail.toLowerCase() === user.email.toLowerCase()) ||
+                      (isMaster && (post.uid === 'user_malith' || post.author === 'අපේ පිං පොත'));
+      return isOwner;
+    }
+
+    if (activeTab === 'needs') {
+      if (!isCategoryMatch) return false;
+      return post.type === 'need';
+    }
+
+    return true;
+  });
+
+  const sentinel = document.getElementById('infiniteScrollSentinel');
+  if (filteredNew.length > 0) {
+    const cardsHtml = filteredNew.map(post => renderPostCardHTML(post, user)).join('');
+    if (sentinel) {
+      sentinel.insertAdjacentHTML('beforebegin', cardsHtml);
+    } else {
+      container.insertAdjacentHTML('beforeend', cardsHtml);
+    }
+  }
+
+  updateSentinelUI();
+  setupInfiniteScrollObserver();
+}
+window.appendNewPostsToFeed = appendNewPostsToFeed;
 
 // Side Needs Widget
 function renderSideNeeds() {
   const container = document.getElementById('sideNeedsList');
   if (!container) return;
 
-  const needs = currentPostsData.filter(p => p.type === 'need').slice(0, 3);
+  const needs = currentPostsData.filter(p => p.type === 'need' && (!StorageService.isDummyTestPost || !StorageService.isDummyTestPost(p))).slice(0, 3);
   if (needs.length === 0) {
     container.innerHTML = `<p style="font-size: 0.72rem; color: #94a3b8;">දැනට ඉල්ලීම් නොමැත.</p>`;
     return;
@@ -2062,11 +3114,6 @@ function triggerSadhuFloatingAnimation(target, posY) {
 
 // Global actions exposed to HTML
 window.handleSadhuClick = async function(postId, btnElement) {
-  if (isGuestUser()) {
-    showAuthRequiredModal('සාදුකාර ලබා දීමට');
-    return;
-  }
-
   // Prevent double taps
   if (!window._sadhuClickBusy) window._sadhuClickBusy = {};
   if (window._sadhuClickBusy[postId]) return;
@@ -2188,6 +3235,12 @@ window.toggleCommentsSection = function(postId) {
     const isHidden = (box.style.display === 'none' || window.getComputedStyle(box).display === 'none');
     if (isHidden) {
       box.style.display = 'block';
+      // Always freshly sync comments list when opening comments section
+      const allPosts = StorageService.getLocalPosts() || [];
+      const targetPost = allPosts.find(p => String(p.id) === String(postId)) || (window.currentPostsData || []).find(p => String(p.id) === String(postId));
+      if (targetPost && Array.isArray(targetPost.comments)) {
+        renderCommentsListContent(postId, targetPost.comments);
+      }
       setTimeout(() => {
         document.getElementById(`comment-input-${postId}`)?.focus();
       }, 100);
@@ -2198,11 +3251,6 @@ window.toggleCommentsSection = function(postId) {
 };
 
 window.submitQuickBlessing = async function(postId, text) {
-  if (isGuestUser()) {
-    showAuthRequiredModal('ප්‍රාර්ථනා / ආශිර්වාද එක් කිරීමට');
-    return;
-  }
-
   window._commentSubmitting = window._commentSubmitting || {};
   if (window._commentSubmitting[postId]) return;
   window._commentSubmitting[postId] = true;
@@ -2213,8 +3261,19 @@ window.submitQuickBlessing = async function(postId, text) {
     SoundService.playSadhu();
     triggerHaptic(20);
 
-    const newComment = await StorageService.addComment(postId, text);
-    if (newComment) {
+    const anonCheckbox = document.getElementById(`comment-anon-${postId}`);
+    const isAnonymous = Boolean(
+      (anonCheckbox && anonCheckbox.checked) ||
+      StorageService.currentUser?.useAlias ||
+      StorageService.currentUser?.isAnonymous
+    );
+
+    const newComment = await StorageService.addComment(postId, text, { isAnonymous });
+    const allPosts = StorageService.getLocalPosts() || [];
+    let targetPost = allPosts.find(p => String(p.id) === String(postId)) || (window.currentPostsData || []).find(p => String(p.id) === String(postId));
+    if (targetPost && Array.isArray(targetPost.comments)) {
+      renderCommentsListContent(postId, targetPost.comments);
+    } else if (newComment) {
       appendCommentToDOM(postId, newComment);
     }
     updatePostCommentCountUI(postId);
@@ -2244,14 +3303,26 @@ window.handleCommentSubmit = async function(event, postId) {
   const text = input.value.trim();
   input.value = '';
 
+  const anonCheckbox = document.getElementById(`comment-anon-${postId}`);
+  const isAnonymous = Boolean(
+    (anonCheckbox && anonCheckbox.checked) ||
+    StorageService.currentUser?.useAlias ||
+    StorageService.currentUser?.isAnonymous
+  );
+
   try {
     const box = document.getElementById(`comments-box-${postId}`);
     if (box) box.style.display = 'block';
     SoundService.playSadhu();
     triggerHaptic(20);
 
-    const newComment = await StorageService.addComment(postId, text);
-    if (newComment) {
+    const newComment = await StorageService.addComment(postId, text, { isAnonymous });
+    if (anonCheckbox) anonCheckbox.checked = false;
+    const allPosts = StorageService.getLocalPosts() || [];
+    let targetPost = allPosts.find(p => String(p.id) === String(postId)) || (window.currentPostsData || []).find(p => String(p.id) === String(postId));
+    if (targetPost && Array.isArray(targetPost.comments)) {
+      renderCommentsListContent(postId, targetPost.comments);
+    } else if (newComment) {
       appendCommentToDOM(postId, newComment);
     }
     updatePostCommentCountUI(postId);
@@ -2534,6 +3605,24 @@ window.openEditPostModal = function(postId) {
     if (contactWrap) contactWrap.style.display = 'none';
   }
 
+  // Master Admin Controls inside Edit Modal
+  const editAdminControls = document.getElementById('editAdminPostControls');
+  const editOfficialChk = document.getElementById('editAdminIsOfficial');
+  const editPinnedChk = document.getElementById('editAdminIsPinned');
+  if (editAdminControls) {
+    if (isMaster) {
+      editAdminControls.style.display = 'block';
+      editAdminControls.classList.remove('hidden');
+      if (editOfficialChk) editOfficialChk.checked = Boolean(StorageService.isOfficialPost(post));
+      if (editPinnedChk) editPinnedChk.checked = Boolean(post.isPinned);
+    } else {
+      editAdminControls.style.display = 'none';
+      editAdminControls.classList.add('hidden');
+      if (editOfficialChk) editOfficialChk.checked = false;
+      if (editPinnedChk) editPinnedChk.checked = false;
+    }
+  }
+
   modal.classList.remove('hidden');
 };
 
@@ -2555,6 +3644,7 @@ window.handleEditPostSubmit = async function(event) {
   const description = (document.getElementById('editPostDesc')?.value || '').trim();
   const contact = (document.getElementById('editPostContact')?.value || '').trim();
 
+  const isMaster = StorageService.isMasterAdmin();
   const submitBtn = document.getElementById('editPostSubmitBtn');
   const origBtnText = submitBtn ? submitBtn.innerHTML : '';
 
@@ -2564,14 +3654,22 @@ window.handleEditPostSubmit = async function(event) {
       submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> සුරකිමින්...';
     }
 
-    await StorageService.updatePost(postId, {
+    const updatePayload = {
       title,
       category,
       visibility,
       location,
       description,
       contact
-    });
+    };
+    if (isMaster) {
+      const editOfficialChk = document.getElementById('editAdminIsOfficial');
+      const editPinnedChk = document.getElementById('editAdminIsPinned');
+      if (editOfficialChk) updatePayload.isOfficial = editOfficialChk.checked;
+      if (editPinnedChk) updatePayload.isPinned = editPinnedChk.checked;
+    }
+
+    await StorageService.updatePost(postId, updatePayload);
 
     SoundService.playPublish?.();
     triggerHaptic([25, 40]);
@@ -2584,6 +3682,36 @@ window.handleEditPostSubmit = async function(event) {
       submitBtn.disabled = false;
       submitBtn.innerHTML = origBtnText;
     }
+  }
+};
+
+window.toggleOfficialPrompt = async function(postId) {
+  if (!StorageService.isMasterAdmin()) {
+    alert("මෙම ක්‍රියාව සිදුකිරීමට Master Admin අවසර අවශ්‍යයි.");
+    return;
+  }
+  const allPosts = StorageService.getLocalPosts() || [];
+  let post = allPosts.find(p => p.id === postId) || (typeof currentPostsData !== 'undefined' && currentPostsData.find(p => p.id === postId));
+  if (!post) {
+    const off = StorageService.getOfficialPosts();
+    post = off.find(p => p.id === postId);
+  }
+  const isCurrentlyOfficial = post ? StorageService.isOfficialPost(post) : false;
+  const actionText = isCurrentlyOfficial ? 
+    "මෙම සටහනේ 'නිල නිවේදන (Official)' තත්වය ඉවත් කිරීමට ඔබට අවශ්‍යද?" : 
+    "මෙම සටහන 'අපේ පිං පොත නිල නිවේදනයක් (Official Post)' බවට පත් කිරීමට ඔබට අවශ්‍යද?";
+
+  if (!confirm(actionText)) return;
+
+  try {
+    await StorageService.toggleOfficialPost(postId, !isCurrentlyOfficial);
+    SoundService.playPublish?.();
+    renderFeed();
+    if (typeof showToastNotification === 'function') {
+      showToastNotification(isCurrentlyOfficial ? "නිල නිවේදන තත්වය ඉවත් කෙරිණි." : "නිල නිවේදනයක් ලෙස සාර්ථකව පත් කෙරිණි! 📢");
+    }
+  } catch (err) {
+    alert("දෝෂයකි: " + err.message);
   }
 };
 
@@ -2726,7 +3854,9 @@ window.viewOriginalPost = function(origId, parentPostId) {
       const orig = parentPost.originalPost;
       post = {
         id: orig.id || origId,
-        author: orig.author || 'කල්‍යාණ මිත්‍ර',
+        author: StorageService.resolveAuthorName(orig) || orig.author || 'කල්‍යාණ මිත්‍ර',
+        authorUid: orig.authorUid || orig.uid || null,
+        authorPhoto: StorageService.resolveAuthorPhoto(orig) || orig.authorPhoto || null,
         title: orig.title || '',
         description: orig.description || '',
         category: orig.category || 'දානමය',
@@ -2833,6 +3963,78 @@ let currentGeneratedStatusCardDataUrl = null;
 let currentGeneratedStatusCardBlob = null;
 let currentGeneratedStatusCardFileName = null;
 
+/**
+ * Direct Facebook Share with Engaging Ad-style Caption & Deep Link
+ */
+window.shareToFacebookFromModal = function() {
+  const postId = currentShareTargetPostId;
+  if (!postId) return;
+
+  const allPosts = StorageService.getLocalPosts() || [];
+  let post = allPosts.find(p => p.id === postId);
+  if (!post && typeof currentPostsData !== 'undefined' && Array.isArray(currentPostsData)) {
+    post = currentPostsData.find(p => p.id === postId);
+  }
+  if (!post && StorageService._cachedPosts) {
+    post = StorageService._cachedPosts.find(p => p.id === postId);
+  }
+  if (!post) {
+    post = { id: postId, title: 'පින්කමක්', description: '', author: 'කල්‍යාණ මිත්‍ර' };
+  }
+
+  const isRepost = post.isRepost || !!post.originalPost;
+  const orig = post.originalPost || null;
+  const isNeed = post.type === 'need' || (orig && orig.type === 'need');
+  const realAuthor = post.isOfficial ? 'අපේ පිං පොත' : ((isRepost && orig) ? StorageService.resolveAuthorName(orig) : StorageService.resolveAuthorName(post));
+  const realTitle = (isRepost && orig && orig.title) ? orig.title : (post.title || 'පින්කම');
+  const realDesc = (isRepost && orig && orig.description) ? orig.description : (post.description || '');
+  const realPhone = (isRepost && orig && orig.contact) ? orig.contact : (post.contact || '');
+
+  const origin = window.location.origin;
+  const pathname = window.location.pathname;
+  const targetId = (isRepost && orig && orig.id) ? orig.id : post.id;
+  const tabParam = isNeed ? '&tab=needs' : '';
+  const postUrl = `${origin}${pathname}?post=${encodeURIComponent(targetId)}${tabParam}`;
+
+  try {
+    StorageService.incrementShare(targetId);
+    if (postId !== targetId) StorageService.incrementShare(postId);
+    if (post) post.shareCount = (post.shareCount || 0) + 1;
+    const shareBtnEl = document.getElementById(`shares-btn-${postId}`);
+    const shareStatEl = document.getElementById(`stat-shares-${postId}`);
+    if (shareBtnEl) shareBtnEl.innerText = post.shareCount;
+    if (shareStatEl) shareStatEl.innerText = post.shareCount;
+  } catch (e) {}
+
+  let cleanDesc = realDesc ? realDesc.replace(/<[^>]*>?/gm, '').trim() : '';
+  if (cleanDesc.length > 180) cleanDesc = cleanDesc.substring(0, 180) + '...';
+
+  let fbCopy = '';
+  if (isNeed) {
+    fbCopy = `🤝 විශේෂ සත්කාර ඇරයුමකි! | අපේ පිං පොත\n✨ ${realTitle}\n\n${cleanDesc ? `"${cleanDesc}"\n\n` : ''}${realPhone ? `📞 සෘජු දුරකථන අංකය: ${realPhone}\n\n` : ''}🙏 මෙම සත්කාරය පිළිබඳ සියලු ඡායාරූප දැකබලා ගැනීමට, සාදුකාර දී අනුමෝදන් වීමට / දායක වීමට අපේ පිං පොත වෙත පිවිසෙන්න:\n👉 ${postUrl}\n\n#ApePinPotha #SathkaraHawula #PinPotha #KalyanaMithra #SriLanka`;
+  } else {
+    fbCopy = `🌸 උතුම් පින්කමක් දැකබලා සතුටු සිතින් අනුමෝදන් වන්න! | අපේ පිං පොත\n✨ ${realTitle}\n(කල්‍යාණ මිත්‍ර: ${realAuthor})\n\n${cleanDesc ? `"${cleanDesc}"\n\n` : ''}🙏 මෙම පින්කම දැකබලා ඔබත් සාදුකාර දී පින් අනුමෝදන් වීමට පිං පොත වෙත පිවිසෙන්න:\n👉 ${postUrl}\n\n#ApePinPotha #PinPotha #KalyanaMithra #MeritSharing`;
+  }
+
+  try {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(fbCopy);
+    }
+  } catch (err) {}
+
+  closeShareChoiceModal();
+
+  const fbShareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(postUrl)}`;
+  window.open(fbShareUrl, '_blank', 'width=640,height=580,scrollbars=yes,resizable=yes');
+
+  alert('Facebook සටහන සඳහා ආකර්ෂණීය විස්තරය සහ සබැඳිය (Link) පිටපත් කරගන්නා ලදී! 🎉\n\nFacebook කවුළුවෙහි එය Paste කළ හැක.');
+};
+
+window.shareStatusToFacebook = function() {
+  closeStatusCardPreviewModal();
+  shareToFacebookFromModal();
+};
+
 window.handleShare = function(postId) {
   SoundService.playShare();
   triggerHaptic(25);
@@ -2934,27 +4136,53 @@ window.generateWhatsAppStatusCardFromModal = async function() {
     const renderBox = document.getElementById('viralStatusCardRenderBox');
     if (!renderBox) throw new Error('Render box not found');
 
+    const isNeed = post.type === 'need' || (orig && orig.type === 'need');
     const cleanDesc = realDesc ? realDesc.replace(/<[^>]*>?/gm, '').trim() : '';
+    const cleanImages = (isRepost && orig)
+      ? (orig.images || (orig.image ? [orig.image] : []))
+      : (post.images || (post.image ? [post.image] : []));
+    const realPhone = (isRepost && orig && orig.contact) ? orig.contact : (post.contact || '');
+
+    // Multi-image collage for viral social card (Up to 4 images, like Facebook/Threads card)
+    let imagesMarkup = '';
+    if (cleanImages.length > 1) {
+      const displayImgs = cleanImages.slice(0, 4);
+      imagesMarkup = `
+        <div style="display: grid; grid-template-columns: ${displayImgs.length === 2 ? '1fr 1fr' : '1fr 1fr'}; gap: 4px; border-radius: 16px; overflow: hidden; border: 2px solid ${isNeed ? '#a7f3d0' : '#fde68a'}; margin-top: 12px; background: #000;">
+          ${displayImgs.map((img, idx) => `
+            <div style="height: ${displayImgs.length <= 2 ? '220px' : '160px'}; overflow: hidden; position: relative;">
+              <img src="${Security.sanitizeUrl(img)}" style="width: 100%; height: 100%; object-fit: cover; display: block;" crossorigin="anonymous">
+            </div>
+          `).join('')}
+        </div>
+      `;
+    } else if (realImage) {
+      imagesMarkup = `
+        <div style="border-radius: 16px; overflow: hidden; border: 2px solid ${isNeed ? '#a7f3d0' : '#fde68a'}; box-shadow: 0 4px 18px rgba(0,0,0,0.08); margin-top: 12px; background: #000; text-align: center;">
+          <img src="${Security.sanitizeUrl(realImage)}" style="max-width: 100%; max-height: 380px; width: 100%; object-fit: contain; display: block;" crossorigin="anonymous">
+        </div>
+      `;
+    }
 
     renderBox.innerHTML = `
-      <div id="statusCardRoot" style="width: 580px; background: #fffcf7; border: 10px solid #78350f; border-radius: 26px; overflow: hidden; font-family: 'Noto Sans Sinhala', -apple-system, BlinkMacSystemFont, sans-serif; box-shadow: 0 10px 40px rgba(0,0,0,0.3); color: #1e293b; box-sizing: border-box;">
+      <div id="statusCardRoot" style="width: 580px; background: #fffcf7; border: 10px solid ${isNeed ? '#065f46' : '#78350f'}; border-radius: 26px; overflow: hidden; font-family: 'Noto Sans Sinhala', -apple-system, BlinkMacSystemFont, sans-serif; box-shadow: 0 10px 40px rgba(0,0,0,0.3); color: #1e293b; box-sizing: border-box;">
         
-        <!-- Top Golden Gradient Strip -->
-        <div style="background: linear-gradient(90deg, #d97706, #fbbf24, #f59e0b, #b45309); height: 8px;"></div>
+        <!-- Top Strip -->
+        <div style="background: ${isNeed ? 'linear-gradient(90deg, #059669, #10b981, #f59e0b, #d97706)' : 'linear-gradient(90deg, #d97706, #fbbf24, #f59e0b, #b45309)'}; height: 8px;"></div>
         
         <!-- Header with Branding -->
-        <div style="background: linear-gradient(135deg, #451a03 0%, #78350f 60%, #92400e 100%); padding: 18px 24px; color: #fff; display: flex; align-items: center; justify-content: space-between;">
+        <div style="background: ${isNeed ? 'linear-gradient(135deg, #064e3b 0%, #065f46 60%, #047857 100%)' : 'linear-gradient(135deg, #451a03 0%, #78350f 60%, #92400e 100%)'}; padding: 18px 24px; color: #fff; display: flex; align-items: center; justify-content: space-between;">
           <div style="display: flex; align-items: center; gap: 14px;">
-            <div style="width: 48px; height: 48px; border-radius: 50%; background: rgba(251, 191, 36, 0.2); border: 2px solid #fbbf24; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: #fbbf24;">
-              ☸️
+            <div style="width: 48px; height: 48px; border-radius: 50%; background: ${isNeed ? 'rgba(52, 211, 153, 0.25)' : 'rgba(251, 191, 36, 0.2)'}; border: 2px solid ${isNeed ? '#34d399' : '#fbbf24'}; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: #fff;">
+              ${isNeed ? '🤝' : '☸️'}
             </div>
             <div>
               <div style="font-family: 'Noto Serif Sinhala', serif; font-size: 1.35rem; font-weight: 700; color: #fffbeb; letter-spacing: 0.5px;">පිං පොත</div>
-              <div style="font-size: 0.74rem; color: #fef3c7; opacity: 0.9;">කල්‍යාණ මිත්‍ර පුණ්‍ය ජාලය • apepinpotha.lk</div>
+              <div style="font-size: 0.74rem; color: ${isNeed ? '#a7f3d0' : '#fef3c7'}; opacity: 0.95;">${isNeed ? 'සත්කාර හවුල • apepinpotha.lk' : 'කල්‍යාණ මිත්‍ර පුණ්‍ය ජාලය • apepinpotha.lk'}</div>
             </div>
           </div>
-          <div style="background: rgba(251, 191, 36, 0.25); border: 1px solid #fbbf24; color: #fef3c7; font-size: 0.74rem; font-weight: 700; padding: 4px 12px; border-radius: 9999px;">
-            ${Security.escapeHTML(realCategory)}
+          <div style="background: ${isNeed ? '#dc2626' : 'rgba(251, 191, 36, 0.25)'}; border: 1px solid ${isNeed ? '#ef4444' : '#fbbf24'}; color: #fff; font-size: 0.76rem; font-weight: 800; padding: 5px 14px; border-radius: 9999px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
+            ${isNeed ? '🚨 සත්කාර ඇරයුමකි' : Security.escapeHTML(realCategory)}
           </div>
         </div>
 
@@ -2975,8 +4203,8 @@ window.generateWhatsAppStatusCardFromModal = async function() {
             </div>
           </div>
           <div style="text-align: right;">
-            <div style="font-size: 0.74rem; font-weight: 700; color: #b45309; background: #fffbeb; padding: 4px 12px; border-radius: 8px; border: 1px solid #fde68a;">
-              🙏 සාදු සාදු සාදු!
+            <div style="font-size: 0.74rem; font-weight: 700; color: ${isNeed ? '#065f46' : '#b45309'}; background: ${isNeed ? '#ecfdf5' : '#fffbeb'}; padding: 4px 12px; border-radius: 8px; border: 1px solid ${isNeed ? '#a7f3d0' : '#fde68a'};">
+              ${isNeed ? '🤝 සත්කාර හවුල' : '🙏 සාදු සාදු සාදු!'}
             </div>
           </div>
         </div>
@@ -2988,29 +4216,44 @@ window.generateWhatsAppStatusCardFromModal = async function() {
           </h2>
 
           ${cleanDesc ? `
-          <p style="font-size: 0.92rem; color: #334155; line-height: 1.65; white-space: pre-line; margin-bottom: 16px;">
+          <p style="font-size: 0.92rem; color: #334155; line-height: 1.65; white-space: pre-line; margin-bottom: 14px;">
             ${Security.escapeHTML(cleanDesc)}
           </p>
           ` : ''}
 
-          ${realImage ? `
-          <div style="border-radius: 16px; overflow: hidden; border: 2px solid #fde68a; box-shadow: 0 4px 18px rgba(0,0,0,0.08); margin-top: 10px; background: #000; text-align: center;">
-            <img src="${realImage}" style="max-width: 100%; max-height: 380px; width: 100%; object-fit: contain; display: block;" crossorigin="anonymous">
+          ${imagesMarkup}
+
+          ${(isNeed && realPhone) ? `
+          <div style="background: #ecfdf5; border: 2px dashed #059669; padding: 12px 18px; border-radius: 14px; margin-top: 14px; display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 1.25rem;">📞</span>
+              <div>
+                <div style="font-size: 0.7rem; color: #047857; font-weight: 700;">සෘජුව අමතන්න (Contact):</div>
+                <div style="font-size: 1.05rem; font-weight: 800; color: #065f46; letter-spacing: 0.5px;">${Security.escapeHTML(realPhone)}</div>
+              </div>
+            </div>
+            <span style="background: #059669; color: #fff; font-size: 0.72rem; font-weight: 700; padding: 4px 12px; border-radius: 9999px;">සත්‍යාපිතයි ✓</span>
+          </div>
+          ` : ''}
+
+          ${isNeed ? `
+          <div style="background: #fffbeb; border: 1px solid #fef3c7; border-radius: 12px; padding: 10px 14px; margin-top: 12px; font-size: 0.82rem; color: #92400e; font-weight: 600; text-align: center; line-height: 1.5;">
+            🌸 මෙම පණිවිඩය තවත් කල්‍යාණ මිතුරෙකුට දැකගැනීම පිණිස Share කර ඔබත් ධර්ම දානමය කුසලයට හිමිකම් කියන්න!
           </div>
           ` : ''}
         </div>
 
         <!-- Bottom Footer Banner -->
-        <div style="background: linear-gradient(135deg, #78350f, #451a03); padding: 16px 24px; color: #fff; display: flex; align-items: center; justify-content: space-between; border-top: 3px solid #fbbf24;">
+        <div style="background: ${isNeed ? 'linear-gradient(135deg, #064e3b, #065f46)' : 'linear-gradient(135deg, #78350f, #451a03)'}; padding: 16px 24px; color: #fff; display: flex; align-items: center; justify-content: space-between; border-top: 3px solid ${isNeed ? '#34d399' : '#fbbf24'};">
           <div>
-            <div style="font-size: 0.95rem; font-weight: 700; color: #fef08a;">
-              🙏 දැකබලා සතුටු සිතින් අනුමෝදන් වන්න!
+            <div style="font-size: 0.95rem; font-weight: 700; color: ${isNeed ? '#a7f3d0' : '#fef08a'};">
+              ${isNeed ? '👉 වැඩිදුර විස්තර දැකබලා ගැනීමට / දායක වීමට:' : '🙏 දැකබලා සතුටු සිතින් අනුමෝදන් වන්න!'}
             </div>
             <div style="font-size: 0.74rem; color: #fef3c7; opacity: 0.9; margin-top: 2px;">
-              ඔබ සිදුකරන පින්කම් සටහන් කරගන්න පිං පොතට එක්වන්න
+              ලංකාවේ ප්‍රථම ඩිජිටල් පුණ්‍ය ජාලය • අපේ පිං පොත
             </div>
           </div>
-          <div style="background: #fbbf24; color: #451a03; font-weight: 800; font-size: 0.78rem; padding: 6px 14px; border-radius: 9999px; white-space: nowrap;">
+          <div style="background: ${isNeed ? '#34d399' : '#fbbf24'}; color: ${isNeed ? '#064e3b' : '#451a03'}; font-weight: 800; font-size: 0.82rem; padding: 7px 16px; border-radius: 9999px; white-space: nowrap;">
             🌐 apepinpotha.lk
           </div>
         </div>
@@ -3229,28 +4472,88 @@ window.copyPostLinkFromModal = async function() {
   }
 };
 
-// Check for deep-linked post in URL query (?post=post_123)
-function checkUrlDirectPost() {
+// Check for deep-linked post in URL query (?post=post_123) - Instant Facebook / Social traffic arrival
+async function checkUrlDirectPost() {
   const urlParams = new URLSearchParams(window.location.search);
   const targetPostId = urlParams.get('post');
   if (!targetPostId) return;
 
-  const tryScroll = () => {
+  const tabParam = urlParams.get('tab');
+
+  // 1. Locate post in current memory or local cache
+  let targetPost = (currentPostsData || []).find(p => p.id === targetPostId);
+  if (!targetPost) {
+    const allPosts = StorageService.getLocalPosts() || [];
+    targetPost = allPosts.find(p => p.id === targetPostId);
+  }
+  if (!targetPost && StorageService._cachedPosts) {
+    targetPost = StorageService._cachedPosts.find(p => p.id === targetPostId);
+  }
+
+  // 2. If not in local storage (e.g. brand new visitor arriving from Facebook link), fetch directly from Firestore by ID!
+  if (!targetPost && typeof StorageService.getPostById === 'function') {
+    try {
+      targetPost = await StorageService.getPostById(targetPostId);
+    } catch (e) {
+      console.warn('[DirectPost] Fetch error:', e);
+    }
+  }
+
+  // 3. If it's a Sathkara Need post or ?tab=needs, switch to needs tab
+  const isNeedPost = targetPost && targetPost.type === 'need';
+  if ((isNeedPost || tabParam === 'needs') && activeTab !== 'needs') {
+    switchTab('needs', false);
+  }
+
+  // 4. If we have the post, ensure it is at index 0 of currentPostsData so it renders right at the top
+  if (targetPost) {
+    currentPostsData = (currentPostsData || []).filter(p => p.id !== targetPostId);
+    currentPostsData.unshift(targetPost);
+    renderFeed();
+  }
+
+  // 5. Scroll to element, add arrival banner, and expand comments for high engagement
+  const tryFocusPost = () => {
     const elem = document.getElementById(`post-elem-${targetPostId}`);
     if (elem) {
+      if (!elem.querySelector('.shared-post-direct-banner')) {
+        const banner = document.createElement('div');
+        banner.className = 'shared-post-direct-banner';
+        banner.innerHTML = `
+          <i class="fa-solid fa-arrow-up-right-from-square" style="color: #d97706;"></i>
+          <span>${isNeedPost ? '🤝 ඔබ Facebook / සමාජ මාධ්‍ය සබැඳියෙන් විවෘත කළ සත්කාර ඇරයුම' : '✨ ඔබ Facebook / සමාජ මාධ්‍ය සබැඳියෙන් විවෘත කළ පින්කම'}</span>
+        `;
+        elem.insertBefore(banner, elem.firstChild);
+      }
+
+      // Automatically expand full text if collapsed
+      const collapsedDesc = document.getElementById(`post-desc-collapsed-${targetPostId}`);
+      const fullDesc = document.getElementById(`post-desc-full-${targetPostId}`);
+      if (collapsedDesc && fullDesc) {
+        collapsedDesc.style.display = 'none';
+        fullDesc.style.display = 'block';
+      }
+
+      // Automatically open comments/blessings section
+      const commentsBox = document.getElementById(`comments-box-${targetPostId}`);
+      if (commentsBox && commentsBox.style.display === 'none') {
+        commentsBox.style.display = 'block';
+      }
+
       elem.scrollIntoView({ behavior: 'smooth', block: 'center' });
       elem.classList.add('highlight-shared-post');
       setTimeout(() => {
         elem.classList.remove('highlight-shared-post');
-      }, 4500);
+      }, 6000);
       return true;
     }
     return false;
   };
 
-  if (!tryScroll()) {
-    setTimeout(tryScroll, 600);
-    setTimeout(tryScroll, 1600);
+  if (!tryFocusPost()) {
+    setTimeout(tryFocusPost, 400);
+    setTimeout(tryFocusPost, 1200);
+    setTimeout(tryFocusPost, 2400);
   }
 }
 
@@ -3270,6 +4573,15 @@ window.openModal = function(type = 'merit', triggerPhoto = false, triggerVideo =
   selectedImagesList = [];
   renderComposerThumbnails();
 
+  const visSelect = document.getElementById('postVisibility');
+  if (visSelect) {
+    if (activeTab === 'mybook') {
+      visSelect.value = 'private';
+    } else {
+      visSelect.value = 'public';
+    }
+  }
+
   // Toggle Master Admin post controls
   const adminPostControls = document.getElementById('adminPostControls');
   if (adminPostControls) {
@@ -3279,8 +4591,8 @@ window.openModal = function(type = 'merit', triggerPhoto = false, triggerVideo =
     } else {
       adminPostControls.classList.add('hidden');
       adminPostControls.style.display = 'none';
-      const chkOfficial = document.getElementById('postIsOfficial');
-      const chkPinned = document.getElementById('postIsPinned');
+      const chkOfficial = document.getElementById('adminIsOfficial') || document.getElementById('postIsOfficial');
+      const chkPinned = document.getElementById('adminIsPinned') || document.getElementById('postIsPinned');
       if (chkOfficial) chkOfficial.checked = false;
       if (chkPinned) chkPinned.checked = false;
     }
@@ -3553,9 +4865,9 @@ function renderComposerThumbnails() {
 
   container.style.display = 'block';
   grid.innerHTML = selectedImagesList.map((img, idx) => `
-    <div class="composer-thumb-item">
+    <div class="composer-thumb-item" onclick="openLightbox(selectedImagesList, ${idx})" style="cursor: pointer;" title="විශාල කර බලන්න">
       <img src="${img}" alt="තෝරාගත් ඡායාරූපය ${idx + 1}">
-      <button type="button" class="composer-thumb-remove" onclick="removeSelectedComposerImage(${idx})" title="ඉවත් කරන්න">
+      <button type="button" class="composer-thumb-remove" onclick="event.stopPropagation(); removeSelectedComposerImage(${idx})" title="ඉවත් කරන්න">
         <i class="fa-solid fa-xmark"></i>
       </button>
     </div>
@@ -3563,7 +4875,7 @@ function renderComposerThumbnails() {
 
   const totalSizeKB = Math.round(selectedImagesList.reduce((acc, img) => acc + (img.length * 3 / 4), 0) / 1024);
   if (statsEl) {
-    statsEl.innerText = `ඡායාරූප ${selectedImagesList.length}/5 ක් තෝරාගන්නා ලදී (සම්පීඩිත ධාරිතාව: ~${totalSizeKB} KB)`;
+    statsEl.innerText = `ඡායාරූප ${selectedImagesList.length}/5 ක් තෝරාගන්නා ලදී (සම්පීඩිත ධාරිතාව: ~${totalSizeKB} KB) • විශාල කර බැලීමට පින්තූරය ඔබන්න`;
   }
 }
 
@@ -3595,13 +4907,14 @@ function applyLightboxTransform(isDragging = false) {
   imgEl.style.transition = isDragging ? 'none' : 'transform 0.22s cubic-bezier(0.2, 0, 0.2, 1)';
 }
 
-window.zoomInLightbox = function(step = 0.5) {
+export function zoomInLightbox(step = 0.5) {
   currentLightboxZoom = Math.min(4, Math.round((currentLightboxZoom + step) * 10) / 10);
   applyLightboxTransform(false);
   triggerHaptic(10);
-};
+}
+window.zoomInLightbox = zoomInLightbox;
 
-window.zoomOutLightbox = function(step = 0.5) {
+export function zoomOutLightbox(step = 0.5) {
   currentLightboxZoom = Math.max(1, Math.round((currentLightboxZoom - step) * 10) / 10);
   if (currentLightboxZoom === 1) {
     currentLightboxPanX = 0;
@@ -3609,20 +4922,96 @@ window.zoomOutLightbox = function(step = 0.5) {
   }
   applyLightboxTransform(false);
   triggerHaptic(10);
-};
+}
+window.zoomOutLightbox = zoomOutLightbox;
 
-window.resetZoomLightbox = function() {
+export function resetZoomLightbox() {
   currentLightboxZoom = 1;
   currentLightboxPanX = 0;
   currentLightboxPanY = 0;
   applyLightboxTransform(false);
   triggerHaptic(10);
-};
+}
+window.resetZoomLightbox = resetZoomLightbox;
 
-window.openLightbox = function(encodedImages, startIndex = 0) {
+export function openPostLightbox(postId, startIndex = 0, el = null) {
   try {
-    const images = typeof encodedImages === 'string' ? JSON.parse(decodeURIComponent(encodedImages)) : encodedImages;
-    if (!images || !Array.isArray(images) || images.length === 0) return;
+    const strId = (postId != null) ? String(postId) : '';
+    let images = [];
+    if (strId && window._postImagesMap && window._postImagesMap[strId] && window._postImagesMap[strId].length > 0) {
+      images = window._postImagesMap[strId];
+    }
+    if ((!images || images.length === 0) && typeof currentPostsData !== 'undefined' && Array.isArray(currentPostsData)) {
+      const p = currentPostsData.find(item => item && String(item.id) === strId);
+      if (p) {
+        images = (p.images && p.images.length > 0) ? p.images : (p.image ? [p.image] : []);
+      }
+    }
+    if ((!images || images.length === 0) && typeof StorageService !== 'undefined' && StorageService.getLocalPosts) {
+      try {
+        const localPosts = StorageService.getLocalPosts() || [];
+        const p = localPosts.find(item => item && String(item.id) === strId);
+        if (p) {
+          images = (p.images && p.images.length > 0) ? p.images : (p.image ? [p.image] : []);
+        }
+      } catch (e) {}
+    }
+    if ((!images || images.length === 0) && el) {
+      const container = el.closest ? el.closest('.photo-collage-container') : null;
+      if (container) {
+        images = Array.from(container.querySelectorAll('img')).map(i => i.currentSrc || i.src).filter(Boolean);
+      } else if (el.tagName === 'IMG') {
+        images = [el.currentSrc || el.src];
+      }
+    }
+    if ((!images || images.length === 0) && strId && (strId.startsWith('http') || strId.startsWith('data:') || strId.startsWith('blob:') || strId.startsWith('assets/'))) {
+      images = [strId];
+    }
+    if (images && images.length > 0) {
+      openLightbox(images, startIndex);
+    } else {
+      console.warn('[openPostLightbox] No images found for post:', postId);
+    }
+  } catch (err) {
+    console.error('[openPostLightbox] Error:', err);
+  }
+}
+window.openPostLightbox = openPostLightbox;
+
+export function openLightbox(encodedImages, startIndex = 0) {
+  try {
+    let images = [];
+    if (Array.isArray(encodedImages)) {
+      images = [...encodedImages];
+    } else if (typeof encodedImages === 'string') {
+      const trimmed = encodedImages.trim();
+      if (trimmed.startsWith('[') || trimmed.startsWith('%5B') || trimmed.startsWith('%5b')) {
+        try {
+          const decoded = trimmed.startsWith('%') ? decodeURIComponent(trimmed) : trimmed;
+          const parsed = JSON.parse(decoded);
+          if (Array.isArray(parsed)) images = parsed;
+        } catch (e) {
+          images = [trimmed];
+        }
+      } else if (trimmed.startsWith('data:') || trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('blob:') || trimmed.startsWith('/') || trimmed.startsWith('./') || trimmed.startsWith('assets/')) {
+        images = [trimmed];
+      } else if (window._postImagesMap && window._postImagesMap[trimmed]) {
+        images = window._postImagesMap[trimmed];
+      } else {
+        images = [trimmed];
+      }
+    }
+
+    const cleanList = (images || []).map(img => {
+      if (typeof img !== 'string') return null;
+      return Security.sanitizeUrl(img) || img;
+    }).filter(Boolean);
+
+    if (cleanList.length > 0) {
+      images = cleanList;
+    }
+    if (!images || images.length === 0) return;
+
     currentLightboxImages = images;
     currentLightboxIndex = startIndex >= 0 && startIndex < images.length ? startIndex : 0;
 
@@ -3634,58 +5023,86 @@ window.openLightbox = function(encodedImages, startIndex = 0) {
     const prevBtn = document.getElementById('lightboxPrevBtn');
     const nextBtn = document.getElementById('lightboxNextBtn');
 
-    if (imgEl) imgEl.src = currentLightboxImages[currentLightboxIndex];
+    if (imgEl && currentLightboxImages[currentLightboxIndex]) {
+      imgEl.src = currentLightboxImages[currentLightboxIndex];
+    }
     if (counterEl) counterEl.innerText = `${currentLightboxIndex + 1} / ${currentLightboxImages.length}`;
 
     if (prevBtn) prevBtn.style.display = currentLightboxImages.length > 1 ? 'flex' : 'none';
     if (nextBtn) nextBtn.style.display = currentLightboxImages.length > 1 ? 'flex' : 'none';
 
     if (modal) {
+      lastLightboxOpenTime = Date.now();
       try {
         history.pushState({ type: 'modal', id: 'photoLightboxModal' }, '');
       } catch (e) {}
       modal.classList.remove('hidden');
+      modal.style.setProperty('display', 'flex', 'important');
+      modal.style.background = '';
+      if (imgEl) {
+        imgEl.style.transform = 'translate(0px, 0px) scale(1)';
+        imgEl.style.transition = '';
+      }
       document.body.style.overflow = 'hidden';
     }
   } catch (err) {
     console.error('[Lightbox] Failed to open:', err);
   }
-};
+}
+window.openLightbox = openLightbox;
 
-window.closeLightbox = function() {
+export function closeLightbox() {
   resetZoomLightbox();
   const modal = document.getElementById('photoLightboxModal');
+  const imgEl = document.getElementById('lightboxActiveImage');
   if (modal) {
     modal.classList.add('hidden');
+    modal.style.setProperty('display', 'none', 'important');
+    modal.style.background = '';
     document.body.style.overflow = '';
   }
-};
+  if (imgEl) {
+    imgEl.style.transform = 'translate(0px, 0px) scale(1)';
+    imgEl.style.transition = '';
+  }
+}
+window.closeLightbox = closeLightbox;
 
-window.closeLightboxOnBackdrop = function(e) {
-  if (e.target.id === 'photoLightboxModal' || e.target.id === 'lightboxContentBox') {
+let lastLightboxOpenTime = 0;
+
+export function closeLightboxOnBackdrop(e) {
+  // Prevent immediate closure if the touch/click was part of opening
+  if (Date.now() - lastLightboxOpenTime < 1000) {
+    return;
+  }
+  // Only close if clicking outside the image content on the backdrop overlay
+  if (e.target.classList.contains('lightbox-backdrop') || e.target.id === 'photoLightboxModal') {
     if (currentLightboxZoom > 1) {
       resetZoomLightbox();
     } else {
-      window.closeLightbox();
+      closeLightbox();
     }
   }
-};
+}
+window.closeLightboxOnBackdrop = closeLightboxOnBackdrop;
 
-window.nextLightboxImage = function() {
+export function nextLightboxImage() {
   if (currentLightboxImages.length <= 1) return;
   currentLightboxIndex = (currentLightboxIndex + 1) % currentLightboxImages.length;
   updateLightboxView();
   triggerHaptic(15);
-};
+}
+window.nextLightboxImage = nextLightboxImage;
 
-window.prevLightboxImage = function() {
+export function prevLightboxImage() {
   if (currentLightboxImages.length <= 1) return;
   currentLightboxIndex = (currentLightboxIndex - 1 + currentLightboxImages.length) % currentLightboxImages.length;
   updateLightboxView();
   triggerHaptic(15);
-};
+}
+window.prevLightboxImage = prevLightboxImage;
 
-function updateLightboxView() {
+export function updateLightboxView() {
   resetZoomLightbox();
   const imgEl = document.getElementById('lightboxActiveImage');
   const counterEl = document.getElementById('lightboxCounter');
@@ -3706,12 +5123,197 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// Touch Gestures: Swipe left/right, Pinch to zoom, Double-tap to zoom, Pan when enlarged
+// Universal Photo Open Handler (Shared between Touch & Click)
+let lastPhotoTriggerTime = 0;
+
+function handlePhotoOpenTarget(target) {
+  if (!target) return false;
+  if (target.closest('.lightbox-top-bar') || target.closest('.lightbox-nav-btn')) return false;
+  if (target.closest('.composer-thumb-remove')) return false;
+
+  // 1. Post Photo Collage Grid item or container
+  const collageContainer = target.closest('.photo-collage-container');
+  if (collageContainer) {
+    const postId = collageContainer.dataset.postId || collageContainer.getAttribute('data-post-id');
+    let images = [];
+    if (postId && window._postImagesMap && window._postImagesMap[String(postId)] && window._postImagesMap[String(postId)].length > 0) {
+      images = window._postImagesMap[String(postId)];
+    }
+    if ((!images || images.length === 0) && typeof currentPostsData !== 'undefined' && Array.isArray(currentPostsData)) {
+      const p = currentPostsData.find(item => item && String(item.id) === String(postId));
+      if (p) {
+        images = (p.images && p.images.length > 0) ? p.images : (p.image ? [p.image] : []);
+      }
+    }
+    if ((!images || images.length === 0) && typeof StorageService !== 'undefined' && StorageService.getLocalPosts) {
+      try {
+        const localPosts = StorageService.getLocalPosts() || [];
+        const p = localPosts.find(item => item && String(item.id) === String(postId));
+        if (p) {
+          images = (p.images && p.images.length > 0) ? p.images : (p.image ? [p.image] : []);
+        }
+      } catch (e) {}
+    }
+    if (!images || images.length === 0) {
+      images = Array.from(collageContainer.querySelectorAll('img')).map(img => img.currentSrc || img.src).filter(Boolean);
+    }
+    if (!images || images.length === 0) {
+      const directImg = target.tagName === 'IMG' ? target : target.querySelector('img');
+      if (directImg && (directImg.currentSrc || directImg.src)) {
+        images = [directImg.currentSrc || directImg.src];
+      }
+    }
+
+    let startIndex = 0;
+    const collageItem = target.closest('.collage-item');
+    if (collageItem) {
+      const dataIdx = collageItem.dataset.index || collageItem.getAttribute('data-index');
+      if (dataIdx !== null && dataIdx !== undefined && !isNaN(parseInt(dataIdx, 10))) {
+        startIndex = parseInt(dataIdx, 10);
+      } else {
+        const allItems = Array.from(collageContainer.querySelectorAll('.collage-item'));
+        const idx = allItems.indexOf(collageItem);
+        if (idx >= 0) startIndex = idx;
+      }
+    }
+
+    if (images && images.length > 0) {
+      window.openLightbox(images, startIndex);
+      return true;
+    }
+    return false;
+  }
+
+  // 2. Quoted Merit Image
+  const quoted = target.closest('.quoted-merit-image');
+  if (quoted) {
+    const img = quoted.querySelector('img') || (target.tagName === 'IMG' ? target : null);
+    if (img && (img.currentSrc || img.src)) {
+      window.openLightbox([img.currentSrc || img.src], 0);
+      return true;
+    }
+  }
+
+  // 3. Profile Gallery Card
+  const gallery = target.closest('.gallery-card');
+  if (gallery) {
+    const img = gallery.querySelector('img') || (target.tagName === 'IMG' ? target : null);
+    if (img && (img.currentSrc || img.src)) {
+      window.openLightbox([img.currentSrc || img.src], 0);
+      return true;
+    }
+  }
+
+  // 4. Composer Upload Preview Thumbnails
+  const thumb = target.closest('.composer-thumb-item');
+  if (thumb) {
+    const allThumbs = Array.from(document.querySelectorAll('.composer-thumb-item'));
+    const idx = allThumbs.indexOf(thumb);
+    if (typeof selectedImagesList !== 'undefined' && selectedImagesList.length > 0) {
+      window.openLightbox(selectedImagesList, Math.max(0, idx));
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// =========================================================================
+// Facebook-style High-Precision Photo Tap & Click Handler (Mobile & Desktop)
+// =========================================================================
+let photoTouchStartX = 0;
+let photoTouchStartY = 0;
+let photoTouchStartTime = 0;
+let photoTouchTarget = null;
+let photoTouchMoved = false;
+
+// 26px threshold accommodates natural finger compression/roll on high-DPI screens without canceling taps
+const PHOTO_TAP_MAX_DISTANCE = 26;
+// Up to 650ms accommodates natural and deliberate mobile taps
+const PHOTO_TAP_MAX_DURATION = 650;
+
+document.addEventListener('touchstart', (e) => {
+  if (e.touches.length !== 1) {
+    photoTouchTarget = null;
+    return;
+  }
+  const touch = e.touches[0];
+  const target = touch.target;
+  const isPhotoTarget = target.closest('.photo-collage-container') ||
+                        target.closest('.quoted-merit-image') ||
+                        target.closest('.gallery-card') ||
+                        target.closest('.composer-thumb-item');
+  if (isPhotoTarget) {
+    photoTouchStartX = touch.clientX;
+    photoTouchStartY = touch.clientY;
+    photoTouchStartTime = Date.now();
+    photoTouchTarget = target;
+    photoTouchMoved = false;
+  } else {
+    photoTouchTarget = null;
+  }
+}, { passive: true });
+
+document.addEventListener('touchmove', (e) => {
+  if (!photoTouchTarget || e.touches.length !== 1) return;
+  const touch = e.touches[0];
+  const dx = touch.clientX - photoTouchStartX;
+  const dy = touch.clientY - photoTouchStartY;
+  // Only classify as a feed scroll if user drags beyond 26px
+  if (Math.hypot(dx, dy) > PHOTO_TAP_MAX_DISTANCE) {
+    photoTouchMoved = true;
+    photoTouchTarget = null;
+  }
+}, { passive: true });
+
+document.addEventListener('touchend', (e) => {
+  if (!photoTouchTarget || photoTouchMoved) {
+    photoTouchTarget = null;
+    return;
+  }
+  const duration = Date.now() - photoTouchStartTime;
+  const target = photoTouchTarget;
+  photoTouchTarget = null;
+
+  if (duration < PHOTO_TAP_MAX_DURATION && target) {
+    if (Date.now() - lastPhotoTriggerTime < 400) return;
+    lastPhotoTriggerTime = Date.now();
+    const handled = handlePhotoOpenTarget(target);
+    if (handled && e.cancelable) {
+      // Prevent browser's delayed synthetic click to avoid duplicate execution
+      e.preventDefault();
+    }
+  }
+}, { passive: false });
+
+document.addEventListener('touchcancel', () => {
+  photoTouchTarget = null;
+  photoTouchMoved = false;
+});
+
+// Desktop Mouse Click & Fallback Browser Click Interceptor (Event Delegation)
+document.addEventListener('click', (e) => {
+  if (e.target.closest('.lightbox-top-bar') || e.target.closest('.lightbox-nav-btn')) return;
+  if (e.target.closest('.composer-thumb-remove')) return;
+
+  const isPhotoTarget = e.target.closest('.photo-collage-container') ||
+                        e.target.closest('.quoted-merit-image') ||
+                        e.target.closest('.gallery-card') ||
+                        e.target.closest('.composer-thumb-item');
+  if (isPhotoTarget) {
+    if (Date.now() - lastPhotoTriggerTime < 450) {
+      return;
+    }
+    lastPhotoTriggerTime = Date.now();
+    handlePhotoOpenTarget(e.target);
+  }
+});
+
+// Fullscreen Photo Lightbox Gestures (Swipe Left/Right, Swipe Down to Dismiss, Pinch & Double-tap Zoom)
 function initLightboxTouchGestures() {
   const modal = document.getElementById('photoLightboxModal');
-  const contentBox = document.getElementById('lightboxContentBox') || modal;
   const imgEl = document.getElementById('lightboxActiveImage');
-  if (!modal || !contentBox || !imgEl) return;
+  if (!modal || !imgEl) return;
 
   let touchStartX = 0;
   let touchStartY = 0;
@@ -3726,7 +5328,7 @@ function initLightboxTouchGestures() {
   let pinchStartZoom = 1;
   let lastTapTime = 0;
 
-  contentBox.addEventListener('touchstart', (e) => {
+  modal.addEventListener('touchstart', (e) => {
     if (e.target.closest('.lightbox-top-bar') || e.target.closest('.lightbox-nav-btn')) return;
 
     if (e.touches.length === 1) {
@@ -3754,7 +5356,7 @@ function initLightboxTouchGestures() {
     }
   }, { passive: false });
 
-  contentBox.addEventListener('touchmove', (e) => {
+  modal.addEventListener('touchmove', (e) => {
     if (isPinching && e.touches.length === 2) {
       e.preventDefault();
       const t1 = e.touches[0];
@@ -3776,16 +5378,25 @@ function initLightboxTouchGestures() {
         currentLightboxPanY = t.clientY - panStartY;
         applyLightboxTransform(true);
       } else if (currentLightboxZoom === 1) {
-        if (Math.abs(touchDeltaX) > Math.abs(touchDeltaY) && currentLightboxImages.length > 1) {
+        // Vertical Swipe-Down/Up to Dismiss (Facebook style)
+        if (Math.abs(touchDeltaY) > Math.abs(touchDeltaX) * 1.1) {
           e.preventDefault();
-          imgEl.style.transform = `translate(${touchDeltaX * 0.35}px, 0px) scale(1)`;
+          const scale = Math.max(0.72, 1 - Math.abs(touchDeltaY) / 900);
           imgEl.style.transition = 'none';
+          imgEl.style.transform = `translate(0px, ${touchDeltaY}px) scale(${scale})`;
+          const bgOpacity = Math.max(0.25, 0.96 - Math.abs(touchDeltaY) / 500);
+          modal.style.background = `rgba(10, 10, 15, ${bgOpacity})`;
+        } else if (Math.abs(touchDeltaX) > Math.abs(touchDeltaY) && currentLightboxImages.length > 1) {
+          // Horizontal Swipe to view next/prev image
+          e.preventDefault();
+          imgEl.style.transition = 'none';
+          imgEl.style.transform = `translate(${touchDeltaX * 0.4}px, 0px) scale(1)`;
         }
       }
     }
   }, { passive: false });
 
-  contentBox.addEventListener('touchend', (e) => {
+  modal.addEventListener('touchend', (e) => {
     if (isPinching) {
       isPinching = false;
       if (currentLightboxZoom < 1.05) {
@@ -3801,7 +5412,7 @@ function initLightboxTouchGestures() {
       const now = Date.now();
       const tapDist = Math.hypot(touchDeltaX, touchDeltaY);
 
-      // Double-tap to zoom in / reset
+      // Double-tap to zoom in (2.2x) or reset (1x)
       if (tapDist < 12 && (now - lastTapTime) < 300) {
         lastTapTime = 0;
         if (currentLightboxZoom > 1) {
@@ -3819,16 +5430,26 @@ function initLightboxTouchGestures() {
         isDraggingPan = false;
         applyLightboxTransform(false);
       } else {
-        // Horizontal Swipe navigation
-        imgEl.style.transition = 'transform 0.22s cubic-bezier(0.2, 0, 0.2, 1)';
+        // Vertical swipe to dismiss threshold (Facebook style)
+        if (Math.abs(touchDeltaY) > 75 && Math.abs(touchDeltaY) > Math.abs(touchDeltaX) * 1.1) {
+          window.closeLightbox();
+          modal.style.background = '';
+          return;
+        }
+
+        // Horizontal swipe to next/prev image threshold
         if (Math.abs(touchDeltaX) > 45 && Math.abs(touchDeltaX) > Math.abs(touchDeltaY) * 1.2 && currentLightboxImages.length > 1) {
+          imgEl.style.transition = 'transform 0.22s cubic-bezier(0.2, 0, 0.2, 1)';
           if (touchDeltaX < 0) {
             window.nextLightboxImage();
           } else {
             window.prevLightboxImage();
           }
         } else {
+          // Snap back to center
+          imgEl.style.transition = 'transform 0.22s cubic-bezier(0.2, 0, 0.2, 1)';
           imgEl.style.transform = 'translate(0px, 0px) scale(1)';
+          modal.style.background = '';
         }
       }
     }
@@ -3891,10 +5512,10 @@ window.openReelsViewer = function(initialPostId = null) {
 
   // Filter all posts that have a valid videoId
   const posts = (Array.isArray(currentPostsData) && currentPostsData.length > 0) ? currentPostsData : StorageService.getLocalPosts();
-  const videoPosts = posts.filter(p => p.videoId && p.isDeleted !== true);
+  const videoPosts = posts.filter(p => p.videoId && p.isDeleted !== true && (!StorageService.isDummyTestPost || !StorageService.isDummyTestPost(p)));
 
   if (videoPosts.length === 0) {
-    alert("දැනට පුණ්‍ය දැක්මේ Shorts වීඩියෝ සටහන් නොමැත. ඔබේ ප්‍රථම ධර්ම Shorts සටහන දැන්ම එක් කරන්න!");
+    alert("දැනට Reels වීඩියෝ සටහන් නොමැත. ඔබේ ප්‍රථම ධර්ම Reels සටහන දැන්ම එක් කරන්න!");
     window.openShortsUploadModal();
     return;
   }
@@ -3915,8 +5536,18 @@ window.openReelsViewer = function(initialPostId = null) {
 
   // Render slides into reelsViewport
   viewport.innerHTML = videoPosts.map((reel, index) => {
-    const authorName = reel.author || 'කල්‍යාණ මිත්‍රයෙක්';
-    const authorPhoto = reel.authorPhoto || null;
+    const isReelAnon = Boolean(
+      reel.isAnonymous === true ||
+      reel.useAlias === true ||
+      reel.authorRole === 'anonymous' ||
+      reel.author === 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' ||
+      reel.author === 'කල්‍යාණ මිත්‍ර සාමාජික' ||
+      (reel.uid && StorageService.currentUser?.uid === reel.uid && (StorageService.currentUser?.useAlias || StorageService.currentUser?.isAnonymous)) ||
+      (reel.uid && (StorageService._cachedCommunityMembers || []).some(m => m.uid === reel.uid && (m.useAlias || m.isAnonymous)))
+    );
+
+    const authorName = isReelAnon ? 'කල්‍යාණ මිත්‍ර සාමාජික' : (StorageService.resolveAuthorName(reel) || reel.author || 'කල්‍යාණ මිත්‍රයෙක්');
+    const authorPhoto = isReelAnon ? BO_LEAF_AVATAR : (StorageService.resolveAuthorPhoto(reel) || reel.authorPhoto || null);
     const sadhuCount = Math.max(0, parseInt(reel.sadhuCount, 10) || (Array.isArray(reel.sadhuUsers) ? reel.sadhuUsers.length : 0));
     const commentsCount = Array.isArray(reel.comments) ? reel.comments.length : 0;
     const hasGivenSadhu = StorageService.hasUserGivenSadhu ? StorageService.hasUserGivenSadhu(reel) : false;
@@ -3958,11 +5589,11 @@ window.openReelsViewer = function(initialPostId = null) {
         <!-- Bottom Post Information Overlay -->
         <div class="reels-bottom-info">
           <div class="reels-author-row">
-            <div class="reels-author-avatar" onclick="closeReelsViewer(); viewUserProfile('${reel.uid}', '${Security.escapeHTML(authorName)}')" style="cursor: pointer;">
+            <div class="reels-author-avatar ${isReelAnon ? 'reels-anon-avatar' : ''}" ${isReelAnon ? 'style="cursor: default;" title="කල්‍යාණ මිත්‍ර සාමාජික"' : `onclick="closeReelsViewer(); viewUserProfile('${reel.uid || ''}', '${Security.escapeHTML(authorName)}', '${authorPhoto ? Security.sanitizeUrl(authorPhoto) : ''}')" style="cursor: pointer;"`}>
               ${authorPhoto ? `<img src="${Security.sanitizeUrl(authorPhoto)}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">` : Security.escapeHTML(authorName.charAt(0))}
             </div>
             <div>
-              <span class="reels-author-name" onclick="closeReelsViewer(); viewUserProfile('${reel.uid}', '${Security.escapeHTML(authorName)}')">${Security.escapeHTML(authorName)}</span>
+              <span class="reels-author-name" ${isReelAnon ? 'style="cursor: default;" title="කල්‍යාණ මිත්‍ර සාමාජික"' : `onclick="closeReelsViewer(); viewUserProfile('${reel.uid || ''}', '${Security.escapeHTML(authorName)}', '${authorPhoto ? Security.sanitizeUrl(authorPhoto) : ''}')"`}>${Security.escapeHTML(authorName)}</span>
             </div>
             <span class="reels-category-tag">${Security.escapeHTML(reel.category || 'ධර්ම දානමය')}</span>
           </div>
@@ -4286,8 +5917,8 @@ window.handleReelShare = async function(postId, btnEl) {
   const reel = (typeof currentPostsData !== 'undefined' && currentPostsData.find(p => p.id === postId)) ||
                (StorageService.getLocalPosts() || []).find(p => p.id === postId);
 
-  const shareTitle = reel?.title || 'අපේ පින් පොත - පුණ්‍ය දැක්ම';
-  const shareText = `ධර්ම කරුණක් / පින්කමක් නරඹන්න: ${reel?.title || 'පුණ්‍ය දැක්ම Shorts'}`;
+  const shareTitle = reel?.title || 'අපේ පින් පොත - Reels';
+  const shareText = `ධර්ම කරුණක් / පින්කමක් නරඹන්න: ${reel?.title || 'දහම් Reels'}`;
   const shareUrl = `${window.location.origin}${window.location.pathname}?post=${encodeURIComponent(postId)}`;
 
   // Increment share count atomically
@@ -4401,16 +6032,17 @@ window.renderReelCommentsList = function(post) {
   }
 
   body.innerHTML = comments.map(c => {
-    const cAuthorName = StorageService.resolveAuthorName(c);
-    const cAuthorPhoto = StorageService.resolveAuthorPhoto(c);
+    const isAnon = Boolean(c.isAnonymous === true || c.author === 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' || c.authorName === 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' || (c.author && c.author.startsWith('නිර්නාමික')));
+    const cAuthorName = isAnon ? 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' : StorageService.resolveAuthorName(c);
+    const cAuthorPhoto = isAnon ? null : StorageService.resolveAuthorPhoto(c);
     return `
-      <div class="reels-comment-item">
-        <div class="reels-comment-avatar" onclick="closeReelsViewer(); viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(cAuthorName)}')" style="cursor: pointer;" title="${Security.escapeHTML(cAuthorName)} ගේ Profile එක බලන්න">
-          ${cAuthorPhoto ? `<img src="${Security.sanitizeUrl(cAuthorPhoto)}" alt="${Security.escapeHTML(cAuthorName)}">` : Security.escapeHTML(cAuthorName.charAt(0) || '👤')}
+      <div class="reels-comment-item ${isAnon ? 'reels-comment-item-anon' : ''}">
+        <div class="reels-comment-avatar ${isAnon ? 'reels-comment-anon-avatar' : ''}" ${isAnon ? 'style="cursor: default; background: #334155;" title="නිර්නාමික කල්‍යාණ මිත්‍රයෙක්"' : `onclick="closeReelsViewer(); viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(cAuthorName)}', '${cAuthorPhoto ? Security.sanitizeUrl(cAuthorPhoto) : ''}')" style="cursor: pointer;" title="${Security.escapeHTML(cAuthorName)} ගේ Profile එක බලන්න"`}>
+          ${isAnon ? '<i class="fa-solid fa-user-secret" style="color: #94a3b8; font-size: 0.85rem;"></i>' : (cAuthorPhoto ? `<img src="${Security.sanitizeUrl(cAuthorPhoto)}" alt="${Security.escapeHTML(cAuthorName)}">` : Security.escapeHTML(cAuthorName.charAt(0) || '👤'))}
         </div>
         <div class="reels-comment-content">
           <div class="reels-comment-author-line">
-            <span class="reels-comment-author" onclick="closeReelsViewer(); viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(cAuthorName)}')">${Security.escapeHTML(cAuthorName)}</span>
+            <span class="reels-comment-author" ${isAnon ? 'style="cursor: default; color: #94a3b8;" title="නිර්නාමික කල්‍යාණ මිත්‍රයෙක්"' : `onclick="closeReelsViewer(); viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(cAuthorName)}', '${cAuthorPhoto ? Security.sanitizeUrl(cAuthorPhoto) : ''}')"`}>${Security.escapeHTML(cAuthorName)}</span>
             <span class="reels-comment-time">${Security.escapeHTML(formatRelativeTimeSinhala(c.timestamp, c.time || 'දැන්'))}</span>
           </div>
           <div class="reels-comment-text">${formatCommentTextWithMentions(c.text)}</div>
@@ -4439,12 +6071,20 @@ window.submitReelComment = async function(event) {
   const submitBtn = document.getElementById('reelsCommentSubmitBtn');
   if (submitBtn) submitBtn.disabled = true;
 
+  const anonCheckbox = document.getElementById('reelsCommentAnon');
+  const isAnonymous = Boolean(
+    (anonCheckbox && anonCheckbox.checked) ||
+    StorageService.currentUser?.useAlias ||
+    StorageService.currentUser?.isAnonymous
+  );
+
   try {
     const postId = activeReelsCommentPostId;
-    await StorageService.addComment(postId, commentText);
+    await StorageService.addComment(postId, commentText, { isAnonymous });
     SoundService.playSadhu();
     triggerHaptic(20);
     input.value = '';
+    if (anonCheckbox) anonCheckbox.checked = false;
 
     const allPosts = StorageService.getLocalPosts() || [];
     const updatedPost = allPosts.find(p => p.id === postId);
@@ -4477,9 +6117,16 @@ window.submitReelQuickBlessing = async function(text) {
     return;
   }
 
+  const anonCheckbox = document.getElementById('reelsCommentAnon');
+  const isAnonymous = Boolean(
+    (anonCheckbox && anonCheckbox.checked) ||
+    StorageService.currentUser?.useAlias ||
+    StorageService.currentUser?.isAnonymous
+  );
+
   try {
     const postId = activeReelsCommentPostId;
-    await StorageService.addComment(postId, text);
+    await StorageService.addComment(postId, text, { isAnonymous });
     SoundService.playSadhu();
     triggerHaptic(20);
 
@@ -4669,19 +6316,29 @@ function setupEventListeners() {
       location = city;
     }
 
-    await StorageService.updateProfile({ firstName, lastName, occupation, location, district, province, city, bio, photo });
+    const useAlias = Boolean(document.getElementById('editProfUseAliasToggle')?.checked);
+    await StorageService.updateProfile({ firstName, lastName, occupation, location, district, province, city, bio, photo, useAlias, isAnonymous: useAlias });
     closeEditProfileModal();
     updateUserInfoUI();
     renderProfileView();
     renderFeed();
   });
 
-  document.getElementById('profileForm')?.addEventListener('submit', (e) => {
+  document.getElementById('profileForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const input = document.getElementById('profileNameInput');
-    if (input && input.value.trim()) {
-      StorageService.setUserName(input.value.trim());
+    const newName = (input?.value || '').trim();
+    if (newName && newName.length >= 2) {
+      await StorageService.setUserName(newName);
       closeProfileModal();
+      updateUserInfoUI();
+      if (typeof activeTab !== 'undefined' && activeTab === 'profile') renderProfileView();
+      renderFeed();
+      triggerHaptic([25, 50, 25]);
+      SoundService.playSadhu();
+      alert("ඔබගේ නම සාර්ථකව වෙනස් විය! සියලුම සටහන් යාවත්කාලීන විය. 🙏");
+    } else {
+      alert("කරුණාකර වලංගු නමක් ඇතුළත් කරන්න (අවම වශයෙන් අකුරු 2ක්).");
     }
   });
 
@@ -4792,11 +6449,142 @@ function setupEventListeners() {
 // Facebook-Style Premium Profile Controllers
 // ============================================================================
 
+// ============================================================================
+// Profile Completeness Calculator & Quick Quote Preset Handlers
+// ============================================================================
+export function calculateProfileCompleteness(user) {
+  if (!user) return { percent: 0, hasAvatar: false, hasBio: false, hasLocation: false, hasSpiritual: false, isComplete: false };
+  const hasAvatar = Boolean(user.photo && typeof user.photo === 'string' && user.photo.trim().length > 0);
+  const hasBio = Boolean(user.bio && typeof user.bio === 'string' && user.bio.trim().length > 0);
+  const hasLocation = Boolean(
+    (typeof user.district === 'string' && user.district.trim().length > 0) ||
+    (typeof user.location === 'string' && user.location.trim().length > 0) ||
+    (typeof user.province === 'string' && user.province.trim().length > 0)
+  );
+  const hasSpiritual = Boolean(
+    (typeof user.spiritualInterest === 'string' && user.spiritualInterest.trim().length > 0) ||
+    (typeof user.occupation === 'string' && user.occupation.trim().length > 0) ||
+    (typeof user.temple === 'string' && user.temple.trim().length > 0)
+  );
+
+  let percent = 0;
+  if (hasAvatar) percent += 25;
+  if (hasBio) percent += 25;
+  if (hasLocation) percent += 25;
+  if (hasSpiritual) percent += 25;
+
+  return {
+    percent,
+    hasAvatar,
+    hasBio,
+    hasLocation,
+    hasSpiritual,
+    isComplete: percent === 100
+  };
+}
+window.calculateProfileCompleteness = calculateProfileCompleteness;
+
+export function renderProfileCompletenessUI(user) {
+  try {
+    if (!user) {
+      user = StorageService.currentUser || {};
+    }
+    const completeness = calculateProfileCompleteness(user);
+    const percentEl = document.getElementById('profCompletenessPercent');
+    const barEl = document.getElementById('profCompletenessBar');
+    const checklistEl = document.getElementById('profCompletenessChecklist');
+    const bannerEl = document.getElementById('profCompletenessUnlockedBanner');
+    const badgeEl = document.getElementById('profCompletenessBadge');
+
+    if (percentEl) percentEl.innerText = `${completeness.percent}%`;
+    if (barEl) barEl.style.width = `${completeness.percent}%`;
+
+    if (badgeEl) {
+      if (completeness.isComplete) {
+        badgeEl.classList.remove('hidden');
+        badgeEl.style.display = 'inline-flex';
+      } else {
+        badgeEl.classList.add('hidden');
+        badgeEl.style.display = 'none';
+      }
+    }
+
+    if (bannerEl) {
+      if (completeness.isComplete) {
+        bannerEl.classList.remove('hidden');
+      } else {
+        bannerEl.classList.add('hidden');
+      }
+    }
+
+    if (checklistEl) {
+      checklistEl.innerHTML = `
+        <div class="completeness-item ${completeness.hasAvatar ? 'done' : ''}">
+          <span class="completeness-item-label">
+            <span class="completeness-item-icon">${completeness.hasAvatar ? '✅' : '⚪'}</span>
+            <span>පැතිකඩ ඡායාරූපය / ධාර්මික සංකේතය</span>
+          </span>
+          <span class="completeness-item-status">${completeness.hasAvatar ? '+25%' : 'අවශ්‍යයි'}</span>
+        </div>
+        <div class="completeness-item ${completeness.hasBio ? 'done' : ''}">
+          <span class="completeness-item-label">
+            <span class="completeness-item-icon">${completeness.hasBio ? '✅' : '⚪'}</span>
+            <span>ධර්ම පාඨය / Bio හැඳින්වීම</span>
+          </span>
+          <span class="completeness-item-status">${completeness.hasBio ? '+25%' : 'අවශ්‍යයි'}</span>
+        </div>
+        <div class="completeness-item ${completeness.hasLocation ? 'done' : ''}">
+          <span class="completeness-item-label">
+            <span class="completeness-item-icon">${completeness.hasLocation ? '✅' : '⚪'}</span>
+            <span>පළාත සහ දිස්ත්‍රික්කය</span>
+          </span>
+          <span class="completeness-item-status">${completeness.hasLocation ? '+25%' : 'අවශ්‍යයි'}</span>
+        </div>
+        <div class="completeness-item ${completeness.hasSpiritual ? 'done' : ''}">
+          <span class="completeness-item-label">
+            <span class="completeness-item-icon">${completeness.hasSpiritual ? '✅' : '⚪'}</span>
+            <span>දායක විහාරය / ප්‍රියතම පුණ්‍ය ක්ෂේත්‍රය</span>
+          </span>
+          <span class="completeness-item-status">${completeness.hasSpiritual ? '+25%' : 'අවශ්‍යයි'}</span>
+        </div>
+      `;
+    }
+  } catch (err) {
+    console.warn('[renderProfileCompletenessUI] caught safely:', err);
+  }
+}
+window.renderProfileCompletenessUI = renderProfileCompletenessUI;
+
+window.handleQuickQuoteSelect = function(quoteText, targetTextareaId) {
+  if (!quoteText) return;
+  const textarea = document.getElementById(targetTextareaId);
+  if (textarea) {
+    textarea.value = quoteText;
+    if (typeof triggerHaptic === 'function') triggerHaptic(15);
+    if (typeof SoundService !== 'undefined' && SoundService.playClick) SoundService.playClick();
+  }
+};
+
 function renderProfileView() {
-  const user = StorageService.currentUser || {};
-  const myPosts = currentPostsData.filter(p => p.uid && user.uid && p.uid === user.uid);
-  const myPrivatePosts = currentPostsData.filter(p => p.uid && user.uid && p.uid === user.uid && p.visibility === 'private');
-  const myPhotosPosts = currentPostsData.filter(p => p.uid && user.uid && p.uid === user.uid && p.image);
+  const user = StorageService.currentUser;
+  const isGuest = !user || !user.email;
+  const isMasterUser = Boolean(!isGuest && user && user.email && user.email.trim().toLowerCase() === 'silvadilan9@gmail.com');
+  const isMyPost = (p) => {
+    if (!p) return false;
+    if (isGuest) return false;
+    if (user && user.uid && p.uid === user.uid) return true;
+    if (user && user.email && p.authorEmail && p.authorEmail.toLowerCase() === user.email.toLowerCase()) return true;
+    if (user && user.name && p.author && p.author.trim().toLowerCase() === user.name.trim().toLowerCase()) return true;
+    if (isMasterUser && (
+      p.uid === 'user_malith' ||
+      p.uid === 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2' ||
+      (p.author && (p.author.includes('මලිත්') || p.author === 'අපේ පිං පොත' || p.author === 'පිං පොත පරිපාලනය'))
+    )) return true;
+    return false;
+  };
+  const myPosts = currentPostsData.filter(isMyPost);
+  const myPrivatePosts = myPosts.filter(p => p.visibility === 'private');
+  const myPhotosPosts = myPosts.filter(p => p.image || (Array.isArray(p.images) && p.images.length > 0));
   const totalSadhu = myPosts.reduce((acc, p) => acc + (p.sadhuCount || 0), 0);
 
   // Update community member counter badge
@@ -4833,14 +6621,15 @@ function renderProfileView() {
   // 3. Name & Verified Badge & Admin Dash Button
   const isMaster = StorageService.isMasterAdmin();
   const isSub = StorageService.isSubAdmin(user);
-  const isAdminUser = isMaster || isSub || user.isAdmin || user.role === 'admin';
+  const isAdminUser = isMaster || isSub;
   const isSangha = StorageService.isSangha(user);
 
   const nameEl = document.getElementById('profFullName');
   if (nameEl) {
     nameEl.innerHTML = `
       ${Security.escapeHTML(user.name || 'කල්‍යාණ මිත්‍ර')}
-      ${isMaster ? `<span class="badge-crown" style="font-size: 1.15rem;" title="Master Admin">👑</span>` : (isSub ? `<span class="badge-shield" style="font-size: 1.05rem;" title="පරිපාලක (Admin)">🛡️</span>` : '')}
+      ${user.useAlias ? `<span class="alias-active-badge" style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.72rem; color: #047857; background: #ecfdf5; border: 1.5px solid #a7f3d0; padding: 3px 10px; border-radius: 9999px; margin-left: 8px; font-weight: 700; vertical-align: middle;"><i class="fa-solid fa-user-shield"></i> ප්‍රසිද්ධියේ: කල්‍යාණ මිත්‍ර සාමාජික</span>` : ''}
+      ${isMaster ? `<span class="badge-crown" style="font-size: 1.15rem;" title="කල්‍යාණ මිත්‍ර">👑</span>` : (isSub ? `<span class="badge-shield" style="font-size: 1.05rem;" title="කල්‍යාණ මිත්‍ර">🛡️</span>` : '')}
     `;
   }
 
@@ -4850,13 +6639,7 @@ function renderProfileView() {
     if (isSangha) {
       badgeEl.className = 'sangha-verified-badge';
       badgeEl.innerHTML = `<i class="fa-solid fa-dharmachakra"></i> <span>පූජනීය මහා සංඝරත්නය</span>`;
-    } else if (isMaster) {
-      badgeEl.className = 'official-author-badge';
-      badgeEl.innerHTML = `<span class="badge-crown">👑</span> <span>Master Admin</span>`;
-    } else if (isSub) {
-      badgeEl.className = 'admin-shield-badge';
-      badgeEl.innerHTML = `<span class="badge-shield">🛡️</span> <span>පිං පොත පරිපාලක</span>`;
-    } else if (user.email && !user.isAnonymous) {
+    } else if (user.email) {
       badgeEl.className = 'verified-pill';
       badgeEl.innerHTML = `<i class="fa-solid fa-circle-check"></i> <span>Google සත්‍යාපිත කල්‍යාණ මිත්‍ර</span>`;
     } else {
@@ -4872,19 +6655,16 @@ function renderProfileView() {
   const profAdminBtn = document.getElementById('profAdminDashboardBtn');
   const profAdminIcon = document.getElementById('profAdminDashboardIcon');
   const profAdminText = document.getElementById('profAdminDashboardText');
+  const isStrictMasterAdmin = Boolean(
+    (user && user.email && user.email.trim().toLowerCase() === 'silvadilan9@gmail.com') ||
+    (typeof window !== 'undefined' && window.isStrictMasterAdmin === true)
+  );
   if (profAdminBtn) {
-    if (isAdminUser) {
+    if (isStrictMasterAdmin) {
+      profAdminBtn.classList.remove('hidden');
       profAdminBtn.style.display = 'inline-flex';
-      if (isMaster) {
-        if (profAdminIcon) profAdminIcon.className = 'fa-solid fa-crown';
-        if (profAdminText) profAdminText.innerText = 'Master Admin Dashboard';
-        profAdminBtn.style.background = 'linear-gradient(135deg, #d97706, #b45309)';
-      } else {
-        if (profAdminIcon) profAdminIcon.className = 'fa-solid fa-shield-halved';
-        if (profAdminText) profAdminText.innerText = 'පරිපාලක Dashboard';
-        profAdminBtn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
-      }
     } else {
+      profAdminBtn.classList.add('hidden');
       profAdminBtn.style.display = 'none';
     }
   }
@@ -4892,7 +6672,7 @@ function renderProfileView() {
   // 4. Header Auth action button
   const authBtn = document.getElementById('profAuthActionBtn');
   if (authBtn) {
-    if (user.email && !user.isAnonymous) {
+    if (user.email) {
       authBtn.className = 'btn-profile-danger';
       authBtn.innerHTML = `<i class="fa-solid fa-right-from-bracket"></i> <span>Sign Out</span>`;
       authBtn.title = 'ගිණුමෙන් ඉවත් වන්න';
@@ -4918,6 +6698,8 @@ function renderProfileView() {
   const widgetOccRow = document.getElementById('profWidgetOccRow');
   if (occEl) occEl.innerText = occText;
   if (widgetOccEl) widgetOccEl.innerText = occText;
+  // Render Profile Completeness Progress Bar & Badges
+  renderProfileCompletenessUI(user);
   if (metaOccWrap) metaOccWrap.style.display = occText ? 'inline-flex' : 'none';
   if (widgetOccRow) widgetOccRow.style.display = occText ? 'flex' : 'none';
 
@@ -4946,7 +6728,7 @@ function renderProfileView() {
   if (joinedEl) joinedEl.innerText = `${user.joinedDate || '2026 ඔක්තෝබර්'} සිට සාමාජික`;
 
   const widgetAccount = document.getElementById('profWidgetAccount');
-  if (widgetAccount) widgetAccount.innerText = (user.email && !user.isAnonymous) ? 'Google සත්‍යාපිත' : 'සාමාන්‍ය සාමාජික';
+  if (widgetAccount) widgetAccount.innerText = user.email ? 'Google සත්‍යාපිත' : 'සාමාන්‍ය සාමාජික';
 
   // 7. Counters
   const countTimeline = document.getElementById('profCountTimeline');
@@ -5162,13 +6944,20 @@ function renderProfileSubTabContent(user, myPosts, myPhotosPosts, myPrivatePosts
       if (pendingIncoming.length > 0) {
         pendingSection.style.display = 'block';
         if (pendingCountText) pendingCountText.innerText = `(${pendingIncoming.length})`;
-        pendingList.innerHTML = pendingIncoming.map(req => `
+        pendingList.innerHTML = pendingIncoming.map(req => {
+          const isReqSangha = StorageService.isSangha(req) || StorageService.isSangha({ uid: req.senderUid, name: req.senderName });
+          const initial = (req.senderName || 'ක').charAt(0);
+          return `
           <div class="mithra-card" style="border-color: #fde68a; background: #fffdf8;">
-            <div class="mithra-card-avatar" onclick="openMemberProfileModal('${req.senderUid}', '${Security.escapeHTML(req.senderName)}')" style="cursor: pointer;">
-              ${req.senderPhoto ? `<img src="${Security.sanitizeUrl(req.senderPhoto)}" alt="${Security.escapeHTML(req.senderName)}" onerror="this.parentElement.innerText = '${(req.senderName || 'ක').charAt(0)}';">` : (req.senderName || 'ක').charAt(0)}
+            <div class="mithra-card-avatar ${isReqSangha ? 'sangha-framed-avatar' : ''}" onclick="openMemberProfileModal('${req.senderUid}', '${Security.escapeHTML(req.senderName)}', '${req.senderPhoto ? Security.sanitizeUrl(req.senderPhoto) : ''}')" style="cursor: pointer;">
+              ${req.senderPhoto ? `<img src="${Security.sanitizeUrl(req.senderPhoto)}" alt="${Security.escapeHTML(req.senderName)}" onerror="this.parentElement.innerText = '${initial}';">` : initial}
+              ${isReqSangha ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
             </div>
-            <div class="mithra-card-details" onclick="openMemberProfileModal('${req.senderUid}', '${Security.escapeHTML(req.senderName)}')" style="cursor: pointer;">
-              <div class="mithra-card-name">${Security.escapeHTML(req.senderName || 'කල්‍යාණ මිත්‍ර')}</div>
+            <div class="mithra-card-details" onclick="openMemberProfileModal('${req.senderUid}', '${Security.escapeHTML(req.senderName)}', '${req.senderPhoto ? Security.sanitizeUrl(req.senderPhoto) : ''}')" style="cursor: pointer;">
+              <div class="mithra-card-name">
+                <span>${Security.escapeHTML(req.senderName || 'කල්‍යාණ මිත්‍ර')}</span>
+                ${isReqSangha ? `<span class="sangha-author-badge" style="margin-left: 4px; padding: 1px 7px; font-size: 0.62rem;"><i class="fa-solid fa-dharmachakra"></i> පූජනීය සංඝරත්නය</span>` : ''}
+              </div>
               <div class="mithra-card-loc">
                 <i class="fa-solid fa-clock"></i> <span>ඇරයුමක් එවා ඇත</span>
               </div>
@@ -5182,7 +6971,8 @@ function renderProfileSubTabContent(user, myPosts, myPhotosPosts, myPrivatePosts
               </button>
             </div>
           </div>
-        `).join('');
+        `;
+        }).join('');
       } else {
         pendingSection.style.display = 'none';
       }
@@ -5211,20 +7001,30 @@ function renderProfileSubTabContent(user, myPosts, myPhotosPosts, myPrivatePosts
           `;
           return;
         }
-        friendsContainer.innerHTML = profiles.map(m => `
+        friendsContainer.innerHTML = profiles.map(m => {
+          const isMemberSangha = StorageService.isSangha(m);
+          const isMemberMaster = StorageService.isMasterAdmin(m);
+          const isMemberSubAdmin = !isMemberMaster && StorageService.isSubAdmin(m);
+          const initial = (m.name || 'ක').charAt(0);
+          return `
           <div class="mithra-card">
-            <div class="mithra-card-avatar" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}')" style="cursor: pointer;">
-              ${m.photo ? `<img src="${Security.sanitizeUrl(m.photo)}" alt="${Security.escapeHTML(m.name)}" onerror="this.parentElement.innerText = '${(m.name || 'ක').charAt(0)}';">` : (m.name || 'ක').charAt(0)}
+            <div class="mithra-card-avatar ${isMemberSangha ? 'sangha-framed-avatar' : ''}" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}', '${m.photo ? Security.sanitizeUrl(m.photo) : ''}', '${m.coverImage ? Security.sanitizeUrl(m.coverImage) : ''}')" style="cursor: pointer;">
+              ${m.photo ? `<img src="${Security.sanitizeUrl(m.photo)}" alt="${Security.escapeHTML(m.name)}" onerror="this.parentElement.innerText = '${initial}';">` : `<span>${initial}</span>`}
+              ${isMemberSangha ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
             </div>
-            <div class="mithra-card-details" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}')" style="cursor: pointer;">
-              <div class="mithra-card-name">${Security.escapeHTML(m.name || 'කල්‍යාණ මිත්‍ර')}</div>
+            <div class="mithra-card-details" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}', '${m.photo ? Security.sanitizeUrl(m.photo) : ''}', '${m.coverImage ? Security.sanitizeUrl(m.coverImage) : ''}')" style="cursor: pointer;">
+              <div class="mithra-card-name">
+                <span>${Security.escapeHTML(m.name || 'කල්‍යාණ මිත්‍ර')}</span>
+                ${isMemberMaster ? `<span class="badge-crown" title="කල්‍යාණ මිත්‍ර">👑</span>` : (isMemberSubAdmin ? `<span class="badge-shield" title="කල්‍යාණ මිත්‍ර">🛡️</span>` : '')}
+                ${isMemberSangha ? `<span class="sangha-author-badge" style="margin-left: 4px; padding: 1px 7px; font-size: 0.62rem;"><i class="fa-solid fa-dharmachakra"></i> පූජනීය සංඝරත්නය</span>` : ''}
+              </div>
               <div class="mithra-card-loc">
                 <i class="fa-solid fa-location-dot" style="color: #ea580c;"></i>
                 <span>${Security.escapeHTML(m.district || m.location || 'ශ්‍රී ලංකා')}</span>
               </div>
             </div>
             <div class="mithra-card-actions">
-              <button type="button" class="btn-mithra-view" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}')">
+              <button type="button" class="btn-mithra-view" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}', '${m.photo ? Security.sanitizeUrl(m.photo) : ''}', '${m.coverImage ? Security.sanitizeUrl(m.coverImage) : ''}')">
                 <i class="fa-solid fa-eye"></i> පැතිකඩ
               </button>
               <button type="button" class="btn-mithra-view" style="color: #ef4444; border-color: #fecaca; background: #fff1f2;" onclick="handleRemoveMithra('${m.uid}')" title="මිතුරු සබඳතාව ඉවත් කරන්න">
@@ -5232,7 +7032,8 @@ function renderProfileSubTabContent(user, myPosts, myPhotosPosts, myPrivatePosts
               </button>
             </div>
           </div>
-        `).join('');
+        `;
+        }).join('');
         applyFriendsViewModeUI();
       });
     }
@@ -5250,9 +7051,19 @@ function renderProfileSubTabContent(user, myPosts, myPhotosPosts, myPrivatePosts
         </div>
       `;
     } else {
+      // Cache photos in _postImagesMap so openPostLightbox opens them in high-def Lightbox
+      myPhotosPosts.forEach(p => {
+        const pImages = (p.images && p.images.length > 0) ? p.images : (p.image ? [p.image] : []);
+        const cleanPImages = pImages.map(img => Security.sanitizeUrl(img)).filter(Boolean);
+        if (cleanPImages.length > 0) {
+          window._postImagesMap = window._postImagesMap || {};
+          window._postImagesMap[p.id] = cleanPImages;
+        }
+      });
+
       photosContainer.innerHTML = myPhotosPosts.map(p => `
-        <div class="gallery-card" onclick="window.open('${Security.sanitizeUrl(p.image)}', '_blank')" title="${Security.escapeHTML(p.title)}">
-          <img src="${Security.sanitizeUrl(p.image)}" alt="${Security.escapeHTML(p.title)}" loading="lazy">
+        <div class="gallery-card" onclick="openPostLightbox('${p.id}', 0, this)" title="${Security.escapeHTML(p.title)}" style="cursor: pointer;" role="button" tabindex="0">
+          <img src="${Security.sanitizeUrl(p.image || (p.images && p.images[0]))}" alt="${Security.escapeHTML(p.title)}" onclick="event.stopPropagation(); openPostLightbox('${p.id}', 0, this)" loading="lazy" role="button" style="cursor: pointer;">
           <div class="gallery-overlay">
             <h4 style="font-size: 0.82rem; font-weight: 700; line-height: 1.3;">${Security.escapeHTML(p.title)}</h4>
             <p style="font-size: 0.68rem; opacity: 0.85; margin-top: 2px;">
@@ -5409,8 +7220,17 @@ window.openEditProfileModal = function() {
 
   const uploadStatus = document.getElementById('profPhotoUploadStatus');
   if (uploadStatus) {
-    uploadStatus.innerText = "පැහැදිලි ඡායාරූපයක් තෝරාගන්න.";
+    uploadStatus.innerText = "පැහැදිලි ඡායාරූපයක් හෝ පහත ධාර්මික සංකේතයක් තෝරාගන්න.";
     uploadStatus.style.color = "#78350f";
+  }
+
+  // Initialize Privacy Alias Toggle & Spiritual Avatar Picker
+  const aliasToggle = document.getElementById('editProfUseAliasToggle');
+  if (aliasToggle) {
+    aliasToggle.checked = Boolean(user && (user.isAnonymous || user.useAlias));
+  }
+  if (typeof renderSpiritualAvatarPicker === 'function') {
+    renderSpiritualAvatarPicker('editProfSpiritualAvatarsGrid', 'editProf', user.photo || '');
   }
 
   document.getElementById('editProfileModal')?.classList.remove('hidden');
@@ -5774,7 +7594,7 @@ window.logoutFromApp = async function() {
 
 window.handleProfileAuthAction = function() {
   const user = StorageService.currentUser;
-  if (user.email && !user.isAnonymous) {
+  if (user && user.email) {
     logoutFromApp();
   } else {
     openProfileModal();
@@ -5787,7 +7607,7 @@ window.handleProfileAuthAction = function() {
 
 window.openProfileModal = function() {
   const modal = document.getElementById('profileModal');
-  const user = StorageService.currentUser;
+  const user = StorageService.currentUser || {};
   if (modal) modal.classList.remove('hidden');
 
   const nameInput = document.getElementById('profileNameInput');
@@ -5815,7 +7635,7 @@ window.openProfileModal = function() {
   }
 
   if (status) {
-    if (user.email && !user.isAnonymous) {
+    if (user.email) {
       status.innerHTML = `<span style="color: #059669; font-weight: 600;"><i class="fa-solid fa-circle-check"></i> Google සත්‍යාපිතයි (${user.email})</span>`;
     } else {
       status.innerText = 'කල්‍යාණ මිත්‍ර පුණ්‍ය සාමාජික (නොමිලේ)';
@@ -5823,12 +7643,15 @@ window.openProfileModal = function() {
   }
 
   // Toggle login vs logout buttons
-  if (user.email && !user.isAnonymous) {
+  const profileTrustBox = document.getElementById('profileTrustBox');
+  if (user.email) {
     if (googleLoginBtn) googleLoginBtn.classList.add('hidden');
     if (googleLogoutBtn) googleLogoutBtn.classList.remove('hidden');
+    if (profileTrustBox) profileTrustBox.classList.add('hidden');
   } else {
     if (googleLoginBtn) googleLoginBtn.classList.remove('hidden');
     if (googleLogoutBtn) googleLogoutBtn.classList.add('hidden');
+    if (profileTrustBox) profileTrustBox.classList.remove('hidden');
   }
 };
 
@@ -5907,7 +7730,7 @@ window.filterNotifications = function(filterType, e) {
   renderNotificationsList();
 };
 
-window.renderNotificationsList = function() {
+export function renderNotificationsList() {
   const listEl = document.getElementById('notifList');
   const badgeEl = document.getElementById('notificationBadge');
   const pillEl = document.getElementById('notifUnreadPill');
@@ -5966,9 +7789,29 @@ window.renderNotificationsList = function() {
 
   listEl.innerHTML = filtered.map(n => {
     const isUnread = !n.read;
-    const initial = (n.senderName || 'ක').trim().charAt(0);
-    const photo = n.senderPhoto;
     const timeAgo = formatTimeAgo(n.timestamp);
+
+    // Identify if sender is anonymous (from payload, name string, or community member cache)
+    const cachedMember = (n.senderUid && (
+      (typeof kmpMembersCache !== 'undefined' && Array.isArray(kmpMembersCache) && kmpMembersCache.find(m => String(m.uid) === String(n.senderUid))) ||
+      (typeof StorageService !== 'undefined' && Array.isArray(StorageService._cachedCommunityMembers) && StorageService._cachedCommunityMembers.find(m => String(m.uid) === String(n.senderUid)))
+    )) || null;
+
+    const isCachedMemberAnon = Boolean(
+      cachedMember && (cachedMember.isAnonymous === true || cachedMember.useAlias === true || cachedMember.name === 'කල්‍යාණ මිත්‍ර සාමාජික')
+    );
+
+    const isNotifAnon = Boolean(
+      n.isAnonymous === true ||
+      isCachedMemberAnon ||
+      n.senderName === 'කල්‍යාණ මිත්‍ර සාමාජික' ||
+      n.senderName === 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' ||
+      (typeof n.senderName === 'string' && n.senderName.startsWith('නිර්නාමික'))
+    );
+
+    const senderDisplayName = isNotifAnon ? 'කල්‍යාණ මිත්‍ර සාමාජික' : (n.senderName || 'කල්‍යාණ මිත්‍ර');
+    const photo = isNotifAnon ? BO_LEAF_AVATAR : (n.senderPhoto || '');
+    const initial = isNotifAnon ? '🌿' : (senderDisplayName || 'ක').trim().charAt(0);
 
     let typeIconHtml = '';
     let mithraActionHtml = '';
@@ -5991,10 +7834,10 @@ window.renderNotificationsList = function() {
       if (!isAccepted && !isDeclined && (!n.status || n.status === 'pending')) {
         mithraActionHtml = `
           <div class="notif-mithra-actions" onclick="event.stopPropagation()">
-            <button type="button" class="btn-notif-accept" onclick="handleAcceptMithra('${n.id}', '${n.senderUid}', '${Security.escapeHTML(n.senderName)}')">
+            <button type="button" class="btn-notif-accept" onclick="handleAcceptMithra('${n.id}', '${n.senderUid}', '${Security.escapeHTML(senderDisplayName)}')">
               <i class="fa-solid fa-circle-check"></i> පිළිගන්න (සාදු!)
             </button>
-            <button type="button" class="btn-notif-reject" onclick="handleRejectMithra('${n.id}', '${n.senderUid}', '${Security.escapeHTML(n.senderName)}')">
+            <button type="button" class="btn-notif-reject" onclick="handleRejectMithra('${n.id}', '${n.senderUid}', '${Security.escapeHTML(senderDisplayName)}')">
               <i class="fa-solid fa-xmark"></i> ඉවත් කරන්න
             </button>
           </div>
@@ -6022,28 +7865,38 @@ window.renderNotificationsList = function() {
 
     let notifBodyText = '';
     if (n.type === 'sangha_reverence') {
-      notifBodyText = `<strong>${Security.escapeHTML(n.senderName || 'පින්වත් සැදැහැවතෙක්')}</strong> ඔබ වහන්සේට නමස්කාර පූර්වකව ගෞරව දක්වමින් අනුගමනය කළාය. 🙏`;
+      notifBodyText = `<strong>${Security.escapeHTML(senderDisplayName || 'පින්වත් සැදැහැවතෙක්')}</strong> ඔබ වහන්සේට නමස්කාර පූර්වකව ගෞරව දක්වමින් අනුගමනය කළාය. 🙏`;
     } else if (n.type === 'mithra_accepted') {
-      notifBodyText = `ඔබගේ කල්‍යාණ මිත්‍ර ඇරයුම <strong>${Security.escapeHTML(n.senderName || 'කල්‍යාණ මිත්‍රයා')}</strong> විසින් පිළිගන්නා ලදී. 🙏`;
+      notifBodyText = `ඔබගේ කල්‍යාණ මිත්‍ර ඇරයුම <strong>${Security.escapeHTML(senderDisplayName || 'කල්‍යාණ මිත්‍රයා')}</strong> විසින් පිළිගන්නා ලදී. 🙏`;
     } else if (n.type === 'mithra_rejected') {
-      notifBodyText = `ඔබගේ කල්‍යාණ මිත්‍ර ඇරයුම <strong>${Security.escapeHTML(n.senderName || 'කල්‍යාණ මිත්‍රයා')}</strong> විසින් පිළි නොගන්නා ලදී.`;
+      notifBodyText = `ඔබගේ කල්‍යාණ මිත්‍ර ඇරයුම <strong>${Security.escapeHTML(senderDisplayName || 'කල්‍යාණ මිත්‍රයා')}</strong> විසින් පිළි නොගන්නා ලදී.`;
     } else if (n.type === 'mithra_request') {
-      notifBodyText = `<strong>${Security.escapeHTML(n.senderName || 'කල්‍යාණ මිත්‍ර')}</strong> ඔබව කල්‍යාණ මිත්‍රයෙකු ලෙස සම්බන්ධ කරගැනීමට ඇරයුම් කළාය. 🙏`;
+      notifBodyText = `<strong>${Security.escapeHTML(senderDisplayName || 'කල්‍යාණ මිත්‍ර')}</strong> ඔබව කල්‍යාණ මිත්‍රයෙකු ලෙස සම්බන්ධ කරගැනීමට ඇරයුම් කළාය. 🙏`;
     } else {
-      notifBodyText = `<strong>${Security.escapeHTML(n.senderName || 'කල්‍යාණ මිත්‍ර')}</strong> ${Security.escapeHTML(n.message || '')}`;
+      let rawMsg = n.message || '';
+      if (isNotifAnon && n.senderName && n.senderName !== senderDisplayName) {
+        rawMsg = rawMsg.split(n.senderName).join(senderDisplayName);
+      }
+      notifBodyText = `<strong>${Security.escapeHTML(senderDisplayName || 'කල්‍යාණ මිත්‍ර')}</strong> ${Security.escapeHTML(rawMsg)}`;
     }
 
     return `
-      <div class="notif-item ${isUnread ? 'unread' : ''}" onclick="handleNotificationClick('${n.id}', '${n.senderUid || n.postId || ''}', '${n.type || ''}')">
-        <div class="notif-avatar-wrap">
+      <div class="notif-item ${isUnread ? 'unread' : ''}" onclick="handleNotificationClick('${n.id}', '${n.postId || ''}', '${n.type || ''}', '${n.senderUid || ''}', ${isNotifAnon})">
+        <div class="notif-avatar-wrap" ${n.senderUid ? `onclick="event.stopPropagation(); handleNotifSenderClick('${n.senderUid}', ${isNotifAnon})"` : ''} style="${n.senderUid ? 'cursor: pointer;' : ''}">
           <div class="notif-avatar">
-            ${photo ? `<img src="${Security.sanitizeUrl(photo)}" alt="${Security.escapeHTML(n.senderName)}" onerror="this.parentElement.innerText = '${initial}';">` : initial}
+            ${photo ? `<img src="${Security.sanitizeUrl(photo)}" alt="${Security.escapeHTML(senderDisplayName)}" onerror="this.parentElement.innerText = '${initial}';">` : initial}
           </div>
           ${typeIconHtml}
         </div>
         <div class="notif-body">
           <div class="notif-body-text">
             ${notifBodyText}
+            ${n.postTitle ? `
+              <div class="notif-post-title-preview" title="${Security.escapeHTML(n.postTitle)}">
+                <i class="fa-solid fa-file-pen" style="color: #d97706; font-size: 0.72rem;"></i>
+                <span>"${Security.escapeHTML(n.postTitle)}"</span>
+              </div>
+            ` : ''}
           </div>
           ${mithraActionHtml}
           <div class="notif-time">
@@ -6056,7 +7909,24 @@ window.renderNotificationsList = function() {
   }).join('');
 };
 
-window.handleNotificationClick = async function(notifId, postId, postType) {
+window.renderNotificationsList = renderNotificationsList;
+
+window.handleNotifSenderClick = function(senderUid, isAnon = false) {
+  if (!senderUid) return;
+  if (isAnon) {
+    if (typeof showCustomToast === 'function') {
+      showCustomToast("මෙම සාමාජිකයා නිර්නාමිකව සිටින බැවින් පැතිකඩ විවෘත කළ නොහැක.", "info");
+    }
+    return;
+  }
+  if (typeof openPublicProfile === 'function') {
+    openPublicProfile(senderUid);
+  } else if (typeof openMemberProfileModal === 'function') {
+    openMemberProfileModal(senderUid);
+  }
+};
+
+window.handleNotificationClick = async function(notifId, postId, postType, senderUid, isAnon = false) {
   // Mark as read
   if (notifId) {
     try {
@@ -6069,43 +7939,85 @@ window.handleNotificationClick = async function(notifId, postId, postType) {
   // Close dropdown
   closeNotificationDropdown();
 
+  // If friend request or acceptance, open member profile
   if (postType === 'mithra_request' || postType === 'mithra_accepted' || postType === 'mithra_rejected') {
-    if (postId) {
-      openMemberProfileModal(postId);
+    const targetUid = senderUid || postId;
+    if (targetUid) {
+      if (isAnon) {
+        if (typeof showCustomToast === 'function') {
+          showCustomToast("මෙම සාමාජිකයා නිර්නාමිකව සිටින බැවින් පැතිකඩ විවෘත කළ නොහැක.", "info");
+        }
+        return;
+      }
+      if (typeof openPublicProfile === 'function') {
+        openPublicProfile(targetUid);
+      } else if (typeof openMemberProfileModal === 'function') {
+        openMemberProfileModal(targetUid);
+      }
     }
     return;
   }
 
   if (!postId) return;
 
-  // Switch to correct tab
-  if (postType === 'sathkara') {
-    switchTab('needs');
-  } else {
-    // Check if post is in feed or needs
-    const post = currentPostsData.find(p => p.id === postId);
-    if (post && post.type === 'need') {
-      switchTab('needs');
-    } else {
-      switchTab('feed');
-    }
+  // Determine if post belongs to needs or feed
+  const post = (currentPostsData || []).find(p => p.id === postId) || 
+               (StorageService.getLocalPosts() || []).find(p => p.id === postId);
+
+  const targetTab = (postType === 'sathkara' || (post && post.type === 'need')) ? 'needs' : 'feed';
+  
+  // Switch to target tab
+  switchTab(targetTab);
+
+  // If a filter is currently active in the feed, reset to 'all' so the post is visible
+  if (targetTab === 'feed' && typeof currentCategoryFilter !== 'undefined' && currentCategoryFilter !== 'all') {
+    filterCategory('all', false);
   }
 
-  // Scroll to post and highlight with golden glow
-  setTimeout(() => {
+  // Function to perform scroll & highlight
+  const focusAndHighlight = () => {
     const elem = document.getElementById(`post-elem-${postId}`);
     if (elem) {
       elem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      elem.classList.remove('highlight-post-pulse');
+      // Trigger reflow for clean re-trigger
+      void elem.offsetWidth;
       elem.classList.add('highlight-post-pulse');
+
+      // If it was a comment or mention notification, automatically expand comments box
       if (postType === 'comment' || postType === 'mention') {
         const box = document.getElementById(`comments-box-${postId}`);
         if (box) box.style.display = 'block';
       }
+
+      // Add temporary reaction notice tag if not already added
+      let noticeTag = elem.querySelector('.notif-target-indicator');
+      if (!noticeTag) {
+        noticeTag = document.createElement('div');
+        noticeTag.className = 'notif-target-indicator';
+        noticeTag.innerHTML = `<i class="fa-solid fa-bell" style="color: #d97706;"></i> <span>ඔබගේ මෙම පින්කම සඳහා ප්‍රතිචාරයක් ලැබුණි</span>`;
+        elem.insertBefore(noticeTag, elem.firstChild);
+        setTimeout(() => {
+          noticeTag?.remove();
+        }, 5000);
+      }
+
       setTimeout(() => {
         elem.classList.remove('highlight-post-pulse');
-      }, 3000);
+      }, 3500);
+      return true;
     }
-  }, 220);
+    return false;
+  };
+
+  // Try immediately, or retry after DOM renders
+  if (!focusAndHighlight()) {
+    setTimeout(() => {
+      if (!focusAndHighlight()) {
+        setTimeout(focusAndHighlight, 350);
+      }
+    }, 180);
+  }
 };
 
 window.markAllNotificationsAsRead = async function(e) {
@@ -6121,12 +8033,12 @@ window.markAllNotificationsAsRead = async function(e) {
 // Community Member Counter & Directory Controller (PC & Mobile)
 // ============================================================================
 
-let allCommunityMembersCache = [];
+// allCommunityMembersCache moved to top
 let activeFriendsSegment = 'my';
 let currentDirectoryFilterType = 'all';
 let currentDirectorySearchQuery = '';
 
-window.updateCommunityMemberCount = async function() {
+export async function updateCommunityMemberCount() {
   try {
     const counterPill = document.getElementById('headerMemberCounter');
     const countText = document.getElementById('globalMemberCountText');
@@ -6140,12 +8052,15 @@ window.updateCommunityMemberCount = async function() {
       counterPill.setAttribute('title', `කල්‍යාණ මිතුරු පවුර (${formatted} දෙනෙක්)`);
     }
 
-    // Refresh PC right sidebar members preview
-    renderPcSidebarMembers();
+    // Refresh PC right sidebar members preview if on desktop
+    if (window.innerWidth > 992 && document.getElementById('pcSidebarMemberList')) {
+      renderPcSidebarMembers();
+    }
   } catch (err) {
     console.warn('[App] Update community member count warning:', err);
   }
-};
+}
+window.updateCommunityMemberCount = updateCommunityMemberCount;
 
 // ============================================================================
 // Friends & Directory View Mode (Grid vs List)
@@ -6211,7 +8126,7 @@ window.openFriendsView = function(segment = 'my') {
 };
 
 window.openFriendsViewWithTab = function(segment) {
-  openFriendsView(segment);
+  switchTab('friends');
 };
 
 window.switchFriendsSegment = function(seg) {
@@ -6333,7 +8248,7 @@ window.renderCommunityDirectory = async function(filtered = null) {
     }
 
     return `
-      <div class="mithra-card directory-member-card" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}')">
+      <div class="mithra-card directory-member-card" onclick="openPublicProfile('${m.uid}')" style="cursor: pointer;">
         <div class="mithra-card-avatar ${isMemberSangha ? 'sangha-framed-avatar' : ''}" style="cursor: pointer;">
           ${m.photo ? `<img src="${Security.sanitizeUrl(m.photo)}" alt="${Security.escapeHTML(m.name)}" onerror="this.parentElement.innerText = '${initial}';">` : `<span>${initial}</span>`}
           ${isMemberSangha ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
@@ -6341,7 +8256,7 @@ window.renderCommunityDirectory = async function(filtered = null) {
         <div class="mithra-card-details">
           <div class="mithra-card-name" style="cursor: pointer;">
             <span>${Security.escapeHTML(m.name || 'කල්‍යාණ මිත්‍ර')}</span>
-            ${isMemberMaster ? `<span class="badge-crown" title="Master Admin">👑</span>` : (isMemberSubAdmin ? `<span class="badge-shield" title="පරිපාලක (Admin)">🛡️</span>` : '')}
+            ${isMemberMaster ? `<span class="badge-crown" title="කල්‍යාණ මිත්‍ර">👑</span>` : (isMemberSubAdmin ? `<span class="badge-shield" title="කල්‍යාණ මිත්‍ර">🛡️</span>` : '')}
             ${isMemberSangha ? `<span class="sangha-author-badge" style="margin-left: 4px; padding: 1px 7px; font-size: 0.62rem;"><i class="fa-solid fa-dharmachakra"></i> පූජනීය සංඝරත්නය</span>` : ''}
           </div>
           <div class="mithra-card-loc">
@@ -6351,7 +8266,7 @@ window.renderCommunityDirectory = async function(filtered = null) {
         </div>
         <div class="mithra-card-actions" onclick="event.stopPropagation()">
           ${actionBtnHtml}
-          <button type="button" class="btn-mithra-view" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}')" title="සම්පූර්ණ පැතිකඩ බලන්න">
+          <button type="button" class="btn-mithra-view" onclick="openPublicProfile('${m.uid}')" title="සම්පූර්ණ පැතිකඩ බලන්න">
             <i class="fa-solid fa-eye"></i>
           </button>
         </div>
@@ -6386,88 +8301,116 @@ window.filterDirectoryBy = function(type) {
   renderCommunityDirectory(list);
 };
 
-window.renderPcSidebarMembers = async function(filterQuery = '') {
-  const container = document.getElementById('pcSidebarMemberList');
-  const countPill = document.getElementById('pcCommunityCountPill');
-  if (!container) return;
+export async function renderPcSidebarMembers(filterQuery = '', forceRefresh = false) {
+  try {
+    const container = document.getElementById('pcSidebarMemberList');
+    const countPill = document.getElementById('pcCommunityCountPill');
+    if (!container) return;
 
-  if (allCommunityMembersCache.length === 0) {
-    allCommunityMembersCache = await StorageService.getAllCommunityMembers();
-  }
+    // Instant zero-latency local fallback if cache is empty
+    if (Array.isArray(StorageService._cachedCommunityMembers) && StorageService._cachedCommunityMembers.length > (allCommunityMembersCache?.length || 0)) {
+      allCommunityMembersCache = StorageService._cachedCommunityMembers;
+    } else if (!allCommunityMembersCache || allCommunityMembersCache.length === 0) {
+      if (typeof StorageService.getInstantLocalCommunityMembers === "function") {
+        allCommunityMembersCache = StorageService.getInstantLocalCommunityMembers();
+      }
+    }
 
-  const currentUser = StorageService.currentUser || {};
-  const currentMithrayan = Array.isArray(currentUser.mithrayan) ? currentUser.mithrayan : [];
-  const currentSent = Array.isArray(currentUser.pendingMithraSent) ? currentUser.pendingMithraSent : [];
+    const currentUser = StorageService.currentUser || {};
+    const currentMithrayan = Array.isArray(currentUser.mithrayan) ? currentUser.mithrayan : [];
+    const currentSent = Array.isArray(currentUser.pendingMithraSent) ? currentUser.pendingMithraSent : [];
 
-  if (countPill) {
-    countPill.innerText = `${allCommunityMembersCache.length} දෙනෙක්`;
-  }
+    if (countPill && allCommunityMembersCache.length > 0) {
+      countPill.innerText = `${allCommunityMembersCache.length} දෙනෙක්`;
+    }
 
-  let list = allCommunityMembersCache;
-  if (filterQuery && filterQuery.trim()) {
-    const q = filterQuery.trim().toLowerCase();
-    list = list.filter(m =>
-      (m.name || '').toLowerCase().includes(q) ||
-      (m.location || '').toLowerCase().includes(q)
-    );
-  }
+    let list = allCommunityMembersCache || [];
+    if (filterQuery && filterQuery.trim()) {
+      const q = filterQuery.trim().toLowerCase();
+      list = list.filter(m =>
+        (m.name || '').toLowerCase().includes(q) ||
+        (m.location || '').toLowerCase().includes(q)
+      );
+    }
 
-  if (list.length === 0) {
-    container.innerHTML = `
-      <div style="text-align: center; padding: 16px 8px; color: #94a3b8; font-size: 0.74rem;">
-        සාමාජිකයින් හමු නොවීය.
-      </div>
-    `;
-    return;
-  }
+    if (list.length > 0) {
+      const displayList = list.slice(0, 6);
+      container.innerHTML = displayList.map(m => {
+        const isMe = m.uid === currentUser.uid;
+        const isFriend = currentMithrayan.includes(m.uid);
+        const isSent = currentSent.includes(m.uid);
+        const isMemberAnon = Boolean(
+          m.isAnonymous === true ||
+          m.useAlias === true ||
+          m.name === 'කල්‍යාණ මිත්‍ර සාමාජික' ||
+          (isMe && (currentUser.useAlias === true || currentUser.isAnonymous === true))
+        );
+        const displayName = isMemberAnon ? 'කල්‍යාණ මිත්‍ර සාමාජික' : (m.name || 'කල්‍යාණ මිත්‍ර');
+        const displayPhoto = isMemberAnon ? BO_LEAF_AVATAR : (m.photo || '');
+        const displayLocation = isMemberAnon ? (m.location ? 'ශ්‍රී ලංකාව' : '') : (m.location || '');
+        const initial = isMemberAnon ? '🌿' : (displayName || 'ක').trim().charAt(0);
 
-  // Display top 6 in sidebar preview
-  const displayList = list.slice(0, 6);
+        let actionBtn = '';
+        if (isMe) {
+          actionBtn = `<span style="font-size: 0.65rem; color: #92400e; font-weight: 700;">(ඔබ)</span>`;
+        } else if (isFriend) {
+          actionBtn = `<i class="fa-solid fa-circle-check" style="color: #059669; font-size: 0.85rem;" title="කල්‍යාණ මිතුරෙකි"></i>`;
+        } else if (isSent) {
+          actionBtn = `<i class="fa-solid fa-clock" style="color: #d97706; font-size: 0.82rem;" title="ඇරයුමක් යවා ඇත"></i>`;
+        } else {
+          actionBtn = `
+            <button type="button" class="sidebar-member-action-btn" onclick="event.stopPropagation(); handleSidebarMemberAction('${m.uid}', '${Security.escapeHTML(m.name)}')" title="කල්‍යාණ මිත්‍ර ඇරයුමක් යවන්න">
+              <i class="fa-solid fa-user-plus"></i>
+            </button>
+          `;
+        }
 
-  container.innerHTML = displayList.map(m => {
-    const isMe = m.uid === currentUser.uid;
-    const isFriend = currentMithrayan.includes(m.uid);
-    const isSent = currentSent.includes(m.uid);
-    const initial = (m.name || 'ක').charAt(0);
-
-    let actionBtn = '';
-    if (isMe) {
-      actionBtn = `<span style="font-size: 0.65rem; color: #92400e; font-weight: 700;">(ඔබ)</span>`;
-    } else if (isFriend) {
-      actionBtn = `<i class="fa-solid fa-circle-check" style="color: #059669; font-size: 0.85rem;" title="කල්‍යාණ මිතුරෙකි"></i>`;
-    } else if (isSent) {
-      actionBtn = `<i class="fa-solid fa-clock" style="color: #d97706; font-size: 0.82rem;" title="ඇරයුමක් යවා ඇත"></i>`;
+        const isMemberSangha = StorageService.isSangha(m);
+        return `
+          <div class="sidebar-member-item ${isMemberAnon ? 'sidebar-member-anon' : ''}" onclick="openPublicProfile('${m.uid}')" style="cursor: pointer;" title="${Security.escapeHTML(displayName)} ගේ පැතිකඩ බලන්න">
+            <div class="sidebar-member-avatar ${isMemberSangha && !isMemberAnon ? 'sangha-framed-avatar' : ''}">
+              ${displayPhoto ? `<img src="${Security.sanitizeUrl(displayPhoto)}" alt="${Security.escapeHTML(displayName)}" onerror="this.parentElement.innerText = '${initial}';">` : `<span>${initial}</span>`}
+              ${isMemberSangha && !isMemberAnon ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
+            </div>
+            <div class="sidebar-member-info">
+              <div class="sidebar-member-name">
+                <span>${Security.escapeHTML(displayName)}</span>
+                ${!isMemberAnon && m.isAdmin ? `<i class="fa-solid fa-crown" style="color: #f59e0b; font-size: 0.65rem;" title="Master Admin"></i>` : ''}
+                ${!isMemberAnon && isMemberSangha ? `<span class="sangha-author-badge" style="margin-left: 3px; padding: 1px 5px; font-size: 0.58rem;"><i class="fa-solid fa-dharmachakra"></i> සංඝරත්නය</span>` : ''}
+              </div>
+              <div class="sidebar-member-meta">
+                ${displayLocation ? `<i class="fa-solid fa-location-dot"></i> ${Security.escapeHTML(displayLocation)}` : (isMemberAnon ? '<span style="color: #059669;">🌿 නිර්නාමික</span>' : (m.joinedDate ? `<i class="fa-solid fa-calendar-check"></i> ${Security.escapeHTML(m.joinedDate)}` : 'කල්‍යාණ මිත්‍ර'))}
+              </div>
+            </div>
+            <div>
+              ${actionBtn}
+            </div>
+          </div>
+        `;
+      }).join('');
     } else {
-      actionBtn = `
-        <button type="button" class="sidebar-member-action-btn" onclick="event.stopPropagation(); handleSidebarMemberAction('${m.uid}', '${Security.escapeHTML(m.name)}')" title="කල්‍යාණ මිත්‍ර ඇරයුමක් යවන්න">
-          <i class="fa-solid fa-user-plus"></i>
-        </button>
+      container.innerHTML = `
+        <div style="text-align: center; padding: 16px 8px; color: #94a3b8; font-size: 0.74rem;">
+          සාමාජිකයින් හමු නොවීය.
+        </div>
       `;
     }
 
-    const isMemberSangha = StorageService.isSangha(m);
-    return `
-      <div class="sidebar-member-item" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}')" title="${Security.escapeHTML(m.name)} ගේ පැතිකඩ බලන්න">
-        <div class="sidebar-member-avatar ${isMemberSangha ? 'sangha-framed-avatar' : ''}">
-          ${m.photo ? `<img src="${Security.sanitizeUrl(m.photo)}" alt="${Security.escapeHTML(m.name)}" onerror="this.parentElement.innerText = '${initial}';">` : `<span>${initial}</span>`}
-          ${isMemberSangha ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
-        </div>
-        <div class="sidebar-member-info">
-          <div class="sidebar-member-name">
-            <span>${Security.escapeHTML(m.name || 'කල්‍යාණ මිත්‍ර')}</span>
-            ${m.isAdmin ? `<i class="fa-solid fa-crown" style="color: #f59e0b; font-size: 0.65rem;" title="Master Admin"></i>` : ''}
-          </div>
-          <div class="sidebar-member-meta">
-            ${m.location ? `<i class="fa-solid fa-location-dot"></i> ${Security.escapeHTML(m.location)}` : (m.joinedDate ? `<i class="fa-solid fa-calendar-check"></i> ${Security.escapeHTML(m.joinedDate)}` : 'කල්‍යාණ මිත්‍ර')}
-          </div>
-        </div>
-        <div>
-          ${actionBtn}
-        </div>
-      </div>
-    `;
-  }).join('');
+    // Seamless background fetch of full directory if needed
+    if (forceRefresh || allCommunityMembersCache.length < 20) {
+      StorageService.getAllCommunityMembers(forceRefresh).then(fresh => {
+        if (Array.isArray(fresh) && fresh.length > 0 && fresh.length !== allCommunityMembersCache.length) {
+          allCommunityMembersCache = fresh;
+          if (countPill) countPill.innerText = `${fresh.length} දෙනෙක්`;
+          renderPcSidebarMembers(filterQuery, false);
+        }
+      }).catch(() => {});
+    }
+  } catch (err) {
+    console.warn('[Sidebar] renderPcSidebarMembers error caught:', err);
+  }
 };
+window.renderPcSidebarMembers = renderPcSidebarMembers;
 
 window.handlePcSidebarMemberSearch = function(query) {
   renderPcSidebarMembers(query);
@@ -6485,6 +8428,477 @@ window.handleSendMithraFromDirectory = async function(targetUid, targetName) {
   await handleSendMithra(targetUid, targetName);
   renderCommunityDirectory();
   renderPcSidebarMembers();
+  if (activeTab === 'friends') renderKmpDirectoryView(true);
+};
+
+// ============================================================================
+// Real-Time User Presence & Kalyana Mithuru Pawura Live Sync Engine
+// ============================================================================
+let kmpLivePollTimer = null;
+
+function startKmpLivePolling() {
+  if (kmpLivePollTimer) clearInterval(kmpLivePollTimer);
+  kmpLivePollTimer = setInterval(async () => {
+    if (activeTab === 'friends' && !document.hidden) {
+      try {
+        await renderKmpDirectoryView(true);
+      } catch (e) {
+        console.warn('[KMP] Live poll error:', e);
+      }
+    }
+  }, 20000); // Poll every 20 seconds for live updates
+}
+
+function stopKmpLivePolling() {
+  if (kmpLivePollTimer) {
+    clearInterval(kmpLivePollTimer);
+    kmpLivePollTimer = null;
+  }
+}
+
+window.refreshKmpDirectoryLive = async function(e) {
+  if (e && e.stopPropagation) e.stopPropagation();
+  triggerHaptic(15);
+  const dot = document.getElementById('kmpLivePulseDot');
+  if (dot) dot.style.animation = 'spin 0.6s linear infinite';
+  try {
+    await StorageService.updateUserPresence(true);
+    await renderKmpDirectoryView(true);
+  } finally {
+    if (dot) dot.style.animation = '';
+  }
+};
+
+function initPresenceEngine() {
+  // Update presence immediately on start
+  StorageService.updateUserPresence(true);
+
+  // Background heartbeat every 60s
+  setInterval(() => {
+    if (!document.hidden) {
+      StorageService.updateUserPresence();
+    }
+  }, 60000);
+
+  // Handle visibility transitions
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      StorageService.updateUserPresence(true);
+      if (activeTab === 'friends') {
+        renderKmpDirectoryView(true);
+      }
+    }
+  });
+
+  // Track user actions (throttled to 60s inside StorageService)
+  ['click', 'touchstart', 'keydown'].forEach(evt => {
+    window.addEventListener(evt, () => {
+      StorageService.updateUserPresence();
+    }, { passive: true });
+  });
+}
+
+// ============================================================================
+// Kalyana Mithuru Pawura (Direct Directory Page) Controller
+// ============================================================================
+window.openFriendsView = function(segment) {
+  window.switchTab('friends');
+  if (segment) {
+    const targetSeg = segment === 'my' ? 'friends' : segment;
+    if (window.switchKmpSegment) window.switchKmpSegment(targetSeg);
+  }
+};
+
+let kmpActiveSegment = 'all'; // 'all', 'friends', 'online', 'sangha', 'suggested', 'requests'
+let kmpSearchQuery = '';
+let kmpSortMode = 'active'; // 'active', 'newest', 'name'
+let kmpViewMode = 'grid'; // 'grid', 'list'
+let kmpMembersCache = [];
+
+window.switchKmpSegment = function(seg) {
+  triggerHaptic(12);
+  kmpActiveSegment = seg;
+
+  const chips = ['all', 'friends', 'online', 'sangha', 'suggested', 'requests'];
+  chips.forEach(s => {
+    const chip = document.getElementById(`kmpSeg${s.charAt(0).toUpperCase() + s.slice(1)}`);
+    if (chip) {
+      if (s === seg) chip.classList.add('active');
+      else chip.classList.remove('active');
+    }
+  });
+
+  renderKmpDirectoryView(false);
+};
+
+window.handleKmpSearch = function(val) {
+  kmpSearchQuery = (val || '').trim();
+  const clearBtn = document.getElementById('kmpClearSearchBtn');
+  if (clearBtn) {
+    if (kmpSearchQuery) clearBtn.classList.remove('hidden');
+    else clearBtn.classList.add('hidden');
+  }
+  renderKmpDirectoryView(false);
+};
+
+window.clearKmpSearch = function() {
+  kmpSearchQuery = '';
+  const input = document.getElementById('kmpSearchInput');
+  if (input) input.value = '';
+  const clearBtn = document.getElementById('kmpClearSearchBtn');
+  if (clearBtn) clearBtn.classList.add('hidden');
+  renderKmpDirectoryView(false);
+};
+
+window.handleKmpSortChange = function(sort) {
+  kmpSortMode = sort || 'active';
+  renderKmpDirectoryView(false);
+};
+
+window.setKmpViewMode = function(mode) {
+  kmpViewMode = mode;
+  const gridBtn = document.getElementById('kmpViewGridBtn');
+  const listBtn = document.getElementById('kmpViewListBtn');
+  const container = document.getElementById('kmpGridContainer');
+
+  if (gridBtn && listBtn) {
+    if (mode === 'grid') {
+      gridBtn.classList.add('active');
+      listBtn.classList.remove('active');
+    } else {
+      listBtn.classList.add('active');
+      gridBtn.classList.remove('active');
+    }
+  }
+
+  if (container) {
+    if (mode === 'list') container.classList.add('list-view');
+    else container.classList.remove('list-view');
+  }
+};
+
+window.resetKmpFilters = function() {
+  kmpActiveSegment = 'all';
+  kmpSearchQuery = '';
+  kmpSortMode = 'active';
+  const searchInput = document.getElementById('kmpSearchInput');
+  if (searchInput) searchInput.value = '';
+  const clearBtn = document.getElementById('kmpClearSearchBtn');
+  if (clearBtn) clearBtn.classList.add('hidden');
+  const sortSelect = document.getElementById('kmpSortSelect');
+  if (sortSelect) sortSelect.value = 'active';
+
+  const chips = ['all', 'friends', 'online', 'sangha', 'suggested', 'requests'];
+  chips.forEach(s => {
+    const chip = document.getElementById(`kmpSeg${s.charAt(0).toUpperCase() + s.slice(1)}`);
+    if (chip) {
+      if (s === 'all') chip.classList.add('active');
+      else chip.classList.remove('active');
+    }
+  });
+
+  renderKmpDirectoryView(false);
+};
+
+window.renderKmpDirectoryView = async function(forceRefresh = false) {
+  const container = document.getElementById('kmpGridContainer');
+  const emptyState = document.getElementById('kmpEmptyState');
+  if (!container) return;
+
+  // Keep current user presence alive
+  try {
+    StorageService.updateUserPresence();
+  } catch (e) {}
+
+  if (kmpMembersCache.length === 0) {
+    container.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 48px 20px; color: #78350f;">
+        <i class="fa-solid fa-spinner fa-spin" style="font-size: 2.2rem; color: #d97706; margin-bottom: 12px;"></i>
+        <p style="font-size: 0.92rem; font-weight: 700;">කල්‍යාණ මිතුරු පවුර සූදානම් වෙමින් පවතී...</p>
+      </div>
+    `;
+  }
+
+  if (forceRefresh || kmpMembersCache.length === 0) {
+    kmpMembersCache = await StorageService.getAllCommunityMembers(forceRefresh);
+  }
+
+  const currentUser = StorageService.currentUser || {};
+  const currentMithrayan = Array.isArray(currentUser.mithrayan) ? currentUser.mithrayan : [];
+  const currentSent = Array.isArray(currentUser.pendingMithraSent) ? currentUser.pendingMithraSent : [];
+
+  // Notifications for pending incoming requests
+  const notifs = StorageService.getLocalNotifications() || [];
+  const pendingIncoming = notifs.filter(n =>
+    n.type === 'mithra_request' &&
+    n.recipientUid === currentUser.uid &&
+    !StorageService.isRequestAccepted(n.id, n.senderUid) &&
+    !StorageService.isRequestDeclined(n.id, n.senderUid) &&
+    (!currentUser.mithrayan || !currentUser.mithrayan.includes(n.senderUid)) &&
+    (!n.status || n.status === 'pending')
+  );
+
+  // Calculate live presence stats
+  let onlineCount = kmpMembersCache.filter(m => m.isOnline).length;
+  if (onlineCount === 0 && currentUser.uid) onlineCount = 1;
+
+  const totalMembers = kmpMembersCache.length;
+  const friendsCount = currentMithrayan.length;
+  const sanghaCount = kmpMembersCache.filter(m => m.isSangha).length;
+
+  // Update Hero & Segments counters
+  const liveEl = document.getElementById('kmpLiveOnlineCount');
+  if (liveEl) liveEl.innerText = `${onlineCount} දෙනෙක්`;
+
+  const totalEl = document.getElementById('kmpTotalMembersCount');
+  if (totalEl) totalEl.innerText = totalMembers;
+
+  const myFriendsEl = document.getElementById('kmpMyFriendsCount');
+  if (myFriendsEl) myFriendsEl.innerText = friendsCount;
+
+  const sanghaEl = document.getElementById('kmpSanghaMembersCount');
+  if (sanghaEl) sanghaEl.innerText = sanghaCount;
+
+  const countAll = document.getElementById('kmpSegCountAll');
+  if (countAll) countAll.innerText = totalMembers;
+
+  const countFriends = document.getElementById('kmpSegCountFriends');
+  if (countFriends) countFriends.innerText = friendsCount;
+
+  const countOnline = document.getElementById('kmpSegCountOnline');
+  if (countOnline) countOnline.innerText = onlineCount;
+
+  const countSangha = document.getElementById('kmpSegCountSangha');
+  if (countSangha) countSangha.innerText = sanghaCount;
+
+  const countReq = document.getElementById('kmpSegCountRequests');
+  if (countReq) {
+    countReq.innerText = pendingIncoming.length;
+    if (pendingIncoming.length > 0) {
+      countReq.classList.remove('hidden');
+    } else {
+      countReq.classList.add('hidden');
+    }
+  }
+
+  // Filter based on segment
+  let list = [...kmpMembersCache];
+
+  if (kmpActiveSegment === 'friends') {
+    list = list.filter(m => currentMithrayan.includes(m.uid));
+  } else if (kmpActiveSegment === 'online') {
+    list = list.filter(m => m.isOnline);
+  } else if (kmpActiveSegment === 'sangha') {
+    list = list.filter(m => m.isSangha);
+  } else if (kmpActiveSegment === 'suggested') {
+    list = list.filter(m => m.uid !== currentUser.uid && !currentMithrayan.includes(m.uid));
+    list.sort((a, b) => ((b.postsCount || 0) + (b.totalSadhu || 0)) - ((a.postsCount || 0) + (a.totalSadhu || 0)));
+  } else if (kmpActiveSegment === 'requests') {
+    const senderUids = pendingIncoming.map(r => r.senderUid);
+    list = list.filter(m => senderUids.includes(m.uid));
+    pendingIncoming.forEach(req => {
+      if (!list.some(m => m.uid === req.senderUid)) {
+        list.push({
+          uid: req.senderUid,
+          name: req.senderName || 'කල්‍යාණ මිත්‍ර',
+          photo: req.senderPhoto || '',
+          bio: 'කල්‍යාණ මිතුරු ඇරයුමක් එවා ඇත',
+          location: '',
+          joinedDate: '2026',
+          isOnline: true,
+          isSangha: StorageService.isSangha(req) || StorageService.isSangha({ uid: req.senderUid, name: req.senderName }),
+          role: 'member',
+          postsCount: 1,
+          totalSadhu: 0,
+          mithrayanCount: 0
+        });
+      }
+    });
+  }
+
+  // Search filter
+  if (kmpSearchQuery) {
+    const q = kmpSearchQuery.toLowerCase();
+    list = list.filter(m =>
+      (m.name || '').toLowerCase().includes(q) ||
+      (m.bio || '').toLowerCase().includes(q) ||
+      (m.location || '').toLowerCase().includes(q)
+    );
+  }
+
+  // Sorting
+  if (kmpSortMode === 'active') {
+    list.sort((a, b) => {
+      if (a.isOnline && !b.isOnline) return -1;
+      if (!a.isOnline && b.isOnline) return 1;
+      return (b.lastActiveAt || b.updatedAt || 0) - (a.lastActiveAt || a.updatedAt || 0);
+    });
+  } else if (kmpSortMode === 'newest') {
+    list.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  } else if (kmpSortMode === 'name') {
+    list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }
+
+  // Results count & segment badge
+  const resultsCountEl = document.getElementById('kmpResultsCount');
+  if (resultsCountEl) resultsCountEl.innerText = `සාමාජිකයින් ${list.length} දෙනෙක්`;
+
+  const badgeEl = document.getElementById('kmpResultsSegmentBadge');
+  if (badgeEl) {
+    const segNames = {
+      all: 'සියලු සාමාජිකයින්',
+      friends: 'මගේ මිතුරන්',
+      online: 'දැන් Online',
+      sangha: 'මහා සංඝරත්නය',
+      suggested: 'යෝජිත මිතුරන්',
+      requests: 'ලැබුණු ඇරයුම්'
+    };
+    badgeEl.innerText = segNames[kmpActiveSegment] || 'සියල්ල';
+  }
+
+  // Empty state handling
+  if (list.length === 0) {
+    if (emptyState) {
+      emptyState.classList.remove('hidden');
+      emptyState.style.display = 'block';
+      const emptyTitle = document.getElementById('kmpEmptyTitle');
+      const emptyDesc = document.getElementById('kmpEmptyDesc');
+      if (kmpActiveSegment === 'friends') {
+        if (emptyTitle) emptyTitle.innerText = 'තවමත් කල්‍යාණ මිතුරන් සම්බන්ධ වී නොමැත';
+        if (emptyDesc) emptyDesc.innerText = 'සාමාජික නාමාවලියෙන් නව කල්‍යාණ මිතුරන්ට ඇරයුම් කර ඔබේ පවුර පුළුල් කරගන්න.';
+      } else if (kmpActiveSegment === 'requests') {
+        if (emptyTitle) emptyTitle.innerText = 'ලැබුණු ඇරයුම් කිසිවක් නොමැත';
+        if (emptyDesc) emptyDesc.innerText = 'නව කල්‍යාණ මිතුරු ඇරයුම් ලැබුණු විට මෙහි දිස්වනු ඇත.';
+      } else if (kmpActiveSegment === 'online') {
+        if (emptyTitle) emptyTitle.innerText = 'දැනට වෙනත් සාමාජිකයින් Online නොමැත';
+        if (emptyDesc) emptyDesc.innerText = 'මඳ වේලාවකින් නැවත පරික්ෂා කර බලන්න.';
+      } else {
+        if (emptyTitle) emptyTitle.innerText = 'කිසිදු සාමාජිකයෙකු හමු නොවීය';
+        if (emptyDesc) emptyDesc.innerText = 'ඔබ සොයන නම හෝ පෙරහන වෙනස් කර නැවත සොයා බලන්න.';
+      }
+    }
+    container.innerHTML = '';
+    return;
+  }
+
+  if (emptyState) {
+    emptyState.classList.add('hidden');
+    emptyState.style.display = 'none';
+  }
+
+  // Render cards
+  container.innerHTML = list.map(m => {
+    const isMe = m.uid === currentUser.uid;
+    const isFriend = currentMithrayan.includes(m.uid);
+    const isSent = currentSent.includes(m.uid);
+
+    const isMemberSangha = StorageService.isSangha(m);
+    const isMemberMaster = StorageService.isMasterAdmin(m);
+    const isMemberSubAdmin = !isMemberMaster && StorageService.isSubAdmin(m);
+
+    // Enforce Anonymous Mode in Friends Directory:
+    const isMemberAnon = Boolean(
+      m.isAnonymous === true ||
+      m.useAlias === true ||
+      m.name === 'කල්‍යාණ මිත්‍ර සාමාජික' ||
+      (isMe && (currentUser.useAlias === true || currentUser.isAnonymous === true))
+    );
+
+    const displayName = isMemberAnon ? 'කල්‍යාණ මිත්‍ර සාමාජික' : (m.name || 'කල්‍යාණ මිත්‍ර');
+    const displayPhoto = isMemberAnon ? BO_LEAF_AVATAR : (m.photo || '');
+    const displayLocation = isMemberAnon ? (m.location ? 'ශ්‍රී ලංකාව' : '') : (m.location || '');
+    const initial = isMemberAnon ? '🌿' : (displayName || 'ක').charAt(0);
+
+    // Incoming request check
+    const pendingReq = pendingIncoming.find(r => r.senderUid === m.uid);
+
+    let actionBtnHtml = '';
+    if (isMe) {
+      actionBtnHtml = `
+        <span class="kmp-badge-friend" style="background: #fef3c7; border-color: #fde68a; color: #92400e;">
+          <i class="fa-solid fa-circle-user"></i> ඔබගේ Profile එක
+        </span>
+      `;
+    } else if (pendingReq) {
+      actionBtnHtml = `
+        <button type="button" class="kmp-btn-action-primary" style="background: linear-gradient(135deg, #10b981, #059669);" onclick="event.stopPropagation(); handleAcceptKmpRequest('${pendingReq.id}', '${m.uid}', '${Security.escapeHTML(displayName)}')">
+          <i class="fa-solid fa-circle-check"></i> පිළිගන්න
+        </button>
+        <button type="button" class="kmp-btn-view-profile" onclick="event.stopPropagation(); handleRejectKmpRequest('${pendingReq.id}', '${m.uid}')" title="ඉවත් කරන්න">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      `;
+    } else if (isMemberSangha && !isMemberAnon) {
+      const isRevered = StorageService.isReveringSangha(m.uid);
+      actionBtnHtml = isRevered
+        ? `<button type="button" class="kmp-btn-action-primary" style="background: #fef3c7; color: #92400e; border: 1px solid #fde68a;" onclick="event.stopPropagation(); handleToggleSanghaReverence('${m.uid}', '${Security.escapeHTML(displayName)}')"><i class="fa-solid fa-hands-praying"></i> නමස්කාර කර ඇත 🙏</button>`
+        : `<button type="button" class="kmp-btn-action-primary" style="background: linear-gradient(135deg, #d97706, #b45309);" onclick="event.stopPropagation(); handleToggleSanghaReverence('${m.uid}', '${Security.escapeHTML(displayName)}')"><i class="fa-solid fa-hands-praying"></i> නමස්කාර කරමි 🙏</button>`;
+    } else if (isFriend) {
+      actionBtnHtml = `<span class="kmp-badge-friend"><i class="fa-solid fa-circle-check"></i> කල්‍යාණ මිතුරෙකි</span>`;
+    } else if (isSent) {
+      actionBtnHtml = `<span class="kmp-badge-friend" style="background: #fffbeb; color: #b45309; border-color: #fde68a;"><i class="fa-solid fa-clock"></i> ඇරයුමක් යවා ඇත</span>`;
+    } else {
+      actionBtnHtml = `
+        <button type="button" class="kmp-btn-action-primary" onclick="event.stopPropagation(); handleSendKmpRequest('${m.uid}', '${Security.escapeHTML(displayName)}')">
+          <i class="fa-solid fa-user-plus"></i> මිතුරු වන්න
+        </button>
+      `;
+    }
+
+    return `
+      <div class="kmp-card ${isMemberAnon ? 'kmp-card-anon' : ''}" onclick="openPublicProfile('${m.uid}')" style="cursor: pointer;">
+        <div class="kmp-card-top">
+          <div class="kmp-avatar-wrap ${isMemberSangha && !isMemberAnon ? 'kmp-sangha-avatar' : ''}" onclick="event.stopPropagation(); openPublicProfile('${m.uid}')" style="cursor: pointer;" title="පැතිකඩ බලන්න">
+            ${displayPhoto ? `<img src="${Security.sanitizeUrl(displayPhoto)}" alt="${Security.escapeHTML(displayName)}" class="kmp-avatar-img" onerror="this.parentElement.innerHTML = '<div class=\\\'kmp-avatar-initial\\\'>${initial}</div>';">` : `<div class="kmp-avatar-initial">${initial}</div>`}
+            ${m.isOnline ? `<span class="kmp-online-dot" title="දැන් සජීවීව Online"></span>` : ''}
+            ${isMemberSangha && !isMemberAnon ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
+          </div>
+          <div class="kmp-card-meta">
+            <div class="kmp-name-row" onclick="event.stopPropagation(); openPublicProfile('${m.uid}')" style="cursor: pointer;" title="පැතිකඩ බලන්න">
+              <span class="kmp-member-name">${Security.escapeHTML(displayName)}</span>
+              ${!isMemberAnon && isMemberMaster ? `<span class="badge-crown" title="කල්‍යාණ මිත්‍ර">👑</span>` : (!isMemberAnon && isMemberSubAdmin ? `<span class="badge-shield" title="කල්‍යාණ මිත්‍ර">🛡️</span>` : '')}
+              ${!isMemberAnon && isMemberSangha ? `<span class="sangha-author-badge" style="margin-left: 3px; padding: 1px 6px; font-size: 0.6rem;"><i class="fa-solid fa-dharmachakra"></i> පූජනීය සංඝරත්නය</span>` : ''}
+            </div>
+            ${m.isOnline
+              ? `<div class="kmp-presence-tag"><span class="kmp-pulse-dot-mini"></span> <span>දැන් Online</span></div>`
+              : `<div class="kmp-presence-tag offline"><i class="fa-solid fa-clock-rotate-left"></i> <span>ක්‍රියාකාරී විය</span></div>`
+            }
+            ${displayLocation ? `<div class="kmp-location-text"><i class="fa-solid fa-location-dot" style="color: #ea580c;"></i> <span>${Security.escapeHTML(displayLocation)}</span></div>` : ''}
+          </div>
+        </div>
+
+        ${m.bio && !isMemberAnon ? `<p class="kmp-card-bio">${Security.escapeHTML(m.bio)}</p>` : (isMemberAnon ? '<p class="kmp-card-bio" style="color: #059669; font-style: italic;">🌿 නිර්නාමික කල්‍යාණ මිත්‍රයෙකි</p>' : '')}
+
+        <div class="kmp-card-stats">
+          <span title="පින්කම්"><i class="fa-solid fa-dharmachakra" style="color: #d97706;"></i> <strong>${m.postsCount || 0}</strong></span>
+          <span title="සාදු"><i class="fa-solid fa-hands-praying" style="color: #ea580c;"></i> <strong>${m.totalSadhu || 0}</strong></span>
+          <span title="මිතුරන්"><i class="fa-solid fa-user-group" style="color: #059669;"></i> <strong>${m.mithrayanCount || 0}</strong></span>
+        </div>
+
+        <div class="kmp-card-actions" onclick="event.stopPropagation()">
+          ${actionBtnHtml}
+          <button type="button" class="kmp-btn-view-profile" onclick="event.stopPropagation(); openPublicProfile('${m.uid}')" title="සම්පූර්ණ පැතිකඩ (Profile) බලන්න">
+            <i class="fa-solid fa-user"></i>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+};
+
+window.handleSendKmpRequest = async function(targetUid, targetName) {
+  await handleSendMithra(targetUid, targetName);
+  renderKmpDirectoryView(true);
+};
+
+window.handleAcceptKmpRequest = async function(notifId, senderUid, senderName) {
+  await handleAcceptMithra(notifId, senderUid, senderName);
+  renderKmpDirectoryView(true);
+};
+
+window.handleRejectKmpRequest = async function(notifId, senderUid) {
+  await handleRejectMithra(notifId, senderUid);
+  renderKmpDirectoryView(true);
 };
 
 // ============================================================================
@@ -6536,6 +8950,9 @@ window.handleToggleAdminSanghaVerification = async function(targetUid, newStatus
 
   try {
     await StorageService.setMemberSanghaStatus(targetUid, newStatus);
+    allCommunityMembersCache = [];
+    renderCommunityDirectory();
+    renderFeed();
     alert("සාර්ථකයි! සංඝ සත්‍යාපන තත්ත්වය යාවත්කාලීන කරන ලදී. 🙏");
     const memModal = document.getElementById('memberProfileModal');
     if (memModal && !memModal.classList.contains('hidden')) {
@@ -6596,6 +9013,9 @@ window.handleSendMithra = async function(targetUid, targetName) {
     if (activeTab === 'profile') {
       renderProfileView();
     }
+    if (activeTab === 'friends') {
+      renderKmpDirectoryView(true);
+    }
     updateUserInfoUI();
   } catch (err) {
     console.error('Failed to send Kalyana Mithra request:', err);
@@ -6646,6 +9066,9 @@ window.handleAcceptMithra = async function(notifId, senderUid, senderName) {
     if (activeTab === 'profile') {
       renderProfileView();
     }
+    if (activeTab === 'friends') {
+      renderKmpDirectoryView(true);
+    }
     updateUserInfoUI();
   } catch (err) {
     console.error('Failed to accept Kalyana Mithra request:', err);
@@ -6679,6 +9102,9 @@ window.handleRejectMithra = async function(notifId, senderUid, senderName) {
     if (activeTab === 'profile') {
       renderProfileView();
     }
+    if (activeTab === 'friends') {
+      renderKmpDirectoryView(true);
+    }
     updateUserInfoUI();
   } catch (err) {
     console.warn('Reject mithra note:', err);
@@ -6705,6 +9131,9 @@ window.handleRemoveMithra = async function(targetUid) {
     if (activeTab === 'profile') {
       renderProfileView();
     }
+    if (activeTab === 'friends') {
+      renderKmpDirectoryView(true);
+    }
     updateUserInfoUI();
   } catch (err) {
     console.error('Remove mithra failed:', err);
@@ -6717,35 +9146,110 @@ window.removeKalyanaMithra = window.handleRemoveMithra;
 // Settings & Policy System Controller
 // ============================================================================
 
-window.openSettingsModal = function(initialTab = 'profile') {
+window.openSettingsModal = function(initialTab = 'profile', mode = null) {
   try {
     history.pushState({ type: 'modal', id: 'settingsModal' }, '');
   } catch (e) {}
   const modal = document.getElementById('settingsModal');
-  const user = StorageService.currentUser;
   if (!modal) return;
 
-  // Pre-fill profile settings fields
-  const firstInput = document.getElementById('setFirstNameInput');
-  const lastInput = document.getElementById('setLastNameInput');
-  const occInput = document.getElementById('setOccupationInput');
-  const bioInput = document.getElementById('setBioInput');
+  const isPolicyMode = mode === 'policies' || (mode === null && (initialTab === 'privacy' || initialTab === 'terms' || initialTab === 'about'));
+  const targetMode = isPolicyMode ? 'policies' : 'settings';
 
-  if (firstInput) firstInput.value = user.firstName || '';
-  if (lastInput) lastInput.value = user.lastName || '';
-  if (occInput) occInput.value = user.occupation || '';
-  if (bioInput) bioInput.value = user.bio || '';
+  const modalTitleIcon = document.getElementById('settingsModalTitleIcon');
+  const modalTitleText = document.getElementById('settingsModalTitleText');
+  const tabsBar = document.getElementById('settingsTabsBar') || document.querySelector('.settings-tabs-bar');
+  const profTabBtn = document.getElementById('set-tab-profile');
+  const adminTabBtn = document.getElementById('set-tab-admin');
 
-  // Pre-fill Province and District dropdowns
-  const { district: setDist, province: setProv, city: setCity } = resolveUserLocationFields(user);
-  const setProvSelect = document.getElementById('setProvinceSelect');
-  const setCityInp = document.getElementById('setCityInput');
-  if (setProvSelect) setProvSelect.value = setProv;
-  populateDistrictSelect('set', setDist, setProv);
-  if (setCityInp) setCityInp.value = setCity;
+  if (targetMode === 'settings') {
+    // 1. Settings Only Mode (Profile Page)
+    if (modalTitleIcon) {
+      modalTitleIcon.className = 'fa-solid fa-gear';
+      modalTitleIcon.style.color = '#d97706';
+    }
+    if (modalTitleText) {
+      modalTitleText.textContent = 'පැතිකඩ සහ පද්ධති සැකසුම්';
+    }
+    // Completely hide tab bar
+    if (tabsBar) {
+      tabsBar.style.display = 'none';
+    }
+    if (profTabBtn) profTabBtn.style.display = 'none';
+    if (adminTabBtn) adminTabBtn.style.display = 'none';
 
-  switchSettingsTab(initialTab);
+    // Pre-fill profile settings fields
+    const user = StorageService.currentUser || {};
+    const firstInput = document.getElementById('setFirstNameInput');
+    const lastInput = document.getElementById('setLastNameInput');
+    const occInput = document.getElementById('setOccupationInput');
+    const bioInput = document.getElementById('setBioInput');
+
+    if (firstInput) firstInput.value = user.firstName || '';
+    if (lastInput) lastInput.value = user.lastName || '';
+    if (occInput) occInput.value = user.occupation || '';
+    if (bioInput) bioInput.value = user.bio || '';
+
+    // Pre-fill Province and District dropdowns
+    const { district: setDist, province: setProv, city: setCity } = resolveUserLocationFields(user);
+    const setProvSelect = document.getElementById('setProvinceSelect');
+    const setCityInp = document.getElementById('setCityInput');
+    if (setProvSelect) setProvSelect.value = setProv;
+    populateDistrictSelect('set', setDist, setProv);
+    if (setCityInp) setCityInp.value = setCity;
+
+    // Initialize Privacy Alias Toggle & Spiritual Avatar Picker in Settings
+    const setAliasToggle = document.getElementById('setUseAliasToggle');
+    if (setAliasToggle) {
+      setAliasToggle.checked = Boolean(user && (user.isAnonymous || user.useAlias));
+    }
+    const setPhotoInp = document.getElementById('setProfPhotoInput');
+    if (setPhotoInp) setPhotoInp.value = user.photo || '';
+    const setPhotoPreview = document.getElementById('setPhotoPreview');
+    if (setPhotoPreview) {
+      if (user.photo) {
+        setPhotoPreview.innerHTML = `<img src="${user.photo}" alt="${user.name}" style="width: 100%; height: 100%; object-fit: cover;">`;
+      } else {
+        setPhotoPreview.innerText = (user.name || 'අ').trim().charAt(0);
+      }
+    }
+    if (typeof renderSpiritualAvatarPicker === 'function') {
+      renderSpiritualAvatarPicker('setSpiritualAvatarsGrid', 'set', user.photo || '');
+    }
+
+    // Switch to profile content panel
+    switchSettingsTab('profile', 'settings');
+  } else {
+    // 2. Policies Only Mode (Side Menu / Footer Links)
+    if (modalTitleIcon) {
+      modalTitleIcon.className = 'fa-solid fa-shield-halved';
+      modalTitleIcon.style.color = '#059669';
+    }
+    if (modalTitleText) {
+      modalTitleText.textContent = 'ප්‍රතිපත්ති සහ පිං පොත';
+    }
+    // Show tab bar with only policy tabs as equal 3-column grid
+    if (tabsBar) {
+      tabsBar.style.display = 'grid';
+      tabsBar.style.gridTemplateColumns = 'repeat(3, 1fr)';
+    }
+    if (profTabBtn) profTabBtn.style.display = 'none';
+    if (adminTabBtn) adminTabBtn.style.display = 'none';
+
+    ['privacy', 'terms', 'about'].forEach(t => {
+      const btn = document.getElementById(`set-tab-${t}`);
+      if (btn) btn.style.display = 'flex';
+    });
+
+    const activePolicyTab = (initialTab && ['privacy', 'terms', 'about'].includes(initialTab)) ? initialTab : 'privacy';
+    switchSettingsTab(activePolicyTab, 'policies');
+  }
+
   modal.classList.remove('hidden');
+};
+
+window.openPoliciesModal = function(initialTab = 'privacy') {
+  window.openSettingsModal(initialTab, 'policies');
 };
 
 window.closeSettingsModal = function() {
@@ -6753,7 +9257,7 @@ window.closeSettingsModal = function() {
   if (modal) modal.classList.add('hidden');
 };
 
-window.switchSettingsTab = function(tabName) {
+window.switchSettingsTab = function(tabName, mode = null) {
   ['profile', 'privacy', 'terms', 'about', 'admin'].forEach(t => {
     const btn = document.getElementById(`set-tab-${t}`);
     const panel = document.getElementById(`settingsContent${t.charAt(0).toUpperCase() + t.slice(1)}`);
@@ -6795,7 +9299,11 @@ window.saveSettingsProfile = async function(e) {
     location = city;
   }
 
-  await StorageService.updateProfile({ firstName, lastName, occupation, location, district, province, city, bio });
+  const useAlias = Boolean(document.getElementById('setUseAliasToggle')?.checked);
+  const photo = document.getElementById('setProfPhotoInput')?.value;
+  const updatePayload = { firstName, lastName, occupation, location, district, province, city, bio, useAlias, isAnonymous: useAlias };
+  if (photo) updatePayload.photo = photo;
+  await StorageService.updateProfile(updatePayload);
   updateUserInfoUI();
   if (activeTab === 'profile') renderProfileView();
   renderFeed();
@@ -6854,13 +9362,14 @@ window.openRepostModal = function(postId) {
   const orig = post.originalPost || post;
   const origImg = orig.image || (orig.images && orig.images[0]) || null;
 
+  const origAuthorName = StorageService.resolveAuthorName(orig) || orig.author || 'කල්‍යාණ මිත්‍ර';
   if (previewBox) {
     previewBox.innerHTML = `
       <div class="quoted-merit-header">
         <div style="display: flex; align-items: center; gap: 8px;">
-          <div class="quoted-avatar">${Security.escapeHTML((orig.author || 'ක').charAt(0))}</div>
+          <div class="quoted-avatar">${Security.escapeHTML(origAuthorName.charAt(0) || 'ක')}</div>
           <div>
-            <div style="font-weight: 700; font-size: 0.82rem; color: #78350f;">${Security.escapeHTML(orig.author || 'කල්‍යාණ මිත්‍ර')}</div>
+            <div style="font-weight: 700; font-size: 0.82rem; color: #78350f;">${Security.escapeHTML(origAuthorName)}</div>
             <div style="font-size: 0.68rem; color: #94a3b8;">${Security.escapeHTML(formatRelativeTimeSinhala(orig.timestamp, orig.date || 'මෑතකදී'))} ${orig.location ? '• ' + Security.escapeHTML(orig.location) : ''}</div>
           </div>
         </div>
@@ -6992,48 +9501,71 @@ window.submitRepost = async function() {
 // ============================================================================
 
 function renderGlobalAnnouncementUI(announcement) {
-  const banner = document.getElementById('globalAnnouncementBanner');
-  if (!banner) return;
-  const text = announcement?.text || announcement?.message || '';
-  if (announcement && announcement.active && text.trim()) {
-    banner.innerHTML = `
-      <div class="global-announcement-content">
-        <i class="fa-solid fa-bullhorn" style="font-size: 0.95rem; color: #b45309; animation: pulse 2s infinite;"></i>
-        <div class="global-announcement-marquee">
-          <span>${Security.escapeHTML(text)}</span>
+  try {
+    const banner = document.getElementById('globalAnnouncementBanner');
+    if (!banner) return;
+    const text = announcement?.text || announcement?.message || '';
+    if (announcement && announcement.active && text.trim()) {
+      banner.innerHTML = `
+        <div class="global-announcement-content" style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;">
+            <i class="fa-solid fa-bullhorn" style="font-size: 0.95rem; color: #b45309; animation: pulse 2s infinite; flex-shrink: 0;"></i>
+            <div class="global-announcement-marquee" style="flex: 1; min-width: 0;">
+              <span>${Security.escapeHTML(text)}</span>
+            </div>
+          </div>
+          <button type="button" onclick="dismissGlobalAnnouncement()" title="වසන්න" style="background: none; border: none; font-size: 1.15rem; color: #92400e; cursor: pointer; padding: 0 4px; line-height: 1; flex-shrink: 0;">&times;</button>
         </div>
-      </div>
-    `;
-    banner.classList.remove('hidden');
-    banner.style.display = 'block';
-  } else {
-    banner.classList.add('hidden');
-    banner.style.display = 'none';
+      `;
+      banner.classList.remove('hidden');
+      banner.style.display = 'block';
+    } else {
+      banner.classList.add('hidden');
+      banner.style.display = 'none';
+    }
+  } catch (err) {
+    console.warn('[renderGlobalAnnouncementUI] caught safely:', err);
   }
 }
 
-function renderDailyVerseUI(verse) {
-  if (!verse) return;
-  const paliEl = document.getElementById('dailyDhammaPali');
-  const sinhalaEl = document.getElementById('dailyDhammaSinhala');
-  if (paliEl && verse.pali) {
-    paliEl.innerText = `"${verse.pali}"`;
+window.dismissGlobalAnnouncement = function() {
+  const banner = document.getElementById('globalAnnouncementBanner');
+  if (banner) {
+    banner.classList.add('hidden');
+    banner.style.display = 'none';
   }
-  if (sinhalaEl && verse.sinhala) {
-    sinhalaEl.innerText = verse.sinhala;
+};
+
+function renderDailyVerseUI(verse) {
+  try {
+    if (!verse) return;
+    const paliEl = document.getElementById('dailyDhammaPali');
+    const sinhalaEl = document.getElementById('dailyDhammaSinhala');
+    if (paliEl && verse.pali) {
+      paliEl.innerText = `"${verse.pali}"`;
+    }
+    if (sinhalaEl && verse.sinhala) {
+      sinhalaEl.innerText = verse.sinhala;
+    }
+  } catch (err) {
+    console.warn('[renderDailyVerseUI] caught safely:', err);
   }
 }
 
 function renderPoyaUI(poya) {
-  if (!poya) return;
-  const mEl = document.getElementById('poyaMonthBadge');
-  const dEl = document.getElementById('poyaDayBadge');
-  const tEl = document.getElementById('poyaEventTitle');
-  const descEl = document.getElementById('poyaEventDesc');
-  if (mEl && poya.month) mEl.innerText = poya.month;
-  if (dEl && poya.day) dEl.innerText = poya.day;
-  if (tEl && poya.title) tEl.innerText = poya.title;
-  if (descEl && poya.desc) descEl.innerText = poya.desc;
+  try {
+    if (!poya) return;
+    const mEl = document.getElementById('poyaMonthBadge');
+    const dEl = document.getElementById('poyaDayBadge');
+    const tEl = document.getElementById('poyaEventTitle');
+    const descEl = document.getElementById('poyaEventDesc');
+    if (mEl && poya.month) mEl.innerText = poya.month;
+    if (dEl && poya.day) dEl.innerText = poya.day;
+    if (tEl && poya.title) tEl.innerText = poya.title;
+    if (descEl && poya.desc) descEl.innerText = poya.desc;
+  } catch (err) {
+    console.warn('[renderPoyaUI] caught safely:', err);
+  }
 }
 
 window.renderAdminDashboard = async function() {
@@ -7059,7 +9591,7 @@ window.renderAdminDashboard = async function() {
   const announce = StorageService.getAdminAnnouncement();
   const announceInput = document.getElementById('adminAnnounceInput');
   const announceActive = document.getElementById('adminAnnounceActive');
-  if (announceInput && !announceInput.dataset.userEditing) {
+  if (announceInput && !announceInput.dataset?.userEditing) {
     announceInput.value = announce.text || announce.message || '';
   }
   if (announceActive) {
@@ -7070,10 +9602,10 @@ window.renderAdminDashboard = async function() {
   const verse = StorageService.getDailyDhammaVerse();
   const versePali = document.getElementById('adminVersePaliInput');
   const verseSinhala = document.getElementById('adminVerseSinhalaInput');
-  if (verse && versePali && !versePali.dataset.userEditing) {
+  if (verse && versePali && !versePali.dataset?.userEditing) {
     versePali.value = verse.pali || '';
   }
-  if (verse && verseSinhala && !verseSinhala.dataset.userEditing) {
+  if (verse && verseSinhala && !verseSinhala.dataset?.userEditing) {
     verseSinhala.value = verse.sinhala || '';
   }
 
@@ -7083,10 +9615,10 @@ window.renderAdminDashboard = async function() {
   const poyaD = document.getElementById('adminPoyaDayInput');
   const poyaT = document.getElementById('adminPoyaTitleInput');
   const poyaDesc = document.getElementById('adminPoyaDescInput');
-  if (poya && poyaM && !poyaM.dataset.userEditing) poyaM.value = poya.month || '';
-  if (poya && poyaD && !poyaD.dataset.userEditing) poyaD.value = poya.day || '';
-  if (poya && poyaT && !poyaT.dataset.userEditing) poyaT.value = poya.title || '';
-  if (poya && poyaDesc && !poyaDesc.dataset.userEditing) poyaDesc.value = poya.desc || '';
+  if (poya && poyaM && !poyaM.dataset?.userEditing) poyaM.value = poya.month || '';
+  if (poya && poyaD && !poyaD.dataset?.userEditing) poyaD.value = poya.day || '';
+  if (poya && poyaT && !poyaT.dataset?.userEditing) poyaT.value = poya.title || '';
+  if (poya && poyaDesc && !poyaDesc.dataset?.userEditing) poyaDesc.value = poya.desc || '';
 
   // 3c. Populate Charity Needs Verification List
   const charityList = document.getElementById('adminCharityNeedsList');
@@ -7105,7 +9637,7 @@ window.renderAdminDashboard = async function() {
                 ${isVer ? '<span class="verified-need-badge"><i class="fa-solid fa-circle-check"></i> සත්‍යාපිතයි</span>' : '<span style="font-size: 0.62rem; color: #d97706; background: #fffbeb; padding: 1px 6px; border-radius: 4px; font-weight: 700;">අසත්‍යාපිතයි</span>'}
               </div>
               <div style="font-size: 0.68rem; color: #64748b; margin-top: 2px;">
-                <span>${Security.escapeHTML(n.author || 'කල්‍යාණ මිත්‍ර')}</span> • <span>📞 ${Security.escapeHTML(n.contact || 'නැත')}</span>
+                <span>${Security.escapeHTML(StorageService.resolveAuthorName(n) || n.author || 'කල්‍යාණ මිත්‍ර')}</span> • <span>📞 ${Security.escapeHTML(n.contact || 'නැත')}</span>
               </div>
             </div>
             <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
@@ -7152,7 +9684,7 @@ window.renderAdminDashboard = async function() {
                 <span style="font-size: 0.65rem; color: #64748b;">(${Security.escapeHTML(p.category || 'පින්කම')})</span>
               </div>
               <div style="font-size: 0.68rem; color: #94a3b8; margin-top: 2px;">
-                <span>${isOfficial ? 'අපේ පිං පොත (නිල)' : Security.escapeHTML(p.author || 'නොදන්නා')}</span> • <span>${Security.escapeHTML(p.date || 'දැන්')}</span>
+                <span>${isOfficial ? 'අපේ පිං පොත (නිල)' : Security.escapeHTML(StorageService.resolveAuthorName(p) || p.author || 'නොදන්නා')}</span> • <span>${Security.escapeHTML(p.date || 'දැන්')}</span>
               </div>
             </div>
             <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
@@ -7641,15 +10173,15 @@ let deferredPwaPrompt = null;
 let newWorkerWaiting = null;
 
 function initPWAEngine() {
-  // Check standalone mode
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
-                       window.navigator.standalone === true;
+  // Check standalone mode safely
+  const isStandalone = (typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)')?.matches) || 
+                       (window.navigator && window.navigator.standalone === true);
 
-  // iOS Safari detection
-  const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()) && !window.MSStream;
+  // iOS Safari detection safely
+  const isIos = (typeof window !== 'undefined' && window.navigator && /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase())) && !window.MSStream;
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v70';
+  const ACTIVE_BUILD = 'v139';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
@@ -7663,10 +10195,18 @@ function initPWAEngine() {
     }
   }
 
-  // Register Service Worker
-  if ('serviceWorker' in navigator) {
+  // Register Service Worker safely
+  if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+    const registerSW = () => {
+      navigator.serviceWorker.register('./sw.js?v=139', { updateViaCache: 'none' });
+    };
+    if (document.readyState === 'complete') {
+      registerSW();
+    } else {
+      window.addEventListener('load', registerSW);
+    }
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=68', { updateViaCache: 'none' })
+      navigator.serviceWorker.register('./sw.js?v=139', { updateViaCache: 'none' })
         .then((registration) => {
           // Immediately check for service worker updates
           try { registration.update(); } catch (e) {}
@@ -7782,17 +10322,19 @@ window.triggerPWAInstall = async function () {
   }
 };
 
-window.showPWAInstallBanner = function () {
+export function showPWAInstallBanner() {
   const banner = document.getElementById('pwaInstallBanner');
   if (banner) {
     banner.classList.remove('hidden');
-    requestAnimationFrame(() => {
+    (window.requestAnimationFrame || ((cb) => setTimeout(cb, 16)))(() => {
       banner.classList.add('visible');
     });
   }
 };
 
-window.hidePWAInstallBanner = function () {
+window.showPWAInstallBanner = showPWAInstallBanner;
+
+export function hidePWAInstallBanner() {
   const banner = document.getElementById('pwaInstallBanner');
   if (banner) {
     banner.classList.remove('visible');
@@ -7801,6 +10343,8 @@ window.hidePWAInstallBanner = function () {
     }, 400);
   }
 };
+
+window.hidePWAInstallBanner = hidePWAInstallBanner;
 
 window.dismissPWAInstallBanner = function () {
   triggerHaptic(15);
@@ -7824,7 +10368,7 @@ window.showPwaUpdateToast = function () {
   const toast = document.getElementById('pwaUpdateToast');
   if (toast) {
     toast.classList.remove('hidden');
-    requestAnimationFrame(() => {
+    (window.requestAnimationFrame || ((cb) => setTimeout(cb, 16)))(() => {
       toast.classList.add('visible');
     });
   }
@@ -7922,6 +10466,197 @@ function initSmartHeaderScroll() {
   window.addEventListener('scroll', onScroll, { passive: true });
 }
 
+// ============================================================================
+// Lock Mobile Bottom Navigation Bar to Visual Viewport (Prevents Sinking on Scroll)
+// ============================================================================
+function initMobileBottomBarLock() {
+  const bar = document.getElementById('mobileBottomBar');
+  if (!bar) return;
+
+  let scheduled = false;
+  const updatePosition = () => {
+    if (window.innerWidth > 768) return;
+    if (!scheduled) {
+      scheduled = true;
+      window.requestAnimationFrame(() => {
+        scheduled = false;
+        if (window.visualViewport) {
+          const vv = window.visualViewport;
+          const layoutHeight = document.documentElement.clientHeight || window.innerHeight;
+          const offset = Math.max(0, layoutHeight - (vv.height + vv.offsetTop));
+          bar.style.bottom = `${offset}px`;
+        } else {
+          bar.style.bottom = '0px';
+        }
+      });
+    }
+  };
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', updatePosition, { passive: true });
+    window.visualViewport.addEventListener('scroll', updatePosition, { passive: true });
+  }
+  window.addEventListener('scroll', updatePosition, { passive: true });
+  window.addEventListener('resize', updatePosition, { passive: true });
+  window.addEventListener('orientationchange', () => setTimeout(updatePosition, 100));
+  updatePosition();
+}
+
+export function toggleAranyaTab() {
+  triggerHaptic(12);
+  if (activeTab === 'aranya') {
+    switchTab('feed');
+  } else {
+    switchTab('aranya');
+  }
+}
+window.toggleAranyaTab = toggleAranyaTab;
+
+// ============================================================================
+// Native Mobile App Slide Drawer Menu Controller
+// ============================================================================
+export function openMobileMenuDrawer() {
+  triggerHaptic(12);
+  const overlay = document.getElementById('mobileDrawerOverlay');
+  const drawer = document.getElementById('mobileDrawer');
+  if (!drawer) return;
+
+  updateUserInfoUI();
+
+  overlay?.classList.remove('hidden');
+  drawer.classList.remove('hidden');
+
+  (window.requestAnimationFrame || ((cb) => setTimeout(cb, 16)))(() => {
+    overlay?.classList.add('open');
+    drawer.classList.add('open');
+    document.body.classList.add('drawer-open');
+  });
+}
+window.openMobileMenuDrawer = openMobileMenuDrawer;
+
+export function closeMobileMenuDrawer() {
+  triggerHaptic(8);
+  const overlay = document.getElementById('mobileDrawerOverlay');
+  const drawer = document.getElementById('mobileDrawer');
+  if (!drawer) return;
+
+  overlay?.classList.remove('open');
+  drawer.classList.remove('open');
+  document.body.classList.remove('drawer-open');
+
+  setTimeout(() => {
+    overlay?.classList.add('hidden');
+    drawer.classList.add('hidden');
+  }, 300);
+}
+window.closeMobileMenuDrawer = closeMobileMenuDrawer;
+
+export function toggleMobileMenuDrawer() {
+  const drawer = document.getElementById('mobileDrawer');
+  if (drawer && drawer.classList.contains('open')) {
+    closeMobileMenuDrawer();
+  } else {
+    openMobileMenuDrawer();
+  }
+}
+window.toggleMobileMenuDrawer = toggleMobileMenuDrawer;
+
+// Keyboard Escape listener to dismiss drawer & modals
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const drawer = document.getElementById('mobileDrawer');
+    if (drawer && drawer.classList.contains('open')) {
+      closeMobileMenuDrawer();
+    }
+    const nameModal = document.getElementById('quickNameEditModal');
+    if (nameModal && !nameModal.classList.contains('hidden')) {
+      closeQuickNameEditModal();
+    }
+  }
+});
+
+// ============================================================================
+// Quick Inline Name Edit Modal Controller
+// ============================================================================
+export function openInlineNameEditModal() {
+  triggerHaptic(10);
+  const user = StorageService.currentUser;
+  const input = document.getElementById('quickNameInput');
+  if (input) {
+    input.value = user?.name || '';
+  }
+  const modal = document.getElementById('quickNameEditModal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+    setTimeout(() => {
+      input?.focus();
+      input?.select();
+    }, 100);
+  }
+}
+window.openInlineNameEditModal = openInlineNameEditModal;
+
+export function closeQuickNameEditModal() {
+  triggerHaptic(8);
+  const modal = document.getElementById('quickNameEditModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
+}
+window.closeQuickNameEditModal = closeQuickNameEditModal;
+
+export async function saveQuickNameEdit() {
+  const input = document.getElementById('quickNameInput');
+  const newName = (input?.value || '').trim();
+  if (!newName) {
+    showToast("කරුණාකර වලංගු නමක් ඇතුළත් කරන්න.", "warning");
+    input?.focus();
+    return;
+  }
+  if (newName.length < 2) {
+    showToast("නම සඳහා අවම වශයෙන් අකුරු 2ක් වත් තිබිය යුතුය.", "warning");
+    input?.focus();
+    return;
+  }
+
+  const saveBtn = document.getElementById('btnSaveQuickName');
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> සුරකිමින්...';
+  }
+
+  try {
+    const parts = newName.split(' ');
+    const firstName = parts[0] || newName;
+    const lastName = parts.slice(1).join(' ') || '';
+
+    await StorageService.updateUserProfile({
+      name: newName,
+      firstName: firstName,
+      lastName: lastName
+    });
+
+    // Update UI across header, drawer, and profile
+    updateUserInfoUI();
+    loadProfilePage();
+    
+    closeQuickNameEditModal();
+    showToast("ඔබගේ නම සාර්ථකව යාවත්කාලීන විය! 🙏", "success");
+    triggerHaptic(15);
+  } catch (err) {
+    console.error("Error updating name:", err);
+    showToast("නම යාවත්කාලීන කිරීමේදී දෝෂයක් සිදුවිය: " + (err.message || ''), "error");
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = '<i class="fa-solid fa-check"></i> සුරකින්න';
+    }
+  }
+}
+window.saveQuickNameEdit = saveQuickNameEdit;
+
 // =========================================================================
 // Sidebar Daily Dhamma Verse & Poya Calendar Admin Modals
 // =========================================================================
@@ -8015,4 +10750,397 @@ window.handleSavePoyaCalendarModal = async function(e) {
   } finally {
     if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
   }
+};
+
+/* ==========================================================================
+   Sri Lanka Aranya Senasana Directory Controller
+   ========================================================================== */
+let allAranyaSenasana = [];
+let currentAranyaDistrict = 'සියලුම';
+let currentAranyaSearch = '';
+
+window.renderAranyaDirectoryView = async function() {
+  const grid = document.getElementById('aranyaGrid');
+  const countEl = document.getElementById('aranyaResultsCount');
+
+  if (grid) {
+    grid.innerHTML = `
+      <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #059669;">
+        <i class="fa-solid fa-spinner fa-spin" style="font-size: 1.8rem; margin-bottom: 10px;"></i>
+        <p style="font-weight: 600; font-size: 0.9rem;">පූජනීය ආරණ්‍ය සේනාසන නාමාවලිය පූරණය වෙමින්...</p>
+      </div>
+    `;
+  }
+
+  try {
+    allAranyaSenasana = await StorageService.getAranyaSenasanaList();
+  } catch (err) {
+    console.error('[Aranya] Failed to load list:', err);
+    allAranyaSenasana = [];
+  }
+
+  // Render Districts Bar if not rendered or update counts
+  renderAranyaDistrictsBar();
+
+  // Filter & Render Cards
+  filterAndRenderAranyaCards();
+};
+
+function renderAranyaDistrictsBar() {
+  const bar = document.getElementById('aranyaDistrictsBar');
+  if (!bar) return;
+
+  const districts = [
+    'සියලුම', 'කුරුණෑගල', 'ගාල්ල', 'කළුතර', 'ගම්පහ', 'මහනුවර', 'මාතලේ',
+    'අනුරාධපුරය', 'පොළොන්නරුව', 'හම්බන්තොට', 'බදුල්ල', 'රත්නපුරය', 'අම්පාර', 'මාතර'
+  ];
+
+  bar.innerHTML = districts.map(d => {
+    let count = 0;
+    if (d === 'සියලුම') {
+      count = allAranyaSenasana.length;
+    } else {
+      count = allAranyaSenasana.filter(a => (a.district || '').includes(d)).length;
+    }
+
+    const isActive = currentAranyaDistrict === d;
+    return `
+      <button type="button" 
+        class="aranya-district-chip ${isActive ? 'active' : ''}" 
+        onclick="setAranyaDistrictFilter('${d}')">
+        <span>${d}</span>
+        <span style="font-size: 0.68rem; opacity: 0.85; margin-left: 3px;">(${count})</span>
+      </button>
+    `;
+  }).join('');
+}
+
+window.setAranyaDistrictFilter = function(district) {
+  triggerHaptic(10);
+  currentAranyaDistrict = district;
+  renderAranyaDistrictsBar();
+  filterAndRenderAranyaCards();
+};
+
+window.filterAranyaDirectory = function() {
+  const input = document.getElementById('aranyaSearchInput');
+  const clearBtn = document.getElementById('aranyaSearchClearBtn');
+  currentAranyaSearch = (input?.value || '').trim().toLowerCase();
+
+  if (clearBtn) {
+    if (currentAranyaSearch) clearBtn.classList.remove('hidden');
+    else clearBtn.classList.add('hidden');
+  }
+
+  filterAndRenderAranyaCards();
+};
+
+window.clearAranyaSearch = function() {
+  const input = document.getElementById('aranyaSearchInput');
+  const clearBtn = document.getElementById('aranyaSearchClearBtn');
+  if (input) input.value = '';
+  if (clearBtn) clearBtn.classList.add('hidden');
+  currentAranyaSearch = '';
+  filterAndRenderAranyaCards();
+};
+
+window.resetAranyaFilters = function() {
+  currentAranyaDistrict = 'සියලුම';
+  currentAranyaSearch = '';
+  const input = document.getElementById('aranyaSearchInput');
+  const clearBtn = document.getElementById('aranyaSearchClearBtn');
+  if (input) input.value = '';
+  if (clearBtn) clearBtn.classList.add('hidden');
+  renderAranyaDistrictsBar();
+  filterAndRenderAranyaCards();
+};
+
+function filterAndRenderAranyaCards() {
+  const grid = document.getElementById('aranyaGrid');
+  const emptyState = document.getElementById('aranyaEmptyState');
+  const countEl = document.getElementById('aranyaResultsCount');
+  if (!grid) return;
+
+  let filtered = [...allAranyaSenasana];
+
+  // District filter
+  if (currentAranyaDistrict !== 'සියලුම') {
+    filtered = filtered.filter(a => (a.district || '').includes(currentAranyaDistrict));
+  }
+
+  // Search query filter
+  if (currentAranyaSearch) {
+    const q = currentAranyaSearch;
+    filtered = filtered.filter(a => {
+      const name = (a.name || '').toLowerCase();
+      const nameEn = (a.nameEn || '').toLowerCase();
+      const town = (a.town || '').toLowerCase();
+      const district = (a.district || '').toLowerCase();
+      const tradition = (a.tradition || '').toLowerCase();
+      const desc = (a.description || '').toLowerCase();
+      const services = (a.services || []).join(' ').toLowerCase();
+      return name.includes(q) || nameEn.includes(q) || town.includes(q) || district.includes(q) || tradition.includes(q) || desc.includes(q) || services.includes(q);
+    });
+  }
+
+  // Update counter
+  if (countEl) {
+    countEl.innerText = `සෙනසුන් ${filtered.length} ක් හමුවිය`;
+  }
+
+  if (filtered.length === 0) {
+    grid.innerHTML = '';
+    if (emptyState) emptyState.style.display = 'block';
+    return;
+  }
+
+  if (emptyState) emptyState.style.display = 'none';
+
+  grid.innerHTML = filtered.map(item => {
+    const primaryPhone = item.phones && item.phones[0] ? item.phones[0] : '';
+    const secondaryPhone = item.phones && item.phones[1] ? item.phones[1] : '';
+    const cleanPhoneForTel = primaryPhone.replace(/[^0-9]/g, '');
+    const cleanSecPhoneForTel = secondaryPhone.replace(/[^0-9]/g, '');
+    const waClean = (item.whatsapp || primaryPhone).replace(/[^0-9]/g, '').replace(/^0/, '94');
+
+    const servicesHtml = (item.services || []).map(s => `
+      <span class="aranya-service-pill">${Security.escapeHTML(s)}</span>
+    `).join('');
+
+    return `
+      <div class="aranya-card" id="card_${item.id}">
+        <div class="aranya-card-top">
+          <span class="aranya-tradition-tag">
+            <i class="fa-solid fa-dharmachakra"></i>
+            <span>${Security.escapeHTML(item.tradition || 'ආරණ්‍ය සම්ප්‍රදාය')}</span>
+          </span>
+          <span class="aranya-district-tag">
+            <i class="fa-solid fa-location-dot"></i>
+            <span>${Security.escapeHTML(item.district || 'දිස්ත්‍රික්කය')}</span>
+          </span>
+        </div>
+
+        <h3 class="aranya-title">${Security.escapeHTML(item.name)}</h3>
+        ${item.nameEn ? `<div class="aranya-subtitle">${Security.escapeHTML(item.nameEn)}</div>` : ''}
+
+        <div class="aranya-location">
+          <i class="fa-solid fa-map-pin"></i>
+          <span>${Security.escapeHTML(item.town || '')}</span>
+        </div>
+
+        <p class="aranya-desc">${Security.escapeHTML(item.description || '')}</p>
+
+        ${item.callingHours ? `
+          <div class="aranya-calling-hours">
+            <i class="fa-regular fa-clock"></i>
+            <span><strong>ඇමතුම් වේලාව:</strong> ${Security.escapeHTML(item.callingHours)}</span>
+          </div>
+        ` : ''}
+
+        <div class="aranya-contact-person">
+          <i class="fa-solid fa-user-tie" style="color: #64748b;"></i>
+          <span>${Security.escapeHTML(item.contactPerson || 'දායක සභාව / කාර්යාලය')}</span>
+        </div>
+
+        ${servicesHtml ? `<div class="aranya-services-list">${servicesHtml}</div>` : ''}
+
+        <div class="aranya-action-bar">
+          ${primaryPhone ? `
+            <a href="tel:${cleanPhoneForTel}" class="aranya-action-btn btn-call" title="දුරකථන ඇමතුමක් ලබාගන්න">
+              <i class="fa-solid fa-phone"></i>
+              <span>${primaryPhone}</span>
+            </a>
+          ` : ''}
+
+          ${secondaryPhone ? `
+            <a href="tel:${cleanSecPhoneForTel}" class="aranya-action-btn btn-call-sub" title="දෙවන අංකය අමතන්න">
+              <i class="fa-solid fa-phone-volume"></i>
+              <span>${secondaryPhone}</span>
+            </a>
+          ` : ''}
+
+          ${item.whatsapp ? `
+            <a href="https://wa.me/${waClean}" target="_blank" rel="noopener" class="aranya-action-btn btn-wa" title="WhatsApp පණිවිඩයක් යොමු කරන්න">
+              <i class="fa-brands fa-whatsapp"></i>
+              <span>WhatsApp</span>
+            </a>
+          ` : ''}
+
+          ${item.mapUrl ? `
+            <a href="${item.mapUrl}" target="_blank" rel="noopener" class="aranya-action-btn btn-map" title="Google Maps මඟින් යන මඟ බලන්න">
+              <i class="fa-solid fa-diamond-turn-right"></i>
+              <span>Maps</span>
+            </a>
+          ` : ''}
+
+          ${primaryPhone ? `
+            <button type="button" class="aranya-action-btn btn-copy" onclick="copyAranyaPhone('${primaryPhone}', this)" title="අංකය Copy කරගන්න">
+              <i class="fa-regular fa-copy"></i>
+            </button>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+window.copyAranyaPhone = function(phone, btn) {
+  triggerHaptic(15);
+  if (!navigator.clipboard) {
+    alert("දුරකථන අංකය: " + phone);
+    return;
+  }
+  navigator.clipboard.writeText(phone).then(() => {
+    if (btn) {
+      const origHtml = btn.innerHTML;
+      btn.innerHTML = '<i class="fa-solid fa-check" style="color: #059669;"></i>';
+      setTimeout(() => { btn.innerHTML = origHtml; }, 1800);
+    }
+  }).catch(() => {
+    alert("දුරකථන අංකය: " + phone);
+  });
+};
+
+/* Suggest Monastery Modal Logic */
+window.openSuggestAranyaModal = function() {
+  triggerHaptic(12);
+  const modal = document.getElementById('suggestAranyaModal');
+  if (modal) modal.classList.remove('hidden');
+};
+
+window.closeSuggestAranyaModal = function() {
+  const modal = document.getElementById('suggestAranyaModal');
+  if (modal) modal.classList.add('hidden');
+};
+
+window.closeSuggestAranyaModalOnBackdrop = function(e) {
+  if (e.target && e.target.id === 'suggestAranyaModal') {
+    closeSuggestAranyaModal();
+  }
+};
+
+window.submitAranyaSuggestion = async function(e) {
+  if (e) e.preventDefault();
+  const name = (document.getElementById('suggAranyaName')?.value || '').trim();
+  const district = (document.getElementById('suggAranyaDistrict')?.value || '').trim();
+  const town = (document.getElementById('suggAranyaTown')?.value || '').trim();
+  const phone = (document.getElementById('suggAranyaPhone')?.value || '').trim();
+  const whatsapp = (document.getElementById('suggAranyaWa')?.value || '').trim();
+  const callingHours = (document.getElementById('suggAranyaHours')?.value || '').trim();
+  const notes = (document.getElementById('suggAranyaNotes')?.value || '').trim();
+
+  if (!name || !district || !town || !phone) {
+    alert("කරුණාකර ආරණ්‍යයේ නම, දිස්ත්‍රික්කය, නගරය සහ දුරකථන අංකය ඇතුළත් කරන්න.");
+    return;
+  }
+
+  const btn = document.getElementById('btnSubmitAranyaSugg');
+  const origHtml = btn ? btn.innerHTML : '';
+
+  try {
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> යොමු කරමින්...';
+    }
+
+    await StorageService.suggestAranyaSenasana({
+      name,
+      district,
+      town,
+      phone,
+      whatsapp,
+      callingHours,
+      notes
+    });
+
+    SoundService.playPublish();
+    triggerHaptic([30, 60, 30]);
+    alert("සාදු! ඔබගේ යෝජනාව සාර්ථකව ලැබුණි. පරිපාලක මණ්ඩලය විසින් සත්‍යාපනය කිරීමෙන් පසු එය ප්‍රධාන නාමාවලියට ඇතුළත් කරනු ඇත. 🙏🌿");
+
+    const form = document.getElementById('suggestAranyaForm');
+    if (form) form.reset();
+    closeSuggestAranyaModal();
+  } catch (err) {
+    alert("දෝෂයක් සිදු විය: " + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+    }
+  }
+};
+
+
+// ============================================================================
+// Policies & About Ape Pin Potha Controller
+// ============================================================================
+window.switchPoliciesSubTab = function(subTabName = 'about') {
+  triggerHaptic(10);
+  const tabs = ['about', 'privacy', 'terms', 'settings'];
+  tabs.forEach(t => {
+    const btn = document.getElementById(`pol-tab-${t}`);
+    const content = document.getElementById(`policiesContent${t.charAt(0).toUpperCase() + t.slice(1)}`);
+    if (btn) {
+      if (t === subTabName) btn.classList.add('active');
+      else btn.classList.remove('active');
+    }
+    if (content) {
+      if (t === subTabName) {
+        content.classList.remove('hidden');
+        content.style.setProperty('display', 'block', 'important');
+      } else {
+        content.classList.add('hidden');
+        content.style.setProperty('display', 'none', 'important');
+      }
+    }
+  });
+
+  // Auto-center active tab button horizontally in the tabs bar so users clearly see more tabs on either side
+  const centerActiveTab = () => {
+    const activeBtn = document.getElementById(`pol-tab-${subTabName}`);
+    const navTabsContainer = activeBtn ? activeBtn.closest('.policies-nav-tabs') : null;
+    if (activeBtn && navTabsContainer) {
+      const btnLeft = activeBtn.offsetLeft;
+      const btnWidth = activeBtn.offsetWidth;
+      const containerWidth = navTabsContainer.clientWidth;
+      const scrollTarget = btnLeft - (containerWidth / 2) + (btnWidth / 2);
+      navTabsContainer.scrollTo({ left: Math.max(0, scrollTarget), behavior: 'smooth' });
+    }
+  };
+  centerActiveTab();
+  setTimeout(centerActiveTab, 80);
+
+  // If settings subtab is active, sync sound checkbox, avatar logo and user data
+  if (subTabName === 'settings') {
+    const polSound = document.getElementById('chkPoliciesSoundEffects');
+    if (polSound && typeof SoundService !== 'undefined') {
+      polSound.checked = SoundService.getSoundEnabled();
+    }
+    const user = StorageService.currentUser;
+    const nameEl = document.getElementById('policiesUserName');
+    const emailEl = document.getElementById('policiesUserEmail');
+    const avatarEl = document.getElementById('policiesUserAvatar');
+    if (nameEl && user) nameEl.textContent = user.name || 'පින්වත් කල්‍යාණ මිත්‍රයෙක්';
+    if (emailEl && user) emailEl.textContent = user.email || 'Google ගිණුම සම්බන්ධ කර නැත';
+    if (avatarEl && user) {
+      const firstLetter = (user.name || 'අ').trim().charAt(0);
+      if (user.photo) {
+        avatarEl.innerHTML = `<img src="${user.photo}" alt="${user.name}" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover; display: block;" onerror="this.parentElement.innerText='${firstLetter}';">`;
+      } else {
+        avatarEl.innerText = firstLetter;
+      }
+    }
+  }
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+window.togglePoliciesSound = function(e) {
+  const enabled = e.target.checked;
+  if (typeof SoundService !== 'undefined') {
+    SoundService.setSoundEnabled(enabled);
+    if (enabled) SoundService.playClick();
+  }
+  const otherChk = document.getElementById('chkSoundEffects');
+  if (otherChk) otherChk.checked = enabled;
 };

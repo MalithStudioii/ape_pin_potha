@@ -111,20 +111,18 @@ export const FeedAlgorithm = {
     const cloned = [...posts];
 
     return cloned.sort((a, b) => {
-      // 1. Pinned posts ALWAYS come first regardless of mode
+      // 1. Pinned official platform announcement (Welcome banner) ALWAYS comes #1 at the top of the feed
+      const aPinnedOff = (a.isOfficial && a.isPinned) ? 1 : 0;
+      const bPinnedOff = (b.isOfficial && b.isPinned) ? 1 : 0;
+      if (bPinnedOff !== aPinnedOff) {
+        return bPinnedOff - aPinnedOff;
+      }
+
+      // 2. Pinned posts come next (or pinned official announcements come before other official announcements)
       const aPin = a.isPinned ? 1 : 0;
       const bPin = b.isPinned ? 1 : 0;
       if (bPin !== aPin) {
         return bPin - aPin;
-      }
-
-      // 2. In trending mode, official posts have higher hierarchy
-      if (mode === 'trending') {
-        const aOff = a.isOfficial ? 1 : 0;
-        const bOff = b.isOfficial ? 1 : 0;
-        if (bOff !== aOff) {
-          return bOff - aOff;
-        }
       }
 
       // 3. Mode-specific sorting

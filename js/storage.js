@@ -4,8 +4,10 @@
  * ============================================================================
  */
 
-import { firebaseConfig, isFirebaseConfigured, COLLECTIONS } from './firebase-config.js?v=22';
-import { Security } from './security.js?v=48';
+import { firebaseConfig, isFirebaseConfigured, COLLECTIONS } from './firebase-config.js?v=139';
+import { Security } from './security.js?v=139';
+import { INITIAL_ARANYA_LIST, SRI_LANKA_DISTRICTS } from './aranya-data.js';
+import { SEED_POSTS } from './initial-seed.js?v=144';
 
 let db = null;
 let auth = null;
@@ -18,12 +20,15 @@ let poyaListeners = [];
 let bannedWordsListeners = [];
 
 export const MASTER_ADMIN_EMAIL = "silvadilan9@gmail.com";
+export const MASTER_ADMIN_EMAILS = [
+  "silvadilan9@gmail.com"
+];
 
 const DEFAULT_POYA_EVENT = {
-  month: 'ඔක්',
-  day: '25',
-  title: 'වප් පුර පසළොස්වක පොහොය',
-  desc: 'කඨින චීවර මාසයේ ආරම්භය'
+  month: 'නොවැ',
+  day: '24',
+  title: 'ඉල් පුර පසළොස්වක පොහොය',
+  desc: 'කඨින චීවර පූජා මහා පින්කම් සමයේ අවසානය'
 };
 
 const DEFAULT_BANNED_WORDS = [
@@ -32,166 +37,268 @@ const DEFAULT_BANNED_WORDS = [
 ];
 
 
-// Sample seed data for Local Sandbox mode
-const SEED_POSTS = [
-  {
-    id: "post_201",
-    uid: "user_supun",
-    author: "සුපුන් පෙරේරා",
-    type: "merit",
-    visibility: "public",
-    title: "ගිලන්පස සහ ඖෂධ පූජාව",
-    category: "දානමය",
-    location: "කැලණිය රජමහා විහාරය",
-    description: "අද සවස භාග්‍යවතුන් වහන්සේ උදෙසා සුවඳ මල්, පහන් සහ ගිලන්පස පූජා කර සියලු සත්ත්වයන්ට නිදුක් නීරෝගී සුවය ප්‍රාර්ථනා කළෙමු. දැක බලා සියලු දෙනාම සතුටු සිතින් අනුමෝදන් වෙත්වා! 🙏",
-    date: "පැය 2කට පෙර",
-    timestamp: Date.now() - 7200000,
-    sadhuCount: 38,
-    image: "https://images.unsplash.com/photo-1544650039-22886fbb4323?auto=format&fit=crop&w=800&q=70",
-    images: [
-      "https://images.unsplash.com/photo-1544650039-22886fbb4323?auto=format&fit=crop&w=800&q=70",
-      "https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=800&q=70",
-      "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=800&q=70",
-      "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=70"
-    ],
-    comments: [
-      { author: "නිමාලි සිල්වා", text: "සාදු! සාදු! සාදු! ඉතාමත් උතුම් පින්කමක් 🙏", time: "විනාඩි 45කට පෙර" },
-      { author: "කසුන් රාජපක්ෂ", text: "සියලු දෙනාටම උතුම් චතුරාර්ය සත්‍යය අවබෝධ වේවා!", time: "විනාඩි 15කට පෙර" }
-    ]
-  },
-  {
-    id: "post_202",
-    uid: "user_charity",
-    author: "කල්‍යාණ මිත්‍ර එකමුතුව",
-    type: "need",
-    visibility: "public",
-    title: "දුෂ්කර පාසලක පුස්තකාලයට පොත් අවශ්‍යයි",
-    category: "සමාජ සත්කාර",
-    location: "මොණරාගල - සියඹලාණ්ඩුව",
-    contact: "0712345678",
-    description: "සියඹලාණ්ඩුව ප්‍රදේශයේ දුෂ්කර පාසලක දරුවන් 85 දෙනෙකු සඳහා කියවීමේ පොත් සහ අභ්‍යාස පොත් ලබා දීමට සැලසුම් කර ඇත. ඔබ ළඟ ඇති පොත් ලබා දී මේ පින්කමට දායක විය හැක.",
-    date: "ඊයේ",
-    timestamp: Date.now() - 86400000,
-    sadhuCount: 22,
-    image: null,
-    comments: [
-      { author: "චතුරංග", text: "මම පොත් 25ක් ලබා දෙන්නම්. හෙට කතා කරන්නම් සහෝදරයා.", time: "පැය 5කට පෙර" }
-    ]
-  },
-  {
-    id: "post_203",
-    uid: "user_malith",
-    author: "මලිත්",
-    type: "merit",
-    visibility: "private",
-    title: "රාත්‍රී මෛත්‍රී භාවනාව (විනාඩි 30)",
-    category: "භාවනාමය",
-    location: "නිවසේදී",
-    description: "නින්දට පෙර විනාඩි 30ක් සියලු සත්ත්වයන් වෙත මෙත් සිත පතුරුවමින් භාවනා කළෙමි. සිතට මහත් සැහැල්ලුවක් දැනුණි.",
-    date: "අද",
-    timestamp: Date.now() - 1800000,
-    sadhuCount: 1,
-    image: null,
-    comments: []
-  },
-  {
-    id: "post_204",
-    uid: "user_dharma",
-    author: "ශ්‍රද්ධා ධර්ම දානය",
-    type: "merit",
-    visibility: "public",
-    title: "සිත නිවන කෙටි ධර්ම කරුණක්",
-    category: "ධර්ම දානමය",
-    location: "කොළඹ",
-    description: "සිතේ සැනසීම උදාකරගන්නා අයුරු පැහැදිලි කරන වටිනා කෙටි ධර්ම දේශනාව. ශ්‍රවණය කර සිත පහදවා ගන්න! 🙏",
-    date: "පැය 1කට පෙර",
-    timestamp: Date.now() - 3600000,
-    sadhuCount: 45,
-    videoUrl: "https://www.youtube.com/shorts/5e_0P0c2E2A",
-    videoId: "5e_0P0c2E2A",
-    videoType: "youtube",
-    isShorts: true,
-    videoThumbnail: "https://img.youtube.com/vi/5e_0P0c2E2A/hqdefault.jpg",
-    image: "https://img.youtube.com/vi/5e_0P0c2E2A/hqdefault.jpg",
-    images: ["https://img.youtube.com/vi/5e_0P0c2E2A/hqdefault.jpg"],
-    comments: [
-      { author: "සුමනා පෙරේරා", text: "සාදු! ඉතාමත් පැහැදිලි කෙටි දේශනාවක්.", time: "විනාඩි 30කට පෙර" }
-    ]
-  }
-];
-
-// Sample seed notifications
-const SEED_NOTIFICATIONS = [
-  {
-    id: "notif_101",
-    recipientUid: "user_malith",
-    senderUid: "user_supun",
-    senderName: "සුපුන් පෙරේරා",
-    senderPhoto: null,
-    type: "sadhu",
-    postId: "post_203",
-    postTitle: "රාත්‍රී මෛත්‍රී භාවනාව (විනාඩි 30)",
-    message: "ඔබගේ පින්කමට සාදුකාරයක් ලබා දුන්නා 🙏",
-    timestamp: Date.now() - 1000 * 60 * 18,
-    read: false
-  },
-  {
-    id: "notif_102",
-    recipientUid: "user_malith",
-    senderUid: "user_nimali",
-    senderName: "නිමාලි සිල්වා",
-    senderPhoto: null,
-    type: "comment",
-    postId: "post_203",
-    postTitle: "රාත්‍රී මෛත්‍රී භාවනාව (විනාඩි 30)",
-    message: "ඔබගේ සටහනට පුණ්‍යානුමෝදනාවක් එක් කළාය: 'සාදු! සාදු! ඉතා අගනා පින්කමක්'",
-    timestamp: Date.now() - 1000 * 60 * 55,
-    read: false
-  },
-  {
-    id: "notif_103",
-    recipientUid: "user_malith",
-    senderUid: "user_charity",
-    senderName: "කල්‍යාණ මිත්‍ර එකමුතුව",
-    senderPhoto: null,
-    type: "sathkara",
-    postId: "post_202",
-    postTitle: "දුෂ්කර පාසලක පුස්තකාලයට පොත් අවශ්‍යයි",
-    message: "සත්කාර හවුලේ නව පුණ්‍ය අවස්ථාවක් එක් කර ඇත 🤝",
-    timestamp: Date.now() - 1000 * 60 * 60 * 4,
-    read: true
-  }
-];
-
+// Live community seed feed cache imported from ./initial-seed.js
+const SEED_NOTIFICATIONS = [];
 
 export const StorageService = {
   _cachedPosts: null,
-  currentUser: {
-    uid: "user_malith",
-    name: "මලිත් දුෂාන්ත හපුතන්ත්‍රි",
-    email: null,
-    isAdmin: false,
-    isAnonymous: true
-  },
+  FEED_PAGE_SIZE: 20,
+  _lastVisibleDoc: null,
+  _hasMorePosts: true,
+  _isLoadingMore: false,
+  _isInitialSyncDone: false,
+  _loadedPosts: [],
+  currentUser: null,
 
-  _knownAdminUids: new Set(['user_malith']),
+  _knownAdminUids: new Set(),
+  _knownSanghaUids: new Set(),
+  _cachedOfficialPosts: [],
 
   /**
-   * Checks whether a user/email/post is Master Admin (silvadilan9@gmail.com)
+   * Helper to accurately determine whether a post is an Official Post from 'අපේ පිං පොත'
    */
-  isMasterAdmin(userOrEmailOrUid) {
+  isDummyTestPost(p) {
+    if (!p) return true;
+    if (this.isOfficialPost(p)) return false; // Official platform announcements are NEVER dummy posts!
+    const id = String(p.id || '');
+    const author = String(p.author || '').trim();
+    const title = String(p.title || '').trim();
+
+    // 1. Known dummy seed post IDs
+    if (id === 'post_201' || id === 'post_202' || id === 'post_203' || id === 'post_204' || id.startsWith('post_20')) {
+      return true;
+    }
+    // 2. Dummy authors
+    if (author === 'සුපුන් පෙරේරා' || author === 'ශ්‍රද්ධා ධර්ම දානය' || author === 'කල්‍යාණ මිත්‍ර එකමුතුව') {
+      return true;
+    }
+    // 3. Dummy titles
+    if (title.includes('ගිලන්පස සහ ඖෂධ පූජාව') || 
+        title.includes('සිත නිවන කෙටි ධර්ම කරුණක්') ||
+        title.includes('දුෂ්කර පාසලක පුස්තකාලයට පොත් අවශ්‍යයි') ||
+        title.includes('රාත්‍රී මෛත්‍රී භාවනාව')) {
+      return true;
+    }
+    return false;
+  },
+
+    purgeDummyPostsFromStorage() {
+    if (this._dummyPurged) return;
+    this._dummyPurged = true;
+    try {
+      // 1. Purge from local storage feed caches
+      ['pinKetha_posts', 'pinPotha_sandbox_posts'].forEach(key => {
+        try { localStorage.removeItem(key); } catch(e) {}
+      });
+      const raw = localStorage.getItem('pinPotha_posts');
+      if (raw) {
+        try {
+          const list = JSON.parse(raw);
+          if (Array.isArray(list)) {
+            const hasAnyImage = list.some(p => Boolean(p.image || (Array.isArray(p.images) && p.images.length > 0)));
+            if (!hasAnyImage && list.length > 0) {
+              console.log('[Storage] Self-healing: purged image-stripped posts cache');
+              localStorage.removeItem('pinPotha_posts');
+            } else {
+              const cleaned = list.filter(p => !this.isDummyTestPost(p));
+              localStorage.setItem('pinPotha_posts', JSON.stringify(cleaned));
+            }
+          }
+        } catch(e) {}
+      }
+
+      // 2. Mark dummy seed IDs as deleted locally so no component can ever display them
+      const localDeleted = this.getDeletedPostIds();
+      const dummySeedIds = ['post_201', 'post_202', 'post_203', 'post_204'];
+      const mergedDeleted = Array.from(new Set([...localDeleted, ...dummySeedIds]));
+      localStorage.setItem('pinPotha_deleted_ids', JSON.stringify(mergedDeleted));
+
+      // 3. Purge test notifications
+      const notifRaw = localStorage.getItem('pinKetha_notifications');
+      if (notifRaw) {
+        try {
+          const list = JSON.parse(notifRaw);
+          if (Array.isArray(list)) {
+            const cleanNotifs = list.filter(n => n.senderName !== 'සුපුන් පෙරේරා' && !String(n.id || '').startsWith('notif_10'));
+            localStorage.setItem('pinKetha_notifications', JSON.stringify(cleanNotifs));
+          }
+        } catch(e) {}
+      }
+
+      // 4. Clean active in-memory caches
+      if (Array.isArray(this._cachedPosts)) {
+        this._cachedPosts = this._cachedPosts.filter(p => !this.isDummyTestPost(p));
+      }
+      if (Array.isArray(this._loadedPosts)) {
+        this._loadedPosts = this._loadedPosts.filter(p => !this.isDummyTestPost(p));
+      }
+    } catch(e) {}
+  },
+
+  isOfficialPost(post) {
+    if (!post) return false;
+    const author = (post.author || '').trim();
+    const title = (post.title || '').trim();
+    const authorRole = (post.authorRole || '').trim().toLowerCase();
+    return post.isOfficial === true ||
+           post.isOfficial === 'true' ||
+           authorRole === 'official' ||
+           author === 'අපේ පිං පොත' ||
+           author === 'අපේ පින් පොත' ||
+           title === 'පිං පොත නිල නිවේදනය' ||
+           title === 'පින් පොත නිල නිවේදනය' ||
+           title.includes('නිල නිවේදන') ||
+           post.id === 'ovCufhPElI49tLz0MVDV' ||
+           post.id === 'MtzAbfpxlg3odWmXHuEO' ||
+           post.id === 'tEWldtJVFPSL5LsxtFlE';
+  },
+
+  getOfficialPosts() {
+    // Permanent, instant zero-latency default official announcements (always available offline/cold-start)
+    const defaults = [
+      {
+        id: "MtzAbfpxlg3odWmXHuEO",
+        uid: "o2pWiAX7SXTHiMfSiphI8Ln5HAM2",
+        author: "අපේ පිං පොත",
+        authorRole: "official",
+        authorPhoto: null,
+        title: "පිං පොත නිල නිවේදනය",
+        category: "සාමාන්‍ය",
+        location: "",
+        contact: "",
+        description: "🌸 සාදරයෙන් පිළිගනිමු! 🌸\nලංකාවේ පළමු ඩිජිටල් පුණ්‍ය ජාලයට ඔබත් සාදරයෙන් එක්වන්න!\nඔබ සිදුකළ යහපත් ක්‍රියා, පින්කම් සහ දානමාන සටහන් කරගන්න...\nරට වටා සිටින කල්‍යාණ මිතුරන්ගේ කුසල් දැක සතුටු සිතින් අනුමෝදන් වන්න...",
+        image: "assets/official-welcome-banner.webp",
+        images: ["assets/official-welcome-banner.webp"],
+        isOfficial: true,
+        isPinned: true,
+        sadhuCount: 22,
+        sadhuUsers: ["o2pWiAX7SXTHiMfSiphI8Ln5HAM2"],
+        comments: [],
+        shareCount: 0,
+        repostCount: 0,
+        timestamp: 1792338413395,
+        date: "දවස් 12 කට පෙර",
+        visibility: "public"
+      },
+      {
+        id: "tEWldtJVFPSL5LsxtFlE",
+        uid: "o2pWiAX7SXTHiMfSiphI8Ln5HAM2",
+        author: "අපේ පිං පොත",
+        authorRole: "official",
+        authorPhoto: null,
+        title: "පිං පොත නිල නිවේදනය",
+        category: "සාමාන්‍ය",
+        location: "",
+        contact: "",
+        description: "පිංවත් සියළු දෙනාටම නිදුක් නීරෝගි සුභ දිනයක් වේවා...!!",
+        image: null,
+        images: [],
+        isOfficial: true,
+        isPinned: false,
+        sadhuCount: 20,
+        sadhuUsers: ["o2pWiAX7SXTHiMfSiphI8Ln5HAM2"],
+        comments: [],
+        shareCount: 0,
+        repostCount: 0,
+        timestamp: 1792338413000,
+        date: "දැන්",
+        visibility: "public"
+      },
+      {
+        id: "ovCufhPElI49tLz0MVDV",
+        uid: "o2pWiAX7SXTHiMfSiphI8Ln5HAM2",
+        author: "අපේ පිං පොත",
+        authorRole: "official",
+        authorPhoto: null,
+        title: "පිං පොත නිල නිවේදනය",
+        category: "සාමාන්‍ය",
+        location: "",
+        contact: "",
+        description: "සදහම් ආලෝකයෙන් තුන් ලෙවම පහන් වූ උත්ම් වප් පුර පසළොස්වක පොහෝ දිනයක් වේවා...!",
+        image: null,
+        images: [],
+        isOfficial: true,
+        isPinned: false,
+        sadhuCount: 13,
+        sadhuUsers: ["o2pWiAX7SXTHiMfSiphI8Ln5HAM2"],
+        comments: [],
+        shareCount: 0,
+        repostCount: 0,
+        timestamp: 1792338412000,
+        date: "දැන්",
+        visibility: "public"
+      }
+    ];
+
+    const map = new Map();
+    defaults.forEach(d => map.set(d.id, d));
+
+    // Merge in-memory cached official posts
+    if (Array.isArray(this._cachedOfficialPosts) && this._cachedOfficialPosts.length > 0) {
+      this._cachedOfficialPosts.forEach(p => {
+        if (p && p.id) {
+          const ex = map.get(p.id) || {};
+          map.set(p.id, { ...ex, ...p, isOfficial: true });
+        }
+      });
+    }
+
+    // Merge local storage persistent official posts
+    try {
+      const raw = localStorage.getItem('pinPotha_official_posts');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          parsed.forEach(p => {
+            if (p && p.id) {
+              const ex = map.get(p.id) || {};
+              map.set(p.id, { ...ex, ...p, isOfficial: true });
+            }
+          });
+        }
+      }
+    } catch (e) {}
+
+    const merged = Array.from(map.values());
+    this._cachedOfficialPosts = merged;
+    return merged;
+  },
+
+  cacheOfficialPosts(officialPosts) {
+    if (!Array.isArray(officialPosts) || officialPosts.length === 0) return;
+    const current = this.getOfficialPosts();
+    const map = new Map();
+    current.forEach(p => { if (p && p.id) map.set(p.id, p); });
+    officialPosts.forEach(p => {
+      if (p && p.id) {
+        const ex = map.get(p.id) || {};
+        map.set(p.id, { ...ex, ...p, isOfficial: true });
+      }
+    });
+    const merged = Array.from(map.values());
+    this._cachedOfficialPosts = merged;
+    try {
+      localStorage.setItem('pinPotha_official_posts', JSON.stringify(merged));
+    } catch (e) {}
+  },
+
+  /**
+   * Checks whether a user/email/post is Master Admin (silvadilan9@gmail.com, creativeparadise25@gmail.com, user_malith, o2pWiAX7SXTHiMfSiphI8Ln5HAM2)
+   */
+    isMasterAdmin(userOrEmailOrUid) {
+    const isMasterEmail = (email) => {
+      if (!email || typeof email !== 'string') return false;
+      return email.trim().toLowerCase() === 'silvadilan9@gmail.com';
+    };
+
     if (!userOrEmailOrUid) {
-      if (!this.currentUser) return false;
-      const email = (this.currentUser.email || '').trim().toLowerCase();
-      return email === MASTER_ADMIN_EMAIL.toLowerCase() || this.currentUser.uid === 'user_malith';
+      return Boolean(this.currentUser && isMasterEmail(this.currentUser.email));
     }
     if (typeof userOrEmailOrUid === 'string') {
-      const lower = userOrEmailOrUid.trim().toLowerCase();
-      return lower === MASTER_ADMIN_EMAIL.toLowerCase() || lower === 'user_malith';
+      return isMasterEmail(userOrEmailOrUid);
     }
-    const email = (userOrEmailOrUid.email || userOrEmailOrUid.authorEmail || '').trim().toLowerCase();
-    const uid = userOrEmailOrUid.uid || '';
-    return email === MASTER_ADMIN_EMAIL.toLowerCase() || uid === 'user_malith';
+    const email = (userOrEmailOrUid.email || userOrEmailOrUid.authorEmail || '');
+    return isMasterEmail(email);
   },
 
   /**
@@ -203,7 +310,7 @@ export const StorageService = {
 
     if (typeof userOrPostOrUid === 'object') {
       const role = (userOrPostOrUid.role || userOrPostOrUid.authorRole || '').toLowerCase();
-      if (role === 'admin' || role === 'sub_admin' || userOrPostOrUid.isAdmin === true || userOrPostOrUid.isSubAdmin === true) {
+      if (role === 'admin' || role === 'sub_admin' || userOrPostOrUid.isSubAdmin === true) {
         return true;
       }
       const uid = userOrPostOrUid.uid;
@@ -219,16 +326,32 @@ export const StorageService = {
   },
 
   /**
-   * Returns total registered community members count (Cloud aggregation with baseline)
+   * Returns total registered community members count (Cloud aggregation with baseline + caching)
    */
-  async getTotalMemberCount() {
+  async getTotalMemberCount(force = false) {
+    const now = Date.now();
+    try {
+      const raw = localStorage.getItem('pinPotha_total_members_cache');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (!force && parsed && parsed.count && (now - (parsed.time || 0) < 15 * 60 * 1000)) {
+          return parsed.count;
+        }
+      }
+    } catch (e) {}
+
+    let total = 0;
     if (isCloudReady && db) {
       try {
         const { collection, getCountFromServer } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
         const snap = await getCountFromServer(collection(db, COLLECTIONS.USERS));
         const count = snap.data().count;
         if (typeof count === 'number' && count > 0) {
-          return count + 115;
+          total = count + 115;
+          try {
+            localStorage.setItem('pinPotha_total_members_cache', JSON.stringify({ count: total, time: now }));
+          } catch (e) {}
+          return total;
         }
       } catch (e) {
         console.warn('[Storage] Member count fetch note:', e);
@@ -236,19 +359,120 @@ export const StorageService = {
     }
     const allPosts = this.getLocalPosts();
     const uniqueUids = new Set(allPosts.map(p => p.uid).filter(Boolean));
-    return Math.max(uniqueUids.size + 115, 128);
+    total = Math.max(uniqueUids.size + 115, 128);
+    try {
+      localStorage.setItem('pinPotha_total_members_cache', JSON.stringify({ count: total, time: now }));
+    } catch (e) {}
+    return total;
   },
 
   _cachedCommunityMembers: null,
   _lastCommunityMembersFetchTime: 0,
+
+  getInstantLocalCommunityMembers() {
+    if (Array.isArray(this._cachedCommunityMembers) && this._cachedCommunityMembers.length > 0) {
+      return this._cachedCommunityMembers;
+    }
+    try {
+      const raw = localStorage.getItem('pinPotha_cached_community_members');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          this._cachedCommunityMembers = parsed;
+          return parsed;
+        }
+      }
+    } catch (e) {}
+
+    const now = Date.now();
+    const posts = this.getLocalPosts() || [];
+    const map = new Map();
+    posts.forEach(p => {
+      if (p.uid && !map.has(p.uid)) {
+        const isSelf = this.currentUser && this.currentUser.uid === p.uid;
+        map.set(p.uid, {
+          uid: p.uid,
+          name: p.author || 'කල්‍යාණ මිත්‍ර',
+          photo: p.authorPhoto || '',
+          bio: '',
+          location: p.location || '',
+          joinedDate: '2026',
+          updatedAt: p.timestamp || 0,
+          lastActiveAt: isSelf ? now : (p.timestamp || (now - 3600000)),
+          isOnline: isSelf || ((now - (p.timestamp || 0)) < 7 * 60 * 1000),
+          isAdmin: this.isMasterAdmin({ uid: p.uid, name: p.author }),
+          isSangha: p.isSangha || p.authorRole === 'sangha' || this.isSangha({ name: p.author }),
+          role: (p.isSangha || p.authorRole === 'sangha') ? 'sangha' : (this.isMasterAdmin({ uid: p.uid, name: p.author }) ? 'admin' : 'member'),
+          mithrayanCount: 0
+        });
+      }
+    });
+    if (this.currentUser && this.currentUser.uid && !map.has(this.currentUser.uid)) {
+      map.set(this.currentUser.uid, {
+        uid: this.currentUser.uid,
+        name: this.currentUser.name || 'කල්‍යාණ මිත්‍ර සාමාජික',
+        photo: this.currentUser.photo || '',
+        bio: this.currentUser.bio || '',
+        location: this.currentUser.location || '',
+        joinedDate: this.currentUser.joinedDate || '2026',
+        updatedAt: now,
+        lastActiveAt: now,
+        isOnline: true,
+        isAdmin: this.isMasterAdmin(this.currentUser),
+        isSangha: this.isSangha(this.currentUser),
+        role: this.isSangha(this.currentUser) ? 'sangha' : (this.isMasterAdmin(this.currentUser) ? 'admin' : 'member'),
+        mithrayanCount: Array.isArray(this.currentUser.mithrayan) ? this.currentUser.mithrayan.length : 0
+      });
+    }
+
+    // Ensure we always have the top community members even on initial offline/cold-start paint
+    const defaultTopMembers = [
+      { uid: "1z3CVffo7lb9FoZan9vABNr8fgi1", name: "Sunil Wijaya Kumara", photo: "https://lh3.googleusercontent.com/a/ACg8ocIz_0oGZKwXeIoc1gWHXw2p7ntY6TKreen3A5aqGkieiIzCD48z=s96-c", location: "2026 ඔක්තෝබර්", joinedDate: "2026 ඔක්තෝබර්", isAdmin: false, role: "member" },
+      { uid: "69xlT9NgTUUoGuessE40S7SAabk1", name: "Creative World", photo: "https://lh3.googleusercontent.com/a/ACg8ocKWBk6TI1TYph86IffKhtbJqG9H3Lgv8mkgr0BDozYQabip7H0=s96-c", location: "ගාල්ල, ගාල්ල", joinedDate: "2026 ඔක්තෝබර්", isAdmin: false, role: "member" },
+      { uid: "4MyCCKbszFdct42oN8LcIYvXYEe2", name: "Sanjewa Gamage", photo: "https://i.ibb.co/RpYcqq9R/avatar-1792464305480.jpg", location: "2026 ඔක්තෝබර්", joinedDate: "2026 ඔක්තෝබර්", isAdmin: false, role: "member" },
+      { uid: "1zKUNrsU10dTuJ381WtXtmVjurB2", name: "Janaka Bandara", photo: "https://i.ibb.co/cGNDLLF/avatar-1792991063289.jpg", location: "ත්‍රිකුණාමලය", joinedDate: "2026 ඔක්තෝබර්", isAdmin: false, role: "member" },
+      { uid: "7lYMOj2LGSX8CCEgt13yhvuKaqr2", name: "Bandara Aloka", photo: "https://i.ibb.co/hF8XNJ8V/avatar-1792323148921.jpg", location: "2026 ඔක්තෝබර්", joinedDate: "2026 ඔක්තෝබර්", isAdmin: false, role: "member" },
+      { uid: "0iGHfQKieAOL9roDCgtOk5NIXqm2", name: "Chathuranga Janaka", photo: "https://lh3.googleusercontent.com/a/ACg8ocLiholD0MzL-vkKJvWWBcfhj4CQpNg_tIsl9qP6SUEZXCqyZxk=s96-c", location: "2026 ඔක්තෝබර්", joinedDate: "2026 ඔක්තෝබර්", isAdmin: false, role: "member" }
+    ];
+    defaultTopMembers.forEach(dm => {
+      if (!map.has(dm.uid)) {
+        map.set(dm.uid, {
+          ...dm,
+          bio: '',
+          updatedAt: now,
+          lastActiveAt: now,
+          isOnline: false,
+          isSangha: false,
+          mithrayanCount: 0
+        });
+      }
+    });
+
+    return Array.from(map.values());
+  },
 
   /**
    * Returns all registered community members from Firestore with caching & fallback
    */
   async getAllCommunityMembers(forceRefresh = false) {
     const now = Date.now();
-    if (!forceRefresh && this._cachedCommunityMembers && (now - this._lastCommunityMembersFetchTime < 45000)) {
+    if (!forceRefresh && this._cachedCommunityMembers && this._cachedCommunityMembers.length > 20 && (now - this._lastCommunityMembersFetchTime < 60000)) {
       return this._cachedCommunityMembers;
+    }
+
+    // Try instant local cache on startup
+    if (!this._cachedCommunityMembers && !forceRefresh) {
+      try {
+        const rawSaved = localStorage.getItem('pinPotha_cached_community_members');
+        if (rawSaved) {
+          const list = JSON.parse(rawSaved);
+          if (Array.isArray(list) && list.length > 10) {
+            this._cachedCommunityMembers = list;
+            this._lastCommunityMembersFetchTime = now - 45000;
+            return list;
+          }
+        }
+      } catch (e) {}
     }
 
     let members = [];
@@ -259,27 +483,58 @@ export const StorageService = {
         const snap = await getDocs(q);
         snap.forEach(docSnap => {
           const data = docSnap.data();
-          const isMaster = (data.email || '').trim().toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase() || docSnap.id === 'user_malith';
-          const isSub = !isMaster && (data.role === 'admin' || data.authorRole === 'admin' || data.isAdmin === true || data.isSubAdmin === true);
+          const isMaster = this.isMasterAdmin({ uid: docSnap.id, email: data.email, name: data.name });
+          const isSub = !isMaster && (data.role === 'admin' || data.authorRole === 'admin' || data.isSubAdmin === true);
           if (isSub) {
             this._knownAdminUids.add(docSnap.id);
+          } else {
+            this._knownAdminUids.delete(docSnap.id);
           }
+          const isMemberSangha = data.isSangha === true || data.role === 'sangha' || (data.authorRole === 'sangha') || this.isSangha({ uid: docSnap.id, name: data.name || data.firstName });
+          if (isMemberSangha) {
+            this._knownSanghaUids.add(docSnap.id);
+          }
+          const lastActive = data.lastActiveAt || data.updatedAt || 0;
+          const isOnline = (this.currentUser && this.currentUser.uid === docSnap.id) || ((now - lastActive) < 7 * 60 * 1000);
+          const isUserAnon = Boolean(
+            data.isAnonymous ||
+            data.useAlias ||
+            (this.currentUser && this.currentUser.uid === docSnap.id && (this.currentUser.useAlias || this.currentUser.isAnonymous))
+          );
           members.push({
             uid: docSnap.id,
             name: data.name || data.firstName || 'කල්‍යාණ මිත්‍ර',
             photo: data.photo || '',
+            coverImage: data.coverImage || 'assets/banner.jpg',
             bio: data.bio || '',
             location: data.location || data.district || '',
             joinedDate: data.joinedDate || '',
             updatedAt: data.updatedAt || 0,
+            lastActiveAt: lastActive,
+            isOnline: isOnline,
             isAdmin: isMaster,
             isSubAdmin: isSub,
-            isSangha: data.isSangha === true || data.role === 'sangha' || (data.authorRole === 'sangha') || this.isSangha({ name: data.name || data.firstName }),
-            role: data.role || (data.isSangha ? 'sangha' : (isSub ? 'admin' : 'member'))
+            isSangha: isMemberSangha,
+            isAnonymous: isUserAnon,
+            useAlias: Boolean(data.useAlias || isUserAnon),
+            role: data.role || (isMemberSangha ? 'sangha' : (isSub ? 'admin' : 'member')),
+            mithrayanCount: Array.isArray(data.mithrayan) ? data.mithrayan.length : 0
           });
         });
       } catch (e) {
         console.warn('[Storage] getAllCommunityMembers error:', e);
+      }
+    }
+
+    // Fast REST fallback if Firestore SDK was slow or returned empty
+    if (members.length === 0) {
+      try {
+        const restMembers = await this.fetchUsersViaREST();
+        if (Array.isArray(restMembers) && restMembers.length > 0) {
+          members = restMembers;
+        }
+      } catch (e) {
+        console.warn('[Storage] Fast REST users note:', e);
       }
     }
 
@@ -288,6 +543,7 @@ export const StorageService = {
       const map = new Map();
       posts.forEach(p => {
         if (p.uid && !map.has(p.uid)) {
+          const isSelf = this.currentUser && this.currentUser.uid === p.uid;
           map.set(p.uid, {
             uid: p.uid,
             name: p.author || 'කල්‍යාණ මිත්‍ර',
@@ -296,53 +552,128 @@ export const StorageService = {
             location: p.location || '',
             joinedDate: '2026',
             updatedAt: p.timestamp || 0,
+            lastActiveAt: isSelf ? now : (p.timestamp || (now - 3600000)),
+            isOnline: isSelf || ((now - (p.timestamp || 0)) < 7 * 60 * 1000),
             isAdmin: false,
             isSangha: p.isSangha || p.authorRole === 'sangha' || this.isSangha({ name: p.author }),
-            role: (p.isSangha || p.authorRole === 'sangha') ? 'sangha' : 'member'
+            role: (p.isSangha || p.authorRole === 'sangha') ? 'sangha' : 'member',
+            mithrayanCount: 0
           });
         }
       });
       if (this.currentUser && this.currentUser.uid && !map.has(this.currentUser.uid)) {
         map.set(this.currentUser.uid, {
           uid: this.currentUser.uid,
-          name: this.currentUser.name || 'මලිත්',
+          name: this.currentUser.name || 'කල්‍යාණ මිත්‍ර සාමාජික',
           photo: this.currentUser.photo || '',
           bio: this.currentUser.bio || '',
           location: this.currentUser.location || '',
           joinedDate: this.currentUser.joinedDate || '2026',
-          updatedAt: Date.now(),
-          isAdmin: this.isMasterAdmin()
+          updatedAt: now,
+          lastActiveAt: now,
+          isOnline: true,
+          isAdmin: this.isMasterAdmin(),
+          isSangha: this.isSangha(this.currentUser),
+          role: this.isSangha(this.currentUser) ? 'sangha' : (this.isMasterAdmin() ? 'admin' : 'member'),
+          mithrayanCount: Array.isArray(this.currentUser.mithrayan) ? this.currentUser.mithrayan.length : 0
         });
       }
       members = Array.from(map.values());
     }
 
+    // Attach posts count & sadhu count from posts cache (Fast O(N) pre-indexed pass)
+    const allLocalPosts = this.getLocalPosts();
+    const userStatsMap = new Map();
+    allLocalPosts.forEach(p => {
+      if (!p || !p.uid) return;
+      let stat = userStatsMap.get(p.uid);
+      if (!stat) {
+        stat = { count: 0, sadhu: 0 };
+        userStatsMap.set(p.uid, stat);
+      }
+      stat.count++;
+      stat.sadhu += (p.sadhuCount || 0);
+    });
+
+    members.forEach(m => {
+      const stat = userStatsMap.get(m.uid);
+      m.postsCount = stat ? stat.count : 0;
+      m.totalSadhu = stat ? stat.sadhu : 0;
+      if (this.currentUser && m.uid === this.currentUser.uid) {
+        m.isOnline = true;
+      }
+    });
+
     // Sort by latest update or creation
     members.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 
-    this._cachedCommunityMembers = members;
-    this._lastCommunityMembersFetchTime = now;
+    if (members.length > 0) {
+      this._cachedCommunityMembers = members;
+      this._lastCommunityMembersFetchTime = now;
+      try {
+        localStorage.setItem('pinPotha_cached_community_members', JSON.stringify(members.slice(0, 50)));
+      } catch (e) {}
+    }
     return members;
+  },
+
+  /**
+   * Keep user presence updated in Firestore & local state
+   */
+  _lastPresenceWriteTime: 0,
+
+  /**
+   * Keep user presence updated in Firestore & local state (Live Real-Time Heartbeat)
+   */
+  async updateUserPresence(force = false) {
+    if (!this.currentUser || !this.currentUser.uid) return;
+    const now = Date.now();
+    this.currentUser.lastActiveAt = now;
+    try {
+      localStorage.setItem('pinPotha_last_presence', now.toString());
+      localStorage.setItem('pinPotha_currentUser', JSON.stringify(this.currentUser));
+    } catch (e) {}
+
+    // Throttle remote Firestore write to at most once per 60s (unless forced on startup/tab focus)
+    if (!force && (now - this._lastPresenceWriteTime < 60000)) {
+      return;
+    }
+    this._lastPresenceWriteTime = now;
+
+    if (isCloudReady && db) {
+      try {
+        const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        await updateDoc(doc(db, COLLECTIONS.USERS, this.currentUser.uid), {
+          lastActiveAt: now
+        }).catch(() => {});
+      } catch (e) {}
+    }
   },
 
   /**
    * Initializes the storage engine (Firestore or Sandbox)
    */
   async init() {
-    // Load local user profile if present
-    const savedUser = localStorage.getItem('pinPotha_currentUser');
-    if (savedUser) {
-      try {
-        this.currentUser = JSON.parse(savedUser);
-      } catch (e) {
-        console.error('Failed to parse saved user', e);
+    this.purgeDummyPostsFromStorage();
+    // Strictly initialize as null (Guest mode). No fallback or auto-promoted mock admin.
+    this.currentUser = null;
+    try {
+      localStorage.removeItem('pinPotha_admin_uids');
+      const savedUser = localStorage.getItem('pinPotha_currentUser');
+      if (savedUser) {
+        const parsed = JSON.parse(savedUser);
+        if (parsed && parsed.uid && parsed.email && !parsed.uid.startsWith('user_malith') && parsed.uid !== 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2' && parsed.email.toLowerCase() !== 'silvadilan9@gmail.com') {
+          this.currentUser = parsed;
+          this.currentUser.isAdmin = this.isMasterAdmin(this.currentUser);
+        } else {
+          localStorage.removeItem('pinPotha_currentUser');
+          localStorage.removeItem('pinPotha_current_profile');
+          this.currentUser = null;
+        }
       }
+    } catch (e) {
+      this.currentUser = null;
     }
-    if (this.currentUser) {
-      if (!Array.isArray(this.currentUser.mithrayan)) this.currentUser.mithrayan = [];
-      if (!Array.isArray(this.currentUser.pendingMithraSent)) this.currentUser.pendingMithraSent = [];
-    }
-    this.currentUser.isAdmin = this.isMasterAdmin();
 
     try {
       const savedAdminUids = localStorage.getItem('pinPotha_admin_uids');
@@ -354,11 +685,37 @@ export const StorageService = {
       }
     } catch(e) {}
 
+    try {
+      const savedSanghaUids = localStorage.getItem('pinPotha_sangha_uids');
+      if (savedSanghaUids) {
+        const arr = JSON.parse(savedSanghaUids);
+        if (Array.isArray(arr)) {
+          arr.forEach(id => this._knownSanghaUids.add(id));
+        }
+      }
+    } catch(e) {}
+
+    // Immediate zero-latency background fast REST sync for official announcements & community directory
+    // Immediate zero-latency fast REST bootstrap for BOTH community feed & official announcements
+    this.fallbackFastFetch().catch(err => console.warn('[Storage] Fast feed REST bootstrap note:', err));
+
+    this.fetchUsersViaREST().then(users => {
+      if (Array.isArray(users) && users.length > 0) {
+        this._cachedCommunityMembers = users;
+        try {
+          localStorage.setItem('pinPotha_cached_community_members', JSON.stringify(users));
+        } catch(e) {}
+        if (typeof window.renderPcSidebarMembers === 'function') {
+          window.renderPcSidebarMembers('', false);
+        }
+      }
+    }).catch(() => {});
+
     if (isFirebaseConfigured()) {
       try {
         console.log('[Storage] Initializing Firebase Modular SDK...');
         const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js');
-        const { getFirestore, collection, onSnapshot, query, orderBy } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const { getFirestore, collection, onSnapshot, query, orderBy, limit, startAfter, getDocs, where } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
         const { getAuth, onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js');
 
         const app = initializeApp(firebaseConfig);
@@ -391,43 +748,264 @@ export const StorageService = {
 
         // Listen for Auth changes
         onAuthStateChanged(auth, async (user) => {
-          await this.restoreUserProfile(user);
-          if (user?.uid) {
+          if (user && user.uid) {
+            await this.restoreUserProfile(user);
             this.initUserNotificationsSubscription(user.uid);
+            this.initUserPostsSubscription(user.uid);
+
+            if (typeof window !== 'undefined') {
+              const isAnon = Boolean(this.currentUser?.isAnonymous || this.currentUser?.useAlias);
+              const setToggle = document.getElementById('setUseAliasToggle');
+              const editToggle = document.getElementById('editProfUseAliasToggle');
+              if (setToggle) setToggle.checked = isAnon;
+              if (editToggle) editToggle.checked = isAnon;
+              if (typeof window.updateUserInfoUI === 'function') {
+                try { window.updateUserInfoUI(); } catch (e) {}
+              }
+            }
+          } else {
+            // Strictly guest mode when unauthenticated
+            this.currentUser = null;
+            try {
+              localStorage.removeItem('pinPotha_currentUser');
+              localStorage.removeItem('pinPotha_current_profile');
+              sessionStorage.clear();
+            } catch (e) {}
+            if (this._notifUnsubscribe) {
+              try { this._notifUnsubscribe(); } catch (e) {}
+              this._notifUnsubscribe = null;
+            }
+            if (this._userPostsUnsubscribe) {
+              try { this._userPostsUnsubscribe(); } catch (e) {}
+              this._userPostsUnsubscribe = null;
+            }
+            this.notifyListeners();
+            this.notifyNotificationListeners();
+          }
+
+          // Strict Master Admin check: silvadilan9@gmail.com or role === 'admin'
+          const isStrictAdmin = Boolean(
+            user && (
+              (user.email && user.email.trim().toLowerCase() === 'silvadilan9@gmail.com') ||
+              (this.currentUser && (this.currentUser.role === 'admin' || this.currentUser.role === 'master_admin'))
+            )
+          );
+
+          if (typeof window !== 'undefined') {
+            window.isStrictMasterAdmin = isStrictAdmin;
+            const crownBtn = document.getElementById('headerAdminCrownBtn');
+            if (crownBtn) {
+              if (isStrictAdmin) {
+                crownBtn.classList.remove('hidden');
+                crownBtn.style.display = 'inline-flex';
+                crownBtn.onclick = () => { window.location.href = 'admin.html'; };
+              } else {
+                crownBtn.classList.add('hidden');
+                crownBtn.style.display = 'none';
+                crownBtn.onclick = null;
+              }
+            }
+
+            const adminOptions = document.querySelectorAll('.master-admin-options');
+            adminOptions.forEach(el => {
+              if (isStrictAdmin) {
+                el.classList.remove('hidden');
+                el.style.display = el.tagName === 'BUTTON' ? 'inline-flex' : 'block';
+              } else {
+                el.classList.add('hidden');
+                el.style.display = 'none';
+              }
+            });
+
+            const profAdminBtn = document.getElementById('profAdminDashboardBtn');
+            if (profAdminBtn) {
+              if (isStrictAdmin) {
+                profAdminBtn.classList.remove('hidden');
+                profAdminBtn.style.display = 'inline-flex';
+              } else {
+                profAdminBtn.classList.add('hidden');
+                profAdminBtn.style.display = 'none';
+              }
+            }
+
+            if (typeof window.updateUserInfoUI === 'function') {
+              try { window.updateUserInfoUI(); } catch (e) {}
+            }
+            if (typeof window.updateUserStats === 'function') {
+              try { window.updateUserStats(); } catch (e) {}
+            }
           }
         });
 
-        // Real-time Firestore Feed Subscription
-        const q = query(collection(db, COLLECTIONS.POSTS), orderBy("timestamp", "desc"));
-        onSnapshot(q, (snapshot) => {
+        // Real-time Firestore Feed Subscription - Paginated Stream (Top 20 Posts for ultra-fast startup)
+        try {
+          const q = query(
+            collection(db, COLLECTIONS.POSTS),
+            orderBy("timestamp", "desc"),
+            limit(this.FEED_PAGE_SIZE)
+          );
+
+          let initialSnapshotReceived = false;
+          // Safety timeout (2.5s): unblocks UI if Firestore query hangs or permissions delayed
+          const feedTimeoutId = setTimeout(() => {
+            if (!initialSnapshotReceived) {
+              console.warn('[Firestore] Feed query timed out (2.5s), unblocking with cached/fallback posts...');
+              const fallback = this.getLocalPosts() || [];
+              this.notifyListeners(fallback);
+            }
+          }, 2500);
+
+          onSnapshot(q, (snapshot) => {
+            initialSnapshotReceived = true;
+            clearTimeout(feedTimeoutId);
+
+            if (snapshot.empty) {
+              console.warn('[Firestore] Feed snapshot returned empty, rendering fallback/community posts...');
+              const fallback = this.getLocalPosts() || [];
+              this.notifyListeners(fallback.length > 0 ? fallback : []);
+              return;
+            }
           const deletedIds = this.getDeletedPostIds();
           const posts = [];
           snapshot.forEach((doc) => {
             const data = doc.data();
-            if (!deletedIds.includes(doc.id) && data.isDeleted !== true) {
+            if (this.isDummyTestPost({ id: doc.id, ...data })) {
+              return; // Exclude dummy test posts from feed stream
+            }
+            const isOfficial = this.isOfficialPost(data);
+            const isUserPost = Boolean(this.currentUser && (
+              data.uid === this.currentUser.uid ||
+              (this.currentUser.email && data.authorEmail && data.authorEmail.toLowerCase() === this.currentUser.email.toLowerCase())
+            ));
+
+            // Only hide if deleted in cloud or explicitly deleted locally (never hide user's own posts or official posts)
+            const isDeletedInCloud = data.isDeleted === true;
+            const isLocallyDeleted = deletedIds.includes(doc.id) && !isOfficial && !isUserPost;
+
+            if (!isDeletedInCloud && !isLocallyDeleted) {
               const rawSadhu = typeof data.sadhuCount === 'number' ? data.sadhuCount : 0;
               const sanitizedSadhu = Math.max(0, rawSadhu);
+              const normTimestamp = typeof data.timestamp === 'number' ? data.timestamp : (data.serverCreatedAt?.toMillis ? data.serverCreatedAt.toMillis() : (data.date ? Date.parse(data.date) || Date.now() : Date.now()));
+
+              // Optimize welcome banner image asset if bloated
+              let finalImg = data.image;
+              let finalImgs = Array.isArray(data.images) ? data.images : (data.image ? [data.image] : []);
+              if (doc.id === 'MtzAbfpxlg3odWmXHuEO') {
+                finalImg = 'assets/official-welcome-banner.webp';
+                finalImgs = ['assets/official-welcome-banner.webp'];
+              }
+
               posts.push({
                 id: doc.id,
                 ...data,
+                image: finalImg,
+                images: finalImgs,
+                timestamp: normTimestamp,
+                isOfficial: isOfficial,
                 sadhuCount: sanitizedSadhu,
-                sadhuUsers: Array.isArray(data.sadhuUsers) ? data.sadhuUsers : []
+                sadhuUsers: Array.isArray(data.sadhuUsers) ? data.sadhuUsers : [],
+                comments: Array.isArray(data.comments) ? data.comments : []
               });
             }
           });
-          this.syncPostsWithUserSadhus(posts);
-          this.cacheLocal(posts);
-          this.notifyListeners(posts);
+
+          // Track pagination cursor
+          if (snapshot.docs && snapshot.docs.length > 0) {
+            this._lastVisibleDoc = snapshot.docs[snapshot.docs.length - 1];
+            this._hasMorePosts = snapshot.docs.length >= this.FEED_PAGE_SIZE;
+          }
+
+          // Merge with any known official posts to guarantee they are displayed
+          const officialPosts = this.getOfficialPosts();
+          const map = new Map();
+          officialPosts.forEach(op => {
+            if (op && op.id && !this.isDummyTestPost(op)) {
+              op.isOfficial = true;
+              map.set(op.id, op);
+            }
+          });
+          posts.forEach(p => {
+            if (map.has(p.id)) {
+              const existing = map.get(p.id);
+              map.set(p.id, { ...existing, ...p, isOfficial: existing.isOfficial || p.isOfficial });
+            } else {
+              map.set(p.id, p);
+            }
+          });
+
+          // If user had already loaded deeper pages, preserve them
+          if (this._loadedPosts && this._loadedPosts.length > this.FEED_PAGE_SIZE) {
+            const currentIds = new Set(map.keys());
+            const deeperPosts = this._loadedPosts.filter(p => !currentIds.has(p.id));
+            deeperPosts.forEach(dp => map.set(dp.id, dp));
+          }
+
+          this._loadedPosts = Array.from(map.values());
+          this._cachedPosts = this._loadedPosts;
+          this.syncPostsWithUserSadhus(this._loadedPosts);
+          this.cacheLocal(this._loadedPosts);
+          this.notifyListeners(this._loadedPosts);
         }, (error) => {
-          console.warn('[Firestore] Realtime error, falling back to local cache', error);
-          const localPosts = this.getLocalPosts();
-          this.syncPostsWithUserSadhus(localPosts);
-          this.notifyListeners(localPosts);
-        });
+            clearTimeout(feedTimeoutId);
+            console.warn('[Firestore] Realtime feed query error, unblocking UI with fallback:', error);
+            const fallback = this.getLocalPosts() || [];
+            this.notifyListeners(fallback);
+            this.fallbackFastFetch().catch(() => {});
+          });
+        } catch (qSetupErr) {
+          console.warn('[Firestore] Realtime query setup error:', qSetupErr);
+          const fallback = this.getLocalPosts() || [];
+          this.notifyListeners(fallback);
+        }
+
+        // Real-time Firestore Subscription for Official Platform Announcements
+        try {
+          const officialQ = query(
+            collection(db, COLLECTIONS.POSTS),
+            where("isOfficial", "==", true),
+            limit(50)
+          );
+          onSnapshot(officialQ, (officialSnap) => {
+            const offPosts = [];
+            officialSnap.forEach(doc => {
+              const data = doc.data();
+              if (data.isDeleted === true) return;
+              const rawSadhu = typeof data.sadhuCount === 'number' ? data.sadhuCount : 0;
+              const normTimestamp = typeof data.timestamp === 'number' ? data.timestamp : (data.serverCreatedAt?.toMillis ? data.serverCreatedAt.toMillis() : (data.date ? Date.parse(data.date) || Date.now() : Date.now()));
+              offPosts.push({
+                id: doc.id,
+                ...data,
+                timestamp: normTimestamp,
+                isOfficial: true,
+                sadhuCount: Math.max(0, rawSadhu),
+                sadhuUsers: Array.isArray(data.sadhuUsers) ? data.sadhuUsers : [],
+                comments: Array.isArray(data.comments) ? data.comments : []
+              });
+            });
+            if (offPosts.length > 0) {
+              this.cacheOfficialPosts(offPosts);
+              this.mergeAdditionalPosts(offPosts);
+            }
+          }, (err) => {
+            console.warn('[Firestore] Official posts real-time error:', err);
+          });
+        } catch (offErr) {
+          console.warn('[Firestore] Official posts listener init note:', offErr);
+        }
+
+        // Feed Watchdog: Guarantee that feed renders within 1200ms even if WebSocket / SDK is blocked
+        setTimeout(() => {
+          const nonOfficialCount = (this._loadedPosts || []).filter(p => !this.isOfficialPost(p)).length;
+          if (nonOfficialCount === 0) {
+            console.log('[Storage] Watchdog: Community posts missing, bootstrapping fast REST feed...');
+            this.fallbackFastFetch();
+          }
+        }, 1200);
 
         // Real-time Firestore Notifications Subscription for authenticated user
-        if (this.currentUser && this.currentUser.uid && !this.currentUser.isAnonymous) {
+        if (this.currentUser && this.currentUser.uid && this.currentUser.email) {
           this.initUserNotificationsSubscription(this.currentUser.uid);
+          this.initUserPostsSubscription(this.currentUser.uid);
         }
 
         // Real-time Firestore Admin Settings Subscription
@@ -472,10 +1050,14 @@ export const StorageService = {
           console.warn('[Firestore] Admin settings listener note:', sErr);
         }
 
+        // Pre-fetch community members in background to keep author names and photos fresh
+        this.getAllCommunityMembers().catch(() => {});
+
         return { isCloud: true };
       } catch (err) {
         console.warn('[Firebase] Init failed, running in secure Sandbox mode:', err);
         isCloudReady = false;
+        this.fallbackFastFetch();
       }
     }
 
@@ -609,42 +1191,539 @@ export const StorageService = {
   },
 
   getLocalPosts() {
+    this.purgeDummyPostsFromStorage();
     const deletedIds = this.getDeletedPostIds();
-    if (this._cachedPosts && Array.isArray(this._cachedPosts) && this._cachedPosts.length > 0) {
-      const clean = this._cachedPosts.filter(p => !deletedIds.includes(p.id) && p.isDeleted !== true);
+    const isCleanPost = (p) => {
+      if (!p || p.isDeleted === true || this.isDummyTestPost(p)) return false;
+      const isOff = this.isOfficialPost(p);
+      const isUser = Boolean(this.currentUser && (
+        p.uid === this.currentUser.uid ||
+        (this.currentUser.email && p.authorEmail && p.authorEmail.toLowerCase() === this.currentUser.email.toLowerCase())
+      ));
+      if (isOff || isUser) return true;
+      return !deletedIds.includes(p.id);
+    };
+
+    if (this._loadedPosts && Array.isArray(this._loadedPosts) && this._loadedPosts.length > 0) {
+      const clean = this._loadedPosts.filter(isCleanPost);
       return this.syncPostsWithUserSadhus(clean);
     }
+    if (this._cachedPosts && Array.isArray(this._cachedPosts) && this._cachedPosts.length > 0) {
+      const clean = this._cachedPosts.filter(isCleanPost);
+      this._loadedPosts = clean;
+      return this.syncPostsWithUserSadhus(clean);
+    }
+
     try {
-      const data = localStorage.getItem('pinPotha_sandbox_posts');
-      const posts = data ? JSON.parse(data) : SEED_POSTS;
-      const clean = (Array.isArray(posts) ? posts : SEED_POSTS).filter(p => !deletedIds.includes(p.id) && p.isDeleted !== true);
+      const rawPosts = localStorage.getItem('pinPotha_posts') || localStorage.getItem('pinPotha_sandbox_posts');
+      const rawOfficial = localStorage.getItem('pinPotha_official_posts');
+      let combined = [];
+
+      // 1. Guarantee official announcements are always present in initial feed
+      const offPosts = this.getOfficialPosts();
+      if (Array.isArray(offPosts)) combined.push(...offPosts);
+
+      if (rawOfficial) {
+        try {
+          const offList = JSON.parse(rawOfficial);
+          if (Array.isArray(offList)) combined.push(...offList);
+        } catch (e) {}
+      }
+
+      // 2. Base community seeds (all 71 genuine Firestore community posts)
+      if (typeof SEED_POSTS !== 'undefined' && Array.isArray(SEED_POSTS) && SEED_POSTS.length > 0) {
+        combined.push(...SEED_POSTS);
+      }
+
+      // 3. Merged local storage cache (updated posts & fresh additions)
+      if (rawPosts) {
+        try {
+          const list = JSON.parse(rawPosts);
+          if (Array.isArray(list) && list.length > 0) combined.push(...list);
+        } catch (e) {}
+      }
+
+      const map = new Map();
+      combined.forEach(p => {
+        if (p && p.id && !this.isDummyTestPost(p)) {
+          p.isOfficial = this.isOfficialPost(p);
+          map.set(p.id, p);
+        }
+      });
+
+      let posts = Array.from(map.values());
+      const clean = posts.filter(isCleanPost);
       this._cachedPosts = clean;
+      this._loadedPosts = clean;
       return this.syncPostsWithUserSadhus(clean);
     } catch {
-      return this.syncPostsWithUserSadhus(SEED_POSTS.filter(p => !deletedIds.includes(p.id) && p.isDeleted !== true));
+      return [];
     }
   },
 
   cacheLocal(posts) {
+    if (!Array.isArray(posts) || posts.length === 0) return;
     const deletedIds = this.getDeletedPostIds();
-    const cleanPosts = (posts || []).filter(p => !deletedIds.includes(p.id));
+    const cleanPosts = (posts || []).filter(p => {
+      if (!p || p.isDeleted === true || this.isDummyTestPost(p)) return false;
+      const isOff = this.isOfficialPost(p);
+      const isUser = Boolean(this.currentUser && (
+        p.uid === this.currentUser.uid ||
+        (this.currentUser.email && p.authorEmail && p.authorEmail.toLowerCase() === this.currentUser.email.toLowerCase())
+      ));
+      if (isOff || isUser) return true;
+      return !deletedIds.includes(p.id);
+    });
+
+    if (cleanPosts.length === 0) return;
     this._cachedPosts = cleanPosts;
+    this._loadedPosts = cleanPosts;
 
     try {
-      localStorage.setItem('pinPotha_sandbox_posts', JSON.stringify(cleanPosts));
+      // Store top 30 posts in single localStorage key so initial paint is instantaneous (<100KB) without quota exhaustion
+      const topCache = cleanPosts.slice(0, 30);
+      localStorage.setItem('pinPotha_posts', JSON.stringify(topCache));
+      localStorage.removeItem('pinPotha_sandbox_posts');
     } catch (e) {
-      console.warn('[Storage] LocalStorage quota reached, storing lightweight cache:', e);
+      console.warn('[Storage] LocalStorage quota note, storing lightweight top-15 cache:', e);
       try {
-        // Strip heavy base64 data URLs from offline cache so localStorage never crashes
-        const lightPosts = cleanPosts.slice(0, 20).map(p => ({
-          ...p,
-          image: p.image && String(p.image).startsWith('data:') ? null : p.image,
-          images: Array.isArray(p.images) ? p.images.filter(img => !String(img).startsWith('data:')) : []
-        }));
-        localStorage.setItem('pinPotha_sandbox_posts', JSON.stringify(lightPosts));
+        const top15 = cleanPosts.slice(0, 15);
+        localStorage.setItem('pinPotha_posts', JSON.stringify(top15));
+        localStorage.removeItem('pinPotha_sandbox_posts');
       } catch (err2) {
-        console.warn('[Storage] Lightweight cache fallback also failed:', err2);
+        console.warn('[Storage] Fallback top 50 also failed, storing top 20 posts:', err2);
+        try {
+          const top20 = cleanPosts.slice(0, 20);
+          localStorage.setItem('pinPotha_posts', JSON.stringify(top20));
+          localStorage.removeItem('pinPotha_sandbox_posts');
+        } catch (err3) {}
       }
+    }
+  },
+
+  /**
+   * Merge additional posts (Official announcements, user posts, etc.) into loaded posts without duplicates
+   */
+  /**
+   * Fetch single post by ID directly from memory or Firestore (Essential for Facebook / Social traffic deep-linking)
+   */
+  async getPostById(postId) {
+    if (!postId) return null;
+    const local = (this.getLocalPosts() || []).find(p => p.id === postId);
+    if (local) return local;
+    if (this._cachedPosts) {
+      const cached = this._cachedPosts.find(p => p.id === postId);
+      if (cached) return cached;
+    }
+    try {
+      if (db && COLLECTIONS && COLLECTIONS.POSTS) {
+        const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const snap = await getDoc(doc(db, COLLECTIONS.POSTS, postId));
+        if (snap && snap.exists()) {
+          const postData = snap.data();
+          if (postData && postData.isDeleted !== true) {
+            const cloudPost = { id: snap.id, ...postData };
+            this.mergeAdditionalPosts([cloudPost]);
+            return cloudPost;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[Storage] getPostById error:', e);
+    }
+    return null;
+  },
+
+  mergeAdditionalPosts(additionalPosts) {
+    if (!Array.isArray(additionalPosts) || additionalPosts.length === 0) return;
+    const deletedIds = this.getDeletedPostIds();
+    const currentList = (this._loadedPosts && this._loadedPosts.length > 0) ? this._loadedPosts : this.getLocalPosts();
+    const map = new Map();
+    (currentList || []).forEach(p => map.set(p.id, p));
+    let hasChanged = false;
+    additionalPosts.forEach(p => {
+      if (!p || this.isDummyTestPost(p)) return;
+      if ((!deletedIds.includes(p.id) || p.isOfficial) && p.isDeleted !== true) {
+        if (!map.has(p.id)) {
+          map.set(p.id, p);
+          hasChanged = true;
+        } else {
+          const old = map.get(p.id);
+          const updated = { ...old, ...p };
+          if (JSON.stringify(old) !== JSON.stringify(updated)) {
+            map.set(p.id, updated);
+            hasChanged = true;
+          }
+        }
+      }
+    });
+    if (hasChanged) {
+      this._loadedPosts = Array.from(map.values());
+      this._cachedPosts = this._loadedPosts;
+      this.syncPostsWithUserSadhus(this._loadedPosts);
+      this.cacheLocal(this._loadedPosts);
+      this.notifyListeners(this._loadedPosts);
+    }
+  },
+
+  /**
+   * High-Scale Feed Pagination Helpers
+   */
+  hasMorePosts() {
+    return this._hasMorePosts;
+  },
+
+  isInitialSyncDone() {
+    return this._isInitialSyncDone;
+  },
+
+  isLoadingMorePosts() {
+    return this._isLoadingMore;
+  },
+
+  resetFeedPagination() {
+    this._lastVisibleDoc = null;
+    this._hasMorePosts = true;
+    this._isLoadingMore = false;
+  },
+
+  async fallbackFastFetch() {
+    try {
+      const [posts, officialPosts] = await Promise.all([
+        this.fetchPostsViaREST(this.FEED_PAGE_SIZE),
+        this.fetchOfficialPostsViaREST()
+      ]);
+      if (Array.isArray(officialPosts) && officialPosts.length > 0) {
+        this.cacheOfficialPosts(officialPosts);
+      }
+      const combined = this.mergePostsArray(officialPosts, posts);
+      if (Array.isArray(combined) && combined.length > 0) {
+        this._loadedPosts = combined;
+        this._cachedPosts = combined;
+        this._hasMorePosts = posts.length >= this.FEED_PAGE_SIZE;
+        this._isInitialSyncDone = true;
+        this.syncPostsWithUserSadhus(this._loadedPosts);
+        this.cacheLocal(this._loadedPosts);
+        this.notifyListeners(this._loadedPosts);
+        return;
+      }
+    } catch (e) {
+      console.warn('[Storage] Fast REST fetch note:', e);
+    }
+    const localPosts = this.getLocalPosts();
+    this._isInitialSyncDone = true;
+    this.syncPostsWithUserSadhus(localPosts);
+    this.notifyListeners(localPosts);
+  },
+
+  parseFirestoreRestDoc(doc) {
+    if (!doc) return null;
+    const f = doc.fields || {};
+    const id = doc.name ? doc.name.split('/').pop() : '';
+    const rawSadhu = f.sadhuCount?.integerValue ? parseInt(f.sadhuCount.integerValue, 10) : 0;
+    const rawTs = f.timestamp?.integerValue ? parseInt(f.timestamp.integerValue, 10) : (doc.createTime ? Date.parse(doc.createTime) : Date.now());
+
+    const comments = [];
+    if (f.comments?.arrayValue?.values) {
+      f.comments.arrayValue.values.forEach(cv => {
+        const cf = cv.mapValue?.fields || {};
+        comments.push({
+          id: cf.id?.stringValue || '',
+          uid: cf.uid?.stringValue || '',
+          name: cf.name?.stringValue || '',
+          author: cf.author?.stringValue || cf.name?.stringValue || '',
+          text: cf.text?.stringValue || '',
+          timestamp: cf.timestamp?.integerValue ? parseInt(cf.timestamp.integerValue, 10) : Date.now()
+        });
+      });
+    }
+
+    const rawImgs = f.images?.arrayValue?.values?.map(v => v.stringValue).filter(Boolean) || [];
+    let primaryImg = f.image?.stringValue || (rawImgs.length > 0 ? rawImgs[0] : null);
+    if (primaryImg && !rawImgs.includes(primaryImg)) {
+      rawImgs.unshift(primaryImg);
+    }
+    if (id === 'MtzAbfpxlg3odWmXHuEO') {
+      primaryImg = 'assets/official-welcome-banner.webp';
+      rawImgs.length = 0;
+      rawImgs.push('assets/official-welcome-banner.webp');
+    }
+
+    const postObj = {
+      id,
+      uid: f.uid?.stringValue || '',
+      author: f.author?.stringValue || 'සාමාජික',
+      authorPhoto: f.authorPhoto?.stringValue || null,
+      authorRole: f.authorRole?.stringValue || 'member',
+      authorEmail: f.authorEmail?.stringValue || null,
+      title: f.title?.stringValue || '',
+      description: f.description?.stringValue || '',
+      category: f.category?.stringValue || 'සාමාන්‍ය',
+      type: f.type?.stringValue || 'merit',
+      visibility: f.visibility?.stringValue || 'public',
+      location: f.location?.stringValue || '',
+      contact: f.contact?.stringValue || '',
+      image: primaryImg,
+      images: rawImgs,
+      sadhuCount: Math.max(0, rawSadhu),
+      sadhuUsers: f.sadhuUsers?.arrayValue?.values?.map(v => v.stringValue).filter(Boolean) || [],
+      comments: comments,
+      isOfficial: Boolean(f.isOfficial?.booleanValue),
+      isPinned: Boolean(f.isPinned?.booleanValue),
+      isVerifiedNeed: Boolean(f.isVerifiedNeed?.booleanValue),
+      isDeleted: Boolean(f.isDeleted?.booleanValue),
+      timestamp: rawTs,
+      date: f.date?.stringValue || 'දැන්',
+      videoId: f.videoId?.stringValue || null,
+      videoUrl: f.videoUrl?.stringValue || null,
+      videoType: f.videoType?.stringValue || null,
+      isShorts: Boolean(f.isShorts?.booleanValue),
+      videoThumbnail: f.videoThumbnail?.stringValue || null,
+      shareCount: f.shareCount?.integerValue ? parseInt(f.shareCount.integerValue, 10) : 0,
+      repostCount: f.repostCount?.integerValue ? parseInt(f.repostCount.integerValue, 10) : 0
+    };
+    postObj.isOfficial = this.isOfficialPost(postObj);
+    return postObj;
+  },
+
+  async fetchPostsViaREST(limitCount = 100, startAfterTimestamp = null) {
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents:runQuery?key=${firebaseConfig.apiKey}`;
+      const queryPayload = {
+        structuredQuery: {
+          from: [{ collectionId: COLLECTIONS.POSTS }],
+          orderBy: [{ field: { fieldPath: 'timestamp' }, direction: 'DESCENDING' }],
+          limit: limitCount
+        }
+      };
+      if (startAfterTimestamp) {
+        queryPayload.structuredQuery.startAt = {
+          values: [{ integerValue: String(startAfterTimestamp) }],
+          before: false
+        };
+      }
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(queryPayload)
+      });
+      if (!response.ok) return [];
+      const data = await response.json();
+      const posts = [];
+      data.forEach(item => {
+        if (!item.document) return;
+        const p = this.parseFirestoreRestDoc(item.document);
+        if (p && !this.isDummyTestPost(p)) {
+          posts.push(p);
+        }
+      });
+      return posts;
+    } catch (e) {
+      console.warn('[Storage] fetchPostsViaREST error:', e);
+      return [];
+    }
+  },
+
+  async fetchOfficialPostsViaREST() {
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents:runQuery?key=${firebaseConfig.apiKey}`;
+      const queryPayload = {
+        structuredQuery: {
+          from: [{ collectionId: COLLECTIONS.POSTS }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: 'isOfficial' },
+              op: 'EQUAL',
+              value: { booleanValue: true }
+            }
+          },
+          limit: 50
+        }
+      };
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(queryPayload)
+      });
+      if (!response.ok) return [];
+      const data = await response.json();
+      const posts = [];
+      data.forEach(item => {
+        if (!item.document) return;
+        const p = this.parseFirestoreRestDoc(item.document);
+        if (p) {
+          p.isOfficial = true;
+          posts.push(p);
+        }
+      });
+      if (posts.length > 0) {
+        this.cacheOfficialPosts(posts);
+      }
+      return posts;
+    } catch (e) {
+      console.warn('[Storage] fetchOfficialPostsViaREST error:', e);
+      return [];
+    }
+  },
+
+  async fetchUsersViaREST() {
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/${COLLECTIONS.USERS}?pageSize=100&key=${firebaseConfig.apiKey}`;
+      const response = await fetch(url);
+      if (!response.ok) return [];
+      const data = await response.json();
+      const docs = data.documents || [];
+      const now = Date.now();
+      const list = [];
+      docs.forEach(doc => {
+        const f = doc.fields || {};
+        const uid = doc.name.split('/').pop();
+        const fName = f.firstName?.stringValue || '';
+        const lName = f.lastName?.stringValue || '';
+        const name = f.name?.stringValue || `${fName} ${lName}`.trim() || 'කල්‍යාණ මිත්‍ර';
+        const email = f.email?.stringValue || '';
+        const isMaster = this.isMasterAdmin({ uid, email });
+        const role = f.role?.stringValue || (isMaster ? 'master_admin' : 'member');
+        const isSub = !isMaster && (role === 'admin' || f.isAdmin?.booleanValue === true);
+        const isSangha = f.isSangha?.booleanValue === true || role === 'sangha' || this.isSangha({ uid, name });
+        const lastActive = parseInt(f.lastActiveAt?.integerValue || f.updatedAt?.integerValue || '0', 10);
+        const isOnline = (this.currentUser && this.currentUser.uid === uid) || ((now - lastActive) < 7 * 60 * 1000);
+        const useAlias = f.useAlias?.booleanValue === true;
+        const isAnonymous = f.isAnonymous?.booleanValue === true || useAlias || Boolean(this.currentUser && this.currentUser.uid === uid && (this.currentUser.useAlias || this.currentUser.isAnonymous));
+        list.push({
+          uid,
+          name,
+          firstName: fName,
+          lastName: lName,
+          email,
+          photo: f.photo?.stringValue || '',
+          coverImage: f.coverImage?.stringValue || 'assets/banner.jpg',
+          bio: f.bio?.stringValue || '',
+          location: f.location?.stringValue || f.district?.stringValue || '',
+          district: f.district?.stringValue || '',
+          city: f.city?.stringValue || '',
+          occupation: f.occupation?.stringValue || '',
+          joinedDate: f.joinedDate?.stringValue || '2026 ඔක්තෝබර්',
+          lastActiveAt: lastActive,
+          isOnline,
+          isAdmin: isMaster,
+          isSubAdmin: isSub,
+          isSangha,
+          isAnonymous,
+          useAlias: Boolean(useAlias || isAnonymous),
+          role: isSangha ? 'sangha' : (isSub ? 'admin' : (isMaster ? 'master_admin' : 'member')),
+          mithrayanCount: f.mithrayan?.arrayValue?.values ? f.mithrayan.arrayValue.values.length : 0
+        });
+      });
+      return list;
+    } catch (e) {
+      console.warn('[Storage] fetchUsersViaREST error:', e);
+      return [];
+    }
+  },
+
+  mergePostsArray(officialPosts = [], regularPosts = []) {
+    const map = new Map();
+    (officialPosts || []).forEach(p => {
+      if (p && p.id && !this.isDummyTestPost(p)) {
+        p.isOfficial = true;
+        map.set(p.id, p);
+      }
+    });
+    (regularPosts || []).forEach(p => {
+      if (p && p.id && !this.isDummyTestPost(p)) {
+        p.isOfficial = this.isOfficialPost(p);
+        if (map.has(p.id)) {
+          const existing = map.get(p.id);
+          map.set(p.id, { ...existing, ...p, isOfficial: existing.isOfficial || p.isOfficial });
+        } else {
+          map.set(p.id, p);
+        }
+      }
+    });
+    return Array.from(map.values());
+  },
+
+  async fetchMorePosts() {
+    if (this._isLoadingMore || !this._hasMorePosts) {
+      return { success: false, hasMore: this._hasMorePosts, count: 0 };
+    }
+
+    this._isLoadingMore = true;
+    try {
+      const deletedIds = this.getDeletedPostIds();
+      let newBatch = [];
+
+      if (isCloudReady && db && this._lastVisibleDoc) {
+        const { collection, getDocs, query, orderBy, limit, startAfter } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const qNext = query(
+          collection(db, COLLECTIONS.POSTS),
+          orderBy("timestamp", "desc"),
+          startAfter(this._lastVisibleDoc),
+          limit(this.FEED_PAGE_SIZE)
+        );
+
+        const snap = await getDocs(qNext);
+        const docsCount = snap.docs.length;
+        if (docsCount === 0) {
+          this._hasMorePosts = false;
+          this._isLoadingMore = false;
+          return { success: true, hasMore: false, count: 0 };
+        }
+
+        this._lastVisibleDoc = snap.docs[docsCount - 1];
+        if (docsCount < this.FEED_PAGE_SIZE) {
+          this._hasMorePosts = false;
+        }
+
+        snap.forEach(docSnap => {
+          const data = docSnap.data();
+          if (this.isDummyTestPost({ id: docSnap.id, ...data })) return;
+          if (!deletedIds.includes(docSnap.id) && data.isDeleted !== true) {
+            const rawSadhu = typeof data.sadhuCount === 'number' ? data.sadhuCount : 0;
+            const normTimestamp = typeof data.timestamp === 'number' ? data.timestamp : (data.serverCreatedAt?.toMillis ? data.serverCreatedAt.toMillis() : (data.date ? Date.parse(data.date) || Date.now() : Date.now()));
+            newBatch.push({
+              id: docSnap.id,
+              ...data,
+              timestamp: normTimestamp,
+              isOfficial: this.isOfficialPost(data),
+              sadhuCount: Math.max(0, rawSadhu),
+              sadhuUsers: Array.isArray(data.sadhuUsers) ? data.sadhuUsers : []
+            });
+          }
+        });
+      } else {
+        // Fallback: Paginate via REST API with timestamp cursor
+        // Exclude official announcements from determining the regular post pagination cursor
+        const regularPosts = (this._loadedPosts || []).filter(p => !this.isOfficialPost(p));
+        const lastPost = regularPosts.length > 0 ? regularPosts[regularPosts.length - 1] : null;
+        const lastTs = lastPost ? (lastPost.timestamp || null) : null;
+        const restPosts = await this.fetchPostsViaREST(this.FEED_PAGE_SIZE, lastTs);
+        if (restPosts.length === 0) {
+          this._hasMorePosts = false;
+        } else {
+          if (restPosts.length < this.FEED_PAGE_SIZE) {
+            this._hasMorePosts = false;
+          }
+          newBatch = restPosts.filter(p => !deletedIds.includes(p.id) && p.isDeleted !== true && !this.isDummyTestPost(p));
+        }
+      }
+
+      const currentIds = new Set(this._loadedPosts.map(p => p.id));
+      const filteredNew = newBatch.filter(p => !currentIds.has(p.id));
+      this._loadedPosts = [...this._loadedPosts, ...filteredNew];
+      this._cachedPosts = this._loadedPosts;
+
+      this.syncPostsWithUserSadhus(this._loadedPosts);
+      this.cacheLocal(this._loadedPosts);
+      this.notifyListeners(this._loadedPosts);
+
+      this._isLoadingMore = false;
+      return { success: true, hasMore: this._hasMorePosts, count: filteredNew.length };
+    } catch (err) {
+      console.error('[Storage] fetchMorePosts error:', err);
+      this._isLoadingMore = false;
+      return { success: false, error: err.message, hasMore: this._hasMorePosts };
     }
   },
 
@@ -856,7 +1935,14 @@ export const StorageService = {
   getPoyaEvent() {
     try {
       const raw = localStorage.getItem('pinKetha_poya_event');
-      return raw ? JSON.parse(raw) : DEFAULT_POYA_EVENT;
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.month === 'ඔක්' && (parsed.day === '25' || parsed.title?.includes('වප්'))) {
+          return DEFAULT_POYA_EVENT;
+        }
+        return parsed;
+      }
+      return DEFAULT_POYA_EVENT;
     } catch {
       return DEFAULT_POYA_EVENT;
     }
@@ -1174,6 +2260,47 @@ export const StorageService = {
     }
   },
 
+  /**
+   * Realtime subscription for current user's posts to ensure "මගේ පිං පොත" always has all user posts
+   */
+  initUserPostsSubscription(uid) {
+    if (this._userPostsUnsubscribe) {
+      try { this._userPostsUnsubscribe(); } catch (e) {}
+      this._userPostsUnsubscribe = null;
+    }
+
+    if (!isCloudReady || !db || !uid || uid.startsWith('user_guest_')) {
+      return;
+    }
+
+    try {
+      import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js').then(({ collection, query, where, onSnapshot }) => {
+        const uq = query(
+          collection(db, COLLECTIONS.POSTS),
+          where("uid", "==", uid)
+        );
+        this._userPostsUnsubscribe = onSnapshot(uq, (snapshot) => {
+          const userPosts = [];
+          snapshot.forEach((doc) => {
+            const data = doc.data();
+            if (data.isDeleted !== true) {
+              userPosts.push({ id: doc.id, ...data });
+            }
+          });
+          if (userPosts.length > 0) {
+            this.mergeAdditionalPosts(userPosts);
+          }
+        }, (err) => {
+          console.warn('[Firestore] Realtime user posts listener note:', err);
+        });
+      }).catch(err => {
+        console.warn('[Firestore] User posts import note:', err);
+      });
+    } catch (uErr) {
+      console.warn('[Firestore] Realtime user posts subscription note:', uErr);
+    }
+  },
+
   getNotifications() {
     const all = this.getLocalNotifications();
     const uid = this.currentUser?.uid;
@@ -1187,17 +2314,63 @@ export const StorageService = {
     });
   },
 
+  /**
+   * Helper to resolve public sender identity respecting Privacy Alias (isAnonymous)
+   */
+  getPublicSenderIdentity(actionIsAnonymous = false) {
+    const isUserAnon = Boolean(
+      actionIsAnonymous === true ||
+      this.currentUser?.isAnonymous === true ||
+      this.currentUser?.useAlias === true ||
+      this.currentUser?.name === 'කල්‍යාණ මිත්‍ර සාමාජික'
+    );
+
+    if (isUserAnon) {
+      return {
+        senderUid: this.currentUser?.uid || '',
+        senderName: "කල්‍යාණ මිත්‍ර සාමාජික",
+        senderPhoto: "",
+        isAnonymous: true
+      };
+    }
+
+    return {
+      senderUid: this.currentUser?.uid || '',
+      senderName: this.currentUser?.name || "කල්‍යාණ මිත්‍ර",
+      senderPhoto: this.currentUser?.photo || null,
+      isAnonymous: false
+    };
+  },
+
   async createNotification(notifData) {
+    const senderIdentity = this.getPublicSenderIdentity(notifData?.isAnonymous);
+    const isAnon = Boolean(
+      senderIdentity.isAnonymous ||
+      notifData?.isAnonymous === true ||
+      notifData?.senderName === 'කල්‍යාණ මිත්‍ර සාමාජික' ||
+      notifData?.senderName === 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' ||
+      (notifData?.senderName && notifData.senderName.startsWith('නිර්නාමික'))
+    );
+
+    const finalSenderName = isAnon ? "කල්‍යාණ මිත්‍ර සාමාජික" : (notifData?.senderName || senderIdentity.senderName);
+    const finalSenderPhoto = isAnon ? "" : (notifData?.senderPhoto !== undefined ? notifData.senderPhoto : senderIdentity.senderPhoto);
+
+    let finalMessage = notifData?.message || '';
+    if (isAnon && this.currentUser?.name && finalMessage.includes(this.currentUser.name)) {
+      finalMessage = finalMessage.split(this.currentUser.name).join("කල්‍යාණ මිත්‍ර සාමාජිකයා");
+    }
+
     const newNotif = {
       id: "notif_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
-      recipientUid: notifData.recipientUid || this.currentUser.uid,
-      senderUid: notifData.senderUid || this.currentUser.uid,
-      senderName: notifData.senderName || this.currentUser.name,
-      senderPhoto: notifData.senderPhoto || this.currentUser.photo || null,
-      type: notifData.type || 'sadhu',
-      postId: notifData.postId || null,
-      postTitle: notifData.postTitle || '',
-      message: notifData.message || '',
+      recipientUid: notifData?.recipientUid || this.currentUser?.uid || '',
+      senderUid: notifData?.senderUid || senderIdentity.senderUid || this.currentUser?.uid || '',
+      senderName: finalSenderName,
+      senderPhoto: finalSenderPhoto,
+      isAnonymous: isAnon,
+      type: notifData?.type || 'sadhu',
+      postId: notifData?.postId || null,
+      postTitle: notifData?.postTitle || '',
+      message: finalMessage,
       timestamp: Date.now(),
       read: false
     };
@@ -1279,14 +2452,17 @@ export const StorageService = {
   async createPost(rawPost) {
     // 0. Auto-default title and institutional naming for official posts & general posts
     const postToProcess = { ...rawPost };
-    const isMaster = this.isMasterAdmin();
-    const isOfficial = isMaster && !!postToProcess.isOfficial;
+    const isMaster = this.isMasterAdmin() || this.isMasterAdmin(this.currentUser) || this.isMasterAdmin(rawPost?.authorEmail) || this.isMasterAdmin(rawPost?.uid);
+    const isOfficial = (isMaster && !!postToProcess.isOfficial) || postToProcess.authorRole === 'official' || postToProcess.author === 'අපේ පිං පොත' || postToProcess.author === 'අපේ පින් පොත';
 
     let safeTitle = (postToProcess.title || '').trim();
     if (isOfficial && (!safeTitle || safeTitle.length < 3)) {
       safeTitle = 'පිං පොත නිල නිවේදනය';
     }
     postToProcess.title = safeTitle;
+    postToProcess.type = postToProcess.type || 'general';
+    postToProcess.category = postToProcess.category || (postToProcess.type === 'general' ? 'සාමාන්‍ය' : 'දානමය');
+    postToProcess.visibility = postToProcess.visibility || 'public';
 
     // 1. Strict Security Validation & Sanitization with Banned Words Filter
     const bannedConfig = this.getBannedWords();
@@ -1303,13 +2479,21 @@ export const StorageService = {
     }
 
     const cleanData = validation.sanitized;
-    const authorName = isOfficial ? 'අපේ පිං පොත' : this.currentUser.name;
-    const authorPhoto = isOfficial ? null : (this.currentUser.photo || null);
+    const isAnonymous = Boolean(
+      postToProcess.isAnonymous ||
+      cleanData.isAnonymous ||
+      this.currentUser?.useAlias ||
+      this.currentUser?.isAnonymous
+    );
+    const authorName = isOfficial ? 'අපේ පිං පොත' : (isAnonymous ? 'කල්‍යාණ මිත්‍ර සාමාජික' : (this.currentUser?.name || 'කල්‍යාණ මිත්‍ර'));
+    const authorPhoto = (isOfficial || isAnonymous) ? null : (this.currentUser?.photo || null);
 
     const postPayload = {
-      uid: this.currentUser.uid,
+      uid: this.currentUser?.uid || 'user_guest',
       author: authorName,
       authorPhoto: authorPhoto,
+      isAnonymous: isAnonymous,
+      useAlias: Boolean(this.currentUser?.useAlias || isAnonymous),
       type: cleanData.type,
       visibility: cleanData.visibility,
       title: cleanData.title || safeTitle,
@@ -1328,7 +2512,7 @@ export const StorageService = {
       isPinned: isMaster && !!cleanData.isPinned,
       isVerifiedNeed: isMaster && !!cleanData.isVerifiedNeed,
       authorRole: isOfficial ? 'official' : (isMaster ? 'admin' : 'member'),
-      authorEmail: isOfficial ? null : (this.currentUser.email || null),
+      authorEmail: isOfficial ? null : (this.currentUser?.email || null),
       timestamp: Date.now(),
       date: "දැන්",
       sadhuCount: 0,
@@ -1338,25 +2522,42 @@ export const StorageService = {
       repostCount: 0
     };
 
-    if (isCloudReady && db) {
-      const { collection, addDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
-      await addDoc(collection(db, COLLECTIONS.POSTS), {
-        ...postPayload,
-        serverCreatedAt: serverTimestamp()
-      });
-      return true;
+    // Resilient Optimistic Insertion: ensure immediate feedback in UI and persistent storage
+    const localPostId = "post_" + Date.now() + "_" + Math.random().toString(36).substr(2, 6);
+    const newPost = {
+      id: localPostId,
+      ...postPayload
+    };
+
+    if (isOfficial) {
+      this.cacheOfficialPosts([newPost]);
     }
 
-    // Local Sandbox Mode
-    const posts = this.getLocalPosts();
-    const newPost = {
-      id: "post_" + Date.now(),
-      ...postPayload,
-      repostCount: 0
-    };
-    posts.unshift(newPost);
-    this.cacheLocal(posts);
-    this.notifyListeners(posts);
+    const currentLoaded = Array.isArray(this._loadedPosts) ? this._loadedPosts : (this.getLocalPosts() || []);
+    this._loadedPosts = [newPost, ...currentLoaded.filter(p => p.id !== localPostId)];
+    this._cachedPosts = this._loadedPosts;
+    this.cacheLocal(this._loadedPosts);
+    this.notifyListeners(this._loadedPosts);
+
+    if (isCloudReady && db) {
+      try {
+        const { collection, addDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const docRef = await addDoc(collection(db, COLLECTIONS.POSTS), {
+          ...postPayload,
+          serverCreatedAt: serverTimestamp()
+        });
+        if (docRef && docRef.id) {
+          newPost.id = docRef.id;
+          if (isOfficial) {
+            this.cacheOfficialPosts([newPost]);
+          }
+          this.cacheLocal(this._loadedPosts);
+        }
+      } catch (cloudErr) {
+        console.warn('[Storage] Cloud createPost warning (post kept in local cache):', cloudErr);
+      }
+    }
+
     return true;
   },
 
@@ -1412,7 +2613,8 @@ export const StorageService = {
 
     const repostPayload = {
       uid: this.currentUser.uid || 'anonymous',
-      author: this.currentUser.name || 'කල්‍යාණ මිත්‍ර',
+      author: this.currentUser?.useAlias ? 'කල්‍යාණ මිත්‍ර සාමාජික' : (this.currentUser.name || 'කල්‍යාණ මිත්‍ර'),
+      useAlias: Boolean(this.currentUser?.useAlias),
       type: 'merit',
       isRepost: true,
       visibility: 'public',
@@ -1473,8 +2675,13 @@ export const StorageService = {
     // Trigger notification to original author
     if (original.uid && original.uid !== this.currentUser.uid) {
       try {
+        const sender = this.getPublicSenderIdentity();
         await this.createNotification({
           recipientUid: original.uid,
+          senderUid: sender.senderUid,
+          senderName: sender.senderName,
+          senderPhoto: sender.senderPhoto,
+          isAnonymous: sender.isAnonymous,
           type: 'sadhu',
           postId: original.id,
           postTitle: original.title || 'පින්කම',
@@ -1583,6 +2790,19 @@ export const StorageService = {
     // Keep memory and local cache immediately up-to-date
     this._cachedPosts = allPosts;
     this.cacheLocal(allPosts);
+    if (this.isOfficialPost(targetPost)) {
+      if (Array.isArray(this._cachedOfficialPosts)) {
+        const offIdx = this._cachedOfficialPosts.findIndex(p => p.id === targetPost.id);
+        if (offIdx !== -1) {
+          this._cachedOfficialPosts[offIdx] = { ...this._cachedOfficialPosts[offIdx], ...targetPost };
+        } else {
+          this._cachedOfficialPosts.push({ ...targetPost });
+        }
+        try {
+          localStorage.setItem('pinPotha_official_posts', JSON.stringify(this._cachedOfficialPosts));
+        } catch (e) {}
+      }
+    }
     this.notifyListeners(allPosts);
 
     if (isCloudReady && db) {
@@ -1618,8 +2838,13 @@ export const StorageService = {
 
     // Trigger Notification for the author (only if someone else gave Sadhu)
     if (action === 'added' && targetPost.uid && targetPost.uid !== userUid) {
+      const sender = this.getPublicSenderIdentity();
       this.createNotification({
         recipientUid: targetPost.uid,
+        senderUid: sender.senderUid,
+        senderName: sender.senderName,
+        senderPhoto: sender.senderPhoto,
+        isAnonymous: sender.isAnonymous,
         type: 'sadhu',
         postId: targetPost.id,
         postTitle: targetPost.title || 'පින්කම',
@@ -1633,18 +2858,27 @@ export const StorageService = {
   /**
    * Add comment / blessing & Notification Trigger (Live in-place with author photo & reactions support)
    */
-  async addComment(postId, commentText) {
+  async addComment(postId, commentText, options = {}) {
     const val = Security.validateComment(commentText);
     if (!val.isValid) {
       throw new Error(val.error);
     }
 
+    const isAnonymous = Boolean(
+      options.isAnonymous === true ||
+      this.currentUser?.useAlias ||
+      this.currentUser?.isAnonymous
+    );
+
     const commentId = 'c_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
     const commentObj = {
       id: commentId,
       uid: this.currentUser?.uid || '',
-      author: this.currentUser?.name || 'සාමාජිකයෙක්',
-      authorPhoto: this.currentUser?.photo || '',
+      author: isAnonymous ? 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' : (this.currentUser?.useAlias ? 'කල්‍යාණ මිත්‍ර සාමාජික' : (this.currentUser?.name || 'සාමාජිකයෙක්')),
+      authorName: isAnonymous ? 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' : (this.currentUser?.useAlias ? 'කල්‍යාණ මිත්‍ර සාමාජික' : (this.currentUser?.name || 'සාමාජිකයෙක්')),
+      isAnonymous: isAnonymous,
+      useAlias: Boolean(this.currentUser?.useAlias),
+      authorPhoto: isAnonymous ? '' : (this.currentUser?.photo || ''),
       text: val.text,
       time: "දැන්",
       timestamp: Date.now(),
@@ -1653,15 +2887,41 @@ export const StorageService = {
     };
 
     const allPosts = this.getLocalPosts();
-    const targetPost = allPosts.find(p => p.id === postId);
+    let targetPost = allPosts.find(p => String(p.id) === String(postId));
+    if (!targetPost && Array.isArray(this._loadedPosts)) {
+      targetPost = this._loadedPosts.find(p => String(p.id) === String(postId));
+    }
 
     if (targetPost) {
       if (!Array.isArray(targetPost.comments)) targetPost.comments = [];
       targetPost.comments.push(commentObj);
       this._cachedPosts = allPosts;
       this.cacheLocal(allPosts);
-      this.notifyListeners(allPosts);
     }
+
+    // Also sync in-memory _loadedPosts
+    if (Array.isArray(this._loadedPosts)) {
+      const targetInLoaded = this._loadedPosts.find(p => String(p.id) === String(postId));
+      if (targetInLoaded) {
+        if (!Array.isArray(targetInLoaded.comments)) targetInLoaded.comments = [];
+        if (!targetInLoaded.comments.some(c => c.id === commentObj.id)) {
+          targetInLoaded.comments.push(commentObj);
+        }
+      }
+    }
+
+    // Also sync window.currentPostsData
+    if (typeof window !== 'undefined' && Array.isArray(window.currentPostsData)) {
+      const curTarget = window.currentPostsData.find(p => String(p.id) === String(postId));
+      if (curTarget) {
+        if (!Array.isArray(curTarget.comments)) curTarget.comments = [];
+        if (!curTarget.comments.some(c => c.id === commentObj.id)) {
+          curTarget.comments.push(commentObj);
+        }
+      }
+    }
+
+    this.notifyListeners(allPosts);
 
     if (isCloudReady && db) {
       try {
@@ -1677,18 +2937,24 @@ export const StorageService = {
 
     // Trigger Notification for the author (only if someone else commented)
     if (targetPost && targetPost.uid && targetPost.uid !== this.currentUser?.uid) {
+      const sender = this.getPublicSenderIdentity(isAnonymous);
       const snippet = val.text.length > 45 ? val.text.substring(0, 45) + '...' : val.text;
       this.createNotification({
         recipientUid: targetPost.uid,
         type: 'comment',
         postId: targetPost.id,
         postTitle: targetPost.title || 'පින්කම',
+        senderUid: sender.senderUid,
+        senderName: sender.senderName,
+        senderPhoto: sender.senderPhoto,
+        isAnonymous: sender.isAnonymous,
         message: `ඔබගේ සටහනට පුණ්‍යානුමෝදනාවක් එක් කළාය: "${snippet}"`
       });
     }
 
     // Trigger Notification for Mentioned Members (@Mention)
     if (val.text && val.text.includes('@')) {
+      const sender = this.getPublicSenderIdentity(isAnonymous);
       const allMembers = (this._cachedCommunityMembers && this._cachedCommunityMembers.length > 0)
         ? this._cachedCommunityMembers
         : this.getLocalPosts().map(p => ({ uid: p.uid, name: p.author }));
@@ -1705,6 +2971,10 @@ export const StorageService = {
               type: 'mention',
               postId: targetPost ? targetPost.id : postId,
               postTitle: targetPost?.title || 'පින්කම',
+              senderUid: sender.senderUid,
+              senderName: sender.senderName,
+              senderPhoto: sender.senderPhoto,
+              isAnonymous: sender.isAnonymous,
               message: `ප්‍රාර්ථනාවකදී ඔබව සිහිපත් කළාය: "${snippet}"`
             });
           }
@@ -1718,7 +2988,7 @@ export const StorageService = {
   /**
    * Update post content (Guarded by author or master admin)
    */
-  async updatePost(postId, { title, category, visibility, location, description, contact }) {
+  async updatePost(postId, { title, category, visibility, location, description, contact, isOfficial, isPinned }) {
     let allPosts = this.getLocalPosts();
     let targetPost = allPosts.find(p => p.id === postId);
     if (!targetPost && this._cachedPosts) {
@@ -1726,6 +2996,16 @@ export const StorageService = {
       if (targetPost) {
         allPosts = this._cachedPosts;
       }
+    }
+    if (!targetPost && this._loadedPosts) {
+      targetPost = this._loadedPosts.find(p => p.id === postId);
+      if (targetPost) {
+        allPosts = this._loadedPosts;
+      }
+    }
+    if (!targetPost) {
+      const offList = this.getOfficialPosts();
+      targetPost = offList.find(p => p.id === postId);
     }
     if (!targetPost) {
       throw new Error('පුණ්‍ය සටහන සොයාගත නොහැකි විය.');
@@ -1745,6 +3025,22 @@ export const StorageService = {
     if (location !== undefined) targetPost.location = location;
     if (description !== undefined) targetPost.description = description;
     if (contact !== undefined) targetPost.contact = contact;
+
+    if (isMaster) {
+      if (isOfficial !== undefined) {
+        targetPost.isOfficial = Boolean(isOfficial);
+        if (targetPost.isOfficial) {
+          targetPost.author = 'අපේ පිං පොත';
+          targetPost.authorRole = 'official';
+          targetPost.authorPhoto = null;
+          this.cacheOfficialPosts([targetPost]);
+        }
+      }
+      if (isPinned !== undefined) {
+        targetPost.isPinned = Boolean(isPinned);
+      }
+    }
+
     targetPost.isEdited = true;
     targetPost.editedAt = Date.now();
 
@@ -1766,6 +3062,17 @@ export const StorageService = {
         if (location !== undefined) updateData.location = location;
         if (description !== undefined) updateData.description = description;
         if (contact !== undefined) updateData.contact = contact;
+        if (isMaster && isOfficial !== undefined) {
+          updateData.isOfficial = Boolean(isOfficial);
+          if (updateData.isOfficial) {
+            updateData.author = 'අපේ පිං පොත';
+            updateData.authorRole = 'official';
+            updateData.authorPhoto = null;
+          }
+        }
+        if (isMaster && isPinned !== undefined) {
+          updateData.isPinned = Boolean(isPinned);
+        }
 
         await updateDoc(postRef, updateData);
       } catch (err) {
@@ -1774,6 +3081,72 @@ export const StorageService = {
     }
 
     return targetPost;
+  },
+
+  /**
+   * Master Admin: Toggle Official status of any post
+   */
+  async toggleOfficialPost(postId, makeOfficial = null) {
+    if (!this.isMasterAdmin()) {
+      throw new Error("මෙම ක්‍රියාව සිදුකිරීමට Master Admin අවසර අවශ්‍යයි.");
+    }
+    let allPosts = this._loadedPosts || this.getLocalPosts() || [];
+    let target = allPosts.find(p => p.id === postId);
+    if (!target && this._cachedPosts) {
+      target = this._cachedPosts.find(p => p.id === postId);
+    }
+    if (!target) {
+      const offList = this.getOfficialPosts();
+      target = offList.find(p => p.id === postId);
+    }
+    if (!target) {
+      throw new Error("පුණ්‍ය සටහන සොයාගත නොහැකි විය.");
+    }
+
+    const currentOfficial = this.isOfficialPost(target);
+    const newOfficial = makeOfficial !== null ? Boolean(makeOfficial) : !currentOfficial;
+
+    target.isOfficial = newOfficial;
+    if (newOfficial) {
+      target.author = 'අපේ පිං පොත';
+      target.authorRole = 'official';
+      target.authorPhoto = null;
+      this.cacheOfficialPosts([target]);
+    } else {
+      if (Array.isArray(this._cachedOfficialPosts)) {
+        this._cachedOfficialPosts = this._cachedOfficialPosts.filter(p => p.id !== postId);
+        try {
+          localStorage.setItem('pinPotha_official_posts', JSON.stringify(this._cachedOfficialPosts));
+        } catch (e) {}
+      }
+    }
+    target.isEdited = true;
+    target.editedAt = Date.now();
+
+    this._cachedPosts = allPosts;
+    this.cacheLocal(allPosts);
+    this.notifyListeners(allPosts);
+
+    if (isCloudReady && db) {
+      try {
+        const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const updatePayload = {
+          isOfficial: newOfficial,
+          isEdited: true,
+          editedAt: Date.now()
+        };
+        if (newOfficial) {
+          updatePayload.author = 'අපේ පිං පොත';
+          updatePayload.authorRole = 'official';
+          updatePayload.authorPhoto = null;
+        }
+        await updateDoc(doc(db, COLLECTIONS.POSTS, postId), updatePayload);
+      } catch (err) {
+        console.warn('[Storage] Firestore toggleOfficialPost error:', err);
+      }
+    }
+
+    return target;
   },
 
   /**
@@ -2014,29 +3387,21 @@ export const StorageService = {
   /**
    * Restore and auto-fill user profile upon login or auth state change
    */
-  async restoreUserProfile(user) {
+    async restoreUserProfile(user) {
     if (!user) {
-      this.currentUser = {
-        uid: "user_guest_" + Math.random().toString(36).substring(2, 7),
-        firstName: "අමුත්තා",
-        lastName: "",
-        name: "අමුත්තා",
-        photo: null,
-        email: null,
-        isAdmin: false,
-        bio: "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏",
-        location: "",
-        occupation: "",
-        coverImage: "assets/banner.jpg",
-        joinedDate: "2026 ඔක්තෝබර්",
-        isAnonymous: true,
-        needsNameConfirmation: false
-      };
-      localStorage.setItem('pinPotha_currentUser', JSON.stringify(this.currentUser));
+      this.currentUser = null;
+      try {
+        localStorage.removeItem('pinPotha_currentUser');
+        localStorage.removeItem('pinPotha_current_profile');
+        localStorage.removeItem('pinPotha_admin_uids');
+        sessionStorage.clear();
+      } catch (e) {}
       this.notifyListeners();
       this.notifyNotificationListeners();
-      return this.currentUser;
+      return null;
     }
+
+
 
     // 1. Check local profile cached by UID
     let savedProfile = {};
@@ -2044,6 +3409,16 @@ export const StorageService = {
       const rawUid = localStorage.getItem('pinPotha_profile_' + user.uid);
       if (rawUid) savedProfile = JSON.parse(rawUid);
     } catch (e) {}
+
+    // Check cached anonymous state
+    let cachedAnon = null;
+    try {
+      cachedAnon = localStorage.getItem('pinpotha_anon_' + user.uid);
+    } catch (e) {}
+
+    const initialIsAnon = cachedAnon !== null 
+      ? (cachedAnon === 'true') 
+      : Boolean(savedProfile.isAnonymous || savedProfile.useAlias);
 
     // 2. Check local profile cached by Email
     if ((!savedProfile.name || savedProfile.name === 'අමුත්තා') && user.email) {
@@ -2083,7 +3458,7 @@ export const StorageService = {
     const lName = savedProfile.lastName || (nameParts.length > 1 ? nameParts.slice(1).join(' ') : "");
     const fullName = confirmedName || `${fName} ${lName}`.trim() || "";
 
-    const isMaster = (user.email || '').trim().toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase() || user.uid === 'user_malith';
+    const isMaster = this.isMasterAdmin(user);
     const isSub = !isMaster && (savedProfile.role === 'admin' || savedProfile.isAdmin === true || savedProfile.isSubAdmin === true || (this._knownAdminUids && this._knownAdminUids.has(user.uid)));
 
     this.currentUser = {
@@ -2106,7 +3481,8 @@ export const StorageService = {
       joinedDate: savedProfile.joinedDate || "2026 ඔක්තෝබර්",
       mithrayan: Array.isArray(savedProfile.mithrayan) ? savedProfile.mithrayan : [],
       pendingMithraSent: Array.isArray(savedProfile.pendingMithraSent) ? savedProfile.pendingMithraSent : [],
-      isAnonymous: false,
+      isAnonymous: initialIsAnon,
+      useAlias: initialIsAnon,
       needsNameConfirmation: (!fullName || fullName === 'අමුත්තා' || fullName.length < 2)
     };
     if (isSub) {
@@ -2147,14 +3523,27 @@ export const StorageService = {
           if (Array.isArray(cloudData.mithrayan)) this.currentUser.mithrayan = cloudData.mithrayan;
           if (Array.isArray(cloudData.pendingMithraSent)) this.currentUser.pendingMithraSent = cloudData.pendingMithraSent;
 
+          // CRITICAL: Always load isAnonymous and useAlias from Firestore cloudData (never overwrite with false)
+          if (cloudData.isAnonymous !== undefined || cloudData.useAlias !== undefined) {
+            const cloudAnon = Boolean(cloudData.isAnonymous || cloudData.useAlias);
+            this.currentUser.isAnonymous = cloudAnon;
+            this.currentUser.useAlias = cloudAnon;
+            try {
+              localStorage.setItem('pinpotha_anon_' + user.uid, cloudAnon ? 'true' : 'false');
+            } catch (e) {}
+          }
+
           // CRITICAL: Sync role and admin privileges from Cloud Firestore!
-          const isCloudMaster = (user.email || '').trim().toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase() || user.uid === 'user_malith';
-          const isCloudSub = !isCloudMaster && (cloudData.role === 'admin' || cloudData.isAdmin === true || cloudData.isSubAdmin === true || (this._knownAdminUids && this._knownAdminUids.has(user.uid)));
+          const isCloudMaster = this.isMasterAdmin(user);
+          const isCloudSub = !isCloudMaster && (cloudData.role === 'admin' || cloudData.isSubAdmin === true);
           this.currentUser.role = cloudData.role || (isCloudMaster ? 'master_admin' : (isCloudSub ? 'admin' : 'member'));
-          this.currentUser.isAdmin = isCloudMaster || isCloudSub;
+          this.currentUser.isAdmin = isCloudMaster;
           this.currentUser.isSubAdmin = isCloudSub;
           if (isCloudSub) {
             this._knownAdminUids.add(user.uid);
+            localStorage.setItem('pinPotha_admin_uids', JSON.stringify(Array.from(this._knownAdminUids)));
+          } else {
+            this._knownAdminUids.delete(user.uid);
             localStorage.setItem('pinPotha_admin_uids', JSON.stringify(Array.from(this._knownAdminUids)));
           }
 
@@ -2163,10 +3552,22 @@ export const StorageService = {
           if (user.email) {
             localStorage.setItem('pinPotha_last_user_name_' + user.email.toLowerCase(), this.currentUser.name);
           }
+
+          if (typeof window !== 'undefined') {
+            const isAnon = Boolean(this.currentUser.isAnonymous || this.currentUser.useAlias);
+            const setToggle = document.getElementById('setUseAliasToggle');
+            const editToggle = document.getElementById('editProfUseAliasToggle');
+            if (setToggle) setToggle.checked = isAnon;
+            if (editToggle) editToggle.checked = isAnon;
+            if (typeof window.updateUserInfoUI === 'function') {
+              try { window.updateUserInfoUI(); } catch (e) {}
+            }
+          }
+
           this.notifyListeners();
           this.notifyNotificationListeners();
         } else if (this.currentUser.name && this.currentUser.name !== 'අමුත්තා') {
-          // Sync existing initial data to cloud
+          // Sync existing initial data to cloud without resetting isAnonymous to false
           await setDoc(userDocRef, {
             uid: this.currentUser.uid,
             name: this.currentUser.name,
@@ -2179,6 +3580,8 @@ export const StorageService = {
             location: this.currentUser.location,
             occupation: this.currentUser.occupation,
             joinedDate: this.currentUser.joinedDate,
+            isAnonymous: Boolean(this.currentUser.isAnonymous),
+            useAlias: Boolean(this.currentUser.useAlias),
             updatedAt: Date.now()
           }, { merge: true });
         }
@@ -2191,22 +3594,51 @@ export const StorageService = {
   },
 
   /**
-   * Fetch a member's public profile by UID (from cache, cloud Firestore, or post fallback)
+   * Fetch a member's public profile by UID or Author Name (from in-memory community cache, cloud Firestore, or local posts)
    */
-  async getUserProfile(uid) {
-    if (!uid) return null;
-    if (this.currentUser && this.currentUser.uid === uid) {
-      return this.currentUser;
+  async getUserProfile(uid, authorName = null) {
+    // 0. Sanitize and validate UID
+    if (uid === 'undefined' || uid === 'null' || uid === '' || typeof uid !== 'string') {
+      uid = null;
     }
 
-    // 1. Check local cache
-    try {
-      const raw = localStorage.getItem('pinPotha_profile_' + uid);
-      if (raw) return JSON.parse(raw);
-    } catch (e) {}
+    const cleanAuthor = (authorName || '').trim();
 
-    // 2. Check Firestore
-    if (isCloudReady && db) {
+    // 1. Current user active session check
+    if (this.currentUser) {
+      if ((uid && this.currentUser.uid && this.currentUser.uid === uid) ||
+          (!uid && cleanAuthor && this.currentUser.name && this.currentUser.name.trim().toLowerCase() === cleanAuthor.toLowerCase())) {
+        return this.currentUser;
+      }
+    }
+
+    // 2. Cached community members check (live synced users from Firestore) - FASTEST & MOST ACCURATE!
+    if (this._cachedCommunityMembers && Array.isArray(this._cachedCommunityMembers)) {
+      const found = this._cachedCommunityMembers.find(m => 
+        (uid && m.uid && m.uid === uid) ||
+        (cleanAuthor && m.name && m.name.trim().toLowerCase() === cleanAuthor.toLowerCase())
+      );
+      if (found) {
+        return {
+          uid: found.uid || uid,
+          name: found.name || cleanAuthor || 'කල්‍යාණ මිත්‍ර',
+          photo: found.photo || null,
+          coverImage: found.coverImage || 'assets/banner.jpg',
+          bio: found.bio || "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏",
+          location: found.location || '',
+          occupation: found.occupation || '',
+          joinedDate: found.joinedDate || '2026 ඔක්තෝබර්',
+          isAdmin: found.isAdmin,
+          isSubAdmin: found.isSubAdmin,
+          isSangha: found.isSangha || this.isSangha(found),
+          role: found.role || (found.isSangha ? 'sangha' : 'member'),
+          mithrayan: Array.isArray(found.mithrayan) ? found.mithrayan : []
+        };
+      }
+    }
+
+    // 3. Query Firestore users collection if cloud ready & UID is present
+    if (uid && isCloudReady && db) {
       try {
         const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
         const snap = await getDoc(doc(db, COLLECTIONS.USERS, uid));
@@ -2217,10 +3649,14 @@ export const StorageService = {
           if (isSub) {
             this._knownAdminUids.add(uid);
           }
-          data.isSangha = data.isSangha === true || data.role === 'sangha' || this.isSangha({ name: data.name });
+          data.uid = uid;
+          data.isSangha = data.isSangha === true || data.role === 'sangha' || this.isSangha({ uid, name: data.name });
           data.isAdmin = isMaster;
           data.isSubAdmin = isSub;
-          localStorage.setItem('pinPotha_profile_' + uid, JSON.stringify(data));
+          data.coverImage = data.coverImage || 'assets/banner.jpg';
+          try {
+            localStorage.setItem('pinPotha_profile_' + uid, JSON.stringify(data));
+          } catch (e) {}
           return data;
         }
       } catch (e) {
@@ -2228,22 +3664,59 @@ export const StorageService = {
       }
     }
 
-    // 3. Fallback: derive from existing posts in memory
+    // 4. Safe Local cache check (only if valid UID)
+    if (uid) {
+      try {
+        const raw = localStorage.getItem('pinPotha_profile_' + uid);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && (parsed.uid || parsed.name)) {
+            parsed.coverImage = parsed.coverImage || 'assets/banner.jpg';
+            return parsed;
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 5. Fallback: derive from existing posts in memory
     const allPosts = this.getLocalPosts();
-    const userPost = allPosts.find(p => p.uid === uid);
+    const userPost = allPosts.find(p => 
+      (uid && p.uid === uid) || 
+      (cleanAuthor && p.author && p.author.trim().toLowerCase() === cleanAuthor.toLowerCase())
+    );
     if (userPost) {
+      const resolvedPhoto = this.resolveAuthorPhoto(userPost);
+      const isPostSangha = userPost.isSangha || userPost.authorRole === 'sangha' || this.isSangha({ uid: userPost.uid, name: userPost.author });
       return {
-        uid: userPost.uid,
-        name: userPost.author || 'කල්‍යාණ මිත්‍ර',
-        photo: userPost.authorPhoto || null,
+        uid: userPost.uid || uid,
+        name: userPost.author || cleanAuthor || 'කල්‍යාණ මිත්‍ර',
+        photo: resolvedPhoto || userPost.authorPhoto || null,
         coverImage: userPost.authorCover || 'assets/banner.jpg',
         bio: "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏",
         location: userPost.location || '',
         occupation: '',
         joinedDate: '2026 ඔක්තෝබර්',
         isAdmin: userPost.authorRole === 'admin',
-        isSangha: userPost.isSangha || userPost.authorRole === 'sangha' || this.isSangha({ name: userPost.author }),
-        role: (userPost.isSangha || userPost.authorRole === 'sangha') ? 'sangha' : 'member'
+        isSangha: isPostSangha,
+        role: isPostSangha ? 'sangha' : 'member'
+      };
+    }
+
+    // 6. Safe minimal profile for cleanAuthor
+    if (cleanAuthor) {
+      const isSanghaAuthor = this.isSangha({ uid, name: cleanAuthor });
+      return {
+        uid: uid || null,
+        name: cleanAuthor,
+        photo: null,
+        coverImage: 'assets/banner.jpg',
+        bio: "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏",
+        location: '',
+        occupation: '',
+        joinedDate: '2026 ඔක්තෝබර්',
+        isAdmin: false,
+        isSangha: isSanghaAuthor,
+        role: isSanghaAuthor ? 'sangha' : 'member'
       };
     }
 
@@ -2255,13 +3728,76 @@ export const StorageService = {
    */
   isSangha(userOrMember) {
     if (!userOrMember) return false;
-    if (userOrMember.isSangha === true || userOrMember.role === 'sangha' || userOrMember.authorRole === 'sangha') {
+
+    // 1. Direct UID matching in cached Sangha Set
+    const uid = typeof userOrMember === 'string' ? userOrMember : (userOrMember.uid || userOrMember.senderUid || userOrMember.id);
+    if (uid && this._knownSanghaUids && this._knownSanghaUids.has(uid)) {
       return true;
     }
-    const name = (userOrMember.name || userOrMember.author || '').trim();
-    if (name.includes('ස්වාමීන් වහන්සේ') || name.includes('හිමි') || name.includes('තෙරුන්') || name.startsWith('පූජ්‍ය ') || name.startsWith('පූජ්‍යපාද ')) {
+
+    // 2. Check local profile cache if UID is present
+    if (uid) {
+      try {
+        const raw = localStorage.getItem('pinPotha_profile_' + uid);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && (parsed.isSangha === true || parsed.role === 'sangha' || parsed.authorRole === 'sangha')) {
+            if (this._knownSanghaUids) this._knownSanghaUids.add(uid);
+            return true;
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 3. Explicit properties on object
+    if (typeof userOrMember === 'object') {
+      if (userOrMember.isSangha === true || userOrMember.role === 'sangha' || userOrMember.authorRole === 'sangha') {
+        if (uid && this._knownSanghaUids) this._knownSanghaUids.add(uid);
+        return true;
+      }
+    }
+
+    // 4. Honorific and Title Pattern Matching (Sinhala & English)
+    const rawName = typeof userOrMember === 'string'
+      ? userOrMember
+      : (userOrMember.name || userOrMember.author || userOrMember.senderName || userOrMember.firstName || '').trim();
+
+    if (!rawName) return false;
+
+    // Sinhala checks
+    if (
+      rawName.includes('ස්වාමීන් වහන්සේ') ||
+      rawName.includes('ස්වාමින් වහන්සේ') ||
+      rawName.includes('හිමි') ||
+      rawName.includes('තෙරුන්') ||
+      rawName.includes('හාමුදුරුවෝ') ||
+      rawName.startsWith('පූජ්‍ය ') ||
+      rawName.startsWith('පූජ්‍යපාද ')
+    ) {
+      if (uid && this._knownSanghaUids) this._knownSanghaUids.add(uid);
       return true;
     }
+
+    // English checks (case-insensitive for handles and Romanized Pali/Sinhala names)
+    const lowerName = rawName.toLowerCase();
+    if (
+      lowerName.includes('himi') ||
+      lowerName.includes('thero') ||
+      lowerName.includes('théro') ||
+      lowerName.includes('thera') ||
+      lowerName.includes('bhikkhu') ||
+      lowerName.includes('bhikku') ||
+      lowerName.includes('bhante') ||
+      lowerName.includes('swaminwahanse') ||
+      lowerName.includes('hamuduruwo') ||
+      lowerName.startsWith('ven ') ||
+      lowerName.startsWith('ven. ') ||
+      lowerName.startsWith('venerable ')
+    ) {
+      if (uid && this._knownSanghaUids) this._knownSanghaUids.add(uid);
+      return true;
+    }
+
     return false;
   },
 
@@ -2321,12 +3857,14 @@ export const StorageService = {
     }
 
     if (isNowFollowing) {
+      const sender = this.getPublicSenderIdentity();
       await this.createNotification({
         recipientUid: targetUid,
         type: 'sangha_reverence',
-        senderUid: this.currentUser.uid,
-        senderName: this.currentUser.name || 'පින්වත් සැදැහැවතෙක්',
-        senderPhoto: this.currentUser.photo || null,
+        senderUid: sender.senderUid,
+        senderName: sender.senderName,
+        senderPhoto: sender.senderPhoto,
+        isAnonymous: sender.isAnonymous,
         message: 'ඔබ වහන්සේට නමස්කාර පූර්වකව ගෞරව දක්වමින් අනුගමනය කළාය. 🙏'
       });
     }
@@ -2343,6 +3881,19 @@ export const StorageService = {
     if (!this.isMasterAdmin()) {
       throw new Error("මෙම වෙනස්කම සිදුකළ හැක්කේ ප්‍රධාන පරිපාලක (Master Admin) හට පමණි.");
     }
+    if (isSangha) {
+      this._knownSanghaUids.add(targetUid);
+    } else {
+      this._knownSanghaUids.delete(targetUid);
+    }
+    try {
+      localStorage.setItem('pinPotha_sangha_uids', JSON.stringify(Array.from(this._knownSanghaUids)));
+    } catch (e) {}
+
+    // Invalidate community cache so lists re-render freshly
+    this._cachedCommunityMembers = null;
+    this._lastCommunityMembersFetchTime = 0;
+
     try {
       const raw = localStorage.getItem('pinPotha_profile_' + targetUid);
       if (raw) {
@@ -2497,13 +4048,15 @@ export const StorageService = {
     }
 
     // Create Notification for the target user
+    const sender = this.getPublicSenderIdentity();
     await this.createNotification({
       recipientUid: targetUid,
       type: 'mithra_request',
       status: 'pending',
-      senderUid: this.currentUser.uid,
-      senderName: this.currentUser.name || 'කල්‍යාණ මිත්‍ර',
-      senderPhoto: this.currentUser.photo || null,
+      senderUid: sender.senderUid,
+      senderName: sender.senderName,
+      senderPhoto: sender.senderPhoto,
+      isAnonymous: sender.isAnonymous,
       message: 'ඔබව කල්‍යාණ මිත්‍රයෙකු ලෙස සම්බන්ධ කරගැනීමට ඇරයුම් කළාය. 🙏'
     });
 
@@ -2570,13 +4123,15 @@ export const StorageService = {
     }
 
     // Send celebration notification to senderUid with exact requested Sinhala message
+    const acceptSender = this.getPublicSenderIdentity();
     await this.createNotification({
       recipientUid: senderUid,
       type: 'mithra_accepted',
-      senderUid: this.currentUser.uid,
-      senderName: this.currentUser.name || 'කල්‍යාණ මිත්‍ර',
-      senderPhoto: this.currentUser.photo || null,
-      message: `ඔබගේ කල්‍යාණ මිත්‍ර ඇරයුම ${this.currentUser.name || 'කල්‍යාණ මිත්‍රයා'} විසින් පිළිගන්නා ලදී. 🙏`
+      senderUid: acceptSender.senderUid,
+      senderName: acceptSender.senderName,
+      senderPhoto: acceptSender.senderPhoto,
+      isAnonymous: acceptSender.isAnonymous,
+      message: `ඔබගේ කල්‍යාණ මිත්‍ර ඇරයුම ${acceptSender.senderName} විසින් පිළිගන්නා ලදී. 🙏`
     });
 
     this.notifyListeners();
@@ -2613,13 +4168,15 @@ export const StorageService = {
 
     // Send rejection notification to senderUid with exact requested Sinhala message
     if (senderUid) {
+      const rejectSender = this.getPublicSenderIdentity();
       await this.createNotification({
         recipientUid: senderUid,
         type: 'mithra_rejected',
-        senderUid: this.currentUser.uid,
-        senderName: this.currentUser.name || 'කල්‍යාණ මිත්‍ර',
-        senderPhoto: this.currentUser.photo || null,
-        message: `ඔබගේ කල්‍යාණ මිත්‍ර ඇරයුම ${this.currentUser.name || 'කල්‍යාණ මිත්‍රයා'} විසින් පිළි නොගන්නා ලදී.`
+        senderUid: rejectSender.senderUid,
+        senderName: rejectSender.senderName,
+        senderPhoto: rejectSender.senderPhoto,
+        isAnonymous: rejectSender.isAnonymous,
+        message: `ඔබගේ කල්‍යාණ මිත්‍ර ඇරයුම ${rejectSender.senderName} විසින් පිළි නොගන්නා ලදී.`
       });
     }
 
@@ -2688,29 +4245,50 @@ export const StorageService = {
    */
   resolveAuthorName(item) {
     if (!item) return 'කල්‍යාණ මිත්‍ර';
-    if (item.isOfficial) return 'අපේ පිං පොත';
+    if (this.isOfficialPost(item)) return 'අපේ පිං පොත';
+
+    // Anonymous comment / post protection
+    if (item.isAnonymous === true || item.author === 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' || item.authorName === 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' || (item.author && item.author.startsWith('නිර්නාමික'))) {
+      return 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්';
+    }
 
     const targetUid = item.uid;
 
     // 1. Current user active session check
     if (this.currentUser && this.currentUser.uid && targetUid && targetUid === this.currentUser.uid) {
+      if (this.currentUser.useAlias) return 'කල්‍යාණ මිත්‍ර සාමාජික';
       return this.currentUser.name || item.author || 'කල්‍යාණ මිත්‍ර';
     }
 
-    // 2. Cached profile check for other users
+    // 2. Cached community members check (live synced users from Firestore)
+    if (targetUid && this._cachedCommunityMembers && Array.isArray(this._cachedCommunityMembers)) {
+      const member = this._cachedCommunityMembers.find(m => m.uid === targetUid);
+      if (member) {
+        if (member.useAlias) return 'කල්‍යාණ මිත්‍ර සාමාජික';
+        if (member.name && member.name.trim().length > 0) {
+          return member.name;
+        }
+      }
+    }
+
+    // 3. Cached profile check for other users by UID in localStorage
     if (targetUid) {
       try {
         const cached = localStorage.getItem('pinPotha_profile_' + targetUid);
         if (cached) {
           const parsed = JSON.parse(cached);
-          if (parsed && parsed.name && parsed.name.trim().length > 0) {
-            return parsed.name;
+          if (parsed) {
+            if (parsed.useAlias) return 'කල්‍යාණ මිත්‍ර සාමාජික';
+            if (parsed.name && parsed.name.trim().length > 0) {
+              return parsed.name;
+            }
           }
         }
       } catch (e) {}
     }
 
-    // 3. Fallback to item stored author
+    // 4. Fallback to item stored author or alias
+    if (item.useAlias) return 'කල්‍යාණ මිත්‍ර සාමාජික';
     return item.author || 'කල්‍යාණ මිත්‍ර';
   },
 
@@ -2719,7 +4297,12 @@ export const StorageService = {
    */
   resolveAuthorPhoto(item) {
     if (!item) return null;
-    if (item.isOfficial) return null;
+    if (this.isOfficialPost(item)) return null;
+
+    // Anonymous comment / post protection: strictly never return real photo
+    if (item.isAnonymous === true || item.author === 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' || item.authorName === 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' || (item.author && item.author.startsWith('නිර්නාමික'))) {
+      return null;
+    }
 
     const targetUid = item.uid;
     const authorName = (item.author || '').trim();
@@ -2777,7 +4360,18 @@ export const StorageService = {
   /**
    * Update full user profile details (First & Last Name, Occupation, Location/Address, Bio, Photo, Cover Image)
    */
-  async updateProfile({ firstName, lastName, name, bio, location, district, province, city, occupation, coverImage, photo }) {
+  async updateProfile({ firstName, lastName, name, bio, location, district, province, city, occupation, spiritualInterest, temple, coverImage, photo, useAlias, isAnonymous }) {
+    if (!this.currentUser) return;
+    if (useAlias !== undefined || isAnonymous !== undefined) {
+      const aliasVal = Boolean(useAlias !== undefined ? useAlias : isAnonymous);
+      this.currentUser.useAlias = aliasVal;
+      this.currentUser.isAnonymous = aliasVal;
+      if (this.currentUser.uid) {
+        try {
+          localStorage.setItem('pinpotha_anon_' + this.currentUser.uid, aliasVal ? 'true' : 'false');
+        } catch (e) {}
+      }
+    }
     if (firstName !== undefined || lastName !== undefined) {
       if (firstName !== undefined) {
         this.currentUser.firstName = Security.escapeHTML(Security.sanitizeText(firstName.trim()));
@@ -2791,10 +4385,16 @@ export const StorageService = {
       }
     } else if (name && name.trim().length >= 2) {
       this.currentUser.name = Security.escapeHTML(Security.sanitizeText(name.trim()));
+      const parts = this.currentUser.name.split(' ');
+      this.currentUser.firstName = parts[0] || '';
+      this.currentUser.lastName = parts.slice(1).join(' ') || '';
     }
 
-    if (occupation !== undefined) {
-      this.currentUser.occupation = Security.escapeHTML(Security.sanitizeText(occupation.trim()));
+    const finalSpiritual = spiritualInterest !== undefined ? spiritualInterest : (temple !== undefined ? temple : occupation);
+    if (finalSpiritual !== undefined) {
+      const sanitizedOcc = Security.escapeHTML(Security.sanitizeText(finalSpiritual.trim()));
+      this.currentUser.occupation = sanitizedOcc;
+      this.currentUser.spiritualInterest = sanitizedOcc;
     }
     if (location !== undefined) {
       this.currentUser.location = Security.escapeHTML(Security.sanitizeText(location.trim()));
@@ -2829,62 +4429,93 @@ export const StorageService = {
       localStorage.setItem('pinPotha_last_user_name_' + this.currentUser.email.toLowerCase(), this.currentUser.name);
     }
 
-    // Immediately update all posts authored by this user in memory and local storage
-    const updatedAuthorName = this.currentUser.name;
+    const updatedAuthorName = this.currentUser.useAlias ? "කල්‍යාණ මිත්‍ර සාමාජික" : this.currentUser.name;
     const updatedAuthorPhoto = this.currentUser.photo;
     const targetUid = this.currentUser.uid;
 
-    if (targetUid && updatedAuthorName) {
-      let postsLocallyChanged = false;
-      if (Array.isArray(this._cachedPosts)) {
-        this._cachedPosts.forEach(p => {
-          if (p.uid === targetUid && !p.isOfficial) {
-            p.author = updatedAuthorName;
-            if (updatedAuthorPhoto !== undefined) p.authorPhoto = updatedAuthorPhoto;
-            postsLocallyChanged = true;
-          }
-          if (p.originalPost && p.originalPost.uid === targetUid && !p.originalPost.isOfficial) {
-            p.originalPost.author = updatedAuthorName;
-            if (updatedAuthorPhoto !== undefined) p.originalPost.authorPhoto = updatedAuthorPhoto;
-            postsLocallyChanged = true;
-          }
+    // 1. Immediately update active community member in-memory cache
+    if (targetUid && this._cachedCommunityMembers && Array.isArray(this._cachedCommunityMembers)) {
+      const member = this._cachedCommunityMembers.find(m => m.uid === targetUid);
+      if (member) {
+        member.name = updatedAuthorName;
+        member.firstName = this.currentUser.firstName || '';
+        member.lastName = this.currentUser.lastName || '';
+        if (updatedAuthorPhoto !== undefined) member.photo = updatedAuthorPhoto;
+        if (location !== undefined) member.location = this.currentUser.location;
+      } else {
+        this._cachedCommunityMembers.push({
+          uid: targetUid,
+          name: updatedAuthorName,
+          firstName: this.currentUser.firstName || '',
+          lastName: this.currentUser.lastName || '',
+          photo: updatedAuthorPhoto || null,
+          location: this.currentUser.location || ''
         });
-      }
-
-      try {
-        const rawLocal = localStorage.getItem('pinPotha_posts');
-        if (rawLocal) {
-          const localList = JSON.parse(rawLocal);
-          if (Array.isArray(localList)) {
-            let locChanged = false;
-            localList.forEach(p => {
-              if (p.uid === targetUid && !p.isOfficial) {
-                p.author = updatedAuthorName;
-                if (updatedAuthorPhoto !== undefined) p.authorPhoto = updatedAuthorPhoto;
-                locChanged = true;
-              }
-              if (p.originalPost && p.originalPost.uid === targetUid && !p.originalPost.isOfficial) {
-                p.originalPost.author = updatedAuthorName;
-                if (updatedAuthorPhoto !== undefined) p.originalPost.authorPhoto = updatedAuthorPhoto;
-                locChanged = true;
-              }
-            });
-            if (locChanged) {
-              localStorage.setItem('pinPotha_posts', JSON.stringify(localList));
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('[Storage] Error updating local cached posts author:', e);
-      }
-
-      if (postsLocallyChanged) {
-        this.cacheLocal(this._cachedPosts);
       }
     }
 
-    // Sync with Firestore collection 'users' and batch-update 'merit_posts'
-    if (isCloudReady && db && this.currentUser.uid && !this.currentUser.isAnonymous) {
+    // 2. Immediately update all posts authored by this user in memory and local storage
+    if (targetUid && updatedAuthorName) {
+      const updatePostsWithNewAuthor = (postList) => {
+        if (!Array.isArray(postList)) return false;
+        let changed = false;
+        postList.forEach(p => {
+          // Direct post
+          if (p.uid === targetUid && !p.isOfficial) {
+            if (p.author !== updatedAuthorName) {
+              p.author = updatedAuthorName;
+              changed = true;
+            }
+            if (p.useAlias !== Boolean(this.currentUser.useAlias)) {
+              p.useAlias = Boolean(this.currentUser.useAlias);
+              changed = true;
+            }
+            if (updatedAuthorPhoto !== undefined && p.authorPhoto !== updatedAuthorPhoto) {
+              p.authorPhoto = updatedAuthorPhoto;
+              changed = true;
+            }
+          }
+          // Quoted / Repost original
+          if (p.originalPost && p.originalPost.uid === targetUid && !p.originalPost.isOfficial) {
+            if (p.originalPost.author !== updatedAuthorName) {
+              p.originalPost.author = updatedAuthorName;
+              changed = true;
+            }
+            if (updatedAuthorPhoto !== undefined && p.originalPost.authorPhoto !== updatedAuthorPhoto) {
+              p.originalPost.authorPhoto = updatedAuthorPhoto;
+              changed = true;
+            }
+          }
+          // Comments authored by this user on any post
+          if (Array.isArray(p.comments)) {
+            p.comments.forEach(c => {
+              if (c.uid === targetUid) {
+                if (c.author !== updatedAuthorName) {
+                  c.author = updatedAuthorName;
+                  changed = true;
+                }
+                if (updatedAuthorPhoto !== undefined && c.authorPhoto !== updatedAuthorPhoto) {
+                  c.authorPhoto = updatedAuthorPhoto;
+                  changed = true;
+                }
+              }
+            });
+          }
+        });
+        return changed;
+      };
+
+      const allPosts = this.getLocalPosts();
+      if (Array.isArray(allPosts) && allPosts.length > 0) {
+        if (updatePostsWithNewAuthor(allPosts)) {
+          this.cacheLocal(allPosts);
+          this.notifyListeners(allPosts);
+        }
+      }
+    }
+
+    // 3. Sync with Firestore collection 'users' and chunked batch-update 'merit_posts'
+    if (isCloudReady && db && this.currentUser.uid && this.currentUser.email) {
       try {
         const { doc, setDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
         await setDoc(doc(db, COLLECTIONS.USERS, this.currentUser.uid), {
@@ -2901,6 +4532,9 @@ export const StorageService = {
           province: this.currentUser.province || '',
           city: this.currentUser.city || '',
           occupation: this.currentUser.occupation || '',
+          spiritualInterest: this.currentUser.spiritualInterest || this.currentUser.occupation || '',
+          useAlias: Boolean(this.currentUser.useAlias),
+          isAnonymous: Boolean(this.currentUser.isAnonymous || this.currentUser.useAlias),
           joinedDate: this.currentUser.joinedDate || '2026 ඔක්තෝබර්',
           updatedAt: Date.now()
         }, { merge: true });
@@ -2908,37 +4542,127 @@ export const StorageService = {
         console.warn('[Firestore] Failed to save user profile to cloud:', e);
       }
 
-      // Batch update all posts created by this user so their new name persists in cloud Firestore
+      // Batch update all posts created by this user so their new name persists in cloud Firestore (Chunked by 400)
       try {
         const { collection, query, where, getDocs, writeBatch, doc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
         const postQ = query(collection(db, COLLECTIONS.POSTS), where('uid', '==', this.currentUser.uid));
         const postSnap = await getDocs(postQ);
         if (!postSnap.empty) {
-          const batch = writeBatch(db);
-          postSnap.forEach(postDoc => {
+          const BATCH_SIZE = 400;
+          let batch = writeBatch(db);
+          let opCount = 0;
+
+          for (const postDoc of postSnap.docs) {
             const data = postDoc.data();
             if (!data.isOfficial) {
-              const updatePayload = { author: this.currentUser.name };
+              const updatePayload = { author: this.currentUser.useAlias ? "කල්‍යාණ මිත්‍ර සාමාජික" : this.currentUser.name, useAlias: Boolean(this.currentUser.useAlias) };
               if (this.currentUser.photo) {
                 updatePayload.authorPhoto = this.currentUser.photo;
               }
               batch.update(doc(db, COLLECTIONS.POSTS, postDoc.id), updatePayload);
+              opCount++;
+              if (opCount % BATCH_SIZE === 0) {
+                await batch.commit();
+                batch = writeBatch(db);
+              }
             }
-          });
-          await batch.commit();
-          console.log(`[Firestore] Successfully batch updated author name on ${postSnap.size} posts.`);
+          }
+          if (opCount % BATCH_SIZE !== 0) {
+            await batch.commit();
+          }
+          console.log(`[Firestore] Successfully batch updated author name on ${opCount} posts.`);
         }
       } catch (postBatchErr) {
         console.warn('[Firestore] Batch updating author posts in cloud warning:', postBatchErr);
       }
     }
 
-    this.notifyListeners(this._cachedPosts);
+    const currentLivePosts = this.getLocalPosts();
+    if (Array.isArray(currentLivePosts) && currentLivePosts.length > 0) {
+      this.notifyListeners(currentLivePosts);
+    }
     return this.currentUser;
   },
 
   async setUserName(name) {
     return await this.updateProfile({ name });
+  },
+
+  /**
+   * Immediately toggle and persist Privacy Alias (isAnonymous) to Firestore and LocalStorage
+   */
+  async setPrivacyAlias(isAnon) {
+    if (!this.currentUser || !this.currentUser.uid) return false;
+    const isChecked = Boolean(isAnon);
+    this.currentUser.isAnonymous = isChecked;
+    this.currentUser.useAlias = isChecked;
+
+    try {
+      localStorage.setItem('pinpotha_anon_' + this.currentUser.uid, isChecked ? 'true' : 'false');
+      localStorage.setItem('pinPotha_currentUser', JSON.stringify(this.currentUser));
+      localStorage.setItem('pinPotha_profile_' + this.currentUser.uid, JSON.stringify(this.currentUser));
+    } catch (e) {
+      console.warn('[StorageService.setPrivacyAlias] LocalStorage cache error:', e);
+    }
+
+    if (this._cachedCommunityMembers && Array.isArray(this._cachedCommunityMembers)) {
+      const m = this._cachedCommunityMembers.find(mem => mem.uid === this.currentUser.uid);
+      if (m) {
+        m.isAnonymous = isChecked;
+        m.useAlias = isChecked;
+      }
+    }
+
+    if (isCloudReady && db) {
+      try {
+        const { doc, setDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const userDocRef = doc(db, COLLECTIONS.USERS, this.currentUser.uid);
+        await setDoc(userDocRef, {
+          isAnonymous: isChecked,
+          useAlias: isChecked,
+          updatedAt: Date.now()
+        }, { merge: true });
+      } catch (err) {
+        console.error('[StorageService.setPrivacyAlias] Firestore error:', err);
+        throw err;
+      }
+    }
+    return true;
+  },
+
+  /**
+   * Immediately persist user's chosen Spiritual Avatar or photo to Firestore and LocalStorage
+   */
+  async persistUserPhotoToCloud(photoDataUrl, spiritualAvatarId = null) {
+    if (!this.currentUser || !this.currentUser.uid) return false;
+    this.currentUser.photo = photoDataUrl;
+    if (spiritualAvatarId) this.currentUser.spiritualAvatarId = spiritualAvatarId;
+
+    try {
+      localStorage.setItem('pinPotha_currentUser', JSON.stringify(this.currentUser));
+      localStorage.setItem('pinPotha_profile_' + this.currentUser.uid, JSON.stringify(this.currentUser));
+    } catch (e) {}
+
+    if (this._cachedCommunityMembers && Array.isArray(this._cachedCommunityMembers)) {
+      const m = this._cachedCommunityMembers.find(mem => mem.uid === this.currentUser.uid);
+      if (m) m.photo = photoDataUrl;
+    }
+
+    if (isCloudReady && db) {
+      try {
+        const { doc, setDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const userDocRef = doc(db, COLLECTIONS.USERS, this.currentUser.uid);
+        await setDoc(userDocRef, {
+          photo: photoDataUrl,
+          spiritualAvatarId: spiritualAvatarId || null,
+          updatedAt: Date.now()
+        }, { merge: true });
+      } catch (err) {
+        console.error('[StorageService.persistUserPhotoToCloud] Firestore error:', err);
+        throw err;
+      }
+    }
+    return true;
   },
 
   /**
@@ -2997,18 +4721,90 @@ export const StorageService = {
         console.warn('Sign out warning:', e);
       }
     }
-    this.currentUser = {
-      uid: "user_guest_" + Math.random().toString(36).substring(2, 7),
-      firstName: "අමුත්තා",
-      lastName: "",
-      name: "අමුත්තා",
-      photo: null,
-      email: null,
-      isAdmin: false,
-      isAnonymous: true,
-      needsNameConfirmation: false
-    };
-    localStorage.setItem('pinPotha_currentUser', JSON.stringify(this.currentUser));
+    this.currentUser = null;
+    try {
+      localStorage.removeItem('pinPotha_currentUser');
+      localStorage.removeItem('pinPotha_current_profile');
+      localStorage.removeItem('pinPotha_admin_uids');
+      localStorage.removeItem('pinPotha_last_presence');
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('pinPotha_profile_') || key.startsWith('pinPotha_last_user_name_'))) {
+          localStorage.removeItem(key);
+        }
+      }
+      sessionStorage.clear();
+    } catch (e) {}
     this.notifyListeners();
+    this.notifyNotificationListeners();
+  },
+
+  /**
+   * Returns list of Aranya Senasana (seed + cloud/local custom entries)
+   */
+  async getAranyaSenasanaList() {
+    let list = [...INITIAL_ARANYA_LIST];
+    try {
+      const localCustom = localStorage.getItem('pinPotha_custom_aranya');
+      if (localCustom) {
+        const parsed = JSON.parse(localCustom);
+        if (Array.isArray(parsed)) {
+          parsed.forEach(item => {
+            if (!list.some(a => a.id === item.id)) {
+              list.push(item);
+            }
+          });
+        }
+      }
+    } catch (e) {}
+
+    if (isCloudReady && db) {
+      try {
+        const { collection, getDocs } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const snap = await getDocs(collection(db, COLLECTIONS.ARANYA));
+        snap.forEach(docSnap => {
+          const data = { id: docSnap.id, ...docSnap.data() };
+          const idx = list.findIndex(a => a.id === data.id);
+          if (idx !== -1) {
+            list[idx] = { ...list[idx], ...data };
+          } else {
+            list.push(data);
+          }
+        });
+      } catch (e) {
+        console.warn('[Storage] Aranya cloud sync warning:', e);
+      }
+    }
+
+    return list;
+  },
+
+  /**
+   * Devotee suggests an Aranya Senasana for inclusion
+   */
+  async suggestAranyaSenasana(suggestion) {
+    if (!suggestion || !suggestion.name) return false;
+    const payload = {
+      ...suggestion,
+      timestamp: Date.now(),
+      status: 'pending',
+      suggestedBy: (this.currentUser && this.currentUser.name) ? this.currentUser.name : 'කල්‍යාණ මිත්‍ර'
+    };
+
+    try {
+      const existing = JSON.parse(localStorage.getItem('pinPotha_aranya_suggestions') || '[]');
+      existing.unshift(payload);
+      localStorage.setItem('pinPotha_aranya_suggestions', JSON.stringify(existing));
+    } catch(e) {}
+
+    if (isCloudReady && db) {
+      try {
+        const { collection, addDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        await addDoc(collection(db, 'aranya_suggestions'), payload);
+      } catch (e) {
+        console.warn('[Storage] Cloud suggest aranya warning:', e);
+      }
+    }
+    return true;
   }
 };

@@ -1,24 +1,27 @@
-// Ape Pin Potha Service Worker (v90)
+// Ape Pin Potha Service Worker (v155)
 // Strategy: Network-First for HTML, JS, CSS to guarantee instant updates; Stale-While-Revalidate for media assets
-const CACHE_NAME = 'pin-potha-cache-v90';
+const CACHE_NAME = 'pin-potha-cache-v155';
 const STATIC_ASSETS = [
   './',
   './index.html',
-  './css/styles.css?v=90',
-  './js/app.js?v=90',
-  './js/storage.js?v=75',
-  './js/security.js?v=70',
-  './js/algorithm.js?v=70',
-  './js/sound.js?v=70',
+  './css/styles.css?v=155',
+  './js/app.js?v=155',
+  './js/storage.js?v=155',
+  './js/initial-seed.js?v=147',
+  './js/aranya-data.js',
+  './js/spiritual-avatars.js?v=147',
+  './js/security.js?v=147',
+  './js/algorithm.js?v=147',
+  './js/sound.js?v=66',
   './manifest.json',
   './assets/icon-192.png',
   './assets/icon-512.png',
-  './assets/banner.jpg',
   './assets/og-banner.jpg',
+  './assets/official-welcome-banner.webp',
   './assets/sangha-frame.png'
 ];
 
-// Install: Cache critical shell assets and immediately activate
+// Install: Cache critical shell assets and immediately activate (Instant <50ms install)
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
@@ -80,7 +83,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // App Shell (HTML, JS, CSS): Network-First to guarantee latest code and zero update delay
+  // App Shell (HTML, JS, CSS): Stale-While-Revalidate with instant cache match
   const isAppShell =
     request.mode === 'navigate' ||
     request.destination === 'document' ||
@@ -92,8 +95,9 @@ self.addEventListener('fetch', (event) => {
     url.pathname === '/';
 
   if (isAppShell) {
+    // True Network-First for App Shell: fetch fresh assets from network, fallback to cache if offline
     event.respondWith(
-      fetch(request, { cache: 'no-store' })
+      fetch((request.mode === 'navigate') ? request.url : request, { cache: 'no-cache' })
         .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             const copy = networkResponse.clone();
@@ -102,7 +106,9 @@ self.addEventListener('fetch', (event) => {
           return networkResponse;
         })
         .catch(() => {
-          return caches.match(request).then((cached) => cached || (request.mode === 'navigate' ? caches.match('./index.html') : null));
+          return caches.match(request).then((res) => {
+            return res || (request.mode === 'navigate' ? caches.match('./index.html') : null);
+          });
         })
     );
     return;
