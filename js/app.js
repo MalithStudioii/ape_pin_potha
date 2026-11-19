@@ -7789,9 +7789,29 @@ export function renderNotificationsList() {
 
   listEl.innerHTML = filtered.map(n => {
     const isUnread = !n.read;
-    const initial = (n.senderName || 'ක').trim().charAt(0);
-    const photo = n.senderPhoto;
     const timeAgo = formatTimeAgo(n.timestamp);
+
+    // Identify if sender is anonymous (from payload, name string, or community member cache)
+    const cachedMember = (n.senderUid && (
+      (typeof kmpMembersCache !== 'undefined' && Array.isArray(kmpMembersCache) && kmpMembersCache.find(m => String(m.uid) === String(n.senderUid))) ||
+      (typeof StorageService !== 'undefined' && Array.isArray(StorageService._cachedCommunityMembers) && StorageService._cachedCommunityMembers.find(m => String(m.uid) === String(n.senderUid)))
+    )) || null;
+
+    const isCachedMemberAnon = Boolean(
+      cachedMember && (cachedMember.isAnonymous === true || cachedMember.useAlias === true || cachedMember.name === 'කල්‍යාණ මිත්‍ර සාමාජික')
+    );
+
+    const isNotifAnon = Boolean(
+      n.isAnonymous === true ||
+      isCachedMemberAnon ||
+      n.senderName === 'කල්‍යාණ මිත්‍ර සාමාජික' ||
+      n.senderName === 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' ||
+      (typeof n.senderName === 'string' && n.senderName.startsWith('නිර්නාමික'))
+    );
+
+    const senderDisplayName = isNotifAnon ? 'කල්‍යාණ මිත්‍ර සාමාජික' : (n.senderName || 'කල්‍යාණ මිත්‍ර');
+    const photo = isNotifAnon ? BO_LEAF_AVATAR : (n.senderPhoto || '');
+    const initial = isNotifAnon ? '🌿' : (senderDisplayName || 'ක').trim().charAt(0);
 
     let typeIconHtml = '';
     let mithraActionHtml = '';
@@ -7814,10 +7834,10 @@ export function renderNotificationsList() {
       if (!isAccepted && !isDeclined && (!n.status || n.status === 'pending')) {
         mithraActionHtml = `
           <div class="notif-mithra-actions" onclick="event.stopPropagation()">
-            <button type="button" class="btn-notif-accept" onclick="handleAcceptMithra('${n.id}', '${n.senderUid}', '${Security.escapeHTML(n.senderName)}')">
+            <button type="button" class="btn-notif-accept" onclick="handleAcceptMithra('${n.id}', '${n.senderUid}', '${Security.escapeHTML(senderDisplayName)}')">
               <i class="fa-solid fa-circle-check"></i> පිළිගන්න (සාදු!)
             </button>
-            <button type="button" class="btn-notif-reject" onclick="handleRejectMithra('${n.id}', '${n.senderUid}', '${Security.escapeHTML(n.senderName)}')">
+            <button type="button" class="btn-notif-reject" onclick="handleRejectMithra('${n.id}', '${n.senderUid}', '${Security.escapeHTML(senderDisplayName)}')">
               <i class="fa-solid fa-xmark"></i> ඉවත් කරන්න
             </button>
           </div>
@@ -7845,22 +7865,26 @@ export function renderNotificationsList() {
 
     let notifBodyText = '';
     if (n.type === 'sangha_reverence') {
-      notifBodyText = `<strong>${Security.escapeHTML(n.senderName || 'පින්වත් සැදැහැවතෙක්')}</strong> ඔබ වහන්සේට නමස්කාර පූර්වකව ගෞරව දක්වමින් අනුගමනය කළාය. 🙏`;
+      notifBodyText = `<strong>${Security.escapeHTML(senderDisplayName || 'පින්වත් සැදැහැවතෙක්')}</strong> ඔබ වහන්සේට නමස්කාර පූර්වකව ගෞරව දක්වමින් අනුගමනය කළාය. 🙏`;
     } else if (n.type === 'mithra_accepted') {
-      notifBodyText = `ඔබගේ කල්‍යාණ මිත්‍ර ඇරයුම <strong>${Security.escapeHTML(n.senderName || 'කල්‍යාණ මිත්‍රයා')}</strong> විසින් පිළිගන්නා ලදී. 🙏`;
+      notifBodyText = `ඔබගේ කල්‍යාණ මිත්‍ර ඇරයුම <strong>${Security.escapeHTML(senderDisplayName || 'කල්‍යාණ මිත්‍රයා')}</strong> විසින් පිළිගන්නා ලදී. 🙏`;
     } else if (n.type === 'mithra_rejected') {
-      notifBodyText = `ඔබගේ කල්‍යාණ මිත්‍ර ඇරයුම <strong>${Security.escapeHTML(n.senderName || 'කල්‍යාණ මිත්‍රයා')}</strong> විසින් පිළි නොගන්නා ලදී.`;
+      notifBodyText = `ඔබගේ කල්‍යාණ මිත්‍ර ඇරයුම <strong>${Security.escapeHTML(senderDisplayName || 'කල්‍යාණ මිත්‍රයා')}</strong> විසින් පිළි නොගන්නා ලදී.`;
     } else if (n.type === 'mithra_request') {
-      notifBodyText = `<strong>${Security.escapeHTML(n.senderName || 'කල්‍යාණ මිත්‍ර')}</strong> ඔබව කල්‍යාණ මිත්‍රයෙකු ලෙස සම්බන්ධ කරගැනීමට ඇරයුම් කළාය. 🙏`;
+      notifBodyText = `<strong>${Security.escapeHTML(senderDisplayName || 'කල්‍යාණ මිත්‍ර')}</strong> ඔබව කල්‍යාණ මිත්‍රයෙකු ලෙස සම්බන්ධ කරගැනීමට ඇරයුම් කළාය. 🙏`;
     } else {
-      notifBodyText = `<strong>${Security.escapeHTML(n.senderName || 'කල්‍යාණ මිත්‍ර')}</strong> ${Security.escapeHTML(n.message || '')}`;
+      let rawMsg = n.message || '';
+      if (isNotifAnon && n.senderName && n.senderName !== senderDisplayName) {
+        rawMsg = rawMsg.split(n.senderName).join(senderDisplayName);
+      }
+      notifBodyText = `<strong>${Security.escapeHTML(senderDisplayName || 'කල්‍යාණ මිත්‍ර')}</strong> ${Security.escapeHTML(rawMsg)}`;
     }
 
     return `
-      <div class="notif-item ${isUnread ? 'unread' : ''}" onclick="handleNotificationClick('${n.id}', '${n.postId || ''}', '${n.type || ''}', '${n.senderUid || ''}')">
-        <div class="notif-avatar-wrap">
+      <div class="notif-item ${isUnread ? 'unread' : ''}" onclick="handleNotificationClick('${n.id}', '${n.postId || ''}', '${n.type || ''}', '${n.senderUid || ''}', ${isNotifAnon})">
+        <div class="notif-avatar-wrap" ${n.senderUid ? `onclick="event.stopPropagation(); handleNotifSenderClick('${n.senderUid}', ${isNotifAnon})"` : ''} style="${n.senderUid ? 'cursor: pointer;' : ''}">
           <div class="notif-avatar">
-            ${photo ? `<img src="${Security.sanitizeUrl(photo)}" alt="${Security.escapeHTML(n.senderName)}" onerror="this.parentElement.innerText = '${initial}';">` : initial}
+            ${photo ? `<img src="${Security.sanitizeUrl(photo)}" alt="${Security.escapeHTML(senderDisplayName)}" onerror="this.parentElement.innerText = '${initial}';">` : initial}
           </div>
           ${typeIconHtml}
         </div>
@@ -7887,7 +7911,22 @@ export function renderNotificationsList() {
 
 window.renderNotificationsList = renderNotificationsList;
 
-window.handleNotificationClick = async function(notifId, postId, postType, senderUid) {
+window.handleNotifSenderClick = function(senderUid, isAnon = false) {
+  if (!senderUid) return;
+  if (isAnon) {
+    if (typeof showCustomToast === 'function') {
+      showCustomToast("මෙම සාමාජිකයා නිර්නාමිකව සිටින බැවින් පැතිකඩ විවෘත කළ නොහැක.", "info");
+    }
+    return;
+  }
+  if (typeof openPublicProfile === 'function') {
+    openPublicProfile(senderUid);
+  } else if (typeof openMemberProfileModal === 'function') {
+    openMemberProfileModal(senderUid);
+  }
+};
+
+window.handleNotificationClick = async function(notifId, postId, postType, senderUid, isAnon = false) {
   // Mark as read
   if (notifId) {
     try {
@@ -7904,7 +7943,17 @@ window.handleNotificationClick = async function(notifId, postId, postType, sende
   if (postType === 'mithra_request' || postType === 'mithra_accepted' || postType === 'mithra_rejected') {
     const targetUid = senderUid || postId;
     if (targetUid) {
-      openMemberProfileModal(targetUid);
+      if (isAnon) {
+        if (typeof showCustomToast === 'function') {
+          showCustomToast("මෙම සාමාජිකයා නිර්නාමිකව සිටින බැවින් පැතිකඩ විවෘත කළ නොහැක.", "info");
+        }
+        return;
+      }
+      if (typeof openPublicProfile === 'function') {
+        openPublicProfile(targetUid);
+      } else if (typeof openMemberProfileModal === 'function') {
+        openMemberProfileModal(targetUid);
+      }
     }
     return;
   }

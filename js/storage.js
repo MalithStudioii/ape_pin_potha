@@ -2314,23 +2314,63 @@ export const StorageService = {
     });
   },
 
-  async createNotification(notifData) {
-    const isAnon = Boolean(
-      notifData.isAnonymous === true ||
-      notifData.senderName === 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' ||
-      (notifData.senderName && notifData.senderName.startsWith('නිර්නාමික'))
+  /**
+   * Helper to resolve public sender identity respecting Privacy Alias (isAnonymous)
+   */
+  getPublicSenderIdentity(actionIsAnonymous = false) {
+    const isUserAnon = Boolean(
+      actionIsAnonymous === true ||
+      this.currentUser?.isAnonymous === true ||
+      this.currentUser?.useAlias === true ||
+      this.currentUser?.name === 'කල්‍යාණ මිත්‍ර සාමාජික'
     );
+
+    if (isUserAnon) {
+      return {
+        senderUid: this.currentUser?.uid || '',
+        senderName: "කල්‍යාණ මිත්‍ර සාමාජික",
+        senderPhoto: "",
+        isAnonymous: true
+      };
+    }
+
+    return {
+      senderUid: this.currentUser?.uid || '',
+      senderName: this.currentUser?.name || "කල්‍යාණ මිත්‍ර",
+      senderPhoto: this.currentUser?.photo || null,
+      isAnonymous: false
+    };
+  },
+
+  async createNotification(notifData) {
+    const senderIdentity = this.getPublicSenderIdentity(notifData?.isAnonymous);
+    const isAnon = Boolean(
+      senderIdentity.isAnonymous ||
+      notifData?.isAnonymous === true ||
+      notifData?.senderName === 'කල්‍යාණ මිත්‍ර සාමාජික' ||
+      notifData?.senderName === 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' ||
+      (notifData?.senderName && notifData.senderName.startsWith('නිර්නාමික'))
+    );
+
+    const finalSenderName = isAnon ? "කල්‍යාණ මිත්‍ර සාමාජික" : (notifData?.senderName || senderIdentity.senderName);
+    const finalSenderPhoto = isAnon ? "" : (notifData?.senderPhoto !== undefined ? notifData.senderPhoto : senderIdentity.senderPhoto);
+
+    let finalMessage = notifData?.message || '';
+    if (isAnon && this.currentUser?.name && finalMessage.includes(this.currentUser.name)) {
+      finalMessage = finalMessage.split(this.currentUser.name).join("කල්‍යාණ මිත්‍ර සාමාජිකයා");
+    }
+
     const newNotif = {
       id: "notif_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
-      recipientUid: notifData.recipientUid || this.currentUser?.uid || '',
-      senderUid: isAnon ? '' : (notifData.senderUid || this.currentUser?.uid || ''),
-      senderName: isAnon ? 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' : (notifData.senderName || this.currentUser?.name || 'කල්‍යාණ මිත්‍ර'),
-      senderPhoto: isAnon ? null : (notifData.senderPhoto !== undefined ? notifData.senderPhoto : (this.currentUser?.photo || null)),
+      recipientUid: notifData?.recipientUid || this.currentUser?.uid || '',
+      senderUid: notifData?.senderUid || senderIdentity.senderUid || this.currentUser?.uid || '',
+      senderName: finalSenderName,
+      senderPhoto: finalSenderPhoto,
       isAnonymous: isAnon,
-      type: notifData.type || 'sadhu',
-      postId: notifData.postId || null,
-      postTitle: notifData.postTitle || '',
-      message: notifData.message || '',
+      type: notifData?.type || 'sadhu',
+      postId: notifData?.postId || null,
+      postTitle: notifData?.postTitle || '',
+      message: finalMessage,
       timestamp: Date.now(),
       read: false
     };
@@ -2635,8 +2675,13 @@ export const StorageService = {
     // Trigger notification to original author
     if (original.uid && original.uid !== this.currentUser.uid) {
       try {
+        const sender = this.getPublicSenderIdentity();
         await this.createNotification({
           recipientUid: original.uid,
+          senderUid: sender.senderUid,
+          senderName: sender.senderName,
+          senderPhoto: sender.senderPhoto,
+          isAnonymous: sender.isAnonymous,
           type: 'sadhu',
           postId: original.id,
           postTitle: original.title || 'පින්කම',
@@ -2793,8 +2838,13 @@ export const StorageService = {
 
     // Trigger Notification for the author (only if someone else gave Sadhu)
     if (action === 'added' && targetPost.uid && targetPost.uid !== userUid) {
+      const sender = this.getPublicSenderIdentity();
       this.createNotification({
         recipientUid: targetPost.uid,
+        senderUid: sender.senderUid,
+        senderName: sender.senderName,
+        senderPhoto: sender.senderPhoto,
+        isAnonymous: sender.isAnonymous,
         type: 'sadhu',
         postId: targetPost.id,
         postTitle: targetPost.title || 'පින්කම',
@@ -2887,21 +2937,24 @@ export const StorageService = {
 
     // Trigger Notification for the author (only if someone else commented)
     if (targetPost && targetPost.uid && targetPost.uid !== this.currentUser?.uid) {
+      const sender = this.getPublicSenderIdentity(isAnonymous);
       const snippet = val.text.length > 45 ? val.text.substring(0, 45) + '...' : val.text;
       this.createNotification({
         recipientUid: targetPost.uid,
         type: 'comment',
         postId: targetPost.id,
         postTitle: targetPost.title || 'පින්කම',
-        senderName: isAnonymous ? 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' : (this.currentUser?.useAlias ? 'කල්‍යාණ මිත්‍ර සාමාජික' : (this.currentUser?.name || 'සාමාජිකයෙක්')),
-        senderPhoto: isAnonymous ? null : (this.currentUser?.photo || null),
-        isAnonymous: isAnonymous,
+        senderUid: sender.senderUid,
+        senderName: sender.senderName,
+        senderPhoto: sender.senderPhoto,
+        isAnonymous: sender.isAnonymous,
         message: `ඔබගේ සටහනට පුණ්‍යානුමෝදනාවක් එක් කළාය: "${snippet}"`
       });
     }
 
     // Trigger Notification for Mentioned Members (@Mention)
     if (val.text && val.text.includes('@')) {
+      const sender = this.getPublicSenderIdentity(isAnonymous);
       const allMembers = (this._cachedCommunityMembers && this._cachedCommunityMembers.length > 0)
         ? this._cachedCommunityMembers
         : this.getLocalPosts().map(p => ({ uid: p.uid, name: p.author }));
@@ -2918,6 +2971,10 @@ export const StorageService = {
               type: 'mention',
               postId: targetPost ? targetPost.id : postId,
               postTitle: targetPost?.title || 'පින්කම',
+              senderUid: sender.senderUid,
+              senderName: sender.senderName,
+              senderPhoto: sender.senderPhoto,
+              isAnonymous: sender.isAnonymous,
               message: `ප්‍රාර්ථනාවකදී ඔබව සිහිපත් කළාය: "${snippet}"`
             });
           }
@@ -3800,12 +3857,14 @@ export const StorageService = {
     }
 
     if (isNowFollowing) {
+      const sender = this.getPublicSenderIdentity();
       await this.createNotification({
         recipientUid: targetUid,
         type: 'sangha_reverence',
-        senderUid: this.currentUser.uid,
-        senderName: this.currentUser.name || 'පින්වත් සැදැහැවතෙක්',
-        senderPhoto: this.currentUser.photo || null,
+        senderUid: sender.senderUid,
+        senderName: sender.senderName,
+        senderPhoto: sender.senderPhoto,
+        isAnonymous: sender.isAnonymous,
         message: 'ඔබ වහන්සේට නමස්කාර පූර්වකව ගෞරව දක්වමින් අනුගමනය කළාය. 🙏'
       });
     }
@@ -3989,13 +4048,15 @@ export const StorageService = {
     }
 
     // Create Notification for the target user
+    const sender = this.getPublicSenderIdentity();
     await this.createNotification({
       recipientUid: targetUid,
       type: 'mithra_request',
       status: 'pending',
-      senderUid: this.currentUser.uid,
-      senderName: this.currentUser.name || 'කල්‍යාණ මිත්‍ර',
-      senderPhoto: this.currentUser.photo || null,
+      senderUid: sender.senderUid,
+      senderName: sender.senderName,
+      senderPhoto: sender.senderPhoto,
+      isAnonymous: sender.isAnonymous,
       message: 'ඔබව කල්‍යාණ මිත්‍රයෙකු ලෙස සම්බන්ධ කරගැනීමට ඇරයුම් කළාය. 🙏'
     });
 
@@ -4062,13 +4123,15 @@ export const StorageService = {
     }
 
     // Send celebration notification to senderUid with exact requested Sinhala message
+    const acceptSender = this.getPublicSenderIdentity();
     await this.createNotification({
       recipientUid: senderUid,
       type: 'mithra_accepted',
-      senderUid: this.currentUser.uid,
-      senderName: this.currentUser.name || 'කල්‍යාණ මිත්‍ර',
-      senderPhoto: this.currentUser.photo || null,
-      message: `ඔබගේ කල්‍යාණ මිත්‍ර ඇරයුම ${this.currentUser.name || 'කල්‍යාණ මිත්‍රයා'} විසින් පිළිගන්නා ලදී. 🙏`
+      senderUid: acceptSender.senderUid,
+      senderName: acceptSender.senderName,
+      senderPhoto: acceptSender.senderPhoto,
+      isAnonymous: acceptSender.isAnonymous,
+      message: `ඔබගේ කල්‍යාණ මිත්‍ර ඇරයුම ${acceptSender.senderName} විසින් පිළිගන්නා ලදී. 🙏`
     });
 
     this.notifyListeners();
@@ -4105,13 +4168,15 @@ export const StorageService = {
 
     // Send rejection notification to senderUid with exact requested Sinhala message
     if (senderUid) {
+      const rejectSender = this.getPublicSenderIdentity();
       await this.createNotification({
         recipientUid: senderUid,
         type: 'mithra_rejected',
-        senderUid: this.currentUser.uid,
-        senderName: this.currentUser.name || 'කල්‍යාණ මිත්‍ර',
-        senderPhoto: this.currentUser.photo || null,
-        message: `ඔබගේ කල්‍යාණ මිත්‍ර ඇරයුම ${this.currentUser.name || 'කල්‍යාණ මිත්‍රයා'} විසින් පිළි නොගන්නා ලදී.`
+        senderUid: rejectSender.senderUid,
+        senderName: rejectSender.senderName,
+        senderPhoto: rejectSender.senderPhoto,
+        isAnonymous: rejectSender.isAnonymous,
+        message: `ඔබගේ කල්‍යාණ මිත්‍ර ඇරයුම ${rejectSender.senderName} විසින් පිළි නොගන්නා ලදී.`
       });
     }
 
