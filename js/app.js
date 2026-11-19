@@ -1056,7 +1056,6 @@ currentViewingMember = member;
     }
   }
 
-  const bioEl = document.getElementById('memBio');
   if (bioEl) bioEl.innerText = `"${member.bio || "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏"}"`;
 
   const occEl = document.getElementById('memOccupationText');
