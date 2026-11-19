@@ -2293,12 +2293,18 @@ export const StorageService = {
   },
 
   async createNotification(notifData) {
+    const isAnon = Boolean(
+      notifData.isAnonymous === true ||
+      notifData.senderName === 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' ||
+      (notifData.senderName && notifData.senderName.startsWith('නිර්නාමික'))
+    );
     const newNotif = {
       id: "notif_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
-      recipientUid: notifData.recipientUid || this.currentUser.uid,
-      senderUid: notifData.senderUid || this.currentUser.uid,
-      senderName: notifData.senderName || this.currentUser.name,
-      senderPhoto: notifData.senderPhoto || this.currentUser.photo || null,
+      recipientUid: notifData.recipientUid || this.currentUser?.uid || '',
+      senderUid: isAnon ? '' : (notifData.senderUid || this.currentUser?.uid || ''),
+      senderName: isAnon ? 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' : (notifData.senderName || this.currentUser?.name || 'කල්‍යාණ මිත්‍ර'),
+      senderPhoto: isAnon ? null : (notifData.senderPhoto !== undefined ? notifData.senderPhoto : (this.currentUser?.photo || null)),
+      isAnonymous: isAnon,
       type: notifData.type || 'sadhu',
       postId: notifData.postId || null,
       postTitle: notifData.postTitle || '',
@@ -2773,19 +2779,27 @@ export const StorageService = {
   /**
    * Add comment / blessing & Notification Trigger (Live in-place with author photo & reactions support)
    */
-  async addComment(postId, commentText) {
+  async addComment(postId, commentText, options = {}) {
     const val = Security.validateComment(commentText);
     if (!val.isValid) {
       throw new Error(val.error);
     }
 
+    const isAnonymous = Boolean(
+      options.isAnonymous === true ||
+      this.currentUser?.useAlias ||
+      this.currentUser?.isAnonymous
+    );
+
     const commentId = 'c_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
     const commentObj = {
       id: commentId,
       uid: this.currentUser?.uid || '',
-      author: this.currentUser?.useAlias ? 'කල්‍යාණ මිත්‍ර සාමාජික' : (this.currentUser?.name || 'සාමාජිකයෙක්'),
+      author: isAnonymous ? 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' : (this.currentUser?.useAlias ? 'කල්‍යාණ මිත්‍ර සාමාජික' : (this.currentUser?.name || 'සාමාජිකයෙක්')),
+      authorName: isAnonymous ? 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' : (this.currentUser?.useAlias ? 'කල්‍යාණ මිත්‍ර සාමාජික' : (this.currentUser?.name || 'සාමාජිකයෙක්')),
+      isAnonymous: isAnonymous,
       useAlias: Boolean(this.currentUser?.useAlias),
-      authorPhoto: this.currentUser?.photo || '',
+      authorPhoto: isAnonymous ? '' : (this.currentUser?.photo || ''),
       text: val.text,
       time: "දැන්",
       timestamp: Date.now(),
@@ -2850,6 +2864,9 @@ export const StorageService = {
         type: 'comment',
         postId: targetPost.id,
         postTitle: targetPost.title || 'පින්කම',
+        senderName: isAnonymous ? 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' : (this.currentUser?.useAlias ? 'කල්‍යාණ මිත්‍ර සාමාජික' : (this.currentUser?.name || 'සාමාජිකයෙක්')),
+        senderPhoto: isAnonymous ? null : (this.currentUser?.photo || null),
+        isAnonymous: isAnonymous,
         message: `ඔබගේ සටහනට පුණ්‍යානුමෝදනාවක් එක් කළාය: "${snippet}"`
       });
     }
@@ -4101,6 +4118,11 @@ export const StorageService = {
     if (!item) return 'කල්‍යාණ මිත්‍ර';
     if (this.isOfficialPost(item)) return 'අපේ පිං පොත';
 
+    // Anonymous comment / post protection
+    if (item.isAnonymous === true || item.author === 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' || item.authorName === 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' || (item.author && item.author.startsWith('නිර්නාමික'))) {
+      return 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්';
+    }
+
     const targetUid = item.uid;
 
     // 1. Current user active session check
@@ -4147,6 +4169,11 @@ export const StorageService = {
   resolveAuthorPhoto(item) {
     if (!item) return null;
     if (this.isOfficialPost(item)) return null;
+
+    // Anonymous comment / post protection: strictly never return real photo
+    if (item.isAnonymous === true || item.author === 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' || item.authorName === 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' || (item.author && item.author.startsWith('නිර්නාමික'))) {
+      return null;
+    }
 
     const targetUid = item.uid;
     const authorName = (item.author || '').trim();

@@ -51,7 +51,7 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=144">
+    <link rel="stylesheet" href="css/styles.css?v=148">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
@@ -3365,17 +3365,25 @@
                 </div>
 
                 <!-- Bottom Input Form -->
-                <form class="reels-comments-footer" id="reelsCommentForm" onsubmit="submitReelComment(event)">
-                    <div class="reels-comment-user-avatar" id="reelsDrawerUserAvatar">
-                        <!-- Current user's avatar image or letter -->
+                <form class="reels-comments-footer" id="reelsCommentForm" onsubmit="submitReelComment(event)" style="display: flex; flex-direction: column; gap: 6px;">
+                    <div style="display: flex; align-items: center; gap: 10px; width: 100%;">
+                        <div class="reels-comment-user-avatar" id="reelsDrawerUserAvatar">
+                            <!-- Current user's avatar image or letter -->
+                        </div>
+                        <div class="reels-comment-input-wrap" style="position: relative; flex: 1;">
+                            <input type="text" id="reelsCommentInput" class="reels-comment-input" placeholder="පුණ්‍යානුමෝදනාවක් හෝ ප්‍රාර්ථනාවක් ලියන්න..." maxlength="300" autocomplete="off" required oninput="handleCommentInputMention(this, 'reels')" onkeydown="handleCommentInputKeydown(event, 'reels')">
+                            <div id="mention-dropdown-reels" class="mention-autocomplete-dropdown hidden"></div>
+                        </div>
+                        <button type="submit" class="reels-comment-send-btn" id="reelsCommentSubmitBtn" title="එක් කරන්න">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </button>
                     </div>
-                    <div class="reels-comment-input-wrap" style="position: relative;">
-                        <input type="text" id="reelsCommentInput" class="reels-comment-input" placeholder="පුණ්‍යානුමෝදනාවක් හෝ ප්‍රාර්ථනාවක් ලියන්න..." maxlength="300" autocomplete="off" required oninput="handleCommentInputMention(this, 'reels')" onkeydown="handleCommentInputKeydown(event, 'reels')">
-                        <div id="mention-dropdown-reels" class="mention-autocomplete-dropdown hidden"></div>
+                    <div style="display: flex; align-items: center; justify-content: flex-end; padding: 0 4px; width: 100%;">
+                        <label style="display: inline-flex; align-items: center; gap: 5px; font-size: 0.72rem; color: #94a3b8; cursor: pointer; user-select: none;">
+                            <input type="checkbox" id="reelsCommentAnon" style="width: 13px; height: 13px; accent-color: #10b981; cursor: pointer;">
+                            <span><i class="fa-solid fa-user-secret" style="color: #10b981; font-size: 0.75rem;"></i> නිර්නාමිකව (Anonymous)</span>
+                        </label>
                     </div>
-                    <button type="submit" class="reels-comment-send-btn" id="reelsCommentSubmitBtn" title="එක් කරන්න">
-                        <i class="fa-solid fa-paper-plane"></i>
-                    </button>
                 </form>
             </div>
         </div>
@@ -3641,6 +3649,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=147"></script>
+    <script type="module" src="js/app.js?v=148"></script>
 </body>
 </html>

@@ -1991,18 +1991,31 @@ function renderSingleCommentHTML(c, postId, user, index) {
 
   const reactions = (c.reactions && typeof c.reactions === 'object') ? c.reactions : {};
 
+  const isAnonComment = Boolean(
+    c.isAnonymous === true ||
+    c.author === 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' ||
+    c.authorName === 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' ||
+    (c.author && c.author.startsWith('නිර්නාමික'))
+  );
+  const safeAuthorName = isAnonComment ? 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' : cAuthorName;
+  const safeAuthorPhoto = isAnonComment ? null : cAuthorPhoto;
+
   return `
-    <div class="comment-bubble" id="comment-bubble-${commentKey}">
-      <div class="comment-avatar ${isCommentSangha ? 'sangha-framed-avatar' : ''}" onclick="viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(cAuthorName)}', '${cAuthorPhoto ? Security.sanitizeUrl(cAuthorPhoto) : ''}')" style="cursor: pointer;" title="${Security.escapeHTML(cAuthorName)} ගේ Profile එක බලන්න">
-        ${cAuthorPhoto ? `<img src="${Security.sanitizeUrl(cAuthorPhoto)}" alt="${Security.escapeHTML(cAuthorName)}" loading="lazy">` : `<span>${Security.escapeHTML(cAuthorName.charAt(0) || '👤')}</span>`}
-        ${isCommentSangha ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
+    <div class="comment-bubble ${isAnonComment ? 'comment-bubble-anon' : ''}" id="comment-bubble-${commentKey}">
+      <div class="comment-avatar ${isCommentSangha && !isAnonComment ? 'sangha-framed-avatar' : ''} ${isAnonComment ? 'comment-anon-avatar' : ''}" ${isAnonComment ? 'style="cursor: default; background: #f1f5f9;" title="නිර්නාමික කල්‍යාණ මිත්‍රයෙක්"' : `onclick="viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(safeAuthorName)}', '${safeAuthorPhoto ? Security.sanitizeUrl(safeAuthorPhoto) : ''}')" style="cursor: pointer;" title="${Security.escapeHTML(safeAuthorName)} ගේ Profile එක බලන්න"`}>
+        ${isAnonComment ? '<i class="fa-solid fa-user-secret" style="color: #64748b; font-size: 0.85rem;"></i>' : (safeAuthorPhoto ? `<img src="${Security.sanitizeUrl(safeAuthorPhoto)}" alt="${Security.escapeHTML(safeAuthorName)}" loading="lazy">` : `<span>${Security.escapeHTML(safeAuthorName.charAt(0) || '👤')}</span>`)}
+        ${isCommentSangha && !isAnonComment ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
       </div>
       <div class="comment-text-box">
         <div class="comment-author-row">
           <div class="comment-meta-left">
-            <span class="author-click-link" onclick="viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(cAuthorName)}', '${cAuthorPhoto ? Security.sanitizeUrl(cAuthorPhoto) : ''}')" style="cursor: pointer; font-weight: 700; color: #1e293b;" title="${Security.escapeHTML(cAuthorName)} ගේ Profile එක බලන්න">${Security.escapeHTML(cAuthorName)}</span>
-            ${isCommentMaster ? `<span class="badge-crown" title="කල්‍යාණ මිත්‍ර">👑</span>` : (isCommentSubAdmin ? `<span class="badge-shield" title="කල්‍යාණ මිත්‍ර">🛡️</span>` : '')}
-            ${isCommentSangha ? '<span class="sangha-author-badge" style="padding: 1.5px 7px; font-size: 0.62rem; margin-left: 4px;"><i class="fa-solid fa-dharmachakra"></i> පූජනීය සංඝරත්නය</span>' : ''}
+            ${isAnonComment ? `
+              <span class="comment-anon-author" style="font-weight: 700; color: #475569; cursor: default;" title="නිර්නාමික කල්‍යාණ මිත්‍රයෙක්">${Security.escapeHTML(safeAuthorName)}</span>
+            ` : `
+              <span class="author-click-link" onclick="viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(safeAuthorName)}', '${safeAuthorPhoto ? Security.sanitizeUrl(safeAuthorPhoto) : ''}')" style="cursor: pointer; font-weight: 700; color: #1e293b;" title="${Security.escapeHTML(safeAuthorName)} ගේ Profile එක බලන්න">${Security.escapeHTML(safeAuthorName)}</span>
+              ${isCommentMaster ? `<span class="badge-crown" title="කල්‍යාණ මිත්‍ර">👑</span>` : (isCommentSubAdmin ? `<span class="badge-shield" title="කල්‍යාණ මිත්‍ර">🛡️</span>` : '')}
+              ${isCommentSangha ? '<span class="sangha-author-badge" style="padding: 1.5px 7px; font-size: 0.62rem; margin-left: 4px;"><i class="fa-solid fa-dharmachakra"></i> පූජනීය සංඝරත්නය</span>' : ''}
+            `}
             <span class="comment-time">${Security.escapeHTML(formatRelativeTimeSinhala(c.timestamp, c.time || 'දැන්'))}</span>
             ${c.isEdited ? '<span class="comment-edited-tag" title="මෙම ප්‍රාර්ථනාව සංස්කරණය කරන ලදී">(සංස්කරණය කළ)</span>' : ''}
           </div>
@@ -2357,9 +2370,8 @@ export function renderPostCardHTML(post, user) {
 
           <!-- 5. Direct Phone Call Action (If contact provided for Sathkara need) -->
           ${isNeed && post.contact ? `
-            <a href="tel:${Security.sanitizePhone(post.contact)}" class="post-btn call-action" title="සෘජුව අමතන්න: ${Security.escapeHTML(post.contact)}">
+            <a href="tel:${Security.sanitizePhone(post.contact)}" class="post-btn call-action" title="අමතන්න: ${Security.escapeHTML(post.contact)}" aria-label="අමතන්න">
               <i class="fa-solid fa-phone"></i>
-              <span class="post-btn-count">අමතන්න</span>
             </a>
           ` : ''}
         </div>
@@ -2399,12 +2411,20 @@ export function renderPostCardHTML(post, user) {
           ${renderCommentsListHTML(post.id, comments, user)}
         </div>
 
-        <form class="comment-form" onsubmit="handleCommentSubmit(event, '${post.id}')" style="position: relative;">
-          <input type="text" id="comment-input-${post.id}" class="comment-input" required placeholder="${isGeneral ? 'සුබපැතුමක් හෝ සටහනක් එක් කරන්න...' : 'පුණ්‍යානුමෝදනා සටහනක් එක් කරන්න...'}" oninput="handleCommentInputMention(this, '${post.id}')" onkeydown="handleCommentInputKeydown(event, '${post.id}')" autocomplete="off">
-          <div id="mention-dropdown-${post.id}" class="mention-autocomplete-dropdown hidden"></div>
-          <button type="submit" class="comment-send-btn">
-            <i class="fa-solid fa-paper-plane"></i>
-          </button>
+        <form class="comment-form" onsubmit="handleCommentSubmit(event, '${post.id}')" style="position: relative; display: flex; flex-direction: column; gap: 4px;">
+          <div style="display: flex; align-items: center; gap: 6px; width: 100%; position: relative;">
+            <input type="text" id="comment-input-${post.id}" class="comment-input" required placeholder="${isGeneral ? 'සුබපැතුමක් හෝ සටහනක් එක් කරන්න...' : 'පුණ්‍යානුමෝදනා සටහනක් එක් කරන්න...'}" oninput="handleCommentInputMention(this, '${post.id}')" onkeydown="handleCommentInputKeydown(event, '${post.id}')" autocomplete="off" style="flex: 1;">
+            <div id="mention-dropdown-${post.id}" class="mention-autocomplete-dropdown hidden"></div>
+            <button type="submit" class="comment-send-btn" title="ප්‍රාර්ථනාව යවන්න">
+              <i class="fa-solid fa-paper-plane"></i>
+            </button>
+          </div>
+          <div class="comment-form-options" style="display: flex; align-items: center; justify-content: flex-end; padding: 0 4px;">
+            <label class="comment-anon-label" style="display: inline-flex; align-items: center; gap: 5px; font-size: 0.73rem; color: #64748b; cursor: pointer; user-select: none;">
+              <input type="checkbox" id="comment-anon-${post.id}" class="comment-anon-checkbox" style="width: 13px; height: 13px; accent-color: #059669; cursor: pointer;">
+              <span><i class="fa-solid fa-user-secret" style="color: #059669; font-size: 0.74rem;"></i> නිර්නාමිකව (Anonymous)</span>
+            </label>
+          </div>
         </form>
       </div>
       `}
@@ -3043,7 +3063,14 @@ window.submitQuickBlessing = async function(postId, text) {
     SoundService.playSadhu();
     triggerHaptic(20);
 
-    const newComment = await StorageService.addComment(postId, text);
+    const anonCheckbox = document.getElementById(`comment-anon-${postId}`);
+    const isAnonymous = Boolean(
+      (anonCheckbox && anonCheckbox.checked) ||
+      StorageService.currentUser?.useAlias ||
+      StorageService.currentUser?.isAnonymous
+    );
+
+    const newComment = await StorageService.addComment(postId, text, { isAnonymous });
     const allPosts = StorageService.getLocalPosts() || [];
     let targetPost = allPosts.find(p => String(p.id) === String(postId)) || (window.currentPostsData || []).find(p => String(p.id) === String(postId));
     if (targetPost && Array.isArray(targetPost.comments)) {
@@ -3078,13 +3105,21 @@ window.handleCommentSubmit = async function(event, postId) {
   const text = input.value.trim();
   input.value = '';
 
+  const anonCheckbox = document.getElementById(`comment-anon-${postId}`);
+  const isAnonymous = Boolean(
+    (anonCheckbox && anonCheckbox.checked) ||
+    StorageService.currentUser?.useAlias ||
+    StorageService.currentUser?.isAnonymous
+  );
+
   try {
     const box = document.getElementById(`comments-box-${postId}`);
     if (box) box.style.display = 'block';
     SoundService.playSadhu();
     triggerHaptic(20);
 
-    const newComment = await StorageService.addComment(postId, text);
+    const newComment = await StorageService.addComment(postId, text, { isAnonymous });
+    if (anonCheckbox) anonCheckbox.checked = false;
     const allPosts = StorageService.getLocalPosts() || [];
     let targetPost = allPosts.find(p => String(p.id) === String(postId)) || (window.currentPostsData || []).find(p => String(p.id) === String(postId));
     if (targetPost && Array.isArray(targetPost.comments)) {
@@ -5789,16 +5824,17 @@ window.renderReelCommentsList = function(post) {
   }
 
   body.innerHTML = comments.map(c => {
-    const cAuthorName = StorageService.resolveAuthorName(c);
-    const cAuthorPhoto = StorageService.resolveAuthorPhoto(c);
+    const isAnon = Boolean(c.isAnonymous === true || c.author === 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' || c.authorName === 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' || (c.author && c.author.startsWith('නිර්නාමික')));
+    const cAuthorName = isAnon ? 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' : StorageService.resolveAuthorName(c);
+    const cAuthorPhoto = isAnon ? null : StorageService.resolveAuthorPhoto(c);
     return `
-      <div class="reels-comment-item">
-        <div class="reels-comment-avatar" onclick="closeReelsViewer(); viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(cAuthorName)}', '${cAuthorPhoto ? Security.sanitizeUrl(cAuthorPhoto) : ''}')" style="cursor: pointer;" title="${Security.escapeHTML(cAuthorName)} ගේ Profile එක බලන්න">
-          ${cAuthorPhoto ? `<img src="${Security.sanitizeUrl(cAuthorPhoto)}" alt="${Security.escapeHTML(cAuthorName)}">` : Security.escapeHTML(cAuthorName.charAt(0) || '👤')}
+      <div class="reels-comment-item ${isAnon ? 'reels-comment-item-anon' : ''}">
+        <div class="reels-comment-avatar ${isAnon ? 'reels-comment-anon-avatar' : ''}" ${isAnon ? 'style="cursor: default; background: #334155;" title="නිර්නාමික කල්‍යාණ මිත්‍රයෙක්"' : `onclick="closeReelsViewer(); viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(cAuthorName)}', '${cAuthorPhoto ? Security.sanitizeUrl(cAuthorPhoto) : ''}')" style="cursor: pointer;" title="${Security.escapeHTML(cAuthorName)} ගේ Profile එක බලන්න"`}>
+          ${isAnon ? '<i class="fa-solid fa-user-secret" style="color: #94a3b8; font-size: 0.85rem;"></i>' : (cAuthorPhoto ? `<img src="${Security.sanitizeUrl(cAuthorPhoto)}" alt="${Security.escapeHTML(cAuthorName)}">` : Security.escapeHTML(cAuthorName.charAt(0) || '👤'))}
         </div>
         <div class="reels-comment-content">
           <div class="reels-comment-author-line">
-            <span class="reels-comment-author" onclick="closeReelsViewer(); viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(cAuthorName)}', '${cAuthorPhoto ? Security.sanitizeUrl(cAuthorPhoto) : ''}')">${Security.escapeHTML(cAuthorName)}</span>
+            <span class="reels-comment-author" ${isAnon ? 'style="cursor: default; color: #94a3b8;" title="නිර්නාමික කල්‍යාණ මිත්‍රයෙක්"' : `onclick="closeReelsViewer(); viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(cAuthorName)}', '${cAuthorPhoto ? Security.sanitizeUrl(cAuthorPhoto) : ''}')"`}>${Security.escapeHTML(cAuthorName)}</span>
             <span class="reels-comment-time">${Security.escapeHTML(formatRelativeTimeSinhala(c.timestamp, c.time || 'දැන්'))}</span>
           </div>
           <div class="reels-comment-text">${formatCommentTextWithMentions(c.text)}</div>
@@ -5827,12 +5863,20 @@ window.submitReelComment = async function(event) {
   const submitBtn = document.getElementById('reelsCommentSubmitBtn');
   if (submitBtn) submitBtn.disabled = true;
 
+  const anonCheckbox = document.getElementById('reelsCommentAnon');
+  const isAnonymous = Boolean(
+    (anonCheckbox && anonCheckbox.checked) ||
+    StorageService.currentUser?.useAlias ||
+    StorageService.currentUser?.isAnonymous
+  );
+
   try {
     const postId = activeReelsCommentPostId;
-    await StorageService.addComment(postId, commentText);
+    await StorageService.addComment(postId, commentText, { isAnonymous });
     SoundService.playSadhu();
     triggerHaptic(20);
     input.value = '';
+    if (anonCheckbox) anonCheckbox.checked = false;
 
     const allPosts = StorageService.getLocalPosts() || [];
     const updatedPost = allPosts.find(p => p.id === postId);
@@ -5865,9 +5909,16 @@ window.submitReelQuickBlessing = async function(text) {
     return;
   }
 
+  const anonCheckbox = document.getElementById('reelsCommentAnon');
+  const isAnonymous = Boolean(
+    (anonCheckbox && anonCheckbox.checked) ||
+    StorageService.currentUser?.useAlias ||
+    StorageService.currentUser?.isAnonymous
+  );
+
   try {
     const postId = activeReelsCommentPostId;
-    await StorageService.addComment(postId, text);
+    await StorageService.addComment(postId, text, { isAnonymous });
     SoundService.playSadhu();
     triggerHaptic(20);
 
