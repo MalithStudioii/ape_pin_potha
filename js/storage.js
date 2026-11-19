@@ -7,7 +7,7 @@
 import { firebaseConfig, isFirebaseConfigured, COLLECTIONS } from './firebase-config.js?v=139';
 import { Security } from './security.js?v=139';
 import { INITIAL_ARANYA_LIST, SRI_LANKA_DISTRICTS } from './aranya-data.js';
-import { SEED_POSTS } from './initial-seed.js?v=141';
+import { SEED_POSTS } from './initial-seed.js?v=142';
 
 let db = null;
 let auth = null;
@@ -21,6 +21,7 @@ let bannedWordsListeners = [];
 
 export const MASTER_ADMIN_EMAIL = "silvadilan9@gmail.com";
 export const MASTER_ADMIN_EMAILS = [
+  "supportnexiapro@gmail.com",
   "silvadilan9@gmail.com",
   "creativeparadise25@gmail.com"
 ];
@@ -697,7 +698,8 @@ export const StorageService = {
           lastActiveAt: now
         }).catch(() => {});
       } catch (e) {}
-    },
+    }
+  },
 
   /**
    * Initializes the storage engine (Firestore or Sandbox)
@@ -809,6 +811,51 @@ export const StorageService = {
           if (user?.uid) {
             this.initUserNotificationsSubscription(user.uid);
             this.initUserPostsSubscription(user.uid);
+          }
+
+          // Strict Master Admin check: Only supportnexiapro@gmail.com
+          const isStrictAdmin = Boolean(
+            user &&
+            user.email &&
+            user.email.trim().toLowerCase() === 'supportnexiapro@gmail.com'
+          );
+
+          if (typeof window !== 'undefined') {
+            window.isStrictMasterAdmin = isStrictAdmin;
+            const crownBtn = document.getElementById('headerAdminCrownBtn');
+            if (crownBtn) {
+              if (isStrictAdmin) {
+                crownBtn.classList.remove('hidden');
+                crownBtn.style.display = 'inline-flex';
+                crownBtn.onclick = () => { window.location.href = 'admin.html'; };
+              } else {
+                crownBtn.classList.add('hidden');
+                crownBtn.style.display = 'none';
+                crownBtn.onclick = null;
+              }
+            }
+
+            const adminOptions = document.querySelectorAll('.master-admin-options');
+            adminOptions.forEach(el => {
+              if (isStrictAdmin) {
+                el.classList.remove('hidden');
+                el.style.display = '';
+              } else {
+                el.classList.add('hidden');
+                el.style.display = 'none';
+              }
+            });
+
+            const profAdminBtn = document.getElementById('profAdminDashboardBtn');
+            if (profAdminBtn) {
+              if (isStrictAdmin) {
+                profAdminBtn.classList.remove('hidden');
+                profAdminBtn.style.display = 'inline-flex';
+              } else {
+                profAdminBtn.classList.add('hidden');
+                profAdminBtn.style.display = 'none';
+              }
+            }
           }
         });
 

@@ -4,12 +4,12 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=141';
-import { Security } from './security.js?v=141';
+import { StorageService } from './storage.js?v=142';
+import { Security } from './security.js?v=142';
 import { uploadToImgBB } from './imgbb-service.js?v=66';
 import { SoundService, triggerHaptic } from './sound.js?v=66';
-import { FeedAlgorithm } from './algorithm.js?v=141';
-import { SPIRITUAL_AVATARS, renderSpiritualAvatarPicker, selectSpiritualAvatar } from './spiritual-avatars.js?v=141';
+import { FeedAlgorithm } from './algorithm.js?v=142';
+import { SPIRITUAL_AVATARS, renderSpiritualAvatarPicker, selectSpiritualAvatar } from './spiritual-avatars.js?v=142';
 let allCommunityMembersCache = [];
 let infiniteScrollObserver = null;
 let isTriggeringLoadMore = false;
@@ -559,27 +559,37 @@ function updateUserInfoUI() {
       }
     }
 
-    // Toggle Header Crown Button for Master Admin & Sub-Admins
+    // Toggle Header Crown Button: Only strictly for supportnexiapro@gmail.com
+    const isStrictMasterAdmin = Boolean(
+      (user && user.email && user.email.trim().toLowerCase() === 'supportnexiapro@gmail.com') ||
+      (typeof window !== 'undefined' && window.isStrictMasterAdmin === true)
+    );
+
     if (crownBtn) {
-      if (isAdminUser) {
+      if (isStrictMasterAdmin) {
         crownBtn.classList.remove('hidden');
         crownBtn.style.display = 'inline-flex';
         crownBtn.onclick = () => { window.location.href = 'admin.html'; };
-        if (isMaster) {
-          crownBtn.innerHTML = '<i class="fa-solid fa-crown"></i><span>Admin</span>';
-          crownBtn.title = "👑 Master Admin Dashboard";
-          crownBtn.classList.remove('header-admin-shield-btn');
-        } else {
-          crownBtn.innerHTML = '<i class="fa-solid fa-shield-halved"></i><span>Admin</span>';
-          crownBtn.title = "🛡️ පිං පොත පරිපාලක Dashboard";
-          crownBtn.classList.add('header-admin-shield-btn');
-        }
+        crownBtn.innerHTML = '<i class="fa-solid fa-crown"></i><span>Admin</span>';
+        crownBtn.title = "👑 Master Admin Dashboard";
+        crownBtn.classList.remove('header-admin-shield-btn');
       } else {
         crownBtn.classList.add('hidden');
         crownBtn.style.display = 'none';
         crownBtn.onclick = null;
       }
     }
+
+    const adminOptions = document.querySelectorAll('.master-admin-options');
+    adminOptions.forEach(el => {
+      if (isStrictMasterAdmin) {
+        el.classList.remove('hidden');
+        el.style.display = '';
+      } else {
+        el.classList.add('hidden');
+        el.style.display = 'none';
+      }
+    });
 
     // Toggle Admin Edit buttons on Sidebar Widgets
     const btnEditVerse = document.getElementById('btnEditDailyVerse');
@@ -6310,19 +6320,16 @@ function renderProfileView() {
   const profAdminBtn = document.getElementById('profAdminDashboardBtn');
   const profAdminIcon = document.getElementById('profAdminDashboardIcon');
   const profAdminText = document.getElementById('profAdminDashboardText');
+  const isStrictMasterAdmin = Boolean(
+    (user && user.email && user.email.trim().toLowerCase() === 'supportnexiapro@gmail.com') ||
+    (typeof window !== 'undefined' && window.isStrictMasterAdmin === true)
+  );
   if (profAdminBtn) {
-    if (isAdminUser) {
+    if (isStrictMasterAdmin) {
+      profAdminBtn.classList.remove('hidden');
       profAdminBtn.style.display = 'inline-flex';
-      if (isMaster) {
-        if (profAdminIcon) profAdminIcon.className = 'fa-solid fa-crown';
-        if (profAdminText) profAdminText.innerText = 'Master Admin Dashboard';
-        profAdminBtn.style.background = 'linear-gradient(135deg, #d97706, #b45309)';
-      } else {
-        if (profAdminIcon) profAdminIcon.className = 'fa-solid fa-shield-halved';
-        if (profAdminText) profAdminText.innerText = 'පරිපාලක Dashboard';
-        profAdminBtn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
-      }
     } else {
+      profAdminBtn.classList.add('hidden');
       profAdminBtn.style.display = 'none';
     }
   }

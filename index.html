@@ -51,7 +51,7 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=141">
+    <link rel="stylesheet" href="css/styles.css?v=142">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
@@ -194,7 +194,7 @@
                 <span id="navSettingsBtn" style="display: none;"></span>
 
                 <!-- Admin Crown Button (Visible to Master Admin & Admins) -->
-                <button id="headerAdminCrownBtn" class="header-admin-crown-btn" onclick="window.location.href='admin.html'" title="👑 Master Admin Dashboard">
+                <button id="headerAdminCrownBtn" class="header-admin-crown-btn hidden" style="display: none;" onclick="window.location.href='admin.html'" title="👑 Master Admin Dashboard">
                     <i class="fa-solid fa-crown"></i>
                     <span>Admin</span>
                 </button>
@@ -605,7 +605,7 @@
 
                 <!-- Action Buttons -->
                 <div class="profile-header-actions">
-                    <button id="profAdminDashboardBtn" onclick="window.location.href='admin.html'" class="btn-profile-primary" style="display: none; background: linear-gradient(135deg, #d97706, #b45309); border: none;">
+                    <button id="profAdminDashboardBtn" onclick="window.location.href='admin.html'" class="btn-profile-primary master-admin-options hidden" style="display: none; background: linear-gradient(135deg, #d97706, #b45309); border: none;">
                         <i class="fa-solid fa-crown" id="profAdminDashboardIcon"></i>
                         <span id="profAdminDashboardText">Admin Dashboard</span>
                     </button>
@@ -1657,7 +1657,7 @@
                 </div>
 
                 <!-- Master Admin Exclusive Controls (Official Post & Pin to Top) -->
-                <div id="adminPostControls" class="admin-post-controls-box hidden" style="display: none;">
+                <div id="adminPostControls" class="admin-post-controls-box master-admin-options hidden" style="display: none;">
                     <div class="admin-controls-header">
                         <i class="fa-solid fa-crown" style="color: #f59e0b;"></i>
                         <span>පරිපාලක විශේෂ විකල්ප (Master Admin Options)</span>
@@ -1763,7 +1763,7 @@
                 </div>
 
                 <!-- Master Admin Exclusive Controls inside Edit Modal -->
-                <div id="editAdminPostControls" class="admin-post-controls-box hidden" style="display: none; margin-bottom: 14px;">
+                <div id="editAdminPostControls" class="admin-post-controls-box master-admin-options hidden" style="display: none; margin-bottom: 14px;">
                     <div class="admin-controls-header">
                         <i class="fa-solid fa-crown" style="color: #f59e0b;"></i>
                         <span>පරිපාලක විශේෂ විකල්ප (Master Admin Options)</span>
@@ -3641,6 +3641,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=141"></script>
+    <script type="module" src="js/app.js?v=142"></script>
 </body>
 </html>
