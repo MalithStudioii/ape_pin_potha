@@ -2325,20 +2325,20 @@
             </div>
 
             <!-- Settings Tabs Bar -->
-            <div class="settings-tabs-bar" id="settingsTabsBar">
-                <button type="button" class="settings-tab-btn active" id="set-tab-profile" onclick="switchSettingsTab('profile')">
+            <div class="settings-tabs-bar grid grid-cols-3 w-full gap-1 px-2 py-1.5" id="settingsTabsBar">
+                <button type="button" class="settings-tab-btn flex flex-col sm:flex-row items-center justify-center text-center gap-1 px-1 py-2 text-[11px] sm:text-sm leading-tight whitespace-normal active" id="set-tab-profile" onclick="switchSettingsTab('profile')" style="display: none;">
                     <i class="fa-solid fa-user-pen"></i>
                     <span>ප්‍රොෆයිල් තොරතුරු</span>
                 </button>
-                <button type="button" class="settings-tab-btn" id="set-tab-privacy" onclick="switchSettingsTab('privacy')">
+                <button type="button" class="settings-tab-btn flex flex-col sm:flex-row items-center justify-center text-center gap-1 px-1 py-2 text-[11px] sm:text-sm leading-tight whitespace-normal" id="set-tab-privacy" onclick="switchSettingsTab('privacy')">
                     <i class="fa-solid fa-shield-halved"></i>
                     <span>රහස්‍යතා ප්‍රතිපත්තිය</span>
                 </button>
-                <button type="button" class="settings-tab-btn" id="set-tab-terms" onclick="switchSettingsTab('terms')">
+                <button type="button" class="settings-tab-btn flex flex-col sm:flex-row items-center justify-center text-center gap-1 px-1 py-2 text-[11px] sm:text-sm leading-tight whitespace-normal" id="set-tab-terms" onclick="switchSettingsTab('terms')">
                     <i class="fa-solid fa-file-contract"></i>
                     <span>භාවිත කොන්දේසි</span>
                 </button>
-                <button type="button" class="settings-tab-btn" id="set-tab-about" onclick="switchSettingsTab('about')">
+                <button type="button" class="settings-tab-btn flex flex-col sm:flex-row items-center justify-center text-center gap-1 px-1 py-2 text-[11px] sm:text-sm leading-tight whitespace-normal" id="set-tab-about" onclick="switchSettingsTab('about')">
                     <i class="fa-solid fa-circle-info"></i>
                     <span>පිං පොත ගැන</span>
                 </button>
@@ -3669,6 +3669,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=154"></script>
+    <script type="module" src="js/app.js?v=155"></script>
 </body>
 </html>

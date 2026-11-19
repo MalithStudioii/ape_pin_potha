@@ -3428,18 +3428,17 @@ body {
 }
 
 .settings-tabs-bar {
-  display: flex;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  width: 100%;
+  gap: 4px;
   background: #fdfaf2;
   border-bottom: 1.5px solid #fde68a;
-  padding: 6px 16px;
+  padding: 6px 8px;
   min-height: 48px;
   align-items: center;
-  overflow-x: auto;
   flex-shrink: 0;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
 }
 
 .settings-tabs-bar::-webkit-scrollbar {
@@ -3452,39 +3451,68 @@ body {
   position: relative;
   background: transparent;
   border: none;
-  padding: 8px 14px;
-  min-height: 38px;
-  font-size: 0.82rem;
-  line-height: 1.5;
+  padding: 8px 4px;
+  min-height: 40px;
+  width: 100%;
+  font-size: 0.72rem;
+  line-height: 1.25;
   font-weight: 600;
   color: #78350f;
   cursor: pointer;
-  display: inline-flex;
+  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  white-space: nowrap;
+  text-align: center;
+  gap: 3px;
+  white-space: normal;
+  word-break: break-word;
   transition: all 0.2s ease;
-  flex-shrink: 0;
   border-radius: 8px;
+  box-sizing: border-box;
+}
+
+@media (min-width: 640px) {
+  .settings-tabs-bar {
+    gap: 8px;
+    padding: 6px 14px;
+  }
+  .settings-tab-btn {
+    flex-direction: row;
+    gap: 6px;
+    padding: 8px 12px;
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+}
+
+.settings-tab-btn i {
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+
+.settings-tab-btn span {
+  display: inline-block;
+  line-height: 1.25;
 }
 
 .settings-tab-btn:hover {
   color: #b45309;
-  background: rgba(245, 158, 11, 0.06);
+  background: rgba(245, 158, 11, 0.08);
 }
 
 .settings-tab-btn.active {
   color: #92400e;
   font-weight: 700;
+  background: rgba(245, 158, 11, 0.12);
 }
 
 .settings-tab-btn::after {
   content: '';
   position: absolute;
   bottom: 0;
-  left: 10px;
-  right: 10px;
+  left: 6px;
+  right: 6px;
   height: 3px;
   background: transparent;
   border-radius: 3px 3px 0 0;

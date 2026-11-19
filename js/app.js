@@ -9228,16 +9228,17 @@ window.openSettingsModal = function(initialTab = 'profile', mode = null) {
     if (modalTitleText) {
       modalTitleText.textContent = 'ප්‍රතිපත්ති සහ පිං පොත';
     }
-    // Show tab bar with only policy tabs
+    // Show tab bar with only policy tabs as equal 3-column grid
     if (tabsBar) {
-      tabsBar.style.display = 'flex';
+      tabsBar.style.display = 'grid';
+      tabsBar.style.gridTemplateColumns = 'repeat(3, 1fr)';
     }
     if (profTabBtn) profTabBtn.style.display = 'none';
     if (adminTabBtn) adminTabBtn.style.display = 'none';
 
     ['privacy', 'terms', 'about'].forEach(t => {
       const btn = document.getElementById(`set-tab-${t}`);
-      if (btn) btn.style.display = 'inline-flex';
+      if (btn) btn.style.display = 'flex';
     });
 
     const activePolicyTab = (initialTab && ['privacy', 'terms', 'about'].includes(initialTab)) ? initialTab : 'privacy';
