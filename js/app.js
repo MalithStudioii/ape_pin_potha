@@ -540,7 +540,6 @@ export function updateUserInfoUI() {
     const composerAvatarEl = document.getElementById('composerAvatar');
     const crownBtn = document.getElementById('headerAdminCrownBtn');
 
-    const isGuest = !user || !user.email || user.isAnonymous === true;
     const userProfileBtn = document.getElementById('userProfileBtn');
     const sideViewProfileBtn = document.getElementById('sideViewProfileBtn');
 
