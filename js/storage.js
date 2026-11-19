@@ -496,6 +496,11 @@ export const StorageService = {
           }
           const lastActive = data.lastActiveAt || data.updatedAt || 0;
           const isOnline = (this.currentUser && this.currentUser.uid === docSnap.id) || ((now - lastActive) < 7 * 60 * 1000);
+          const isUserAnon = Boolean(
+            data.isAnonymous ||
+            data.useAlias ||
+            (this.currentUser && this.currentUser.uid === docSnap.id && (this.currentUser.useAlias || this.currentUser.isAnonymous))
+          );
           members.push({
             uid: docSnap.id,
             name: data.name || data.firstName || 'කල්‍යාණ මිත්‍ර',
@@ -510,6 +515,8 @@ export const StorageService = {
             isAdmin: isMaster,
             isSubAdmin: isSub,
             isSangha: isMemberSangha,
+            isAnonymous: isUserAnon,
+            useAlias: Boolean(data.useAlias || isUserAnon),
             role: data.role || (isMemberSangha ? 'sangha' : (isSub ? 'admin' : 'member')),
             mithrayanCount: Array.isArray(data.mithrayan) ? data.mithrayan.length : 0
           });
@@ -1570,6 +1577,8 @@ export const StorageService = {
         const isSangha = f.isSangha?.booleanValue === true || role === 'sangha' || this.isSangha({ uid, name });
         const lastActive = parseInt(f.lastActiveAt?.integerValue || f.updatedAt?.integerValue || '0', 10);
         const isOnline = (this.currentUser && this.currentUser.uid === uid) || ((now - lastActive) < 7 * 60 * 1000);
+        const useAlias = f.useAlias?.booleanValue === true;
+        const isAnonymous = f.isAnonymous?.booleanValue === true || useAlias || Boolean(this.currentUser && this.currentUser.uid === uid && (this.currentUser.useAlias || this.currentUser.isAnonymous));
         list.push({
           uid,
           name,
@@ -1589,6 +1598,8 @@ export const StorageService = {
           isAdmin: isMaster,
           isSubAdmin: isSub,
           isSangha,
+          isAnonymous,
+          useAlias: Boolean(useAlias || isAnonymous),
           role: isSangha ? 'sangha' : (isSub ? 'admin' : (isMaster ? 'master_admin' : 'member')),
           mithrayanCount: f.mithrayan?.arrayValue?.values ? f.mithrayan.arrayValue.values.length : 0
         });
@@ -2417,14 +2428,21 @@ export const StorageService = {
     }
 
     const cleanData = validation.sanitized;
-    const authorName = isOfficial ? 'අපේ පිං පොත' : (this.currentUser?.useAlias ? 'කල්‍යාණ මිත්‍ර සාමාජික' : (this.currentUser?.name || 'කල්‍යාණ මිත්‍ර'));
-    const authorPhoto = isOfficial ? null : (this.currentUser?.photo || null);
+    const isAnonymous = Boolean(
+      postToProcess.isAnonymous ||
+      cleanData.isAnonymous ||
+      this.currentUser?.useAlias ||
+      this.currentUser?.isAnonymous
+    );
+    const authorName = isOfficial ? 'අපේ පිං පොත' : (isAnonymous ? 'කල්‍යාණ මිත්‍ර සාමාජික' : (this.currentUser?.name || 'කල්‍යාණ මිත්‍ර'));
+    const authorPhoto = (isOfficial || isAnonymous) ? null : (this.currentUser?.photo || null);
 
     const postPayload = {
       uid: this.currentUser?.uid || 'user_guest',
       author: authorName,
       authorPhoto: authorPhoto,
-      useAlias: Boolean(this.currentUser?.useAlias),
+      isAnonymous: isAnonymous,
+      useAlias: Boolean(this.currentUser?.useAlias || isAnonymous),
       type: cleanData.type,
       visibility: cleanData.visibility,
       title: cleanData.title || safeTitle,

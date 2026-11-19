@@ -51,7 +51,7 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=148">
+    <link rel="stylesheet" href="css/styles.css?v=149">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
@@ -1047,43 +1047,51 @@
     <!-- ================= KALYANA MITHURU PAWURA DIRECTORY VIEW ================= -->
     <div id="friendsPageContainer" class="kmp-page-container hidden" style="display: none;">
         <div class="kmp-page-content">
-            <!-- Hero Banner Card -->
+            <!-- Hero Banner Card (Compact & Modern) -->
             <div class="kmp-hero-card">
                 <div class="kmp-hero-badge">
                     <i class="fa-solid fa-user-group"></i>
-                    <span>කල්‍යාණ මිතුරු ජාලය • සාමාජික නාමාවලිය</span>
+                    <span>කල්‍යාණ මිතුරු ජාලය</span>
                 </div>
                 <h1 class="kmp-hero-title">කල්‍යාණ මිතුරු පවුර</h1>
                 <p class="kmp-hero-desc">
-                    සම්බුදු සසුන බැබළවීමට හා කුසල් දහම් දියුණු කිරීමට එක්වූ පින්වත් මහා සංඝරත්නය සහ සැදැහැවත් කල්‍යාණ මිතුරන් සමඟ එකමුතු වන්න.
+                    පින්වත් මහා සංඝරත්නය සහ සැදැහැවත් කල්‍යාණ මිතුරන් සමඟ කුසල් දහම් දියුණු කරන්න.
                 </p>
 
-                <!-- Real-time Live Online & Summary Statistics Bar -->
-                <div class="kmp-stats-row">
-                    <div class="kmp-live-pill" id="kmpLiveOnlinePill" onclick="refreshKmpDirectoryLive(event)" title="දැන් සජීවීව පද්ධතිය තුළ රැඳී සිටින සාමාජිකයින් ගණන (Click කර Live යාවත්කාලීන කරන්න)">
+                <!-- Compact 2x2 Grid (Mobile) / 4-Col Row (Desktop) Stat Tiles -->
+                <div class="kmp-stats-grid">
+                    <div class="kmp-stat-tile live-tile" id="kmpLiveOnlinePill" onclick="refreshKmpDirectoryLive(event)" title="දැන් සජීවීව Online සාමාජිකයින් (Click කර Refresh කරන්න)">
                         <span class="kmp-live-pulse-dot" id="kmpLivePulseDot"></span>
-                        <span class="kmp-live-label">සජීවීව Online:</span>
-                        <strong id="kmpLiveOnlineCount">...</strong>
-                        <i class="fa-solid fa-rotate" style="font-size: 0.72rem; margin-left: 4px; opacity: 0.8;" title="සජීවීව යාවත්කාලීන කරන්න"></i>
+                        <div class="kmp-tile-info">
+                            <span class="kmp-tile-label">Online</span>
+                            <strong id="kmpLiveOnlineCount">...</strong>
+                        </div>
+                        <i class="fa-solid fa-rotate kmp-tile-refresh-icon"></i>
                     </div>
-                    <div class="kmp-stat-pill" title="පිං පොතෙහි ලියාපදිංචි සමස්ත සාමාජිකයින්">
+                    <div class="kmp-stat-tile" title="පිං පොතෙහි ලියාපදිංචි සමස්ත සාමාජිකයින්">
                         <i class="fa-solid fa-users" style="color: #fef08a;"></i>
-                        <span class="kmp-stat-label">සමස්ත සාමාජිකයින්:</span>
-                        <strong id="kmpTotalMembersCount">0</strong>
+                        <div class="kmp-tile-info">
+                            <span class="kmp-tile-label">සාමාජිකයින්</span>
+                            <strong id="kmpTotalMembersCount">0</strong>
+                        </div>
                     </div>
-                    <div class="kmp-stat-pill" title="ඔබ හා සම්බන්ධ වී ඇති කල්‍යාණ මිතුරන්">
+                    <div class="kmp-stat-tile" title="ඔබ හා සම්බන්ධ වී ඇති කල්‍යාණ මිතුරන්">
                         <i class="fa-solid fa-heart" style="color: #fca5a5;"></i>
-                        <span class="kmp-stat-label">මගේ මිතුරන්:</span>
-                        <strong id="kmpMyFriendsCount">0</strong>
+                        <div class="kmp-tile-info">
+                            <span class="kmp-tile-label">මගේ මිතුරන්</span>
+                            <strong id="kmpMyFriendsCount">0</strong>
+                        </div>
                     </div>
-                    <div class="kmp-stat-pill" title="පූජනීය මහා සංඝරත්නය">
+                    <div class="kmp-stat-tile" title="පූජනීය මහා සංඝරත්නය">
                         <i class="fa-solid fa-dharmachakra" style="color: #fdba74;"></i>
-                        <span class="kmp-stat-label">මහා සංඝරත්නය:</span>
-                        <strong id="kmpSanghaMembersCount">0</strong>
+                        <div class="kmp-tile-info">
+                            <span class="kmp-tile-label">සංඝරත්නය</span>
+                            <strong id="kmpSanghaMembersCount">0</strong>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Hero Action Buttons -->
+                <!-- Hero Action Buttons: 2-column side-by-side row -->
                 <div class="kmp-hero-actions">
                     <button type="button" class="btn-kmp-back" onclick="switchTab('feed')">
                         <i class="fa-solid fa-arrow-left"></i>
@@ -1879,10 +1887,19 @@
                 </div>
 
                 <!-- Optional Short Caption -->
-                <div class="form-group" style="margin-bottom: 18px;">
+                <div class="form-group" style="margin-bottom: 14px;">
                     <label class="form-label" style="font-weight: 700; color: #78350f; margin-bottom: 6px;">කෙටි හැඳින්වීමක් / Caption (විකල්ප)</label>
                     <textarea id="standaloneShortsCaption" class="form-textarea" rows="2" maxlength="300" placeholder="උදා: සිත නිවන කෙටි ධර්ම දේශනාව | පූජ්‍ය ස්වාමීන් වහන්සේ..."></textarea>
                     <div style="font-size: 0.68rem; color: #94a3b8; text-align: right; margin-top: 4px;">උපරිම අකුරු 300ක් දක්වා</div>
+                </div>
+
+                <!-- Anonymous Short Upload Option -->
+                <div class="form-group" style="margin-bottom: 18px; display: flex; align-items: center; justify-content: space-between; background: #fffbeb; border: 1px dashed #fcd34d; border-radius: 10px; padding: 10px 14px;">
+                    <label for="shortsAnonCheckbox" style="display: flex; align-items: center; gap: 8px; font-size: 0.78rem; font-weight: 700; color: #78350f; cursor: pointer; user-select: none; margin: 0;">
+                        <input type="checkbox" id="shortsAnonCheckbox" style="width: 15px; height: 15px; accent-color: #059669; cursor: pointer;">
+                        <span><i class="fa-solid fa-user-secret" style="color: #059669;"></i> නිර්නාමිකව පළ කරන්න (Anonymous)</span>
+                    </label>
+                    <span style="font-size: 0.68rem; color: #92400e; font-weight: 600;">නම සඟවයි</span>
                 </div>
 
                 <!-- Submit Button -->
@@ -3649,6 +3666,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=148"></script>
+    <script type="module" src="js/app.js?v=149"></script>
 </body>
 </html>

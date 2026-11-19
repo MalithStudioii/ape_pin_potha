@@ -10,6 +10,7 @@ import { uploadToImgBB } from './imgbb-service.js?v=66';
 import { SoundService, triggerHaptic } from './sound.js?v=66';
 import { FeedAlgorithm } from './algorithm.js?v=144';
 import { SPIRITUAL_AVATARS, renderSpiritualAvatarPicker, selectSpiritualAvatar } from './spiritual-avatars.js?v=144';
+export const BO_LEAF_AVATAR = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjggMTI4IiB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCI+CiAgPGRlZnM+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImdfYm9fbGVhZiIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNkY2ZjZTciLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjZDFmYWU1Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGZpbHRlciBpZD0iZl9ib19sZWFmIiB4PSItMjAlIiB5PSItMjAlIiB3aWR0aD0iMTQwJSIgaGVpZ2h0PSIxNDAlIj4KICAgICAgPGZlRHJvcFNoYWRvdyBkeD0iMCIgZHk9IjMiIHN0ZERldmlhdGlvbj0iMyIgZmxvb2Qtb3BhY2l0eT0iMC4xOCIgZmxvb2QtY29sb3I9IiM0NTFhMDMiLz4KICAgIDwvZmlsdGVyPgogIDwvZGVmcz4KICA8Y2lyY2xlIGN4PSI2NCIgY3k9IjY0IiByPSI2MSIgZmlsbD0idXJsKCNnX2JvX2xlYWYpIiBzdHJva2U9IiMxMGI5ODEiIHN0cm9rZS13aWR0aD0iMi41Ii8+CiAgPHRleHQgeD0iNjQiIHk9IjgwIiBmb250LXNpemU9IjU4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iJ0FwcGxlIENvbG9yIEVtb2ppJywnU2Vnb2UgVUkgRW1vamknLCdOb3RvIENvbG9yIEVtb2ppJywnU2Vnb2UgVUkgU3ltYm9sJyxzYW5zLXNlcmlmIiBmaWx0ZXI9InVybCgjZl9ib19sZWFmKSI+8J+MvzwvdGV4dD4KPC9zdmc+";
 let allCommunityMembersCache = [];
 let infiniteScrollObserver = null;
 let isTriggeringLoadMore = false;
@@ -1698,6 +1699,10 @@ window.openShortsUploadModal = function() {
     clearStandaloneShortsInput();
     const captionEl = document.getElementById('standaloneShortsCaption');
     if (captionEl) captionEl.value = '';
+    const anonCheck = document.getElementById('shortsAnonCheckbox');
+    if (anonCheck) {
+      anonCheck.checked = Boolean(StorageService.currentUser?.useAlias || StorageService.currentUser?.isAnonymous);
+    }
     const input = document.getElementById('standaloneShortsUrl');
     if (input) {
       setTimeout(() => input.focus(), 250);
@@ -1786,6 +1791,13 @@ window.handleShortsUploadSubmit = async function(e) {
     if (submitBtn) submitBtn.disabled = true;
     if (submitBtnText) submitBtnText.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> පළවෙමින් පවතී...';
 
+    const shortsAnonCheck = document.getElementById('shortsAnonCheckbox');
+    const isAnonymous = Boolean(
+      (shortsAnonCheck && shortsAnonCheck.checked) ||
+      StorageService.currentUser?.useAlias ||
+      StorageService.currentUser?.isAnonymous
+    );
+
     await StorageService.createPost({
       type: 'general',
       title: safeTitle,
@@ -1802,7 +1814,9 @@ window.handleShortsUploadSubmit = async function(e) {
       isShorts: true,
       videoThumbnail: parsed.videoThumbnail,
       isOfficial: false,
-      isPinned: false
+      isPinned: false,
+      isAnonymous: isAnonymous,
+      useAlias: isAnonymous
     });
 
     SoundService.playPublish();
@@ -5338,8 +5352,18 @@ window.openReelsViewer = function(initialPostId = null) {
 
   // Render slides into reelsViewport
   viewport.innerHTML = videoPosts.map((reel, index) => {
-    const authorName = StorageService.resolveAuthorName(reel) || reel.author || 'කල්‍යාණ මිත්‍රයෙක්';
-    const authorPhoto = StorageService.resolveAuthorPhoto(reel) || reel.authorPhoto || null;
+    const isReelAnon = Boolean(
+      reel.isAnonymous === true ||
+      reel.useAlias === true ||
+      reel.authorRole === 'anonymous' ||
+      reel.author === 'නිර්නාමික කල්‍යාණ මිත්‍රයෙක්' ||
+      reel.author === 'කල්‍යාණ මිත්‍ර සාමාජික' ||
+      (reel.uid && StorageService.currentUser?.uid === reel.uid && (StorageService.currentUser?.useAlias || StorageService.currentUser?.isAnonymous)) ||
+      (reel.uid && (StorageService._cachedCommunityMembers || []).some(m => m.uid === reel.uid && (m.useAlias || m.isAnonymous)))
+    );
+
+    const authorName = isReelAnon ? 'කල්‍යාණ මිත්‍ර සාමාජික' : (StorageService.resolveAuthorName(reel) || reel.author || 'කල්‍යාණ මිත්‍රයෙක්');
+    const authorPhoto = isReelAnon ? BO_LEAF_AVATAR : (StorageService.resolveAuthorPhoto(reel) || reel.authorPhoto || null);
     const sadhuCount = Math.max(0, parseInt(reel.sadhuCount, 10) || (Array.isArray(reel.sadhuUsers) ? reel.sadhuUsers.length : 0));
     const commentsCount = Array.isArray(reel.comments) ? reel.comments.length : 0;
     const hasGivenSadhu = StorageService.hasUserGivenSadhu ? StorageService.hasUserGivenSadhu(reel) : false;
@@ -5381,11 +5405,11 @@ window.openReelsViewer = function(initialPostId = null) {
         <!-- Bottom Post Information Overlay -->
         <div class="reels-bottom-info">
           <div class="reels-author-row">
-            <div class="reels-author-avatar" onclick="closeReelsViewer(); viewUserProfile('${reel.uid || ''}', '${Security.escapeHTML(authorName)}', '${authorPhoto ? Security.sanitizeUrl(authorPhoto) : ''}')" style="cursor: pointer;">
+            <div class="reels-author-avatar ${isReelAnon ? 'reels-anon-avatar' : ''}" ${isReelAnon ? 'style="cursor: default;" title="කල්‍යාණ මිත්‍ර සාමාජික"' : `onclick="closeReelsViewer(); viewUserProfile('${reel.uid || ''}', '${Security.escapeHTML(authorName)}', '${authorPhoto ? Security.sanitizeUrl(authorPhoto) : ''}')" style="cursor: pointer;"`}>
               ${authorPhoto ? `<img src="${Security.sanitizeUrl(authorPhoto)}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">` : Security.escapeHTML(authorName.charAt(0))}
             </div>
             <div>
-              <span class="reels-author-name" onclick="closeReelsViewer(); viewUserProfile('${reel.uid || ''}', '${Security.escapeHTML(authorName)}', '${authorPhoto ? Security.sanitizeUrl(authorPhoto) : ''}')">${Security.escapeHTML(authorName)}</span>
+              <span class="reels-author-name" ${isReelAnon ? 'style="cursor: default;" title="කල්‍යාණ මිත්‍ර සාමාජික"' : `onclick="closeReelsViewer(); viewUserProfile('${reel.uid || ''}', '${Security.escapeHTML(authorName)}', '${authorPhoto ? Security.sanitizeUrl(authorPhoto) : ''}')"`}>${Security.escapeHTML(authorName)}</span>
             </div>
             <span class="reels-category-tag">${Security.escapeHTML(reel.category || 'ධර්ම දානමය')}</span>
           </div>
@@ -8082,7 +8106,16 @@ export async function renderPcSidebarMembers(filterQuery = '', forceRefresh = fa
         const isMe = m.uid === currentUser.uid;
         const isFriend = currentMithrayan.includes(m.uid);
         const isSent = currentSent.includes(m.uid);
-        const initial = (m.name || 'ක').trim().charAt(0);
+        const isMemberAnon = Boolean(
+          m.isAnonymous === true ||
+          m.useAlias === true ||
+          m.name === 'කල්‍යාණ මිත්‍ර සාමාජික' ||
+          (isMe && (currentUser.useAlias === true || currentUser.isAnonymous === true))
+        );
+        const displayName = isMemberAnon ? 'කල්‍යාණ මිත්‍ර සාමාජික' : (m.name || 'කල්‍යාණ මිත්‍ර');
+        const displayPhoto = isMemberAnon ? BO_LEAF_AVATAR : (m.photo || '');
+        const displayLocation = isMemberAnon ? (m.location ? 'ශ්‍රී ලංකාව' : '') : (m.location || '');
+        const initial = isMemberAnon ? '🌿' : (displayName || 'ක').trim().charAt(0);
 
         let actionBtn = '';
         if (isMe) {
@@ -8101,19 +8134,19 @@ export async function renderPcSidebarMembers(filterQuery = '', forceRefresh = fa
 
         const isMemberSangha = StorageService.isSangha(m);
         return `
-          <div class="sidebar-member-item" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}', '${m.photo ? Security.sanitizeUrl(m.photo) : ''}', '${m.coverImage ? Security.sanitizeUrl(m.coverImage) : ''}')" title="${Security.escapeHTML(m.name)} ගේ පැතිකඩ බලන්න">
-            <div class="sidebar-member-avatar ${isMemberSangha ? 'sangha-framed-avatar' : ''}">
-              ${m.photo ? `<img src="${Security.sanitizeUrl(m.photo)}" alt="${Security.escapeHTML(m.name)}" onerror="this.parentElement.innerText = '${initial}';">` : `<span>${initial}</span>`}
-              ${isMemberSangha ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
+          <div class="sidebar-member-item ${isMemberAnon ? 'sidebar-member-anon' : ''}" ${isMemberAnon && !isMe ? 'style="cursor: default;"' : `onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(displayName)}', '${displayPhoto ? Security.sanitizeUrl(displayPhoto) : ''}', '${m.coverImage ? Security.sanitizeUrl(m.coverImage) : ''}')" style="cursor: pointer;" title="${Security.escapeHTML(displayName)} ගේ පැතිකඩ බලන්න"`}>
+            <div class="sidebar-member-avatar ${isMemberSangha && !isMemberAnon ? 'sangha-framed-avatar' : ''}">
+              ${displayPhoto ? `<img src="${Security.sanitizeUrl(displayPhoto)}" alt="${Security.escapeHTML(displayName)}" onerror="this.parentElement.innerText = '${initial}';">` : `<span>${initial}</span>`}
+              ${isMemberSangha && !isMemberAnon ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
             </div>
             <div class="sidebar-member-info">
               <div class="sidebar-member-name">
-                <span>${Security.escapeHTML(m.name || 'කල්‍යාණ මිත්‍ර')}</span>
-                ${m.isAdmin ? `<i class="fa-solid fa-crown" style="color: #f59e0b; font-size: 0.65rem;" title="Master Admin"></i>` : ''}
-                ${isMemberSangha ? `<span class="sangha-author-badge" style="margin-left: 3px; padding: 1px 5px; font-size: 0.58rem;"><i class="fa-solid fa-dharmachakra"></i> සංඝරත්නය</span>` : ''}
+                <span>${Security.escapeHTML(displayName)}</span>
+                ${!isMemberAnon && m.isAdmin ? `<i class="fa-solid fa-crown" style="color: #f59e0b; font-size: 0.65rem;" title="Master Admin"></i>` : ''}
+                ${!isMemberAnon && isMemberSangha ? `<span class="sangha-author-badge" style="margin-left: 3px; padding: 1px 5px; font-size: 0.58rem;"><i class="fa-solid fa-dharmachakra"></i> සංඝරත්නය</span>` : ''}
               </div>
               <div class="sidebar-member-meta">
-                ${m.location ? `<i class="fa-solid fa-location-dot"></i> ${Security.escapeHTML(m.location)}` : (m.joinedDate ? `<i class="fa-solid fa-calendar-check"></i> ${Security.escapeHTML(m.joinedDate)}` : 'කල්‍යාණ මිත්‍ර')}
+                ${displayLocation ? `<i class="fa-solid fa-location-dot"></i> ${Security.escapeHTML(displayLocation)}` : (isMemberAnon ? '<span style="color: #059669;">🌿 නිර්නාමික</span>' : (m.joinedDate ? `<i class="fa-solid fa-calendar-check"></i> ${Security.escapeHTML(m.joinedDate)}` : 'කල්‍යාණ මිත්‍ර'))}
               </div>
             </div>
             <div>
@@ -8525,11 +8558,23 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
     const isMe = m.uid === currentUser.uid;
     const isFriend = currentMithrayan.includes(m.uid);
     const isSent = currentSent.includes(m.uid);
-    const initial = (m.name || 'ක').charAt(0);
 
     const isMemberSangha = StorageService.isSangha(m);
     const isMemberMaster = StorageService.isMasterAdmin(m);
     const isMemberSubAdmin = !isMemberMaster && StorageService.isSubAdmin(m);
+
+    // Enforce Anonymous Mode in Friends Directory:
+    const isMemberAnon = Boolean(
+      m.isAnonymous === true ||
+      m.useAlias === true ||
+      m.name === 'කල්‍යාණ මිත්‍ර සාමාජික' ||
+      (isMe && (currentUser.useAlias === true || currentUser.isAnonymous === true))
+    );
+
+    const displayName = isMemberAnon ? 'කල්‍යාණ මිත්‍ර සාමාජික' : (m.name || 'කල්‍යාණ මිත්‍ර');
+    const displayPhoto = isMemberAnon ? BO_LEAF_AVATAR : (m.photo || '');
+    const displayLocation = isMemberAnon ? (m.location ? 'ශ්‍රී ලංකාව' : '') : (m.location || '');
+    const initial = isMemberAnon ? '🌿' : (displayName || 'ක').charAt(0);
 
     // Incoming request check
     const pendingReq = pendingIncoming.find(r => r.senderUid === m.uid);
@@ -8543,65 +8588,71 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
       `;
     } else if (pendingReq) {
       actionBtnHtml = `
-        <button type="button" class="kmp-btn-action-primary" style="background: linear-gradient(135deg, #10b981, #059669);" onclick="event.stopPropagation(); handleAcceptKmpRequest('${pendingReq.id}', '${m.uid}', '${Security.escapeHTML(m.name)}')">
+        <button type="button" class="kmp-btn-action-primary" style="background: linear-gradient(135deg, #10b981, #059669);" onclick="event.stopPropagation(); handleAcceptKmpRequest('${pendingReq.id}', '${m.uid}', '${Security.escapeHTML(displayName)}')">
           <i class="fa-solid fa-circle-check"></i> පිළිගන්න
         </button>
         <button type="button" class="kmp-btn-view-profile" onclick="event.stopPropagation(); handleRejectKmpRequest('${pendingReq.id}', '${m.uid}')" title="ඉවත් කරන්න">
           <i class="fa-solid fa-xmark"></i>
         </button>
       `;
-    } else if (isMemberSangha) {
+    } else if (isMemberSangha && !isMemberAnon) {
       const isRevered = StorageService.isReveringSangha(m.uid);
       actionBtnHtml = isRevered
-        ? `<button type="button" class="kmp-btn-action-primary" style="background: #fef3c7; color: #92400e; border: 1px solid #fde68a;" onclick="event.stopPropagation(); handleToggleSanghaReverence('${m.uid}', '${Security.escapeHTML(m.name)}')"><i class="fa-solid fa-hands-praying"></i> නමස්කාර කර ඇත 🙏</button>`
-        : `<button type="button" class="kmp-btn-action-primary" style="background: linear-gradient(135deg, #d97706, #b45309);" onclick="event.stopPropagation(); handleToggleSanghaReverence('${m.uid}', '${Security.escapeHTML(m.name)}')"><i class="fa-solid fa-hands-praying"></i> නමස්කාර කරමි 🙏</button>`;
+        ? `<button type="button" class="kmp-btn-action-primary" style="background: #fef3c7; color: #92400e; border: 1px solid #fde68a;" onclick="event.stopPropagation(); handleToggleSanghaReverence('${m.uid}', '${Security.escapeHTML(displayName)}')"><i class="fa-solid fa-hands-praying"></i> නමස්කාර කර ඇත 🙏</button>`
+        : `<button type="button" class="kmp-btn-action-primary" style="background: linear-gradient(135deg, #d97706, #b45309);" onclick="event.stopPropagation(); handleToggleSanghaReverence('${m.uid}', '${Security.escapeHTML(displayName)}')"><i class="fa-solid fa-hands-praying"></i> නමස්කාර කරමි 🙏</button>`;
     } else if (isFriend) {
       actionBtnHtml = `<span class="kmp-badge-friend"><i class="fa-solid fa-circle-check"></i> කල්‍යාණ මිතුරෙකි</span>`;
     } else if (isSent) {
       actionBtnHtml = `<span class="kmp-badge-friend" style="background: #fffbeb; color: #b45309; border-color: #fde68a;"><i class="fa-solid fa-clock"></i> ඇරයුමක් යවා ඇත</span>`;
     } else {
       actionBtnHtml = `
-        <button type="button" class="kmp-btn-action-primary" onclick="event.stopPropagation(); handleSendKmpRequest('${m.uid}', '${Security.escapeHTML(m.name)}')">
+        <button type="button" class="kmp-btn-action-primary" onclick="event.stopPropagation(); handleSendKmpRequest('${m.uid}', '${Security.escapeHTML(displayName)}')">
           <i class="fa-solid fa-user-plus"></i> මිතුරු වන්න
         </button>
       `;
     }
 
+    const clickCardHandler = isMemberAnon && !isMe
+      ? ''
+      : `openMemberProfileModal('${m.uid}', '${Security.escapeHTML(displayName)}', '${displayPhoto ? Security.sanitizeUrl(displayPhoto) : ''}', '${m.coverImage ? Security.sanitizeUrl(m.coverImage) : ''}')`;
+
     return `
-      <div class="kmp-card" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}', '${m.photo ? Security.sanitizeUrl(m.photo) : ''}', '${m.coverImage ? Security.sanitizeUrl(m.coverImage) : ''}')">
+      <div class="kmp-card ${isMemberAnon ? 'kmp-card-anon' : ''}" ${clickCardHandler ? `onclick="${clickCardHandler}"` : 'style="cursor: default;"'}>
         <div class="kmp-card-top">
-          <div class="kmp-avatar-wrap ${isMemberSangha ? 'kmp-sangha-avatar' : ''}">
-            ${m.photo ? `<img src="${Security.sanitizeUrl(m.photo)}" alt="${Security.escapeHTML(m.name)}" class="kmp-avatar-img" onerror="this.parentElement.innerHTML = '<div class=\\'kmp-avatar-initial\\'>${initial}</div>';">` : `<div class="kmp-avatar-initial">${initial}</div>`}
+          <div class="kmp-avatar-wrap ${isMemberSangha && !isMemberAnon ? 'kmp-sangha-avatar' : ''}">
+            ${displayPhoto ? `<img src="${Security.sanitizeUrl(displayPhoto)}" alt="${Security.escapeHTML(displayName)}" class="kmp-avatar-img" onerror="this.parentElement.innerHTML = '<div class=\\\'kmp-avatar-initial\\\'>${initial}</div>';">` : `<div class="kmp-avatar-initial">${initial}</div>`}
             ${m.isOnline ? `<span class="kmp-online-dot" title="දැන් සජීවීව Online"></span>` : ''}
-            ${isMemberSangha ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
+            ${isMemberSangha && !isMemberAnon ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
           </div>
           <div class="kmp-card-meta">
             <div class="kmp-name-row">
-              <span class="kmp-member-name">${Security.escapeHTML(m.name || 'කල්‍යාණ මිත්‍ර')}</span>
-              ${isMemberMaster ? `<span class="badge-crown" title="කල්‍යාණ මිත්‍ර">👑</span>` : (isMemberSubAdmin ? `<span class="badge-shield" title="කල්‍යාණ මිත්‍ර">🛡️</span>` : '')}
-              ${isMemberSangha ? `<span class="sangha-author-badge" style="margin-left: 3px; padding: 1px 6px; font-size: 0.6rem;"><i class="fa-solid fa-dharmachakra"></i> පූජනීය සංඝරත්නය</span>` : ''}
+              <span class="kmp-member-name">${Security.escapeHTML(displayName)}</span>
+              ${!isMemberAnon && isMemberMaster ? `<span class="badge-crown" title="කල්‍යාණ මිත්‍ර">👑</span>` : (!isMemberAnon && isMemberSubAdmin ? `<span class="badge-shield" title="කල්‍යාණ මිත්‍ර">🛡️</span>` : '')}
+              ${!isMemberAnon && isMemberSangha ? `<span class="sangha-author-badge" style="margin-left: 3px; padding: 1px 6px; font-size: 0.6rem;"><i class="fa-solid fa-dharmachakra"></i> පූජනීය සංඝරත්නය</span>` : ''}
             </div>
             ${m.isOnline
               ? `<div class="kmp-presence-tag"><span class="kmp-pulse-dot-mini"></span> <span>දැන් Online</span></div>`
               : `<div class="kmp-presence-tag offline"><i class="fa-solid fa-clock-rotate-left"></i> <span>ක්‍රියාකාරී විය</span></div>`
             }
-            ${m.location ? `<div class="kmp-location-text"><i class="fa-solid fa-location-dot" style="color: #ea580c;"></i> <span>${Security.escapeHTML(m.location)}</span></div>` : ''}
+            ${displayLocation ? `<div class="kmp-location-text"><i class="fa-solid fa-location-dot" style="color: #ea580c;"></i> <span>${Security.escapeHTML(displayLocation)}</span></div>` : ''}
           </div>
         </div>
 
-        ${m.bio ? `<p class="kmp-card-bio">${Security.escapeHTML(m.bio)}</p>` : ''}
+        ${m.bio && !isMemberAnon ? `<p class="kmp-card-bio">${Security.escapeHTML(m.bio)}</p>` : (isMemberAnon ? '<p class="kmp-card-bio" style="color: #059669; font-style: italic;">🌿 නිර්නාමික කල්‍යාණ මිත්‍රයෙකි</p>' : '')}
 
         <div class="kmp-card-stats">
-          <span title="පින්කම් සටහන්"><i class="fa-solid fa-dharmachakra" style="color: #d97706;"></i> පින්කම්: <strong>${m.postsCount || 0}</strong></span>
-          <span title="ලද සාදුකාර"><i class="fa-solid fa-hands-praying" style="color: #ea580c;"></i> සාදු: <strong>${m.totalSadhu || 0}</strong></span>
-          <span title="මිතුරන්"><i class="fa-solid fa-user-group" style="color: #059669;"></i> මිතුරන්: <strong>${m.mithrayanCount || 0}</strong></span>
+          <span title="පින්කම්"><i class="fa-solid fa-dharmachakra" style="color: #d97706;"></i> <strong>${m.postsCount || 0}</strong></span>
+          <span title="සාදු"><i class="fa-solid fa-hands-praying" style="color: #ea580c;"></i> <strong>${m.totalSadhu || 0}</strong></span>
+          <span title="මිතුරන්"><i class="fa-solid fa-user-group" style="color: #059669;"></i> <strong>${m.mithrayanCount || 0}</strong></span>
         </div>
 
         <div class="kmp-card-actions" onclick="event.stopPropagation()">
           ${actionBtnHtml}
-          <button type="button" class="kmp-btn-view-profile" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}', '${m.photo ? Security.sanitizeUrl(m.photo) : ''}', '${m.coverImage ? Security.sanitizeUrl(m.coverImage) : ''}')" title="සම්පූර්ණ පැතිකඩ (Profile) බලන්න">
-            <i class="fa-solid fa-user"></i>
-          </button>
+          ${!isMemberAnon || isMe ? `
+            <button type="button" class="kmp-btn-view-profile" onclick="${clickCardHandler || `switchTab('profile')`}" title="සම්පූර්ණ පැතිකඩ (Profile) බලන්න">
+              <i class="fa-solid fa-user"></i>
+            </button>
+          ` : ''}
         </div>
       </div>
     `;
