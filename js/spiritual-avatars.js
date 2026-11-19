@@ -107,7 +107,7 @@ export function renderSpiritualAvatarPicker(containerId, formPrefix = 'editProf'
   }
 }
 
-export function selectSpiritualAvatar(avatarId, formPrefix = 'editProf') {
+export async function selectSpiritualAvatar(avatarId, formPrefix = 'editProf') {
   const avatar = SPIRITUAL_AVATARS.find(a => a.id === avatarId);
   if (!avatar) return;
 
@@ -143,6 +143,29 @@ export function selectSpiritualAvatar(avatarId, formPrefix = 'editProf') {
       }
     }
   });
+
+  // 5. Immediately persist Spiritual Avatar to currentUser and Firestore if authenticated
+  try {
+    const storageService = (typeof window !== 'undefined' && window.StorageService) ? window.StorageService : null;
+    if (storageService && storageService.currentUser && storageService.currentUser.uid) {
+      storageService.currentUser.photo = avatar.dataUrl;
+      storageService.currentUser.spiritualAvatarId = avatarId;
+      if (typeof storageService.persistUserPhotoToCloud === 'function') {
+        await storageService.persistUserPhotoToCloud(avatar.dataUrl, avatarId);
+      }
+      if (typeof window.updateUserInfoUI === 'function') {
+        window.updateUserInfoUI();
+      }
+      if (typeof window.showCustomToast === 'function') {
+        window.showCustomToast(`ධාර්මික සංකේතය (${avatar.name} ${avatar.symbol}) සාර්ථකව සුරකින ලදී! 🙏`, "success");
+      }
+    }
+  } catch (persistErr) {
+    console.warn('[selectSpiritualAvatar] Could not persist spiritual avatar:', persistErr);
+    if (typeof window.showCustomToast === 'function') {
+      window.showCustomToast("සංකේතය Cloud එකට සුරැකීමේදී දෝෂයක් සිදුවිය.", "warning");
+    }
+  }
 }
 
 if (typeof window !== 'undefined') {

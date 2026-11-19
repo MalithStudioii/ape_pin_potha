@@ -2146,7 +2146,7 @@
                             </div>
                         </div>
                         <label class="alias-toggle-switch">
-                            <input type="checkbox" id="editProfUseAliasToggle">
+                            <input type="checkbox" id="editProfUseAliasToggle" onchange="handlePrivacyAliasToggleChange(event)">
                             <span class="alias-toggle-slider"></span>
                         </label>
                     </div>
@@ -2460,7 +2460,7 @@
                                     </div>
                                 </div>
                                 <label class="alias-toggle-switch">
-                                    <input type="checkbox" id="setUseAliasToggle">
+                                    <input type="checkbox" id="setUseAliasToggle" onchange="handlePrivacyAliasToggleChange(event)">
                                     <span class="alias-toggle-slider"></span>
                                 </label>
                             </div>
@@ -3669,6 +3669,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=151"></script>
+    <script type="module" src="js/app.js?v=152"></script>
 </body>
 </html>

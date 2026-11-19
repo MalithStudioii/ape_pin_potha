@@ -752,6 +752,17 @@ export const StorageService = {
             await this.restoreUserProfile(user);
             this.initUserNotificationsSubscription(user.uid);
             this.initUserPostsSubscription(user.uid);
+
+            if (typeof window !== 'undefined') {
+              const isAnon = Boolean(this.currentUser?.isAnonymous || this.currentUser?.useAlias);
+              const setToggle = document.getElementById('setUseAliasToggle');
+              const editToggle = document.getElementById('editProfUseAliasToggle');
+              if (setToggle) setToggle.checked = isAnon;
+              if (editToggle) editToggle.checked = isAnon;
+              if (typeof window.updateUserInfoUI === 'function') {
+                try { window.updateUserInfoUI(); } catch (e) {}
+              }
+            }
           } else {
             // Strictly guest mode when unauthenticated
             this.currentUser = null;
@@ -992,7 +1003,7 @@ export const StorageService = {
         }, 1200);
 
         // Real-time Firestore Notifications Subscription for authenticated user
-        if (this.currentUser && this.currentUser.uid && !this.currentUser.isAnonymous) {
+        if (this.currentUser && this.currentUser.uid && this.currentUser.email) {
           this.initUserNotificationsSubscription(this.currentUser.uid);
           this.initUserPostsSubscription(this.currentUser.uid);
         }
@@ -3342,6 +3353,16 @@ export const StorageService = {
       if (rawUid) savedProfile = JSON.parse(rawUid);
     } catch (e) {}
 
+    // Check cached anonymous state
+    let cachedAnon = null;
+    try {
+      cachedAnon = localStorage.getItem('pinpotha_anon_' + user.uid);
+    } catch (e) {}
+
+    const initialIsAnon = cachedAnon !== null 
+      ? (cachedAnon === 'true') 
+      : Boolean(savedProfile.isAnonymous || savedProfile.useAlias);
+
     // 2. Check local profile cached by Email
     if ((!savedProfile.name || savedProfile.name === 'අමුත්තා') && user.email) {
       try {
@@ -3403,7 +3424,8 @@ export const StorageService = {
       joinedDate: savedProfile.joinedDate || "2026 ඔක්තෝබර්",
       mithrayan: Array.isArray(savedProfile.mithrayan) ? savedProfile.mithrayan : [],
       pendingMithraSent: Array.isArray(savedProfile.pendingMithraSent) ? savedProfile.pendingMithraSent : [],
-      isAnonymous: false,
+      isAnonymous: initialIsAnon,
+      useAlias: initialIsAnon,
       needsNameConfirmation: (!fullName || fullName === 'අමුත්තා' || fullName.length < 2)
     };
     if (isSub) {
@@ -3444,6 +3466,16 @@ export const StorageService = {
           if (Array.isArray(cloudData.mithrayan)) this.currentUser.mithrayan = cloudData.mithrayan;
           if (Array.isArray(cloudData.pendingMithraSent)) this.currentUser.pendingMithraSent = cloudData.pendingMithraSent;
 
+          // CRITICAL: Always load isAnonymous and useAlias from Firestore cloudData (never overwrite with false)
+          if (cloudData.isAnonymous !== undefined || cloudData.useAlias !== undefined) {
+            const cloudAnon = Boolean(cloudData.isAnonymous || cloudData.useAlias);
+            this.currentUser.isAnonymous = cloudAnon;
+            this.currentUser.useAlias = cloudAnon;
+            try {
+              localStorage.setItem('pinpotha_anon_' + user.uid, cloudAnon ? 'true' : 'false');
+            } catch (e) {}
+          }
+
           // CRITICAL: Sync role and admin privileges from Cloud Firestore!
           const isCloudMaster = this.isMasterAdmin(user);
           const isCloudSub = !isCloudMaster && (cloudData.role === 'admin' || cloudData.isSubAdmin === true);
@@ -3463,10 +3495,22 @@ export const StorageService = {
           if (user.email) {
             localStorage.setItem('pinPotha_last_user_name_' + user.email.toLowerCase(), this.currentUser.name);
           }
+
+          if (typeof window !== 'undefined') {
+            const isAnon = Boolean(this.currentUser.isAnonymous || this.currentUser.useAlias);
+            const setToggle = document.getElementById('setUseAliasToggle');
+            const editToggle = document.getElementById('editProfUseAliasToggle');
+            if (setToggle) setToggle.checked = isAnon;
+            if (editToggle) editToggle.checked = isAnon;
+            if (typeof window.updateUserInfoUI === 'function') {
+              try { window.updateUserInfoUI(); } catch (e) {}
+            }
+          }
+
           this.notifyListeners();
           this.notifyNotificationListeners();
         } else if (this.currentUser.name && this.currentUser.name !== 'අමුත්තා') {
-          // Sync existing initial data to cloud
+          // Sync existing initial data to cloud without resetting isAnonymous to false
           await setDoc(userDocRef, {
             uid: this.currentUser.uid,
             name: this.currentUser.name,
@@ -3479,6 +3523,8 @@ export const StorageService = {
             location: this.currentUser.location,
             occupation: this.currentUser.occupation,
             joinedDate: this.currentUser.joinedDate,
+            isAnonymous: Boolean(this.currentUser.isAnonymous),
+            useAlias: Boolean(this.currentUser.useAlias),
             updatedAt: Date.now()
           }, { merge: true });
         }
@@ -4249,10 +4295,17 @@ export const StorageService = {
   /**
    * Update full user profile details (First & Last Name, Occupation, Location/Address, Bio, Photo, Cover Image)
    */
-  async updateProfile({ firstName, lastName, name, bio, location, district, province, city, occupation, spiritualInterest, temple, coverImage, photo, useAlias }) {
+  async updateProfile({ firstName, lastName, name, bio, location, district, province, city, occupation, spiritualInterest, temple, coverImage, photo, useAlias, isAnonymous }) {
     if (!this.currentUser) return;
-    if (useAlias !== undefined) {
-      this.currentUser.useAlias = Boolean(useAlias);
+    if (useAlias !== undefined || isAnonymous !== undefined) {
+      const aliasVal = Boolean(useAlias !== undefined ? useAlias : isAnonymous);
+      this.currentUser.useAlias = aliasVal;
+      this.currentUser.isAnonymous = aliasVal;
+      if (this.currentUser.uid) {
+        try {
+          localStorage.setItem('pinpotha_anon_' + this.currentUser.uid, aliasVal ? 'true' : 'false');
+        } catch (e) {}
+      }
     }
     if (firstName !== undefined || lastName !== undefined) {
       if (firstName !== undefined) {
@@ -4397,7 +4450,7 @@ export const StorageService = {
     }
 
     // 3. Sync with Firestore collection 'users' and chunked batch-update 'merit_posts'
-    if (isCloudReady && db && this.currentUser.uid && !this.currentUser.isAnonymous) {
+    if (isCloudReady && db && this.currentUser.uid && this.currentUser.email) {
       try {
         const { doc, setDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
         await setDoc(doc(db, COLLECTIONS.USERS, this.currentUser.uid), {
@@ -4416,6 +4469,7 @@ export const StorageService = {
           occupation: this.currentUser.occupation || '',
           spiritualInterest: this.currentUser.spiritualInterest || this.currentUser.occupation || '',
           useAlias: Boolean(this.currentUser.useAlias),
+          isAnonymous: Boolean(this.currentUser.isAnonymous || this.currentUser.useAlias),
           joinedDate: this.currentUser.joinedDate || '2026 ඔක්තෝබර්',
           updatedAt: Date.now()
         }, { merge: true });
@@ -4467,6 +4521,83 @@ export const StorageService = {
 
   async setUserName(name) {
     return await this.updateProfile({ name });
+  },
+
+  /**
+   * Immediately toggle and persist Privacy Alias (isAnonymous) to Firestore and LocalStorage
+   */
+  async setPrivacyAlias(isAnon) {
+    if (!this.currentUser || !this.currentUser.uid) return false;
+    const isChecked = Boolean(isAnon);
+    this.currentUser.isAnonymous = isChecked;
+    this.currentUser.useAlias = isChecked;
+
+    try {
+      localStorage.setItem('pinpotha_anon_' + this.currentUser.uid, isChecked ? 'true' : 'false');
+      localStorage.setItem('pinPotha_currentUser', JSON.stringify(this.currentUser));
+      localStorage.setItem('pinPotha_profile_' + this.currentUser.uid, JSON.stringify(this.currentUser));
+    } catch (e) {
+      console.warn('[StorageService.setPrivacyAlias] LocalStorage cache error:', e);
+    }
+
+    if (this._cachedCommunityMembers && Array.isArray(this._cachedCommunityMembers)) {
+      const m = this._cachedCommunityMembers.find(mem => mem.uid === this.currentUser.uid);
+      if (m) {
+        m.isAnonymous = isChecked;
+        m.useAlias = isChecked;
+      }
+    }
+
+    if (isCloudReady && db) {
+      try {
+        const { doc, setDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const userDocRef = doc(db, COLLECTIONS.USERS, this.currentUser.uid);
+        await setDoc(userDocRef, {
+          isAnonymous: isChecked,
+          useAlias: isChecked,
+          updatedAt: Date.now()
+        }, { merge: true });
+      } catch (err) {
+        console.error('[StorageService.setPrivacyAlias] Firestore error:', err);
+        throw err;
+      }
+    }
+    return true;
+  },
+
+  /**
+   * Immediately persist user's chosen Spiritual Avatar or photo to Firestore and LocalStorage
+   */
+  async persistUserPhotoToCloud(photoDataUrl, spiritualAvatarId = null) {
+    if (!this.currentUser || !this.currentUser.uid) return false;
+    this.currentUser.photo = photoDataUrl;
+    if (spiritualAvatarId) this.currentUser.spiritualAvatarId = spiritualAvatarId;
+
+    try {
+      localStorage.setItem('pinPotha_currentUser', JSON.stringify(this.currentUser));
+      localStorage.setItem('pinPotha_profile_' + this.currentUser.uid, JSON.stringify(this.currentUser));
+    } catch (e) {}
+
+    if (this._cachedCommunityMembers && Array.isArray(this._cachedCommunityMembers)) {
+      const m = this._cachedCommunityMembers.find(mem => mem.uid === this.currentUser.uid);
+      if (m) m.photo = photoDataUrl;
+    }
+
+    if (isCloudReady && db) {
+      try {
+        const { doc, setDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const userDocRef = doc(db, COLLECTIONS.USERS, this.currentUser.uid);
+        await setDoc(userDocRef, {
+          photo: photoDataUrl,
+          spiritualAvatarId: spiritualAvatarId || null,
+          updatedAt: Date.now()
+        }, { merge: true });
+      } catch (err) {
+        console.error('[StorageService.persistUserPhotoToCloud] Firestore error:', err);
+        throw err;
+      }
+    }
+    return true;
   },
 
   /**

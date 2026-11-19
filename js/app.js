@@ -154,7 +154,7 @@ window.toggleSoundPreference = function(e) {
 
 export function isGuestUser() {
   const user = StorageService.currentUser;
-  if (!user || !user.email || user.isAnonymous === true) return true;
+  if (!user || !user.email) return true;
   return false;
 }
 window.isGuestUser = isGuestUser;
@@ -401,6 +401,18 @@ function bootApp() {
       if (soundChk) {
         soundChk.checked = SoundService.getSoundEnabled();
       }
+
+      // Initialize Privacy Alias toggle change listeners
+      const setAliasToggle = document.getElementById('setUseAliasToggle');
+      if (setAliasToggle && !setAliasToggle._hasAnonListener) {
+        setAliasToggle._hasAnonListener = true;
+        setAliasToggle.addEventListener('change', window.handlePrivacyAliasToggleChange);
+      }
+      const editProfAliasToggle = document.getElementById('editProfUseAliasToggle');
+      if (editProfAliasToggle && !editProfAliasToggle._hasAnonListener) {
+        editProfAliasToggle._hasAnonListener = true;
+        editProfAliasToggle.addEventListener('change', window.handlePrivacyAliasToggleChange);
+      }
     } catch (e) {}
 
     // Critical Safety Timeout: If for ANY reason the loader shimmer is still present after 1.8s, remove it
@@ -526,7 +538,7 @@ export function updateUserInfoUI() {
   window.updateUserInfoUI = updateUserInfoUI;
   try {
     const user = StorageService.currentUser;
-    const isGuest = !user || !user.email || user.isAnonymous === true;
+    const isGuest = !user || !user.email;
     const isMaster = Boolean(!isGuest && user && (
       StorageService.isMasterAdmin(user) ||
       (user.email && user.email.trim().toLowerCase() === 'silvadilan9@gmail.com') ||
@@ -538,6 +550,13 @@ export function updateUserInfoUI() {
     const activeName = isGuest ? "කල්‍යාණ මිත්‍ර අමුත්තෙක්" : (user.name || user.displayName || "කල්‍යාණ මිත්‍ර සාමාජික");
     const activePhoto = isGuest ? null : (user.photo || user.photoURL || null);
     const firstLetter = (activeName || "අ").trim().charAt(0);
+
+    // Keep privacy alias toggle checked states in sync with user profile
+    const isAnon = Boolean(!isGuest && (user.isAnonymous || user.useAlias));
+    const setToggle = document.getElementById('setUseAliasToggle');
+    const editToggle = document.getElementById('editProfUseAliasToggle');
+    if (setToggle && setToggle.checked !== isAnon) setToggle.checked = isAnon;
+    if (editToggle && editToggle.checked !== isAnon) editToggle.checked = isAnon;
 
     const displayEl = document.getElementById('userNameDisplay');
     const sideNameEl = document.getElementById('sideUserName');
@@ -754,7 +773,7 @@ export function updateUserStats() {
   window.updateUserStats = updateUserStats;
   try {
     const user = StorageService.currentUser;
-    const isGuest = !user || !user.email || user.isAnonymous === true;
+    const isGuest = !user || !user.email;
     const statPostsEl = document.getElementById('statMyPosts');
     const statSadhuEl = document.getElementById('statMySadhu');
 
@@ -812,6 +831,60 @@ window.showCustomToast = function(msg, type = 'info') {
 };
 window.showToast = window.showCustomToast;
 window.showToastNotification = window.showCustomToast;
+
+// Privacy Alias Immediate Async Persistence Handler
+window.handlePrivacyAliasToggleChange = async function(e) {
+  const isChecked = Boolean(e && e.target ? e.target.checked : e);
+  triggerHaptic(15);
+  SoundService.playClick();
+
+  const user = StorageService.currentUser;
+  if (!user || !user.uid) {
+    if (typeof showCustomToast === 'function') {
+      showCustomToast("කරුණාකර පළමුව ගිණුමට පිවිසෙන්න.", "warning");
+    }
+    return;
+  }
+
+  // Keep both UI toggle elements in sync immediately
+  const setToggle = document.getElementById('setUseAliasToggle');
+  const editToggle = document.getElementById('editProfUseAliasToggle');
+  if (setToggle && setToggle !== e?.target) setToggle.checked = isChecked;
+  if (editToggle && editToggle !== e?.target) editToggle.checked = isChecked;
+
+  try {
+    await StorageService.setPrivacyAlias(isChecked);
+
+    // Re-render relevant UI to match
+    updateUserInfoUI();
+    if (typeof renderProfileView === 'function' && activeTab === 'profile') {
+      renderProfileView();
+    }
+    if (typeof renderFeed === 'function' && activeTab === 'feed') {
+      renderFeed();
+    }
+    if (typeof renderKmpDirectoryView === 'function' && activeTab === 'friends') {
+      renderKmpDirectoryView(true);
+    }
+
+    if (typeof showCustomToast === 'function') {
+      showCustomToast(
+        isChecked 
+          ? "නිර්නාමික කල්‍යාණ මිත්‍ර ප්‍රකාරය සක්‍රීයයි (Privacy Alias ON) 🔒" 
+          : "නිර්නාමික ප්‍රකාරය අක්‍රීයයි (සැබෑ නම ප්‍රදර්ශනය වේ) 🌿", 
+        "success"
+      );
+    }
+  } catch (err) {
+    console.error('[handlePrivacyAliasToggleChange] Failed to save privacy alias:', err);
+    // Revert toggle state on failure
+    if (setToggle) setToggle.checked = !isChecked;
+    if (editToggle) editToggle.checked = !isChecked;
+    if (typeof showCustomToast === 'function') {
+      showCustomToast("සැකසුම් සුරැකීමේදී දෝෂයක් සිදුවිය. කරුණාකර නැවත උත්සාහ කරන්න.", "error");
+    }
+  }
+};
 
 // Public Profile Navigation Handler (Handles Self vs Other Member vs Anonymous)
 window.openPublicProfile = async function(targetUid, optName = null, optPhoto = null, optCover = null) {
@@ -6244,7 +6317,7 @@ function setupEventListeners() {
     }
 
     const useAlias = Boolean(document.getElementById('editProfUseAliasToggle')?.checked);
-    await StorageService.updateProfile({ firstName, lastName, occupation, location, district, province, city, bio, photo, useAlias });
+    await StorageService.updateProfile({ firstName, lastName, occupation, location, district, province, city, bio, photo, useAlias, isAnonymous: useAlias });
     closeEditProfileModal();
     updateUserInfoUI();
     renderProfileView();
@@ -6494,7 +6567,7 @@ window.handleQuickQuoteSelect = function(quoteText, targetTextareaId) {
 
 function renderProfileView() {
   const user = StorageService.currentUser;
-  const isGuest = !user || !user.email || user.isAnonymous === true;
+  const isGuest = !user || !user.email;
   const isMasterUser = Boolean(!isGuest && user && user.email && user.email.trim().toLowerCase() === 'silvadilan9@gmail.com');
   const isMyPost = (p) => {
     if (!p) return false;
@@ -6566,7 +6639,7 @@ function renderProfileView() {
     if (isSangha) {
       badgeEl.className = 'sangha-verified-badge';
       badgeEl.innerHTML = `<i class="fa-solid fa-dharmachakra"></i> <span>පූජනීය මහා සංඝරත්නය</span>`;
-    } else if (user.email && !user.isAnonymous) {
+    } else if (user.email) {
       badgeEl.className = 'verified-pill';
       badgeEl.innerHTML = `<i class="fa-solid fa-circle-check"></i> <span>Google සත්‍යාපිත කල්‍යාණ මිත්‍ර</span>`;
     } else {
@@ -6599,7 +6672,7 @@ function renderProfileView() {
   // 4. Header Auth action button
   const authBtn = document.getElementById('profAuthActionBtn');
   if (authBtn) {
-    if (user.email && !user.isAnonymous) {
+    if (user.email) {
       authBtn.className = 'btn-profile-danger';
       authBtn.innerHTML = `<i class="fa-solid fa-right-from-bracket"></i> <span>Sign Out</span>`;
       authBtn.title = 'ගිණුමෙන් ඉවත් වන්න';
@@ -6655,7 +6728,7 @@ function renderProfileView() {
   if (joinedEl) joinedEl.innerText = `${user.joinedDate || '2026 ඔක්තෝබර්'} සිට සාමාජික`;
 
   const widgetAccount = document.getElementById('profWidgetAccount');
-  if (widgetAccount) widgetAccount.innerText = (user.email && !user.isAnonymous) ? 'Google සත්‍යාපිත' : 'සාමාන්‍ය සාමාජික';
+  if (widgetAccount) widgetAccount.innerText = user.email ? 'Google සත්‍යාපිත' : 'සාමාන්‍ය සාමාජික';
 
   // 7. Counters
   const countTimeline = document.getElementById('profCountTimeline');
@@ -7154,7 +7227,7 @@ window.openEditProfileModal = function() {
   // Initialize Privacy Alias Toggle & Spiritual Avatar Picker
   const aliasToggle = document.getElementById('editProfUseAliasToggle');
   if (aliasToggle) {
-    aliasToggle.checked = Boolean(user.useAlias);
+    aliasToggle.checked = Boolean(user && (user.isAnonymous || user.useAlias));
   }
   if (typeof renderSpiritualAvatarPicker === 'function') {
     renderSpiritualAvatarPicker('editProfSpiritualAvatarsGrid', 'editProf', user.photo || '');
@@ -7521,7 +7594,7 @@ window.logoutFromApp = async function() {
 
 window.handleProfileAuthAction = function() {
   const user = StorageService.currentUser;
-  if (user && user.email && !user.isAnonymous) {
+  if (user && user.email) {
     logoutFromApp();
   } else {
     openProfileModal();
@@ -7562,7 +7635,7 @@ window.openProfileModal = function() {
   }
 
   if (status) {
-    if (user.email && !user.isAnonymous) {
+    if (user.email) {
       status.innerHTML = `<span style="color: #059669; font-weight: 600;"><i class="fa-solid fa-circle-check"></i> Google සත්‍යාපිතයි (${user.email})</span>`;
     } else {
       status.innerText = 'කල්‍යාණ මිත්‍ර පුණ්‍ය සාමාජික (නොමිලේ)';
@@ -7571,7 +7644,7 @@ window.openProfileModal = function() {
 
   // Toggle login vs logout buttons
   const profileTrustBox = document.getElementById('profileTrustBox');
-  if (user.email && !user.isAnonymous) {
+  if (user.email) {
     if (googleLoginBtn) googleLoginBtn.classList.add('hidden');
     if (googleLogoutBtn) googleLogoutBtn.classList.remove('hidden');
     if (profileTrustBox) profileTrustBox.classList.add('hidden');
@@ -9054,7 +9127,7 @@ window.openSettingsModal = function(initialTab = 'profile') {
   // Initialize Privacy Alias Toggle & Spiritual Avatar Picker in Settings
   const setAliasToggle = document.getElementById('setUseAliasToggle');
   if (setAliasToggle) {
-    setAliasToggle.checked = Boolean(user.useAlias);
+    setAliasToggle.checked = Boolean(user && (user.isAnonymous || user.useAlias));
   }
   const setPhotoInp = document.getElementById('setProfPhotoInput');
   if (setPhotoInp) setPhotoInp.value = user.photo || '';
@@ -9123,7 +9196,7 @@ window.saveSettingsProfile = async function(e) {
 
   const useAlias = Boolean(document.getElementById('setUseAliasToggle')?.checked);
   const photo = document.getElementById('setProfPhotoInput')?.value;
-  const updatePayload = { firstName, lastName, occupation, location, district, province, city, bio, useAlias };
+  const updatePayload = { firstName, lastName, occupation, location, district, province, city, bio, useAlias, isAnonymous: useAlias };
   if (photo) updatePayload.photo = photo;
   await StorageService.updateProfile(updatePayload);
   updateUserInfoUI();
