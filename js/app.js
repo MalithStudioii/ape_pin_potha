@@ -1380,7 +1380,7 @@ window.switchTab = function(tab, pushHistory = true) {
   document.querySelector('.app-header')?.classList.remove('header-hidden');
 
   // Update navigation buttons (both desktop & mobile)
-  ['feed', 'profile', 'mybook', 'needs', 'friends', 'aranya', 'policies'].forEach(t => {
+  ['feed', 'profile', 'mybook', 'needs', 'friends', 'aranya', 'policies', 'artisans'].forEach(t => {
     const dBtn = document.getElementById(`desk-tab-${t}`);
     const mBtn = document.getElementById(`mob-tab-${t}`);
     if (dBtn) {
@@ -1397,6 +1397,12 @@ window.switchTab = function(tab, pushHistory = true) {
   if (sideAranyaBtn) {
     if (tab === 'aranya') sideAranyaBtn.classList.add('active');
     else sideAranyaBtn.classList.remove('active');
+  }
+
+  const sideArtisansBtn = document.getElementById('side-btn-artisans');
+  if (sideArtisansBtn) {
+    if (tab === 'artisans') sideArtisansBtn.classList.add('active');
+    else sideArtisansBtn.classList.remove('active');
   }
 
   const headerAranyaBtn = document.getElementById('headerAranyaBtn');
@@ -1416,6 +1422,7 @@ window.switchTab = function(tab, pushHistory = true) {
   const aranyaContainer = document.getElementById('aranyaPageContainer');
   const friendsContainer = document.getElementById('friendsPageContainer');
   const policiesContainer = document.getElementById('policiesPageContainer');
+  const artisansContainer = document.getElementById('artisansPageContainer');
   const banner = document.getElementById('tabHeaderBanner');
 
   if (tab === 'policies') {
@@ -1439,6 +1446,10 @@ window.switchTab = function(tab, pushHistory = true) {
     if (friendsContainer) {
       friendsContainer.classList.add('hidden');
       friendsContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (artisansContainer) {
+      artisansContainer.classList.add('hidden');
+      artisansContainer.style.setProperty('display', 'none', 'important');
     }
     if (policiesContainer) {
       policiesContainer.classList.remove('hidden');
@@ -1471,6 +1482,10 @@ window.switchTab = function(tab, pushHistory = true) {
     if (policiesContainer) {
       policiesContainer.classList.add('hidden');
       policiesContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (artisansContainer) {
+      artisansContainer.classList.add('hidden');
+      artisansContainer.style.setProperty('display', 'none', 'important');
     }
     if (profileContainer) {
       profileContainer.classList.remove('hidden');
@@ -1505,6 +1520,10 @@ window.switchTab = function(tab, pushHistory = true) {
       policiesContainer.classList.add('hidden');
       policiesContainer.style.setProperty('display', 'none', 'important');
     }
+    if (artisansContainer) {
+      artisansContainer.classList.add('hidden');
+      artisansContainer.style.setProperty('display', 'none', 'important');
+    }
     if (aranyaContainer) {
       aranyaContainer.classList.remove('hidden');
       aranyaContainer.style.setProperty('display', 'block', 'important');
@@ -1515,6 +1534,44 @@ window.switchTab = function(tab, pushHistory = true) {
       renderAranyaDirectoryView();
     } catch (err) {
       console.error('[Aranya] Error rendering aranya view:', err);
+    }
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+
+  if (tab === 'artisans') {
+    stopKmpLivePolling();
+    if (feedLayout) {
+      feedLayout.classList.add('hidden');
+      feedLayout.style.setProperty('display', 'none', 'important');
+    }
+    if (profileContainer) {
+      profileContainer.classList.add('hidden');
+      profileContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (aranyaContainer) {
+      aranyaContainer.classList.add('hidden');
+      aranyaContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (friendsContainer) {
+      friendsContainer.classList.add('hidden');
+      friendsContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (policiesContainer) {
+      policiesContainer.classList.add('hidden');
+      policiesContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (artisansContainer) {
+      artisansContainer.classList.remove('hidden');
+      artisansContainer.style.setProperty('display', 'block', 'important');
+    }
+    if (banner) banner.style.display = 'none';
+
+    try {
+      renderArtisansDirectoryView();
+    } catch (err) {
+      console.error('[Artisans] Error rendering artisans view:', err);
     }
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1538,6 +1595,10 @@ window.switchTab = function(tab, pushHistory = true) {
     if (policiesContainer) {
       policiesContainer.classList.add('hidden');
       policiesContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (artisansContainer) {
+      artisansContainer.classList.add('hidden');
+      artisansContainer.style.setProperty('display', 'none', 'important');
     }
     if (friendsContainer) {
       friendsContainer.classList.remove('hidden');
@@ -1578,6 +1639,10 @@ window.switchTab = function(tab, pushHistory = true) {
   if (policiesContainer) {
     policiesContainer.classList.add('hidden');
     policiesContainer.style.setProperty('display', 'none', 'important');
+  }
+  if (artisansContainer) {
+    artisansContainer.classList.add('hidden');
+    artisansContainer.style.setProperty('display', 'none', 'important');
   }
 
   // Context banner
@@ -11143,4 +11208,589 @@ window.togglePoliciesSound = function(e) {
   }
   const otherChk = document.getElementById('chkSoundEffects');
   if (otherChk) otherChk.checked = enabled;
+};
+
+/* ============================================================================
+ * TEMPLE ARTISANS DIRECTORY & REGISTRATION LOGIC
+ * ============================================================================ */
+
+const ARTISAN_CATEGORIES = [
+  'සියල්ල',
+  'විහාර චිත්‍ර හා ප්‍රතිසංස්කරණ',
+  'වෙහෙර දාගැබ් හා චෛත්‍ය නිර්මාණ',
+  'බුදු පිළිම හා මූර්ති නිර්මාණ',
+  'ලී කැටයම් හා මකර තොරණ',
+  'විහාර ගෘහ නිර්මාණ හා වාස්තු',
+  'ගල් කැටයම්, කොත් වහන්සේ හා ලෝහ කර්මාන්ත'
+];
+
+let allArtisansList = [];
+let currentArtisansCategory = 'සියල්ල';
+let currentArtisansDistrict = 'සියල්ල';
+let currentArtisansSearch = '';
+let artisanRegPhotoSelected = null;
+let artisanRegPortfolioSelected = [];
+
+// Expose uploadToImgBB to window if needed
+window.uploadToImgBB = uploadToImgBB;
+
+window.renderArtisansDirectoryView = async function() {
+  const grid = document.getElementById('artisansGrid');
+  const countEl = document.getElementById('artisansResultsCount');
+
+  if (grid) {
+    grid.innerHTML = `
+      <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #d97706;">
+        <i class="fa-solid fa-spinner fa-spin" style="font-size: 1.8rem; margin-bottom: 10px;"></i>
+        <p style="font-weight: 600; font-size: 0.9rem;">විහාර නිර්මාණ ශිල්පීන් නාමාවලිය පූරණය වෙමින්...</p>
+      </div>
+    `;
+  }
+
+  try {
+    allArtisansList = await StorageService.getTempleArtisansList();
+  } catch (err) {
+    console.error('[Artisans] Failed to load list:', err);
+    allArtisansList = [];
+  }
+
+  // Populate district dropdown
+  populateArtisansDistrictDropdown();
+
+  // Render categories bar
+  renderArtisansCategoriesBar();
+
+  // Filter & Render Cards
+  filterAndRenderArtisanCards();
+};
+
+function populateArtisansDistrictDropdown() {
+  const select = document.getElementById('artisansDistrictSelect');
+  if (!select || select.options.length > 1) return;
+
+  if (typeof SRI_LANKA_DISTRICTS_BY_PROVINCE === 'object') {
+    Object.entries(SRI_LANKA_DISTRICTS_BY_PROVINCE).forEach(([prov, dists]) => {
+      if (prov.includes('විදේශගත')) return;
+      const grp = document.createElement('optgroup');
+      grp.label = prov;
+      dists.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d;
+        opt.textContent = d;
+        grp.appendChild(opt);
+      });
+      select.appendChild(grp);
+    });
+  }
+}
+
+function renderArtisansCategoriesBar() {
+  const bar = document.getElementById('artisansCategoriesBar');
+  if (!bar) return;
+
+  bar.innerHTML = ARTISAN_CATEGORIES.map(cat => {
+    let count = 0;
+    if (cat === 'සියල්ල') {
+      count = allArtisansList.length;
+    } else {
+      count = allArtisansList.filter(a => Array.isArray(a.specialties) && a.specialties.includes(cat)).length;
+    }
+
+    const isActive = currentArtisansCategory === cat;
+    return `
+      <button type="button" 
+        class="artisan-category-chip ${isActive ? 'active' : ''}" 
+        onclick="setArtisansCategoryFilter('${cat}')">
+        <span>${cat}</span>
+        <span style="font-size: 0.68rem; opacity: 0.85; margin-left: 3px;">(${count})</span>
+      </button>
+    `;
+  }).join('');
+}
+
+window.setArtisansCategoryFilter = function(cat) {
+  triggerHaptic(10);
+  currentArtisansCategory = cat;
+  renderArtisansCategoriesBar();
+  filterAndRenderArtisanCards();
+};
+
+window.setArtisansDistrictFilter = function(dist) {
+  triggerHaptic(10);
+  currentArtisansDistrict = dist;
+  filterAndRenderArtisanCards();
+};
+
+window.filterArtisansDirectory = function() {
+  const input = document.getElementById('artisansSearchInput');
+  const clearBtn = document.getElementById('artisansSearchClearBtn');
+  currentArtisansSearch = (input?.value || '').trim().toLowerCase();
+
+  if (clearBtn) {
+    if (currentArtisansSearch) clearBtn.classList.remove('hidden');
+    else clearBtn.classList.add('hidden');
+  }
+
+  filterAndRenderArtisanCards();
+};
+
+window.clearArtisansSearch = function() {
+  const input = document.getElementById('artisansSearchInput');
+  const clearBtn = document.getElementById('artisansSearchClearBtn');
+  if (input) input.value = '';
+  if (clearBtn) clearBtn.classList.add('hidden');
+  currentArtisansSearch = '';
+  filterAndRenderArtisanCards();
+};
+
+window.resetArtisansFilters = function() {
+  currentArtisansCategory = 'සියල්ල';
+  currentArtisansDistrict = 'සියල්ල';
+  currentArtisansSearch = '';
+  const input = document.getElementById('artisansSearchInput');
+  const clearBtn = document.getElementById('artisansSearchClearBtn');
+  const distSelect = document.getElementById('artisansDistrictSelect');
+  if (input) input.value = '';
+  if (clearBtn) clearBtn.classList.add('hidden');
+  if (distSelect) distSelect.value = 'සියල්ල';
+  renderArtisansCategoriesBar();
+  filterAndRenderArtisanCards();
+};
+
+window.openArtisanPortfolioGallery = function(encodedImages, index = 0) {
+  try {
+    let images = [];
+    if (typeof encodedImages === 'string') {
+      images = JSON.parse(decodeURIComponent(encodedImages));
+    } else if (Array.isArray(encodedImages)) {
+      images = encodedImages;
+    }
+    if (images && images.length > 0 && typeof window.openLightbox === 'function') {
+      window.openLightbox(images, index);
+    }
+  } catch (err) {
+    console.error('[Artisans] Failed to open portfolio lightbox:', err);
+  }
+};
+
+function formatArtisanWhatsAppUrl(phone, whatsapp) {
+  let num = (whatsapp || phone || '').replace(/[^0-9]/g, '');
+  if (num.startsWith('0')) {
+    num = '94' + num.substring(1);
+  } else if (!num.startsWith('94') && num.length === 9) {
+    num = '94' + num;
+  }
+  const defaultMsg = encodeURIComponent("නමෝ බුද්ධාය! මා අපේ පිං පොත (Ape Pin Potha) විහාර නිර්මාණ ශිල්පීන් නාමාවලිය හරහා සම්බන්ධ වන්නේ විහාරස්ථාන කටයුත්තක් පිළිබඳව තොරතුරු විමසීමටයි.");
+  return `https://wa.me/${num}?text=${defaultMsg}`;
+}
+
+function filterAndRenderArtisanCards() {
+  const grid = document.getElementById('artisansGrid');
+  const emptyState = document.getElementById('artisansEmptyState');
+  const countEl = document.getElementById('artisansResultsCount');
+  if (!grid) return;
+
+  let filtered = [...allArtisansList];
+
+  // Category filter
+  if (currentArtisansCategory !== 'සියල්ල') {
+    filtered = filtered.filter(a => Array.isArray(a.specialties) && a.specialties.includes(currentArtisansCategory));
+  }
+
+  // District filter
+  if (currentArtisansDistrict !== 'සියල්ල') {
+    filtered = filtered.filter(a => (a.district || '').includes(currentArtisansDistrict));
+  }
+
+  // Search query filter
+  if (currentArtisansSearch) {
+    const q = currentArtisansSearch;
+    filtered = filtered.filter(a => {
+      const name = (a.name || '').toLowerCase();
+      const dist = (a.district || '').toLowerCase();
+      const bio = (a.bio || '').toLowerCase();
+      const temples = (a.notableTemples || '').toLowerCase();
+      const specs = (a.specialties || []).join(' ').toLowerCase();
+      return name.includes(q) || dist.includes(q) || bio.includes(q) || temples.includes(q) || specs.includes(q);
+    });
+  }
+
+  // Update counter
+  if (countEl) {
+    countEl.innerText = `ශිල්පීන් ${filtered.length} ක් හමුවිය`;
+  }
+
+  if (filtered.length === 0) {
+    grid.innerHTML = '';
+    if (emptyState) emptyState.style.display = 'block';
+    return;
+  }
+
+  if (emptyState) emptyState.style.display = 'none';
+
+  grid.innerHTML = filtered.map(item => {
+    const rawPhone = item.phone || '';
+    const cleanTel = rawPhone.replace(/[^0-9]/g, '');
+    const waUrl = formatArtisanWhatsAppUrl(item.phone, item.whatsapp);
+
+    const specialtiesHtml = (item.specialties || []).map(s => `
+      <span class="artisan-specialty-tag">${Security.escapeHTML(s)}</span>
+    `).join('');
+
+    const portfolioImages = Array.isArray(item.portfolioImages) ? item.portfolioImages.slice(0, 4) : [];
+    const encodedPortfolio = encodeURIComponent(JSON.stringify(portfolioImages));
+
+    const portfolioHtml = portfolioImages.length > 0 ? `
+      <div class="artisan-portfolio-wrap" style="margin-top: 12px;">
+        <span style="font-size: 0.72rem; font-weight: 700; color: #78350f; display: block; margin-bottom: 6px;">
+          <i class="fa-solid fa-camera" style="margin-right: 4px;"></i> නිර්මාණ එකතුව (Portfolio - ඡායාරූප ${portfolioImages.length}ක්)
+        </span>
+        <div class="artisan-portfolio-grid">
+          ${portfolioImages.map((img, idx) => `
+            <div class="artisan-portfolio-thumb" onclick="openArtisanPortfolioGallery('${encodedPortfolio}', ${idx})" title="විශාල කර බලන්න">
+              <img src="${img}" alt="නිර්මාණ සාම්පලය ${idx + 1}" loading="lazy">
+              <span class="portfolio-zoom-indicator"><i class="fa-solid fa-magnifying-glass-plus"></i></span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    ` : '';
+
+    return `
+      <div class="artisan-card" id="artisan_${item.id || item.docId}">
+        <div class="artisan-card-header">
+          <div class="artisan-avatar-wrap">
+            ${item.photo ? `
+              <img src="${item.photo}" alt="${Security.escapeHTML(item.name)}" class="artisan-avatar-img" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'artisan-avatar-placeholder\\'>🎨</div>';">
+            ` : `
+              <div class="artisan-avatar-placeholder">🎨</div>
+            `}
+          </div>
+          <div class="artisan-meta-header">
+            <div class="artisan-badges-row">
+              <span class="artisan-badge-verified">
+                <i class="fa-solid fa-circle-check"></i>
+                <span>සත්‍යාපිත ශිල්පී</span>
+              </span>
+              ${item.islandWide ? `
+                <span class="artisan-islandwide-pill">
+                  <i class="fa-solid fa-earth-asia"></i>
+                  <span>දිවයින පුරා සේවය</span>
+                </span>
+              ` : ''}
+            </div>
+            <h3 class="artisan-name">${Security.escapeHTML(item.name)}</h3>
+            <div class="artisan-sub-row">
+              <span class="artisan-district-pill">
+                <i class="fa-solid fa-location-dot"></i>
+                <span>${Security.escapeHTML(item.district || 'ශ්‍රී ලංකා')}</span>
+              </span>
+              ${item.experience ? `
+                <span class="artisan-experience-badge">
+                  <i class="fa-solid fa-clock-rotate-left"></i>
+                  <span>වසර ${Number(item.experience)}+ පළපුරුද්ද</span>
+                </span>
+              ` : ''}
+            </div>
+          </div>
+        </div>
+
+        ${specialtiesHtml ? `<div class="artisan-specialties-container">${specialtiesHtml}</div>` : ''}
+
+        ${item.notableTemples ? `
+          <div class="artisan-notable-temples">
+            <i class="fa-solid fa-place-of-worship"></i>
+            <span><strong>දායක වූ ප්‍රකට විහාර:</strong> ${Security.escapeHTML(item.notableTemples)}</span>
+          </div>
+        ` : ''}
+
+        ${item.bio ? `<p class="artisan-bio-text">${Security.escapeHTML(item.bio)}</p>` : ''}
+
+        ${portfolioHtml}
+
+        <div class="artisan-actions">
+          ${cleanTel ? `
+            <a href="tel:${cleanTel}" class="btn-artisan-call" title="සෘජු ඇමතුමක් ලබාගන්න">
+              <i class="fa-solid fa-phone"></i>
+              <span>${Security.escapeHTML(rawPhone)}</span>
+            </a>
+          ` : ''}
+          <a href="${waUrl}" target="_blank" rel="noopener" class="btn-artisan-whatsapp" title="WhatsApp පණිවිඩයක් යොමු කරන්න">
+            <i class="fa-brands fa-whatsapp"></i>
+            <span>WhatsApp</span>
+          </a>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// Modal handling
+window.openArtisanRegisterModal = function() {
+  triggerHaptic(12);
+  const user = StorageService.currentUser;
+  if (!user || !user.email) {
+    if (typeof showCustomToast === 'function') {
+      showCustomToast("කරුණාකර ශිල්පියෙකු ලියාපදිංචි කිරීමට පළමුව Google ගිණුමෙන් පිවිසෙන්න.", "warning");
+    }
+    if (typeof openProfileModal === 'function') {
+      openProfileModal();
+    }
+    return;
+  }
+
+  // Populate district dropdown in modal
+  const distSelect = document.getElementById('artisanRegDistrict');
+  if (distSelect && distSelect.options.length <= 1) {
+    distSelect.innerHTML = '<option value="" disabled selected>දිස්ත්‍රික්කය තෝරන්න (Select District)</option>';
+    if (typeof SRI_LANKA_DISTRICTS_BY_PROVINCE === 'object') {
+      Object.entries(SRI_LANKA_DISTRICTS_BY_PROVINCE).forEach(([prov, dists]) => {
+        if (prov.includes('විදේශගත')) return;
+        const grp = document.createElement('optgroup');
+        grp.label = prov;
+        dists.forEach(d => {
+          const opt = document.createElement('option');
+          opt.value = d;
+          opt.textContent = d;
+          grp.appendChild(opt);
+        });
+        distSelect.appendChild(grp);
+      });
+    }
+  }
+
+  // Attach photo and portfolio change listeners once
+  initArtisanModalPhotoListeners();
+
+  const modal = document.getElementById('artisanRegisterModal');
+  if (modal) modal.classList.remove('hidden');
+};
+
+window.closeArtisanRegisterModal = function() {
+  const modal = document.getElementById('artisanRegisterModal');
+  if (modal) modal.classList.add('hidden');
+  artisanRegPhotoSelected = null;
+  artisanRegPortfolioSelected = [];
+  const form = document.getElementById('artisanRegisterForm');
+  if (form) form.reset();
+  const photoPrev = document.getElementById('artisanRegPhotoPreview');
+  if (photoPrev) {
+    photoPrev.innerHTML = '';
+    photoPrev.style.display = 'none';
+  }
+  const portPrev = document.getElementById('artisanRegPortfolioPreviewGrid');
+  if (portPrev) {
+    portPrev.innerHTML = '';
+  }
+  const uploadStatus = document.getElementById('artisanRegUploadStatus');
+  if (uploadStatus) uploadStatus.style.display = 'none';
+};
+
+function initArtisanModalPhotoListeners() {
+  const photoInp = document.getElementById('artisanRegPhotoInput');
+  const photoPrev = document.getElementById('artisanRegPhotoPreview');
+  if (photoInp && !photoInp.dataset.listenerAttached) {
+    photoInp.dataset.listenerAttached = 'true';
+    photoInp.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) {
+        artisanRegPhotoSelected = file;
+        const reader = new FileReader();
+        reader.onload = (re) => {
+          if (photoPrev) {
+            photoPrev.style.display = 'block';
+            photoPrev.innerHTML = `
+              <div style="position: relative; width: 70px; height: 70px; border-radius: 12px; overflow: hidden; border: 2px solid #d97706;">
+                <img src="${re.target.result}" style="width: 100%; height: 100%; object-fit: cover;">
+                <button type="button" onclick="removeArtisanRegPhoto()" style="position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.6); color: #fff; border: none; border-radius: 9999px; width: 20px; height: 20px; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center;">&times;</button>
+              </div>
+            `;
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  }
+
+  const portInp = document.getElementById('artisanRegPortfolioInput');
+  const portGrid = document.getElementById('artisanRegPortfolioPreviewGrid');
+  if (portInp && !portInp.dataset.listenerAttached) {
+    portInp.dataset.listenerAttached = 'true';
+    portInp.addEventListener('change', (e) => {
+      const files = Array.from(e.target.files || []);
+      if (files.length === 0) return;
+      
+      const remainingSlots = 4 - artisanRegPortfolioSelected.length;
+      if (remainingSlots <= 0) {
+        alert("ඔබට උපරිම වශයෙන් එකතු කළ හැක්කේ ඡායාරූප 4ක් පමණි.");
+        portInp.value = '';
+        return;
+      }
+
+      const filesToAdd = files.slice(0, remainingSlots);
+      filesToAdd.forEach(file => {
+        artisanRegPortfolioSelected.push(file);
+      });
+      renderArtisanPortfolioPreviews();
+      portInp.value = '';
+    });
+  }
+}
+
+window.removeArtisanRegPhoto = function() {
+  artisanRegPhotoSelected = null;
+  const photoInp = document.getElementById('artisanRegPhotoInput');
+  if (photoInp) photoInp.value = '';
+  const photoPrev = document.getElementById('artisanRegPhotoPreview');
+  if (photoPrev) {
+    photoPrev.innerHTML = '';
+    photoPrev.style.display = 'none';
+  }
+};
+
+window.removeArtisanPortfolioThumb = function(index) {
+  if (index >= 0 && index < artisanRegPortfolioSelected.length) {
+    artisanRegPortfolioSelected.splice(index, 1);
+    renderArtisanPortfolioPreviews();
+  }
+};
+
+function renderArtisanPortfolioPreviews() {
+  const portGrid = document.getElementById('artisanRegPortfolioPreviewGrid');
+  if (!portGrid) return;
+  portGrid.innerHTML = '';
+
+  artisanRegPortfolioSelected.forEach((file, idx) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const thumb = document.createElement('div');
+      thumb.style.cssText = "position: relative; width: 68px; height: 68px; border-radius: 8px; overflow: hidden; border: 1.5px solid #cbd5e1;";
+      thumb.innerHTML = `
+        <img src="${e.target.result}" style="width: 100%; height: 100%; object-fit: cover;">
+        <button type="button" onclick="removeArtisanPortfolioThumb(${idx})" style="position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.65); color: #fff; border: none; border-radius: 9999px; width: 18px; height: 18px; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="ඉවත් කරන්න">&times;</button>
+      `;
+      portGrid.appendChild(thumb);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+window.handleArtisanRegisterSubmit = async function(e) {
+  if (e) e.preventDefault();
+  const user = StorageService.currentUser;
+  if (!user || !user.email) {
+    alert("කරුණාකර පළමුව Google ගිණුමෙන් පිවිසෙන්න.");
+    if (typeof openProfileModal === 'function') openProfileModal();
+    return;
+  }
+
+  const name = (document.getElementById('artisanRegName')?.value || '').trim();
+  const expVal = document.getElementById('artisanRegExperience')?.value;
+  const experience = expVal ? parseInt(expVal, 10) : 0;
+  const district = (document.getElementById('artisanRegDistrict')?.value || '').trim();
+  const islandWide = Boolean(document.getElementById('artisanRegIslandWide')?.checked);
+  const phone = (document.getElementById('artisanRegPhone')?.value || '').trim();
+  const whatsapp = (document.getElementById('artisanRegWhatsapp')?.value || '').trim();
+  const notableTemples = (document.getElementById('artisanRegTemples')?.value || '').trim();
+  const bio = (document.getElementById('artisanRegBio')?.value || '').trim();
+
+  // Gather checked specialties
+  const checkedSpecialties = [];
+  const specCheckboxes = document.querySelectorAll('input[name="artisanSpecialty"]:checked');
+  specCheckboxes.forEach(cb => {
+    if (cb.value) checkedSpecialties.push(cb.value.trim());
+  });
+
+  if (!name) {
+    alert("කරුණාකර ශිල්පියාගේ හෝ කලායතනයේ නම ඇතුළත් කරන්න.");
+    return;
+  }
+  if (checkedSpecialties.length === 0) {
+    alert("කරුණාකර අවම වශයෙන් එක් නිර්මාණ ක්ෂේත්‍රයක් (Specialty) තෝරන්න.");
+    return;
+  }
+  if (!district) {
+    alert("කරුණාකර ප්‍රධාන දිස්ත්‍රික්කය තෝරන්න.");
+    return;
+  }
+  if (!phone) {
+    alert("කරුණාකර වලංගු දුරකථන අංකයක් ඇතුළත් කරන්න.");
+    return;
+  }
+
+  const submitBtn = document.getElementById('btnSubmitArtisanReg');
+  const uploadStatus = document.getElementById('artisanRegUploadStatus');
+  const uploadStatusText = document.getElementById('artisanRegUploadStatusText');
+
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>යොමු වෙමින් පවතී...</span>`;
+  }
+  if (uploadStatus) {
+    uploadStatus.style.display = 'block';
+    if (uploadStatusText) uploadStatusText.textContent = "ඡායාරූප සකසමින් හා උඩුගත කරමින් පවතී...";
+  }
+
+  try {
+    let photoUrl = '';
+    // Upload profile photo if present
+    if (artisanRegPhotoSelected) {
+      if (uploadStatusText) uploadStatusText.textContent = "ප්‍රොෆයිල් ඡායාරූපය උඩුගත කෙරේ...";
+      photoUrl = await uploadToImgBB(artisanRegPhotoSelected, `artisan_profile_${Date.now()}`);
+    }
+
+    // Upload portfolio images (up to 4)
+    const portfolioUrls = [];
+    if (artisanRegPortfolioSelected.length > 0) {
+      for (let i = 0; i < artisanRegPortfolioSelected.length; i++) {
+        if (uploadStatusText) {
+          uploadStatusText.textContent = `නිර්මාණ ඡායාරූප උඩුගත කෙරේ (${i + 1}/${artisanRegPortfolioSelected.length})...`;
+        }
+        const imgFile = artisanRegPortfolioSelected[i];
+        const url = await uploadToImgBB(imgFile, `artisan_portfolio_${Date.now()}_${i}`);
+        if (url) portfolioUrls.push(url);
+      }
+    }
+
+    if (uploadStatusText) uploadStatusText.textContent = "අයදුම්පත සුරකිමින් පවතී...";
+
+    const applicationData = {
+      name,
+      specialties: checkedSpecialties,
+      experience: experience || 0,
+      district,
+      islandWide,
+      phone,
+      whatsapp: whatsapp || phone,
+      notableTemples,
+      bio,
+      photo: photoUrl || '',
+      portfolioImages: portfolioUrls,
+      status: 'pending',
+      submittedByUid: user.uid || 'unknown',
+      submittedByName: user.name || 'පින්වත් සාමාජිකයෙක්',
+      submittedByEmail: user.email || ''
+    };
+
+    await StorageService.submitArtisanApplication(applicationData);
+
+    closeArtisanRegisterModal();
+    triggerHaptic([30, 60, 30]);
+    if (typeof SoundService !== 'undefined' && SoundService.playSadhu) {
+      SoundService.playSadhu();
+    }
+
+    alert("සාදු! සාදු! 🙏 ඔබගේ අයදුම්පත සාර්ථකව පරිපාලක මණ්ඩලය වෙත යොමු විය.\n\nතොරතුරු සත්‍යාපනය කිරීමෙන් පසු ප්‍රධාන නාමාවලියෙහි ප්‍රදර්ශනය කරනු ඇත.");
+  } catch (err) {
+    console.error('[Artisans] Application submission error:', err);
+    alert("අයදුම්පත යොමු කිරීමේදී දෝෂයක් සිදුවිය: " + (err.message || 'නැවත උත්සාහ කරන්න.'));
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> <span>අයදුම්පත යොමු කරන්න</span>`;
+    }
+    if (uploadStatus) {
+      uploadStatus.style.display = 'none';
+    }
+  }
 };

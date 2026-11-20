@@ -4806,5 +4806,348 @@ export const StorageService = {
       }
     }
     return true;
+  },
+
+  /**
+   * Fetches the Temple Artisans directory with 15-minute localStorage caching
+   * @param {boolean} [forceRefresh=false]
+   * @returns {Promise<Array>}
+   */
+  async getTempleArtisansList(forceRefresh = false) {
+    const CACHE_KEY = 'pinPotha_artisans_cache';
+    const TTL_MS = 15 * 60 * 1000; // 15 minutes TTL to minimize Spark plan reads
+
+    if (!forceRefresh) {
+      try {
+        const raw = localStorage.getItem(CACHE_KEY);
+        if (raw) {
+          const cached = JSON.parse(raw);
+          if (cached && cached.timestamp && (Date.now() - cached.timestamp < TTL_MS) && Array.isArray(cached.data)) {
+            return cached.data;
+          }
+        }
+      } catch (e) {
+        console.warn('[Storage] Read artisans cache warning:', e);
+      }
+    }
+
+    let list = [];
+
+    // Fallback seed entries for initial display if collection is empty
+    const DEFAULT_ARTISANS = [
+      {
+        id: "artisan_seed_1",
+        name: "ආචාර්ය සෝමපාල කලායතනය",
+        specialties: ["විහාර චිත්‍ර හා ප්‍රතිසංස්කරණ", "බුදු පිළිම හා මූර්ති නිර්මාණ"],
+        experienceYears: 24,
+        district: "මහනුවර",
+        islandWide: true,
+        phone: "0773456789",
+        whatsapp: "0773456789",
+        notableTemples: "රන්ගිරි දඹුලු රජමහා විහාරය, අස්ගිරි මහා විහාරය",
+        bio: "වසර 24ක අඛණ්ඩ සේවාවක් සහිත උඩරට සම්ප්‍රදායික විහාර බිතුසිතුවම් හා ජීවමාන ප්‍රමාණයේ බුදු පිළිම නිර්මාණ ශිල්පී.",
+        profilePhoto: "https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=400&q=80",
+        portfolio: [
+          "https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=800&q=80",
+          "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=800&q=80"
+        ],
+        isVerified: true,
+        createdAt: 1730000000000
+      },
+      {
+        id: "artisan_seed_2",
+        name: "විශ්වකර්ම චෛත්‍ය නිර්මාණ ඉංජිනේරු සේවය",
+        specialties: ["වෙහෙර දාගැබ් හා චෛත්‍ය නිර්මාණ", "විහාර ගෘහ නිර්මාණ හා වාස්තු"],
+        experienceYears: 18,
+        district: "කුරුණෑගල",
+        islandWide: true,
+        phone: "0718901234",
+        whatsapp: "0718901234",
+        notableTemples: "රිදී විහාරය, ඇතුගල්පුර ශ්‍රී ධර්මරාජ විහාරය",
+        bio: "සම්ප්‍රදායික ධාතු ගර්භ වාස්තු විද්‍යාව සහ නවීන ඉංජිනේරු තාක්ෂණය මුසු කරමින් දාගැබ් ඉදිකිරීමේ ප්‍රමුඛයෝ.",
+        profilePhoto: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=400&q=80",
+        portfolio: [
+          "https://images.unsplash.com/photo-1599818491873-61a7a001a182?auto=format&fit=crop&w=800&q=80"
+        ],
+        isVerified: true,
+        createdAt: 1730005000000
+      },
+      {
+        id: "artisan_seed_3",
+        name: "හෙළ ලී කැටයම් කලා මන්දිරය",
+        specialties: ["ලී කැටයම් හා මකර තොරණ", "ගල් කැටයම්, කොත් වහන්සේ හා ලෝහ කර්මාන්ත"],
+        experienceYears: 30,
+        district: "මාතලේ",
+        islandWide: true,
+        phone: "0765554321",
+        whatsapp: "0765554321",
+        notableTemples: "ඇම්බැක්ක දේවාලය (ප්‍රතිසංස්කරණ), අලුවිහාරය",
+        bio: "සම්ප්‍රදායික හෙළ ලී හා ගල් කැටයම්, මකර තොරණ, ධර්මාසන සහ සඳකඩපහණ නිර්මාණය.",
+        profilePhoto: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80",
+        portfolio: [
+          "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80"
+        ],
+        isVerified: true,
+        createdAt: 1730010000000
+      }
+    ];
+
+    if (isCloudReady && db) {
+      try {
+        const { collection, getDocs, query, orderBy } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const q = query(collection(db, COLLECTIONS.ARTISANS), orderBy("createdAt", "desc"));
+        const snap = await getDocs(q);
+        snap.forEach(docSnap => {
+          list.push({ id: docSnap.id, ...docSnap.data() });
+        });
+      } catch (err) {
+        console.warn('[Storage] Cloud artisans read warning:', err);
+      }
+    }
+
+    if (list.length === 0) {
+      list = DEFAULT_ARTISANS;
+    }
+
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify({
+        timestamp: Date.now(),
+        data: list
+      }));
+    } catch (e) {}
+
+    return list;
+  },
+
+  /**
+   * Submits an application for artisan registration
+   * @param {Object} data
+   * @returns {Promise<boolean>}
+   */
+  async submitArtisanApplication(data) {
+    if (!data || !data.name || !data.phone) {
+      throw new Error("අත්‍යවශ්‍ය තොරතුරු (නම සහ දුරකථන අංකය) ඇතුළත් කරන්න.");
+    }
+
+    const payload = {
+      ...data,
+      status: 'pending',
+      submittedByUid: this.currentUser?.uid || '',
+      submittedByName: this.currentUser?.name || 'කල්‍යාණ මිත්‍ර සාමාජික',
+      submittedByEmail: this.currentUser?.email || '',
+      timestamp: Date.now(),
+      createdAt: Date.now()
+    };
+
+    // Save pending application locally
+    try {
+      const localApps = JSON.parse(localStorage.getItem('pinPotha_artisan_apps_local') || '[]');
+      localApps.unshift(payload);
+      localStorage.setItem('pinPotha_artisan_apps_local', JSON.stringify(localApps));
+    } catch (e) {}
+
+    // Save to Firestore
+    if (isCloudReady && db) {
+      try {
+        const { collection, addDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const docRef = await addDoc(collection(db, COLLECTIONS.ARTISAN_APPLICATIONS), payload);
+        payload.id = docRef.id;
+      } catch (err) {
+        console.error('[Storage] Cloud submit artisan application failed:', err);
+        throw err;
+      }
+    }
+
+    // Trigger notification to Master Admin
+    try {
+      const adminUid = (this._cachedCommunityMembers && this._cachedCommunityMembers.find(m => (m.email || '').toLowerCase() === 'silvadilan9@gmail.com')?.uid) || 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2';
+      await this.createNotification({
+        recipientUid: adminUid,
+        type: 'artisan_application',
+        senderUid: this.currentUser?.uid || '',
+        senderName: this.currentUser?.name || 'කල්‍යාණ මිත්‍ර සාමාජික',
+        senderPhoto: this.currentUser?.photo || '',
+        message: `නව විහාර කලා ශිල්පී ලියාපදිංචි අයදුම්පතක් යොමු විය: "${data.name}"`
+      });
+    } catch (notifErr) {
+      console.warn('[Storage] Admin notification trigger notice:', notifErr);
+    }
+
+    return true;
+  },
+
+  /**
+   * Gets pending artisan applications for Master Admin
+   * @returns {Promise<Array>}
+   */
+  async getPendingArtisanApplications() {
+    if (!this.isMasterAdmin()) return [];
+
+    let list = [];
+    if (isCloudReady && db) {
+      try {
+        const { collection, getDocs, query, orderBy } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const q = query(collection(db, COLLECTIONS.ARTISAN_APPLICATIONS), orderBy("timestamp", "desc"));
+        const snap = await getDocs(q);
+        snap.forEach(docSnap => {
+          const item = { id: docSnap.id, ...docSnap.data() };
+          if (item.status === 'pending') {
+            list.push(item);
+          }
+        });
+      } catch (err) {
+        console.warn('[Storage] Cloud read pending artisan apps warning:', err);
+      }
+    }
+
+    if (list.length === 0) {
+      try {
+        const localApps = JSON.parse(localStorage.getItem('pinPotha_artisan_apps_local') || '[]');
+        list = localApps.filter(a => a.status === 'pending');
+      } catch (e) {}
+    }
+
+    return list;
+  },
+
+  /**
+   * Approves an artisan application, copying it to temple_artisans
+   * @param {string} appId
+   * @param {Object} artisanData
+   * @returns {Promise<boolean>}
+   */
+  async approveArtisanApplication(appId, artisanData) {
+    if (!this.isMasterAdmin()) throw new Error("අවශ්‍ය පරිපාලක බලතල නොමැත.");
+
+    const verifiedArtisan = {
+      ...artisanData,
+      isVerified: true,
+      status: 'approved',
+      approvedAt: Date.now(),
+      updatedAt: Date.now(),
+      createdAt: artisanData.createdAt || Date.now()
+    };
+    delete verifiedArtisan.id;
+
+    if (isCloudReady && db) {
+      try {
+        const { collection, addDoc, doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        await addDoc(collection(db, COLLECTIONS.ARTISANS), verifiedArtisan);
+
+        if (appId) {
+          try {
+            await updateDoc(doc(db, COLLECTIONS.ARTISAN_APPLICATIONS, appId), {
+              status: 'approved',
+              approvedAt: Date.now()
+            });
+          } catch (appErr) {
+            console.warn('[Storage] Update application status warning:', appErr);
+          }
+        }
+      } catch (err) {
+        console.error('[Storage] Approve artisan cloud error:', err);
+        throw err;
+      }
+    }
+
+    // Invalidate cached directory
+    localStorage.removeItem('pinPotha_artisans_cache');
+
+    // Notify the submitting user if UID exists
+    if (artisanData.submittedByUid) {
+      try {
+        await this.createNotification({
+          recipientUid: artisanData.submittedByUid,
+          type: 'artisan_approved',
+          senderUid: this.currentUser?.uid || '',
+          senderName: 'අපේ පිං පොත පරිපාලනය',
+          senderPhoto: '',
+          message: `සාදු! ඔබ ඉදිරිපත් කළ විහාර කලා ශිල්පී තොරතුරු ("${artisanData.name}") සත්‍යාපනය කර නාමාවලියට ඇතුළත් කරන ලදී.`
+        });
+      } catch (e) {}
+    }
+
+    return true;
+  },
+
+  /**
+   * Rejects an artisan application
+   * @param {string} appId
+   * @returns {Promise<boolean>}
+   */
+  async rejectArtisanApplication(appId) {
+    if (!this.isMasterAdmin()) throw new Error("අවශ්‍ය පරිපාලක බලතල නොමැත.");
+
+    if (isCloudReady && db && appId) {
+      try {
+        const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        await updateDoc(doc(db, COLLECTIONS.ARTISAN_APPLICATIONS, appId), {
+          status: 'rejected',
+          rejectedAt: Date.now()
+        });
+      } catch (err) {
+        console.error('[Storage] Reject artisan application error:', err);
+        throw err;
+      }
+    }
+
+    return true;
+  },
+
+  /**
+   * Directly saves or updates a verified artisan (Master Admin only)
+   * @param {Object} artisanData
+   * @param {string|null} [docId=null]
+   * @returns {Promise<boolean>}
+   */
+  async saveArtisanDirect(artisanData, docId = null) {
+    if (!this.isMasterAdmin()) throw new Error("අවශ්‍ය පරිපාලක බලතල නොමැත.");
+
+    const payload = {
+      ...artisanData,
+      isVerified: true,
+      updatedAt: Date.now()
+    };
+
+    if (isCloudReady && db) {
+      try {
+        const { collection, addDoc, doc, setDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        if (docId) {
+          await setDoc(doc(db, COLLECTIONS.ARTISANS, docId), payload, { merge: true });
+        } else {
+          payload.createdAt = Date.now();
+          await addDoc(collection(db, COLLECTIONS.ARTISANS), payload);
+        }
+      } catch (err) {
+        console.error('[Storage] Save artisan direct error:', err);
+        throw err;
+      }
+    }
+
+    localStorage.removeItem('pinPotha_artisans_cache');
+    return true;
+  },
+
+  /**
+   * Deletes an artisan from the directory (Master Admin only)
+   * @param {string} docId
+   * @returns {Promise<boolean>}
+   */
+  async deleteArtisan(docId) {
+    if (!this.isMasterAdmin()) throw new Error("අවශ්‍ය පරිපාලක බලතල නොමැත.");
+    if (!docId) return false;
+
+    if (isCloudReady && db) {
+      try {
+        const { doc, deleteDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        await deleteDoc(doc(db, COLLECTIONS.ARTISANS, docId));
+      } catch (err) {
+        console.error('[Storage] Delete artisan error:', err);
+        throw err;
+      }
+    }
+
+    localStorage.removeItem('pinPotha_artisans_cache');
+    return true;
   }
 };

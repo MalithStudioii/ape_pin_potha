@@ -51,7 +51,7 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=149">
+    <link rel="stylesheet" href="css/styles.css?v=156">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
@@ -268,6 +268,12 @@
                 <button onclick="switchTab('aranya')" id="side-btn-aranya" class="category-item" style="background: linear-gradient(135deg, #f0fdf4, #dcfce7); border: 1px solid #86efac; color: #166534; font-weight: 700; margin-bottom: 8px;" title="ශ්‍රී ලංකා ආරණ්‍ය සේනාසන සහ භාවනා මධ්‍යස්ථාන නාමාවලිය">
                     <span><i class="fa-solid fa-mountain-sun cat-icon" style="color: #15803d;"></i> ආරණ්‍ය සේනාසන</span>
                     <span class="badge-live" style="background: linear-gradient(135deg, #15803d, #059669); font-size: 0.65rem; padding: 2px 7px;">නාමාවලිය</span>
+                </button>
+
+                <!-- Temple Artisans Directory Sidebar Shortcut -->
+                <button onclick="switchTab('artisans')" id="side-btn-artisans" class="category-item" style="background: linear-gradient(135deg, #fffbeb, #fef3c7); border: 1px solid #fde68a; color: #92400e; font-weight: 700; margin-bottom: 8px;" title="ශ්‍රී ලංකා විහාර නිර්මාණ හා කලා ශිල්පීන් නාමාවලිය">
+                    <span><i class="fa-solid fa-palette cat-icon" style="color: #d97706;"></i> විහාර කලා ශිල්පීන්</span>
+                    <span class="badge-live" style="background: linear-gradient(135deg, #d97706, #b45309); font-size: 0.65rem; padding: 2px 7px;">නාමාවලිය</span>
                 </button>
 
                 <h3 class="category-title">පින්කම් වර්ගීකරණය</h3>
@@ -1044,6 +1050,95 @@
         </div>
     </div>
 
+    <!-- ========================================================================= -->
+    <!-- Temple Artisans & Creators Directory Page Container                       -->
+    <!-- ========================================================================= -->
+    <div id="artisansPageContainer" class="artisans-page-container hidden" style="display: none;">
+        <div class="artisans-page-content">
+
+            <!-- Hero Banner Card -->
+            <div class="artisans-hero-card">
+                <div class="artisans-hero-badge">
+                    <i class="fa-solid fa-palette"></i>
+                    <span>සම්ප්‍රදායික විහාර කලා හා නිර්මාණ</span>
+                </div>
+                <h1 class="artisans-hero-title">ශ්‍රී ලංකා විහාර නිර්මාණ හා කලා ශිල්පීන් නාමාවලිය</h1>
+                <p class="artisans-hero-desc">
+                    විහාර බිතුසිතුවම්, වෙහෙර දාගැබ්, බුදු පිළිම, ලී හා ගල් කැටයම්, මකර තොරණ සහ වාස්තු නිර්මාණ ශිල්පීන් පිළිබඳ සත්‍යාපිත තොරතුරු සහ සෘජු සබඳතා.
+                </p>
+                <div class="artisans-hero-actions">
+                    <button type="button" class="btn-register-artisan" onclick="openArtisanRegisterModal()">
+                        <i class="fa-solid fa-circle-plus"></i>
+                        <span>+ ශිල්පියෙකු ලියාපදිංචි කරන්න</span>
+                    </button>
+                    <button type="button" class="btn-artisans-back" onclick="switchTab('feed')">
+                        <i class="fa-solid fa-arrow-left"></i>
+                        <span>පුණ්‍ය පවුර වෙත</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Search & Filter Controls -->
+            <div class="artisans-search-filter-card">
+                <div class="artisans-search-row">
+                    <div class="artisans-search-input-wrap">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" id="artisansSearchInput" placeholder="ශිල්පියාගේ හෝ ආයතනයේ නම, විහාරය හෝ සේවාවන් සොයන්න..." oninput="filterArtisansDirectory()">
+                        <button type="button" id="artisansSearchClearBtn" class="artisans-clear-search-btn hidden" onclick="clearArtisansSearch()" title="මකන්න">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                    <div class="artisans-district-select-wrap">
+                        <i class="fa-solid fa-location-dot"></i>
+                        <select id="artisansDistrictSelect" class="artisans-district-select" onchange="setArtisansDistrictFilter(this.value)">
+                            <option value="සියල්ල">සියලුම දිස්ත්‍රික්ක (All Districts)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Specialty Category Chips -->
+                <div class="artisans-categories-bar" id="artisansCategoriesBar">
+                    <!-- Populated dynamically via JS -->
+                </div>
+            </div>
+
+            <!-- Results Counter & Verified Legend -->
+            <div class="artisans-results-header">
+                <span id="artisansResultsCount" class="artisans-results-count">ශිල්පීන් පූරණය වෙමින්...</span>
+                <div class="artisans-sort-legend">
+                    <i class="fa-solid fa-shield-halved" style="color: #059669;"></i>
+                    <span>සත්‍යාපිත ශිල්පීන් (Verified Directory)</span>
+                </div>
+            </div>
+
+            <!-- Artisans Cards Grid -->
+            <div class="artisans-grid" id="artisansGrid">
+                <!-- Populated dynamically via JS -->
+            </div>
+
+            <!-- Empty State -->
+            <div id="artisansEmptyState" class="artisans-empty-state hidden" style="display: none; text-align: center; padding: 40px 20px; background: #fff; border-radius: 16px; border: 1px dashed #cbd5e1; margin-bottom: 20px;">
+                <i class="fa-solid fa-palette" style="font-size: 2.2rem; color: #d97706; margin-bottom: 12px; display: block;"></i>
+                <h3 style="font-size: 1.1rem; color: #451a03; margin-bottom: 6px;">කිසිදු ශිල්පියෙකු හමු නොවීය</h3>
+                <p style="font-size: 0.82rem; color: #64748b; margin-bottom: 16px;">ඔබ සොයන නිර්මාණ ක්ෂේත්‍රය හෝ දිස්ත්‍රික්කය වෙනස් කර නැවත සොයන්න.</p>
+                <button type="button" class="btn-profile-primary" onclick="resetArtisansFilters()" style="margin: 0 auto;">
+                    <i class="fa-solid fa-rotate-left"></i> සියලු ශිල්පීන් පෙන්වන්න
+                </button>
+            </div>
+
+            <!-- Bottom Disclaimer Card -->
+            <div class="artisans-disclaimer-card">
+                <div class="disclaimer-icon">
+                    <i class="fa-solid fa-circle-info"></i>
+                </div>
+                <div class="disclaimer-text">
+                    <strong>වැදගත් සටහන:</strong> අපේ පිං පොත විසින් සිදුකරන්නේ ශිල්පීන් සහ විහාරස්ථාන සම්බන්ධ කිරීම පමණි. මූල්‍ය ගනුදෙනු හා ගිවිසුම් දෙපාර්ශ්වයේ සෘජු එකඟතාවයෙන් සිදුකරගත යුතුය.
+                </div>
+            </div>
+
+        </div>
+    </div>
+
     <!-- ================= KALYANA MITHURU PAWURA DIRECTORY VIEW ================= -->
     <div id="friendsPageContainer" class="kmp-page-container hidden" style="display: none;">
         <div class="kmp-page-content">
@@ -1581,6 +1676,141 @@
                     <button type="button" class="btn" onclick="closeSuggestAranyaModal()" style="padding: 8px 16px; border-radius: 8px; background: #f1f5f9; color: #475569; font-weight: 600; font-size: 0.84rem; border: none; cursor: pointer;">අවලංගු කරන්න</button>
                     <button type="submit" id="btnSubmitAranyaSugg" class="btn btn-primary" style="padding: 8px 20px; border-radius: 8px; background: linear-gradient(135deg, #059669, #047857); color: #ffffff; font-weight: 700; font-size: 0.84rem; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
                         <i class="fa-solid fa-paper-plane"></i> යෝජනා කරන්න
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- Artisan Registration Modal Dialog                                         -->
+    <!-- ========================================================================= -->
+    <div id="artisanRegisterModal" class="modal-overlay hidden" onclick="if(event.target === this) closeArtisanRegisterModal()">
+        <div class="modal-box" style="max-width: 600px; width: 95%; max-height: 90vh; overflow-y: auto; padding: 0; border-radius: 20px;">
+            <div class="modal-header" style="position: sticky; top: 0; background: #fff; z-index: 10; padding: 14px 18px; border-bottom: 1.5px solid #fde68a;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-palette" style="color: #d97706; font-size: 1.15rem;"></i>
+                    <h3 class="modal-title" style="font-size: 1rem; color: #451a03; font-weight: 800;">විහාර කලා ශිල්පියෙකු ලෙස ලියාපදිංචි වන්න</h3>
+                </div>
+                <button type="button" onclick="closeArtisanRegisterModal()" class="modal-close-btn" title="වසන්න">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            
+            <form id="artisanRegisterForm" onsubmit="handleArtisanRegisterSubmit(event)" style="padding: 18px 20px;">
+                <p style="font-size: 0.8rem; color: #64748b; margin-top: 0; margin-bottom: 14px; line-height: 1.5;">
+                    ඔබගේ හෝ ආයතනයේ නිවැරදි විස්තර මෙහි ඇතුළත් කරන්න. අපගේ කණ්ඩායම විසින් සත්‍යාපනය කිරීමෙන් පසු ප්‍රධාන නාමාවලියෙහි ප්‍රදර්ශනය කරනු ඇත.
+                </p>
+
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label class="form-label" style="font-size: 0.82rem; font-weight: 700; color: #334155;">ශිල්පියාගේ හෝ කලායතනයේ නම *</label>
+                    <input type="text" id="artisanRegName" class="form-input" required maxlength="100" placeholder="උදා: සෝමපාල කලායතනය / ඩබ්ලිව්. එම්. සුනිල් ශාන්ත">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label class="form-label" style="font-size: 0.82rem; font-weight: 700; color: #334155; margin-bottom: 6px; display: block;">නිර්මාණ ක්ෂේත්‍ර / Specialties * (අවම වශයෙන් 1ක් තෝරන්න)</label>
+                    <div id="artisanRegSpecialtiesGrid" class="artisan-specialties-checkboxes-grid">
+                        <label class="artisan-checkbox-item">
+                            <input type="checkbox" name="artisanSpecialty" value="විහාර චිත්‍ර හා ප්‍රතිසංස්කරණ">
+                            <span>විහාර චිත්‍ර හා ප්‍රතිසංස්කරණ</span>
+                        </label>
+                        <label class="artisan-checkbox-item">
+                            <input type="checkbox" name="artisanSpecialty" value="වෙහෙර දාගැබ් හා චෛත්‍ය නිර්මාණ">
+                            <span>වෙහෙර දාගැබ් හා චෛත්‍ය නිර්මාණ</span>
+                        </label>
+                        <label class="artisan-checkbox-item">
+                            <input type="checkbox" name="artisanSpecialty" value="බුදු පිළිම හා මූර්ති නිර්මාණ">
+                            <span>බුදු පිළිම හා මූර්ති නිර්මාණ</span>
+                        </label>
+                        <label class="artisan-checkbox-item">
+                            <input type="checkbox" name="artisanSpecialty" value="ලී කැටයම් හා මකර තොරණ">
+                            <span>ලී කැටයම් හා මකර තොරණ</span>
+                        </label>
+                        <label class="artisan-checkbox-item">
+                            <input type="checkbox" name="artisanSpecialty" value="විහාර ගෘහ නිර්මාණ හා වාස්තු">
+                            <span>විහාර ගෘහ නිර්මාණ හා වාස්තු</span>
+                        </label>
+                        <label class="artisan-checkbox-item">
+                            <input type="checkbox" name="artisanSpecialty" value="ගල් කැටයම්, කොත් වහන්සේ හා ලෝහ කර්මාන්ත">
+                            <span>ගල් කැටයම්, කොත් වහන්සේ හා ලෝහ කර්මාන්ත</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" style="font-size: 0.82rem; font-weight: 700; color: #334155;">පළපුරුද්ද (වසර ගණන)</label>
+                        <input type="number" id="artisanRegExperience" class="form-input" min="1" max="75" placeholder="උදා: 15">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" style="font-size: 0.82rem; font-weight: 700; color: #334155;">ප්‍රධාන දිස්ත්‍රික්කය *</label>
+                        <select id="artisanRegDistrict" class="form-select" required>
+                            <!-- Populated with districts -->
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: #78350f; font-weight: 600; cursor: pointer;">
+                        <input type="checkbox" id="artisanRegIslandWide" checked style="accent-color: #d97706; width: 17px; height: 17px;">
+                        <span>දිවයින පුරා සේවය ලබා දේ (Island-wide Service Available)</span>
+                    </label>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" style="font-size: 0.82rem; font-weight: 700; color: #334155;">දුරකථන අංකය (Phone) *</label>
+                        <input type="tel" id="artisanRegPhone" class="form-input" required placeholder="0771234567">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" style="font-size: 0.82rem; font-weight: 700; color: #334155;">WhatsApp අංකය</label>
+                        <input type="tel" id="artisanRegWhatsapp" class="form-input" placeholder="0771234567 (හිස්නම් Phone යොදයි)">
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label class="form-label" style="font-size: 0.82rem; font-weight: 700; color: #334155;">සේවය ලබාදුන් ප්‍රකට විහාරස්ථාන (Notable Temples)</label>
+                    <input type="text" id="artisanRegTemples" class="form-input" maxlength="200" placeholder="උදා: රන්ගිරි දඹුලු රජමහා විහාරය, අස්ගිරි මහා විහාරය...">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label class="form-label" style="font-size: 0.82rem; font-weight: 700; color: #334155;">කෙටි හැඳින්වීමක් / Bio</label>
+                    <textarea id="artisanRegBio" class="form-textarea" rows="2" maxlength="300" placeholder="ඔබගේ කලා නිර්මාණ හා සේවාවන් පිළිබඳ කෙටි විස්තරයක්..."></textarea>
+                </div>
+
+                <!-- Profile Photo Upload -->
+                <div class="form-group" style="margin-bottom: 12px; background: #fffdf8; border: 1px dashed #fde68a; border-radius: 10px; padding: 10px 12px;">
+                    <label class="form-label" style="margin-bottom: 4px; display: flex; justify-content: space-between; font-size: 0.82rem; font-weight: 700; color: #78350f;">
+                        <span>ප්‍රොෆයිල් ඡායාරූපය (Profile Photo)</span>
+                        <span style="font-size: 0.7rem; color: #64748b;">(Optional - 1 Image)</span>
+                    </label>
+                    <input type="file" id="artisanRegPhotoInput" accept="image/*" class="form-control" style="font-size: 0.78rem;">
+                    <div id="artisanRegPhotoPreview" style="margin-top: 6px; display: none;"></div>
+                </div>
+
+                <!-- Portfolio Photos Upload (Up to 4 images) -->
+                <div class="form-group" style="margin-bottom: 14px; background: #fffdf8; border: 1px dashed #fde68a; border-radius: 10px; padding: 10px 12px;">
+                    <label class="form-label" style="margin-bottom: 4px; display: flex; justify-content: space-between; font-size: 0.82rem; font-weight: 700; color: #78350f;">
+                        <span>නිර්මාණ එකතුව / Portfolio (උපරිම 4ක්)</span>
+                        <span style="font-size: 0.7rem; color: #64748b;">(Max 4 Images)</span>
+                    </label>
+                    <input type="file" id="artisanRegPortfolioInput" accept="image/*" multiple class="form-control" style="font-size: 0.78rem;">
+                    <div id="artisanRegPortfolioPreviewGrid" style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;"></div>
+                </div>
+
+                <!-- Upload Status Notice -->
+                <div id="artisanRegUploadStatus" style="display: none; padding: 8px 12px; border-radius: 8px; font-size: 0.78rem; font-weight: 600; margin-bottom: 12px; background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe;">
+                    <i class="fa-solid fa-spinner fa-spin" style="margin-right: 6px;"></i>
+                    <span id="artisanRegUploadStatusText">ඡායාරූප සකසමින් පවතී...</span>
+                </div>
+
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button type="button" onclick="closeArtisanRegisterModal()" class="btn-crop-cancel" style="padding: 8px 16px;">
+                        අවලංගු කරන්න
+                    </button>
+                    <button type="submit" id="btnSubmitArtisanReg" class="btn-submit-merit" style="margin: 0; padding: 8px 20px; min-width: 150px; background: linear-gradient(135deg, #d97706, #b45309);">
+                        <i class="fa-solid fa-paper-plane"></i>
+                        <span>අයදුම්පත යොමු කරන්න</span>
                     </button>
                 </div>
             </form>
@@ -3586,6 +3816,21 @@
                     </div>
                     <i class="fa-solid fa-chevron-right drawer-chevron"></i>
                 </button>
+
+                <!-- 2. Temple Artisans Directory Featured Card -->
+                <button type="button" class="drawer-item-card drawer-item-featured" onclick="closeMobileMenuDrawer(); switchTab('artisans');" style="margin-top: 8px; border-color: rgba(217, 119, 6, 0.35); background: linear-gradient(135deg, rgba(254, 243, 199, 0.45), rgba(255, 251, 235, 0.75));">
+                    <div class="drawer-item-icon-wrap" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; flex-shrink: 0; box-shadow: 0 4px 10px rgba(217, 119, 6, 0.25);">
+                        <i class="fa-solid fa-palette"></i>
+                    </div>
+                    <div class="drawer-item-content">
+                        <div class="drawer-item-title-row">
+                            <span class="drawer-item-title">විහාර නිර්මාණ හා කලා ශිල්පීන්</span>
+                            <span class="drawer-badge-emerald" style="background: linear-gradient(135deg, #d97706, #b45309);">නාමාවලිය</span>
+                        </div>
+                        <p class="drawer-item-desc">විහාර චිත්‍ර, වෙහෙර දාගැබ්, බුදු පිළිම සහ සාම්ප්‍රදායික කැටයම් ශිල්පීන් සම්බන්ධ කරගන්න</p>
+                    </div>
+                    <i class="fa-solid fa-chevron-right drawer-chevron"></i>
+                </button>
             </div>
 
             <!-- Section 2: Shortcuts & Future Features -->
@@ -3669,6 +3914,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=155"></script>
+    <script type="module" src="js/app.js?v=156"></script>
 </body>
 </html>

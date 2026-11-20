@@ -288,6 +288,22 @@
             font-weight: 800;
         }
 
+        .admin-tag-shortcut {
+            display: inline-block;
+            padding: 3px 8px;
+            background: rgba(245, 158, 11, 0.15);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            border-radius: 9999px;
+            font-size: 0.72rem;
+            color: #fbbf24;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .admin-tag-shortcut:hover {
+            background: rgba(245, 158, 11, 0.35);
+            color: #fff;
+        }
+
         /* Top Metric Cards Grid */
         .metrics-grid {
             display: grid;
@@ -1102,6 +1118,11 @@
                 <i class="fa-solid fa-sliders"></i>
                 <span>පද්ධති සැකසුම් (Master Only)</span>
             </button>
+            <button class="nav-pill-btn master-only-tab" onclick="switchAdminTab('artisans')">
+                <i class="fa-solid fa-palette"></i>
+                <span>🎨 විහාර ශිල්පීන්</span>
+                <span class="badge" id="tabBadgeArtisans" style="display:none; background: #dc2626; color: #fff;">0</span>
+            </button>
             <button class="nav-pill-btn" onclick="switchAdminTab('audit')">
                 <i class="fa-solid fa-list-check"></i>
                 <span>ක්‍රියාකාරකම් සටහන් (Audit Log)</span>
@@ -1361,6 +1382,186 @@
             </div>
         </section>
 
+        <!-- ================= TAB: TEMPLE ARTISANS MANAGEMENT (Master Admin Only) ================= -->
+        <section id="sectionArtisans" class="admin-section">
+            <!-- Sub-section A: Pending Applications -->
+            <div class="glass-panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <i class="fa-solid fa-clock-rotate-left" style="color: #f59e0b;"></i>
+                        <span>අනුමැතිය සඳහා ලැබී ඇති ශිල්පී අයදුම්පත් (Pending Artisan Applications)</span>
+                    </div>
+                    <button class="btn-header" onclick="loadAdminArtisanApplications()">
+                        <i class="fa-solid fa-rotate"></i>
+                        <span>Refresh</span>
+                    </button>
+                </div>
+                <div id="adminPendingArtisansList">
+                    <div style="text-align: center; color: var(--text-muted); padding: 30px;">
+                        <i class="fa-solid fa-spinner fa-spin" style="font-size: 1.5rem; margin-bottom: 8px; color: var(--gold-light);"></i>
+                        <p>අයදුම්පත් පූරණය වෙමින් පවතී...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sub-section B: Approved Artisans & Direct Add/Edit -->
+            <div class="glass-panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <i class="fa-solid fa-palette" style="color: #10b981;"></i>
+                        <span>නාමාවලියෙහි සිටින සත්‍යාපිත ශිල්පීන් (Verified Directory)</span>
+                    </div>
+                    <button class="btn-header" onclick="toggleAdminArtisanDirectForm()" style="background: rgba(245, 158, 11, 0.2); border-color: rgba(245, 158, 11, 0.4); color: #fbbf24;">
+                        <i class="fa-solid fa-plus"></i>
+                        <span id="btnToggleArtisanFormText">+ සෘජුව ශිල්පියෙකු එක්කරන්න</span>
+                    </button>
+                </div>
+
+                <!-- Direct Add / Edit Form Accordion (Hidden by default) -->
+                <div id="adminArtisanDirectFormWrap" style="display: none; background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 12px; padding: 18px; margin-bottom: 20px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+                        <h4 id="adminArtisanFormTitle" style="font-size: 0.95rem; font-weight: 700; color: #fbbf24; margin: 0;">
+                            + නව විහාර ශිල්පියෙකු සෘජුව ඇතුළත් කිරීම
+                        </h4>
+                        <button type="button" onclick="cancelAdminArtisanEdit()" style="background: none; border: none; color: var(--text-muted); font-size: 1.1rem; cursor: pointer;">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+
+                    <form id="adminArtisanDirectForm" onsubmit="handleAdminArtisanDirectSubmit(event)">
+                        <input type="hidden" id="adminArtisanEditDocId" value="">
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                            <div class="admin-form-group" style="margin-bottom: 0;">
+                                <label class="admin-form-label">ශිල්පියාගේ / ආයතනයේ නම *</label>
+                                <input type="text" id="adminArtisanName" class="admin-form-input" required placeholder="උදා: සෝමපාල කලායතනය">
+                            </div>
+                            <div class="admin-form-group" style="margin-bottom: 0;">
+                                <label class="admin-form-label">ප්‍රධාන දිස්ත්‍රික්කය *</label>
+                                <select id="adminArtisanDistrict" class="admin-form-input" required>
+                                    <option value="" disabled selected>දිස්ත්‍රික්කය තෝරන්න</option>
+                                    <option value="කොළඹ">කොළඹ</option>
+                                    <option value="ගම්පහ">ගම්පහ</option>
+                                    <option value="කළුතර">කළුතර</option>
+                                    <option value="මහනුවර">මහනුවර</option>
+                                    <option value="මාතලේ">මාතලේ</option>
+                                    <option value="නුවරඑළිය">නුවරඑළිය</option>
+                                    <option value="ගාල්ල">ගාල්ල</option>
+                                    <option value="මාතර">මාතර</option>
+                                    <option value="හම්බන්තොට">හම්බන්තොට</option>
+                                    <option value="කුරුණෑගල">කුරුණෑගල</option>
+                                    <option value="පුත්තලම">පුත්තලම</option>
+                                    <option value="අනුරාධපුරය">අනුරාධපුරය</option>
+                                    <option value="පොළොන්නරුව">පොළොන්නරුව</option>
+                                    <option value="බදුල්ල">බදුල්ල</option>
+                                    <option value="මොණරාගල">මොණරාගල</option>
+                                    <option value="රත්නපුර">රත්නපුර</option>
+                                    <option value="කෑගල්ල">කෑගල්ල</option>
+                                    <option value="ත්‍රිකුණාමලය">ත්‍රිකුණාමලය</option>
+                                    <option value="මඩකලපුව">මඩකලපුව</option>
+                                    <option value="අම්පාර">අම්පාර</option>
+                                    <option value="යාපනය">යාපනය</option>
+                                    <option value="කිලිනොච්චිය">කිලිනොච්චිය</option>
+                                    <option value="මන්නාරම">මන්නාරම</option>
+                                    <option value="වවුනියාව">වවුනියාව</option>
+                                    <option value="මුලතිව්">මුලතිව්</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="admin-form-group" style="margin-bottom: 12px;">
+                            <label class="admin-form-label">නිර්මාණ ක්ෂේත්‍ර / Specialties * (කොමා වලින් වෙන්කරන්න හෝ පහතින් තෝරන්න)</label>
+                            <input type="text" id="adminArtisanSpecialtiesText" class="admin-form-input" required placeholder="උදා: විහාර චිත්‍ර හා ප්‍රතිසංස්කරණ, බුදු පිළිම හා මූර්ති නිර්මාණ">
+                            <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;">
+                                <span class="admin-tag-shortcut" onclick="appendAdminArtisanSpecialty('විහාර චිත්‍ර හා ප්‍රතිසංස්කරණ')">+ විහාර චිත්‍ර</span>
+                                <span class="admin-tag-shortcut" onclick="appendAdminArtisanSpecialty('වෙහෙර දාගැබ් හා චෛත්‍ය නිර්මාණ')">+ වෙහෙර දාගැබ්</span>
+                                <span class="admin-tag-shortcut" onclick="appendAdminArtisanSpecialty('බුදු පිළිම හා මූර්ති නිර්මාණ')">+ බුදු පිළිම</span>
+                                <span class="admin-tag-shortcut" onclick="appendAdminArtisanSpecialty('ලී කැටයම් හා මකර තොරණ')">+ ලී කැටයම්</span>
+                                <span class="admin-tag-shortcut" onclick="appendAdminArtisanSpecialty('විහාර ගෘහ නිර්මාණ හා වාස්තු')">+ ගෘහ නිර්මාණ</span>
+                                <span class="admin-tag-shortcut" onclick="appendAdminArtisanSpecialty('ගල් කැටයම්, කොත් වහන්සේ හා ලෝහ කර්මාන්ත')">+ ගල් කැටයම්</span>
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                            <div class="admin-form-group" style="margin-bottom: 0;">
+                                <label class="admin-form-label">පළපුරුද්ද (වසර)</label>
+                                <input type="number" id="adminArtisanExperience" class="admin-form-input" min="0" placeholder="15">
+                            </div>
+                            <div class="admin-form-group" style="margin-bottom: 0;">
+                                <label class="admin-form-label">දුරකථන අංකය *</label>
+                                <input type="tel" id="adminArtisanPhone" class="admin-form-input" required placeholder="0771234567">
+                            </div>
+                            <div class="admin-form-group" style="margin-bottom: 0;">
+                                <label class="admin-form-label">WhatsApp අංකය</label>
+                                <input type="tel" id="adminArtisanWhatsapp" class="admin-form-input" placeholder="0771234567">
+                            </div>
+                        </div>
+
+                        <div class="admin-form-group" style="margin-bottom: 12px;">
+                            <label class="admin-form-label">දායක වූ ප්‍රකට විහාරස්ථාන</label>
+                            <input type="text" id="adminArtisanTemples" class="admin-form-input" placeholder="උදා: රන්ගිරි දඹුලු රජමහා විහාරය, අස්ගිරි මහා විහාරය">
+                        </div>
+
+                        <div class="admin-form-group" style="margin-bottom: 12px;">
+                            <label class="admin-form-label">කෙටි හැඳින්වීමක් / Bio</label>
+                            <textarea id="adminArtisanBio" class="admin-form-textarea" rows="2" placeholder="ශිල්පියාගේ පසුබිම හා කලා නිර්මාණ පිළිබඳ විස්තරයක්..."></textarea>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                            <div class="admin-form-group" style="margin-bottom: 0;">
+                                <label class="admin-form-label">ප්‍රොෆයිල් ඡායාරූප URL (හෝ File උඩුගත කරන්න)</label>
+                                <input type="url" id="adminArtisanPhotoUrl" class="admin-form-input" placeholder="https://i.ibb.co/...">
+                                <input type="file" id="adminArtisanPhotoFile" accept="image/*" style="font-size: 0.72rem; margin-top: 5px; color: var(--text-secondary);">
+                            </div>
+                            <div class="admin-form-group" style="margin-bottom: 0;">
+                                <label class="admin-form-label">Portfolio Image URLs (කොමා වලින් වෙන්කරන්න)</label>
+                                <input type="text" id="adminArtisanPortfolioUrls" class="admin-form-input" placeholder="https://i.ibb.co/1.jpg, https://i.ibb.co/2.jpg">
+                                <input type="file" id="adminArtisanPortfolioFiles" accept="image/*" multiple style="font-size: 0.72rem; margin-top: 5px; color: var(--text-secondary);">
+                            </div>
+                        </div>
+
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 14px; flex-wrap: wrap; gap: 10px;">
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; color: #fff;">
+                                <input type="checkbox" id="adminArtisanIslandWide" checked style="accent-color: var(--gold-light); width: 18px; height: 18px;">
+                                <span>දිවයින පුරා සේවය ලබා දේ (Island-wide Service)</span>
+                            </label>
+                            <div style="display: flex; gap: 8px;">
+                                <button type="button" class="btn-header" onclick="cancelAdminArtisanEdit()">අවලංගු කරන්න</button>
+                                <button type="submit" id="btnAdminSaveArtisan" class="btn-save-settings" style="background: linear-gradient(135deg, #10b981, #059669);">
+                                    <i class="fa-solid fa-floppy-disk"></i>
+                                    <span id="btnAdminSaveArtisanText">ශිල්පියා සුරකින්න</span>
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Verified Artisans Table -->
+                <div class="table-responsive">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>ශිල්පියා / ආයතනය</th>
+                                <th>ප්‍රධාන දිස්ත්‍රික්කය</th>
+                                <th>නිර්මාණ ක්ෂේත්‍ර (Specialties)</th>
+                                <th>දුරකථන / WhatsApp</th>
+                                <th>Portfolio</th>
+                                <th>පාලනය (Actions)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminVerifiedArtisansTableBody">
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                                    <i class="fa-solid fa-spinner fa-spin" style="font-size: 1.5rem; margin-bottom: 8px; color: var(--gold-light);"></i>
+                                    <p>සත්‍යාපිත ශිල්පීන් දත්ත පූරණය වෙමින් පවතී...</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
         <!-- ================= TAB 5: AUDIT ACTIVITY LOG ================= -->
         <section id="sectionAudit" class="admin-section">
             <div class="glass-panel">
@@ -1421,6 +1622,6 @@
     </div>
 
     <!-- ES Module Script for Admin Logic -->
-    <script type="module" src="js/admin.js?v=84"></script>
+    <script type="module" src="js/admin.js?v=85"></script>
 </body>
 </html>

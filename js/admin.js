@@ -9,6 +9,7 @@
 
 import { firebaseConfig, isFirebaseConfigured, COLLECTIONS } from './firebase-config.js?v=22';
 import { Security } from './security.js?v=48';
+import { uploadToImgBB } from './imgbb-service.js?v=66';
 
 const MASTER_ADMIN_EMAIL = "supportnexiapro@gmail.com";
 const MASTER_ADMIN_EMAILS = [
@@ -39,6 +40,8 @@ let isSubAdmin = false;
 
 let allUsersList = [];
 let allPostsList = [];
+let allPendingArtisanApps = [];
+let allVerifiedArtisans = [];
 let growthChartInstance = null;
 let currentChartDays = 14;
 
@@ -183,6 +186,10 @@ function unlockDashboard(user) {
     subscribeToUsers();
     subscribeToPosts();
     subscribeToSettings();
+    if (isMasterAdmin) {
+        subscribeToArtisanApplications();
+        subscribeToVerifiedArtisans();
+    }
     loadAuditLogs();
 }
 
@@ -1133,6 +1140,7 @@ window.switchAdminTab = function(tabId) {
         'users': document.getElementById('sectionUsers'),
         'moderation': document.getElementById('sectionModeration'),
         'settings': document.getElementById('sectionSettings'),
+        'artisans': document.getElementById('sectionArtisans'),
         'audit': document.getElementById('sectionAudit')
     };
 
@@ -1157,5 +1165,611 @@ window.switchAdminTab = function(tabId) {
 
     if (tabId === 'overview') {
         setTimeout(() => renderGrowthChart(allUsersList), 100);
+    }
+    if (tabId === 'artisans') {
+        loadAdminArtisanApplications();
+        loadAdminVerifiedArtisans();
+    }
+};
+
+// ============================================================================
+// 9. TEMPLE ARTISANS DIRECTORY & APPLICATION APPROVAL (MASTER ADMIN ONLY)
+// ============================================================================
+
+function subscribeToArtisanApplications() {
+    if (!db) return;
+    import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js').then(({ collection, onSnapshot, query, orderBy }) => {
+        try {
+            const q = query(collection(db, COLLECTIONS.ARTISAN_APPLICATIONS || 'artisan_applications'), orderBy('createdAt', 'desc'));
+            onSnapshot(q, (snapshot) => {
+                allPendingArtisanApps = [];
+                snapshot.forEach(docSnap => {
+                    allPendingArtisanApps.push({ docId: docSnap.id, id: docSnap.id, ...docSnap.data() });
+                });
+                renderAdminArtisanApplications();
+            }, (err) => {
+                console.warn('[Admin] Artisan applications onSnapshot error:', err);
+                loadAdminArtisanApplications();
+            });
+        } catch (err) {
+            console.warn('[Admin] Artisan applications setup error:', err);
+            loadAdminArtisanApplications();
+        }
+    }).catch(err => {
+        console.warn('[Admin] Firestore import error for applications:', err);
+    });
+}
+
+function subscribeToVerifiedArtisans() {
+    if (!db) return;
+    import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js').then(({ collection, onSnapshot, query, orderBy }) => {
+        try {
+            const q = query(collection(db, COLLECTIONS.ARTISANS || 'temple_artisans'), orderBy('createdAt', 'desc'));
+            onSnapshot(q, (snapshot) => {
+                allVerifiedArtisans = [];
+                snapshot.forEach(docSnap => {
+                    allVerifiedArtisans.push({ docId: docSnap.id, id: docSnap.id, ...docSnap.data() });
+                });
+                renderAdminVerifiedArtisans();
+            }, (err) => {
+                console.warn('[Admin] Verified artisans onSnapshot error:', err);
+                loadAdminVerifiedArtisans();
+            });
+        } catch (err) {
+            console.warn('[Admin] Verified artisans setup error:', err);
+            loadAdminVerifiedArtisans();
+        }
+    }).catch(err => {
+        console.warn('[Admin] Firestore import error for artisans:', err);
+    });
+}
+
+window.loadAdminArtisanApplications = async function() {
+    if (!db) return;
+    const container = document.getElementById('adminPendingArtisansList');
+    try {
+        const { collection, getDocs, query, orderBy } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const q = query(collection(db, COLLECTIONS.ARTISAN_APPLICATIONS || 'artisan_applications'), orderBy('createdAt', 'desc'));
+        const snap = await getDocs(q);
+        allPendingArtisanApps = [];
+        snap.forEach(docSnap => {
+            allPendingArtisanApps.push({ docId: docSnap.id, id: docSnap.id, ...docSnap.data() });
+        });
+        renderAdminArtisanApplications();
+    } catch (err) {
+        console.error('[Admin] loadAdminArtisanApplications error:', err);
+        if (container) {
+            container.innerHTML = `<div style="text-align: center; color: #ef4444; padding: 20px;">අයදුම්පත් පූරණය කිරීමේදී දෝෂයක් ඇතිවිය: ${Security.escapeHTML(err.message)}</div>`;
+        }
+    }
+};
+
+window.loadAdminVerifiedArtisans = async function() {
+    if (!db) return;
+    const tbody = document.getElementById('adminVerifiedArtisansTableBody');
+    try {
+        const { collection, getDocs, query, orderBy } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const q = query(collection(db, COLLECTIONS.ARTISANS || 'temple_artisans'), orderBy('createdAt', 'desc'));
+        const snap = await getDocs(q);
+        allVerifiedArtisans = [];
+        snap.forEach(docSnap => {
+            allVerifiedArtisans.push({ docId: docSnap.id, id: docSnap.id, ...docSnap.data() });
+        });
+        renderAdminVerifiedArtisans();
+    } catch (err) {
+        console.error('[Admin] loadAdminVerifiedArtisans error:', err);
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #ef4444; padding: 20px;">ශිල්පීන් දත්ත පූරණය කිරීමේදී දෝෂයක් ඇතිවිය: ${Security.escapeHTML(err.message)}</td></tr>`;
+        }
+    }
+};
+
+function renderAdminArtisanApplications() {
+    const container = document.getElementById('adminPendingArtisansList');
+    const badge = document.getElementById('tabBadgeArtisans');
+    if (!container) return;
+
+    const pendingApps = allPendingArtisanApps.filter(a => a.status === 'pending');
+
+    if (badge) {
+        if (pendingApps.length > 0) {
+            badge.textContent = pendingApps.length;
+            badge.style.display = 'inline-block';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+
+    if (pendingApps.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; color: var(--text-muted); padding: 30px;">
+                <i class="fa-solid fa-circle-check" style="color: #10b981; font-size: 1.8rem; margin-bottom: 8px;"></i>
+                <p style="font-size: 0.9rem;">අනුමැතිය සඳහා නව ශිල්පී අයදුම්පත් නොමැත. සියලුම අයදුම්පත් සලකා බලා අවසන් කර ඇත.</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = pendingApps.map(app => {
+        const specs = (app.specialties || []).map(s => `
+            <span style="display: inline-block; padding: 2px 7px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 9999px; font-size: 0.72rem; color: #fbbf24; margin: 2px;">
+                ${Security.escapeHTML(s)}
+            </span>
+        `).join('');
+
+        const portImages = Array.isArray(app.portfolioImages) ? app.portfolioImages.slice(0, 4) : [];
+        const portHtml = portImages.length > 0 ? `
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
+                ${portImages.map(img => `
+                    <a href="${img}" target="_blank" rel="noopener" style="display: block; width: 60px; height: 60px; border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.2);">
+                        <img src="${img}" style="width: 100%; height: 100%; object-fit: cover;" alt="Portfolio">
+                    </a>
+                `).join('')}
+            </div>
+        ` : '<span style="font-size: 0.75rem; color: var(--text-muted);">ඡායාරූප නොමැත</span>';
+
+        const rawPhone = app.phone || '';
+        const cleanTel = rawPhone.replace(/[^0-9]/g, '');
+        let numWa = (app.whatsapp || app.phone || '').replace(/[^0-9]/g, '');
+        if (numWa.startsWith('0')) numWa = '94' + numWa.substring(1);
+        else if (!numWa.startsWith('94') && numWa.length === 9) numWa = '94' + numWa;
+
+        let createdDateStr = 'මෑතකදී';
+        if (app.createdAt) {
+            try {
+                const dateObj = app.createdAt.toDate ? app.createdAt.toDate() : new Date(app.createdAt);
+                createdDateStr = dateObj.toLocaleDateString('si-LK', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            } catch (e) {
+                // Ignore date parsing error
+            }
+        }
+
+        return `
+            <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 14px;">
+                <div style="display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap;">
+                    <div style="width: 60px; height: 60px; border-radius: 12px; overflow: hidden; background: rgba(255,255,255,0.05); border: 1px solid rgba(245,158,11,0.4); flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+                        ${app.photo ? `
+                            <img src="${app.photo}" style="width: 100%; height: 100%; object-fit: cover;">
+                        ` : `
+                            <i class="fa-solid fa-palette" style="font-size: 1.5rem; color: #fbbf24;"></i>
+                        `}
+                    </div>
+                    <div style="flex: 1; min-width: 250px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                            <h4 style="font-size: 1rem; font-weight: 700; color: #fff; margin: 0;">${Security.escapeHTML(app.name)}</h4>
+                            <span style="font-size: 0.72rem; color: var(--text-muted);">🕒 ${createdDateStr}</span>
+                        </div>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; font-size: 0.78rem; color: var(--text-secondary);">
+                            <span><i class="fa-solid fa-location-dot" style="color: #f59e0b;"></i> ${Security.escapeHTML(app.district || 'ශ්‍රී ලංකා')}</span>
+                            ${app.experience ? `<span><i class="fa-solid fa-clock-rotate-left"></i> වසර ${app.experience}+ පළපුරුද්ද</span>` : ''}
+                            ${app.islandWide ? `<span style="color: #34d399;"><i class="fa-solid fa-earth-asia"></i> දිවයින පුරා සේවය</span>` : ''}
+                        </div>
+                        
+                        <div style="margin-top: 8px;">
+                            ${specs}
+                        </div>
+
+                        ${app.notableTemples ? `
+                            <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 6px;">
+                                <strong>දායක වූ ප්‍රකට විහාර:</strong> ${Security.escapeHTML(app.notableTemples)}
+                            </div>
+                        ` : ''}
+
+                        ${app.bio ? `
+                            <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; line-height: 1.4;">
+                                ${Security.escapeHTML(app.bio)}
+                            </div>
+                        ` : ''}
+
+                        <div style="margin-top: 8px;">
+                            <span style="font-size: 0.72rem; color: #fbbf24; font-weight: 600;">Portfolio නිර්මාණ:</span>
+                            ${portHtml}
+                        </div>
+
+                        <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                            <div style="font-size: 0.75rem; color: var(--text-secondary); display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                                <span><strong>දුරකථන:</strong> <a href="tel:${cleanTel}" style="color: #38bdf8;">${Security.escapeHTML(rawPhone)}</a></span>
+                                <span><strong>WhatsApp:</strong> <a href="https://wa.me/${numWa}" target="_blank" rel="noopener" style="color: #34d399;">${Security.escapeHTML(app.whatsapp || rawPhone)}</a></span>
+                                <span><strong>යොමුකළේ:</strong> ${Security.escapeHTML(app.submittedByName || 'සාමාජික')} (${Security.escapeHTML(app.submittedByEmail || '')})</span>
+                            </div>
+
+                            <div style="display: flex; gap: 8px;">
+                                <button type="button" class="btn-header" style="background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.4); color: #fca5a5;" onclick="adminRejectArtisan('${app.docId}')">
+                                    <i class="fa-solid fa-xmark"></i> ප්‍රතික්ෂේප කරන්න
+                                </button>
+                                <button type="button" class="btn-header" style="background: linear-gradient(135deg, #10b981, #059669); border-color: transparent; color: #fff;" onclick="adminApproveArtisan('${app.docId}')">
+                                    <i class="fa-solid fa-check"></i> අනුමත කර එක්කරන්න
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderAdminVerifiedArtisans() {
+    const tbody = document.getElementById('adminVerifiedArtisansTableBody');
+    if (!tbody) return;
+
+    if (allVerifiedArtisans.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                    දැනට සත්‍යාපිත ශිල්පීන් නාමාවලියෙහි නොමැත. ඉහත පෝරමයෙන් සෘජුව එක්කරන්න හෝ අයදුම්පත් අනුමත කරන්න.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = allVerifiedArtisans.map(item => {
+        const specs = (item.specialties || []).map(s => `
+            <span style="display: inline-block; padding: 2px 6px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 9999px; font-size: 0.7rem; color: #fbbf24; margin: 1px;">
+                ${Security.escapeHTML(s)}
+            </span>
+        `).join('');
+
+        const rawPhone = item.phone || '';
+        const cleanTel = rawPhone.replace(/[^0-9]/g, '');
+        let numWa = (item.whatsapp || item.phone || '').replace(/[^0-9]/g, '');
+        if (numWa.startsWith('0')) numWa = '94' + numWa.substring(1);
+        else if (!numWa.startsWith('94') && numWa.length === 9) numWa = '94' + numWa;
+
+        const portCount = Array.isArray(item.portfolioImages) ? item.portfolioImages.length : 0;
+
+        return `
+            <tr>
+                <td>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div style="width: 38px; height: 38px; border-radius: 8px; overflow: hidden; background: rgba(255,255,255,0.05); border: 1px solid rgba(245,158,11,0.3); flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+                            ${item.photo ? `
+                                <img src="${item.photo}" style="width: 100%; height: 100%; object-fit: cover;">
+                            ` : `
+                                <i class="fa-solid fa-palette" style="font-size: 1rem; color: #fbbf24;"></i>
+                            `}
+                        </div>
+                        <div>
+                            <div style="font-weight: 700; color: #fff;">${Security.escapeHTML(item.name)}</div>
+                            ${item.experience ? `<div style="font-size: 0.72rem; color: var(--text-muted);">වසර ${item.experience}+ පළපුරුද්ද</div>` : ''}
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    <div style="font-size: 0.8rem; color: var(--text-secondary);">${Security.escapeHTML(item.district || 'ශ්‍රී ලංකා')}</div>
+                    ${item.islandWide ? `<div style="font-size: 0.7rem; color: #34d399;">දිවයින පුරා</div>` : ''}
+                </td>
+                <td>
+                    <div style="max-width: 280px;">${specs}</div>
+                </td>
+                <td>
+                    <div style="font-size: 0.78rem;">
+                        <div><a href="tel:${cleanTel}" style="color: #38bdf8;"><i class="fa-solid fa-phone" style="font-size: 0.7rem;"></i> ${Security.escapeHTML(rawPhone)}</a></div>
+                        <div><a href="https://wa.me/${numWa}" target="_blank" rel="noopener" style="color: #34d399;"><i class="fa-brands fa-whatsapp" style="font-size: 0.7rem;"></i> ${Security.escapeHTML(item.whatsapp || rawPhone)}</a></div>
+                    </div>
+                </td>
+                <td>
+                    <span style="font-size: 0.78rem; color: var(--text-secondary);">${portCount} ඡායාරූප</span>
+                </td>
+                <td>
+                    <div style="display: flex; gap: 6px;">
+                        <button type="button" class="btn-header" style="padding: 4px 8px; font-size: 0.72rem;" onclick="adminEditArtisan('${item.docId}')" title="සංස්කරණය">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                        <button type="button" class="btn-header" style="padding: 4px 8px; font-size: 0.72rem; color: #fca5a5; border-color: rgba(239, 68, 68, 0.4);" onclick="adminDeleteArtisan('${item.docId}', '${Security.escapeHTML(item.name).replace(/'/g, "\\'")}')" title="ඉවත් කරන්න">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+window.adminApproveArtisan = async function(appId) {
+    if (!isMasterAdmin) {
+        alert("මෙම පහසුකම සඳහා අවසර ඇත්තේ Master Admin ට පමණි.");
+        return;
+    }
+    const app = allPendingArtisanApps.find(a => a.docId === appId);
+    if (!app) {
+        alert("අයදුම්පත සොයාගත නොහැක.");
+        return;
+    }
+
+    if (!confirm(`"${app.name}" ශිල්පියා ප්‍රධාන නාමාවලිය සඳහා අනුමත කිරීමට ඔබට විශ්වාසද?`)) {
+        return;
+    }
+
+    try {
+        const { collection, addDoc, doc, updateDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        
+        // 1. Add to verified artisans collection
+        const artisanPayload = {
+            name: app.name || '',
+            specialties: app.specialties || [],
+            experience: Number(app.experience) || 0,
+            district: app.district || '',
+            islandWide: Boolean(app.islandWide),
+            phone: app.phone || '',
+            whatsapp: app.whatsapp || app.phone || '',
+            notableTemples: app.notableTemples || '',
+            bio: app.bio || '',
+            photo: app.photo || '',
+            portfolioImages: app.portfolioImages || [],
+            isVerified: true,
+            approvedBy: currentAdminUser ? currentAdminUser.email : 'Master Admin',
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+        };
+
+        await addDoc(collection(db, COLLECTIONS.ARTISANS || 'temple_artisans'), artisanPayload);
+
+        // 2. Mark application as approved
+        await updateDoc(doc(db, COLLECTIONS.ARTISAN_APPLICATIONS || 'artisan_applications', appId), {
+            status: 'approved',
+            reviewedAt: serverTimestamp(),
+            reviewedBy: currentAdminUser ? currentAdminUser.email : 'Master Admin'
+        });
+
+        // 3. Clear localStorage cache so directory refreshes
+        try {
+            localStorage.removeItem('pinPotha_artisans_cache');
+        } catch (e) {
+            // Ignore cache error
+        }
+
+        // 4. Record audit log
+        await recordAuditLog('Artisan Application Approved', `Approved artisan "${app.name}" into directory.`);
+
+        alert(`සාර්ථකයි! "${app.name}" විහාර නිර්මාණ ශිල්පියා ප්‍රධාන නාමාවලියට සාර්ථකව එක්කරන ලදී. 🙏`);
+    } catch (err) {
+        console.error('[Admin] adminApproveArtisan error:', err);
+        alert("අනුමත කිරීමේදී දෝෂයක් සිදුවිය: " + err.message);
+    }
+};
+
+window.adminRejectArtisan = async function(appId) {
+    if (!isMasterAdmin) {
+        alert("මෙම පහසුකම සඳහා අවසර ඇත්තේ Master Admin ට පමණි.");
+        return;
+    }
+    const app = allPendingArtisanApps.find(a => a.docId === appId);
+    if (!app) return;
+
+    if (!confirm(`"${app.name}" ගේ අයදුම්පත ප්‍රතික්ෂේප කිරීමට ඔබට විශ්වාසද?`)) {
+        return;
+    }
+
+    try {
+        const { doc, updateDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        await updateDoc(doc(db, COLLECTIONS.ARTISAN_APPLICATIONS || 'artisan_applications', appId), {
+            status: 'rejected',
+            reviewedAt: serverTimestamp(),
+            reviewedBy: currentAdminUser ? currentAdminUser.email : 'Master Admin'
+        });
+
+        await recordAuditLog('Artisan Application Rejected', `Rejected artisan application "${app.name}".`);
+        alert("අයදුම්පත ප්‍රතික්ෂේප කරන ලදී.");
+    } catch (err) {
+        console.error('[Admin] adminRejectArtisan error:', err);
+        alert("දෝෂයක් සිදුවිය: " + err.message);
+    }
+};
+
+window.toggleAdminArtisanDirectForm = function() {
+    const wrap = document.getElementById('adminArtisanDirectFormWrap');
+    if (!wrap) return;
+    if (wrap.style.display === 'none' || !wrap.style.display) {
+        wrap.style.display = 'block';
+    } else {
+        wrap.style.display = 'none';
+    }
+};
+
+window.cancelAdminArtisanEdit = function() {
+    const wrap = document.getElementById('adminArtisanDirectFormWrap');
+    const form = document.getElementById('adminArtisanDirectForm');
+    const title = document.getElementById('adminArtisanFormTitle');
+    const editDoc = document.getElementById('adminArtisanEditDocId');
+    const btnText = document.getElementById('btnAdminSaveArtisanText');
+
+    if (form) form.reset();
+    if (editDoc) editDoc.value = '';
+    if (title) title.textContent = '+ නව විහාර ශිල්පියෙකු සෘජුව ඇතුළත් කිරීම';
+    if (btnText) btnText.textContent = 'ශිල්පියා සුරකින්න';
+    if (wrap) wrap.style.display = 'none';
+};
+
+window.appendAdminArtisanSpecialty = function(spec) {
+    const input = document.getElementById('adminArtisanSpecialtiesText');
+    if (!input) return;
+    const current = input.value.trim();
+    if (!current) {
+        input.value = spec;
+    } else {
+        const parts = current.split(',').map(p => p.trim());
+        if (!parts.includes(spec)) {
+            parts.push(spec);
+            input.value = parts.join(', ');
+        }
+    }
+};
+
+window.adminEditArtisan = function(docId) {
+    const item = allVerifiedArtisans.find(a => a.docId === docId);
+    if (!item) {
+        alert("ශිල්පියාගේ දත්ත සොයාගත නොහැක.");
+        return;
+    }
+
+    const wrap = document.getElementById('adminArtisanDirectFormWrap');
+    const title = document.getElementById('adminArtisanFormTitle');
+    const btnText = document.getElementById('btnAdminSaveArtisanText');
+
+    const editDoc = document.getElementById('adminArtisanEditDocId');
+    const nameInp = document.getElementById('adminArtisanName');
+    const distInp = document.getElementById('adminArtisanDistrict');
+    const specInp = document.getElementById('adminArtisanSpecialtiesText');
+    const expInp = document.getElementById('adminArtisanExperience');
+    const phoneInp = document.getElementById('adminArtisanPhone');
+    const waInp = document.getElementById('adminArtisanWhatsapp');
+    const tempInp = document.getElementById('adminArtisanTemples');
+    const bioInp = document.getElementById('adminArtisanBio');
+    const photoInp = document.getElementById('adminArtisanPhotoUrl');
+    const portInp = document.getElementById('adminArtisanPortfolioUrls');
+    const islandInp = document.getElementById('adminArtisanIslandWide');
+
+    if (editDoc) editDoc.value = item.docId;
+    if (nameInp) nameInp.value = item.name || '';
+    if (distInp) distInp.value = item.district || '';
+    if (specInp) specInp.value = (item.specialties || []).join(', ');
+    if (expInp) expInp.value = item.experience || '';
+    if (phoneInp) phoneInp.value = item.phone || '';
+    if (waInp) waInp.value = item.whatsapp || '';
+    if (tempInp) tempInp.value = item.notableTemples || '';
+    if (bioInp) bioInp.value = item.bio || '';
+    if (photoInp) photoInp.value = item.photo || '';
+    if (portInp) portInp.value = (item.portfolioImages || []).join(', ');
+    if (islandInp) islandInp.checked = Boolean(item.islandWide);
+
+    if (title) title.textContent = '✏️ ශිල්පියාගේ තොරතුරු සංස්කරණය';
+    if (btnText) btnText.textContent = 'යාවත්කාලීන කරන්න';
+    if (wrap) {
+        wrap.style.display = 'block';
+        wrap.scrollIntoView({ behavior: 'smooth' });
+    }
+};
+
+window.adminDeleteArtisan = async function(docId, name) {
+    if (!isMasterAdmin) {
+        alert("මෙම පහසුකම සඳහා අවසර ඇත්තේ Master Admin ට පමණි.");
+        return;
+    }
+    if (!confirm(`ඔබට "${name}" ශිල්පියා නාමාවලියෙන් ඉවත් කිරීමට අවශ්‍යද? මෙම ක්‍රියාව ආපසු හැරවිය නොහැක.`)) {
+        return;
+    }
+
+    try {
+        const { doc, deleteDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        await deleteDoc(doc(db, COLLECTIONS.ARTISANS || 'temple_artisans', docId));
+
+        try {
+            localStorage.removeItem('pinPotha_artisans_cache');
+        } catch (e) {
+            // Ignore cache error
+        }
+
+        await recordAuditLog('Artisan Deleted', `Deleted artisan "${name}" (ID: ${docId}).`);
+        alert(`"${name}" ශිල්පියා සාර්ථකව ඉවත් කරන ලදී.`);
+    } catch (err) {
+        console.error('[Admin] adminDeleteArtisan error:', err);
+        alert("ඉවත් කිරීමේදී දෝෂයක් සිදුවිය: " + err.message);
+    }
+};
+
+window.handleAdminArtisanDirectSubmit = async function(e) {
+    if (e) e.preventDefault();
+    if (!isMasterAdmin) {
+        alert("මෙම පහසුකම සඳහා අවසර ඇත්තේ Master Admin ට පමණි.");
+        return;
+    }
+
+    const editDocId = (document.getElementById('adminArtisanEditDocId')?.value || '').trim();
+    const name = (document.getElementById('adminArtisanName')?.value || '').trim();
+    const district = (document.getElementById('adminArtisanDistrict')?.value || '').trim();
+    const specialtiesRaw = (document.getElementById('adminArtisanSpecialtiesText')?.value || '').trim();
+    const expVal = document.getElementById('adminArtisanExperience')?.value;
+    const experience = expVal ? parseInt(expVal, 10) : 0;
+    const phone = (document.getElementById('adminArtisanPhone')?.value || '').trim();
+    const whatsapp = (document.getElementById('adminArtisanWhatsapp')?.value || '').trim();
+    const notableTemples = (document.getElementById('adminArtisanTemples')?.value || '').trim();
+    const bio = (document.getElementById('adminArtisanBio')?.value || '').trim();
+    let photoUrl = (document.getElementById('adminArtisanPhotoUrl')?.value || '').trim();
+    const portUrlsRaw = (document.getElementById('adminArtisanPortfolioUrls')?.value || '').trim();
+    const islandWide = Boolean(document.getElementById('adminArtisanIslandWide')?.checked);
+
+    const photoFileInput = document.getElementById('adminArtisanPhotoFile');
+    const portFilesInput = document.getElementById('adminArtisanPortfolioFiles');
+    const submitBtn = document.getElementById('btnAdminSaveArtisan');
+    const btnText = document.getElementById('btnAdminSaveArtisanText');
+
+    if (!name || !district || !phone || !specialtiesRaw) {
+        alert("කරුණාකර නම, දිස්ත්‍රික්කය, දුරකථන අංකය සහ අවම වශයෙන් එක් නිර්මාණ ක්ෂේත්‍රයක් ඇතුළත් කරන්න.");
+        return;
+    }
+
+    const specialties = specialtiesRaw.split(',').map(s => s.trim()).filter(Boolean);
+    let portfolioImages = portUrlsRaw.split(',').map(s => s.trim()).filter(Boolean);
+
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        if (btnText) btnText.textContent = "සුරකිමින් පවතී...";
+    }
+
+    try {
+        // Upload photo file if provided
+        if (photoFileInput && photoFileInput.files && photoFileInput.files[0]) {
+            if (btnText) btnText.textContent = "ප්‍රොෆයිල් ඡායාරූපය උඩුගත කෙරේ...";
+            const uploadedPhoto = await uploadToImgBB(photoFileInput.files[0], `admin_artisan_${Date.now()}`);
+            if (uploadedPhoto) photoUrl = uploadedPhoto;
+        }
+
+        // Upload portfolio files if provided
+        if (portFilesInput && portFilesInput.files && portFilesInput.files.length > 0) {
+            const files = Array.from(portFilesInput.files).slice(0, 4);
+            for (let i = 0; i < files.length; i++) {
+                if (btnText) btnText.textContent = `Portfolio උඩුගත කෙරේ (${i + 1}/${files.length})...`;
+                const uploadedPort = await uploadToImgBB(files[i], `admin_port_${Date.now()}_${i}`);
+                if (uploadedPort) portfolioImages.push(uploadedPort);
+            }
+        }
+
+        const { collection, addDoc, doc, setDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+
+        const artisanData = {
+            name,
+            specialties,
+            experience: experience || 0,
+            district,
+            islandWide,
+            phone,
+            whatsapp: whatsapp || phone,
+            notableTemples,
+            bio,
+            photo: photoUrl || '',
+            portfolioImages: portfolioImages.slice(0, 4),
+            isVerified: true,
+            updatedAt: serverTimestamp()
+        };
+
+        if (editDocId) {
+            await setDoc(doc(db, COLLECTIONS.ARTISANS || 'temple_artisans', editDocId), artisanData, { merge: true });
+            await recordAuditLog('Artisan Updated', `Updated artisan "${name}" (ID: ${editDocId}).`);
+            alert(`"${name}" ශිල්පියාගේ තොරතුරු සාර්ථකව යාවත්කාලීන විය!`);
+        } else {
+            artisanData.createdAt = serverTimestamp();
+            artisanData.addedBy = currentAdminUser ? currentAdminUser.email : 'Master Admin';
+            const newDoc = await addDoc(collection(db, COLLECTIONS.ARTISANS || 'temple_artisans'), artisanData);
+            await recordAuditLog('Artisan Added Direct', `Added new verified artisan "${name}" (ID: ${newDoc.id}).`);
+            alert(`"${name}" ශිල්පියා සාර්ථකව නාමාවලියට ඇතුළත් කරන ලදී!`);
+        }
+
+        try {
+            localStorage.removeItem('pinPotha_artisans_cache');
+        } catch (e) {
+            // Ignore cache error
+        }
+
+        cancelAdminArtisanEdit();
+    } catch (err) {
+        console.error('[Admin] handleAdminArtisanDirectSubmit error:', err);
+        alert("සුරැකීමේදී දෝෂයක් සිදුවිය: " + err.message);
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            if (btnText) btnText.textContent = editDocId ? "යාවත්කාලීන කරන්න" : "ශිල්පියා සුරකින්න";
+        }
     }
 };
