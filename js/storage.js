@@ -4821,9 +4821,14 @@ export const StorageService = {
       try {
         const raw = localStorage.getItem(CACHE_KEY);
         if (raw) {
-          const cached = JSON.parse(raw);
-          if (cached && cached.timestamp && (Date.now() - cached.timestamp < TTL_MS) && Array.isArray(cached.data)) {
-            return cached.data;
+          // If cached data contains dummy seed items, immediately invalidate and remove
+          if (raw.includes('artisan_seed_')) {
+            localStorage.removeItem(CACHE_KEY);
+          } else {
+            const cached = JSON.parse(raw);
+            if (cached && cached.timestamp && (Date.now() - cached.timestamp < TTL_MS) && Array.isArray(cached.data)) {
+              return cached.data;
+            }
           }
         }
       } catch (e) {
@@ -4832,65 +4837,6 @@ export const StorageService = {
     }
 
     let list = [];
-
-    // Fallback seed entries for initial display if collection is empty
-    const DEFAULT_ARTISANS = [
-      {
-        id: "artisan_seed_1",
-        name: "ආචාර්ය සෝමපාල කලායතනය",
-        specialties: ["විහාර චිත්‍ර හා ප්‍රතිසංස්කරණ", "බුදු පිළිම හා මූර්ති නිර්මාණ"],
-        experienceYears: 24,
-        district: "මහනුවර",
-        islandWide: true,
-        phone: "0773456789",
-        whatsapp: "0773456789",
-        notableTemples: "රන්ගිරි දඹුලු රජමහා විහාරය, අස්ගිරි මහා විහාරය",
-        bio: "වසර 24ක අඛණ්ඩ සේවාවක් සහිත උඩරට සම්ප්‍රදායික විහාර බිතුසිතුවම් හා ජීවමාන ප්‍රමාණයේ බුදු පිළිම නිර්මාණ ශිල්පී.",
-        profilePhoto: "https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=400&q=80",
-        portfolio: [
-          "https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=800&q=80",
-          "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=800&q=80"
-        ],
-        isVerified: true,
-        createdAt: 1730000000000
-      },
-      {
-        id: "artisan_seed_2",
-        name: "විශ්වකර්ම චෛත්‍ය නිර්මාණ ඉංජිනේරු සේවය",
-        specialties: ["වෙහෙර දාගැබ් හා චෛත්‍ය නිර්මාණ", "විහාර ගෘහ නිර්මාණ හා වාස්තු"],
-        experienceYears: 18,
-        district: "කුරුණෑගල",
-        islandWide: true,
-        phone: "0718901234",
-        whatsapp: "0718901234",
-        notableTemples: "රිදී විහාරය, ඇතුගල්පුර ශ්‍රී ධර්මරාජ විහාරය",
-        bio: "සම්ප්‍රදායික ධාතු ගර්භ වාස්තු විද්‍යාව සහ නවීන ඉංජිනේරු තාක්ෂණය මුසු කරමින් දාගැබ් ඉදිකිරීමේ ප්‍රමුඛයෝ.",
-        profilePhoto: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=400&q=80",
-        portfolio: [
-          "https://images.unsplash.com/photo-1599818491873-61a7a001a182?auto=format&fit=crop&w=800&q=80"
-        ],
-        isVerified: true,
-        createdAt: 1730005000000
-      },
-      {
-        id: "artisan_seed_3",
-        name: "හෙළ ලී කැටයම් කලා මන්දිරය",
-        specialties: ["ලී කැටයම් හා මකර තොරණ", "ගල් කැටයම්, කොත් වහන්සේ හා ලෝහ කර්මාන්ත"],
-        experienceYears: 30,
-        district: "මාතලේ",
-        islandWide: true,
-        phone: "0765554321",
-        whatsapp: "0765554321",
-        notableTemples: "ඇම්බැක්ක දේවාලය (ප්‍රතිසංස්කරණ), අලුවිහාරය",
-        bio: "සම්ප්‍රදායික හෙළ ලී හා ගල් කැටයම්, මකර තොරණ, ධර්මාසන සහ සඳකඩපහණ නිර්මාණය.",
-        profilePhoto: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80",
-        portfolio: [
-          "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80"
-        ],
-        isVerified: true,
-        createdAt: 1730010000000
-      }
-    ];
 
     if (isCloudReady && db) {
       try {
@@ -4903,10 +4849,6 @@ export const StorageService = {
       } catch (err) {
         console.warn('[Storage] Cloud artisans read warning:', err);
       }
-    }
-
-    if (list.length === 0) {
-      list = DEFAULT_ARTISANS;
     }
 
     try {

@@ -51,7 +51,7 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=156">
+    <link rel="stylesheet" href="css/styles.css?v=157">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
@@ -1118,12 +1118,17 @@
 
             <!-- Empty State -->
             <div id="artisansEmptyState" class="artisans-empty-state hidden" style="display: none; text-align: center; padding: 40px 20px; background: #fff; border-radius: 16px; border: 1px dashed #cbd5e1; margin-bottom: 20px;">
-                <i class="fa-solid fa-palette" style="font-size: 2.2rem; color: #d97706; margin-bottom: 12px; display: block;"></i>
-                <h3 style="font-size: 1.1rem; color: #451a03; margin-bottom: 6px;">කිසිදු ශිල්පියෙකු හමු නොවීය</h3>
-                <p style="font-size: 0.82rem; color: #64748b; margin-bottom: 16px;">ඔබ සොයන නිර්මාණ ක්ෂේත්‍රය හෝ දිස්ත්‍රික්කය වෙනස් කර නැවත සොයන්න.</p>
-                <button type="button" class="btn-profile-primary" onclick="resetArtisansFilters()" style="margin: 0 auto;">
-                    <i class="fa-solid fa-rotate-left"></i> සියලු ශිල්පීන් පෙන්වන්න
-                </button>
+                <div style="padding: 10px 8px;">
+                    <i class="fa-solid fa-palette" style="font-size: 2.6rem; color: #d97706; margin-bottom: 14px; display: block;"></i>
+                    <h3 style="font-size: 1.15rem; font-weight: 800; color: #451a03; margin-bottom: 8px;">තවමත් සත්‍යාපිත ශිල්පීන් ඇතුළත් කර නොමැත</h3>
+                    <p style="font-size: 0.85rem; color: #64748b; max-width: 520px; margin: 0 auto 18px; line-height: 1.6;">
+                        විහාර චිත්‍ර, වෙහෙර දාගැබ් හෝ කැටයම් නිර්මාණ ක්ෂේත්‍රයේ දක්ෂ ශිල්පියෙකු ඔබ දන්නේ නම්, දැන්ම නොමිලේ ලියාපදිංචි කර ශාසනික මෙහෙවරට දායක වන්න.
+                    </p>
+                    <button type="button" class="btn-register-artisan" onclick="openArtisanRegisterModal()" style="margin: 0 auto; display: inline-flex; align-items: center; gap: 8px; padding: 10px 22px; font-weight: 700; font-size: 0.9rem; border-radius: 9999px; box-shadow: 0 4px 14px rgba(217, 119, 6, 0.3);">
+                        <i class="fa-solid fa-circle-plus"></i>
+                        <span>+ පළමු ශිල්පියා ලියාපදිංචි කරන්න</span>
+                    </button>
+                </div>
             </div>
 
             <!-- Bottom Disclaimer Card -->
@@ -3914,6 +3919,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=156"></script>
+    <script type="module" src="js/app.js?v=157"></script>
 </body>
 </html>

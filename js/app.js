@@ -11238,6 +11238,16 @@ window.renderArtisansDirectoryView = async function() {
   const grid = document.getElementById('artisansGrid');
   const countEl = document.getElementById('artisansResultsCount');
 
+  // Purge any legacy demo artisan cache if present
+  try {
+    const rawCache = localStorage.getItem('pinPotha_artisans_cache');
+    if (rawCache && (rawCache.includes('artisan_seed_') || rawCache.includes('සෝමපාල') || rawCache.includes('0773456789'))) {
+      localStorage.removeItem('pinPotha_artisans_cache');
+    }
+  } catch (e) {
+    // Ignore cache cleanup error
+  }
+
   if (grid) {
     grid.innerHTML = `
       <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #d97706;">
@@ -11422,7 +11432,37 @@ function filterAndRenderArtisanCards() {
 
   if (filtered.length === 0) {
     grid.innerHTML = '';
-    if (emptyState) emptyState.style.display = 'block';
+    if (emptyState) {
+      emptyState.style.display = 'block';
+      if (allArtisansList.length === 0) {
+        // Welcoming empty state when no artisans exist in directory yet
+        emptyState.innerHTML = `
+          <div style="padding: 10px 8px;">
+            <i class="fa-solid fa-palette" style="font-size: 2.6rem; color: #d97706; margin-bottom: 14px; display: block;"></i>
+            <h3 style="font-size: 1.15rem; font-weight: 800; color: #451a03; margin-bottom: 8px;">තවමත් සත්‍යාපිත ශිල්පීන් ඇතුළත් කර නොමැත</h3>
+            <p style="font-size: 0.85rem; color: #64748b; max-width: 520px; margin: 0 auto 18px; line-height: 1.6;">
+              විහාර චිත්‍ර, වෙහෙර දාගැබ් හෝ කැටයම් නිර්මාණ ක්ෂේත්‍රයේ දක්ෂ ශිල්පියෙකු ඔබ දන්නේ නම්, දැන්ම නොමිලේ ලියාපදිංචි කර ශාසනික මෙහෙවරට දායක වන්න.
+            </p>
+            <button type="button" class="btn-register-artisan" onclick="openArtisanRegisterModal()" style="margin: 0 auto; display: inline-flex; align-items: center; gap: 8px; padding: 10px 22px; font-weight: 700; font-size: 0.9rem; border-radius: 9999px; box-shadow: 0 4px 14px rgba(217, 119, 6, 0.3);">
+              <i class="fa-solid fa-circle-plus"></i>
+              <span>+ පළමු ශිල්පියා ලියාපදිංචි කරන්න</span>
+            </button>
+          </div>
+        `;
+      } else {
+        // Search or filter empty state
+        emptyState.innerHTML = `
+          <div style="padding: 10px 8px;">
+            <i class="fa-solid fa-magnifying-glass" style="font-size: 2.2rem; color: #d97706; margin-bottom: 12px; display: block;"></i>
+            <h3 style="font-size: 1.1rem; color: #451a03; margin-bottom: 6px;">කිසිදු ශිල්පියෙකු හමු නොවීය</h3>
+            <p style="font-size: 0.82rem; color: #64748b; margin-bottom: 16px;">ඔබ සොයන නිර්මාණ ක්ෂේත්‍රය හෝ දිස්ත්‍රික්කය වෙනස් කර නැවත සොයන්න.</p>
+            <button type="button" class="btn-profile-primary" onclick="resetArtisansFilters()" style="margin: 0 auto;">
+              <i class="fa-solid fa-rotate-left"></i> සියලු ශිල්පීන් පෙන්වන්න
+            </button>
+          </div>
+        `;
+      }
+    }
     return;
   }
 
