@@ -348,7 +348,7 @@ function renderUsersTable(usersToRender) {
     }
 
     tbody.innerHTML = usersToRender.map(u => {
-        const rawEmail = u.email || 'නැත';
+        const userEmail = u.email || 'නැත';
         const cleanEmail = (u.email || '').trim().toLowerCase();
         const isMaster = cleanEmail === 'silvadilan9@gmail.com';
         const hasAdminPrivilege = !isMaster && (
@@ -450,7 +450,7 @@ function renderUsersTable(usersToRender) {
                                 <span>${Security.escapeHTML(u.name || 'කල්‍යාණ මිත්‍ර')}</span>
                                 ${isMaster ? '<span title="Master Admin" style="color:#fbbf24;">✓</span>' : ''}
                             </div>
-                            <div class="table-user-email">${Security.escapeHTML(email)}</div>
+                            <div class="table-user-email">${Security.escapeHTML(userEmail)}</div>
                         </div>
                     </div>
                 </td>
