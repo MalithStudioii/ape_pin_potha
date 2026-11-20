@@ -51,7 +51,7 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=157">
+    <link rel="stylesheet" href="css/styles.css?v=158">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
@@ -1058,24 +1058,27 @@
 
             <!-- Hero Banner Card -->
             <div class="artisans-hero-card">
-                <div class="artisans-hero-badge">
-                    <i class="fa-solid fa-palette"></i>
-                    <span>සම්ප්‍රදායික විහාර කලා හා නිර්මාණ</span>
+                <div class="artisans-hero-content">
+                    <div class="artisans-hero-badge">
+                        <i class="fa-solid fa-palette"></i>
+                        <span>සම්ප්‍රදායික විහාර කලා හා නිර්මාණ</span>
+                    </div>
+                    <h1 class="artisans-hero-title">ශ්‍රී ලංකා විහාර නිර්මාණ හා කලා ශිල්පීන් නාමාවලිය</h1>
+                    <p class="artisans-hero-desc">
+                        විහාර බිතුසිතුවම්, වෙහෙර දාගැබ්, බුදු පිළිම, ලී හා ගල් කැටයම්, මකර තොරණ සහ වාස්තු නිර්මාණ ශිල්පීන් පිළිබඳ සත්‍යාපිත තොරතුරු සහ සෘජු සබඳතා.
+                    </p>
+                    <div class="artisans-hero-actions">
+                        <button type="button" class="btn-register-artisan" onclick="openArtisanRegisterModal()">
+                            <i class="fa-solid fa-circle-plus"></i>
+                            <span>+ ශිල්පියෙකු ලියාපදිංචි කරන්න</span>
+                        </button>
+                        <button type="button" class="btn-artisans-back" onclick="switchTab('feed')">
+                            <i class="fa-solid fa-arrow-left"></i>
+                            <span>පුණ්‍ය පවුර වෙත</span>
+                        </button>
+                    </div>
                 </div>
-                <h1 class="artisans-hero-title">ශ්‍රී ලංකා විහාර නිර්මාණ හා කලා ශිල්පීන් නාමාවලිය</h1>
-                <p class="artisans-hero-desc">
-                    විහාර බිතුසිතුවම්, වෙහෙර දාගැබ්, බුදු පිළිම, ලී හා ගල් කැටයම්, මකර තොරණ සහ වාස්තු නිර්මාණ ශිල්පීන් පිළිබඳ සත්‍යාපිත තොරතුරු සහ සෘජු සබඳතා.
-                </p>
-                <div class="artisans-hero-actions">
-                    <button type="button" class="btn-register-artisan" onclick="openArtisanRegisterModal()">
-                        <i class="fa-solid fa-circle-plus"></i>
-                        <span>+ ශිල්පියෙකු ලියාපදිංචි කරන්න</span>
-                    </button>
-                    <button type="button" class="btn-artisans-back" onclick="switchTab('feed')">
-                        <i class="fa-solid fa-arrow-left"></i>
-                        <span>පුණ්‍ය පවුර වෙත</span>
-                    </button>
-                </div>
+                <img src="assets/artisan-banner-buddha.webp" alt="Lord Buddha Statue Artwork" class="artisans-hero-buddha-bg" aria-hidden="true" loading="lazy">
             </div>
 
             <!-- Search & Filter Controls -->
@@ -3919,6 +3922,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=157"></script>
+    <script type="module" src="js/app.js?v=158"></script>
 </body>
 </html>
