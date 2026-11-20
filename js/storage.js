@@ -586,6 +586,7 @@ export const StorageService = {
     const userStatsMap = new Map();
     allLocalPosts.forEach(p => {
       if (!p || !p.uid) return;
+      if (this.isOfficialPost(p) || p.isOfficial === true || p.authorRole === 'official') return;
       let stat = userStatsMap.get(p.uid);
       if (!stat) {
         stat = { count: 0, sadhu: 0 };
@@ -3681,8 +3682,10 @@ export const StorageService = {
     // 5. Fallback: derive from existing posts in memory
     const allPosts = this.getLocalPosts();
     const userPost = allPosts.find(p => 
-      (uid && p.uid === uid) || 
-      (cleanAuthor && p.author && p.author.trim().toLowerCase() === cleanAuthor.toLowerCase())
+      !this.isOfficialPost(p) && (
+        (uid && p.uid === uid) || 
+        (cleanAuthor && p.author && p.author.trim().toLowerCase() === cleanAuthor.toLowerCase())
+      )
     );
     if (userPost) {
       const resolvedPhoto = this.resolveAuthorPhoto(userPost);

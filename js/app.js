@@ -782,21 +782,23 @@ export function updateUserStats() {
 
     const isMasterUser = Boolean(user && user.email && user.email.trim().toLowerCase() === 'silvadilan9@gmail.com');
     const myPosts = currentPostsData.filter(p => {
-      if (!p) return false;
+      if (!p || p.isDeleted || p.deleted) return false;
+      const isOfficial = Boolean(StorageService.isOfficialPost ? StorageService.isOfficialPost(p) : (p.isOfficial || p.authorRole === 'official' || p.author === 'අපේ පිං පොත' || p.author === 'අපේ පින් පොත'));
+      if (isOfficial) return false;
       if (user && user.uid && p.uid === user.uid) return true;
       if (user && user.email && p.authorEmail && p.authorEmail.toLowerCase() === user.email.toLowerCase()) return true;
       if (user && user.name && p.author && p.author.trim().toLowerCase() === user.name.trim().toLowerCase()) return true;
       if (isMasterUser && (
         p.uid === 'user_malith' ||
         p.uid === 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2' ||
-        (p.author && (p.author.includes('මලිත්') || p.author === 'අපේ පිං පොත' || p.author === 'පිං පොත පරිපාලනය'))
+        (p.author && p.author.includes('මලිත්'))
       )) return true;
       return false;
     });
     const totalSadhu = myPosts.reduce((acc, p) => acc + (p.sadhuCount || 0), 0);
 
-    const finalPosts = isMasterUser ? Math.max(myPosts.length, 17) : myPosts.length;
-    const finalSadhu = isMasterUser ? Math.max(totalSadhu, 146) : totalSadhu;
+    const finalPosts = myPosts.length;
+    const finalSadhu = totalSadhu;
 
     if (statPostsEl) statPostsEl.innerText = finalPosts;
     if (statSadhuEl) statSadhuEl.innerText = finalSadhu;
@@ -892,6 +894,12 @@ window.openPublicProfile = async function(targetUid, optName = null, optPhoto = 
     return;
   }
 
+  // Intercept official platform identity clicks and open Policies/About modal
+  if (optName === 'අපේ පිං පොත' || optName === 'අපේ පින් පොත' || optName === 'පිං පොත පරිපාලනය' || optName === 'පිං පොත නිල නිවේදනය' || targetUid === 'official_pin_potha') {
+    if (typeof openPoliciesModal === 'function') openPoliciesModal('about');
+    return;
+  }
+
   const currentUser = StorageService.currentUser;
   const isMe = Boolean(currentUser && currentUser.uid && String(currentUser.uid) === String(targetUid));
 
@@ -935,7 +943,8 @@ window.viewUserProfile = async function(uid, authorName, authorPhoto = null, cov
 
   if (uid === 'undefined' || uid === 'null' || !uid) uid = null;
 
-  if (uid === 'official_pin_potha' || authorName === 'අපේ පිං පොත' || authorName === 'පිං පොත පරිපාලනය' || authorName === 'පිං පොත නිල නිවේදනය') {
+  if (uid === 'official_pin_potha' || authorName === 'අපේ පිං පොත' || authorName === 'අපේ පින් පොත' || authorName === 'පිං පොත පරිපාලනය' || authorName === 'පිං පොත නිල නිවේදනය') {
+    if (typeof openPoliciesModal === 'function') openPoliciesModal('about');
     return;
   }
 
@@ -976,6 +985,12 @@ window.openMemberProfileModal = async function(uid, authorName, authorPhoto = nu
 
   if (uid === 'undefined' || uid === 'null' || !uid) uid = null;
   if (!uid && !authorName) return;
+
+  // Intercept official platform identity clicks and open Policies/About modal
+  if (authorName === 'අපේ පිං පොත' || authorName === 'අපේ පින් පොත' || authorName === 'පිං පොත පරිපාලනය' || authorName === 'පිං පොත නිල නිවේදනය' || uid === 'official_pin_potha') {
+    if (typeof openPoliciesModal === 'function') openPoliciesModal('about');
+    return;
+  }
 
   // Self check: If viewing own profile, redirect to editable profile tab
   const currentUser = StorageService.currentUser;
@@ -1158,7 +1173,7 @@ currentViewingMember = member;
     joinedEl.innerText = rawJoined.includes('සිට') ? rawJoined : `${rawJoined} සිට සාමාජික`;
   }
 
-  // Filter public posts for this member (strictly non-private and not deleted)
+  // Filter public posts for this member (strictly non-private, non-official and not deleted)
   const allPosts = (Array.isArray(currentPostsData) && currentPostsData.length > 0)
     ? currentPostsData
     : (StorageService.getLocalPosts() || []);
@@ -1166,6 +1181,8 @@ currentViewingMember = member;
   const memberPosts = allPosts.filter(p => {
     if (!p || p.isDeleted || p.deleted) return false;
     if (p.visibility === 'private') return false;
+    const isOfficial = Boolean(StorageService.isOfficialPost ? StorageService.isOfficialPost(p) : (p.isOfficial || p.authorRole === 'official' || p.author === 'අපේ පිං පොත' || p.author === 'අපේ පින් පොත'));
+    if (isOfficial) return false;
     const matchUid = Boolean(uid && p.uid && String(p.uid) === String(uid));
     const resolvedName = StorageService.resolveAuthorName ? StorageService.resolveAuthorName(p) : (p.author || p.authorName);
     const matchAuthor = Boolean(
@@ -2375,7 +2392,7 @@ function updatePostCommentCountUI(postId) {
 // Reusable Post Card HTML Generator
 export function renderPostCardHTML(post, user) {
   if (!post) return '';
-  const isOfficial = Boolean(StorageService.isOfficialPost ? StorageService.isOfficialPost(post) : (post.isOfficial || post.author === 'අපේ පිං පොත'));
+  const isOfficial = Boolean(StorageService.isOfficialPost ? StorageService.isOfficialPost(post) : (post.isOfficial || post.authorRole === 'official' || post.author === 'අපේ පිං පොත' || post.author === 'අපේ පින් පොත'));
   post.isOfficial = isOfficial;
   const isMaster = StorageService.isMasterAdmin();
   const isOwner = Boolean(user && user.uid && post.uid === user.uid);
@@ -2386,6 +2403,7 @@ export function renderPostCardHTML(post, user) {
   const isGeneral = post.type === 'general';
   const isRepost = post.type === 'repost' || post.isRepost === true || !!post.originalPost;
   const orig = post.originalPost;
+  const isOrigOfficial = orig ? Boolean(StorageService.isOfficialPost ? StorageService.isOfficialPost(orig) : (orig.isOfficial || orig.authorRole === 'official' || orig.author === 'අපේ පිං පොත' || orig.author === 'අපේ පින් පොත')) : false;
   const currentUserUid = user && user.uid ? user.uid : 'anonymous';
   const sadhuUsers = Array.isArray(post.sadhuUsers) ? post.sadhuUsers : [];
   const hasGivenSadhu = sadhuUsers.includes(currentUserUid) || StorageService.hasUserGivenSadhu(post, currentUserUid);
@@ -2424,11 +2442,11 @@ export function renderPostCardHTML(post, user) {
       ${isRepost ? `
         <div class="repost-header-tag">
           <div style="display: flex; align-items: center; gap: 8px;">
-            <div class="repost-icon-circle" onclick="viewUserProfile('${post.uid || ''}', '${Security.escapeHTML(postAuthorName)}', '${postAuthorPhoto ? Security.sanitizeUrl(postAuthorPhoto) : ''}')" style="cursor: pointer;" title="${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න">
+            <div class="repost-icon-circle" ${post.isOfficial ? `onclick="openPoliciesModal('about')" title="අපේ පිං පොත පිළිබඳ විස්තර"` : `onclick="viewUserProfile('${post.uid || ''}', '${Security.escapeHTML(postAuthorName)}', '${postAuthorPhoto ? Security.sanitizeUrl(postAuthorPhoto) : ''}')" title="${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න"`} style="cursor: pointer;">
               <i class="fa-solid fa-repeat"></i>
             </div>
             <div>
-              <span class="repost-actor-name ${post.isOfficial ? '' : 'author-click-link'}" ${post.isOfficial ? '' : `onclick="viewUserProfile('${post.uid || ''}', '${Security.escapeHTML(postAuthorName)}', '${postAuthorPhoto ? Security.sanitizeUrl(postAuthorPhoto) : ''}')"`} title="${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න"><strong>${Security.escapeHTML(post.isOfficial ? 'අපේ පිං පොත' : postAuthorName)}</strong> විසින් යළි බෙදාගන්නා ලදී</span>
+              <span class="repost-actor-name ${post.isOfficial ? '' : 'author-click-link'}" ${post.isOfficial ? `onclick="openPoliciesModal('about')"` : `onclick="viewUserProfile('${post.uid || ''}', '${Security.escapeHTML(postAuthorName)}', '${postAuthorPhoto ? Security.sanitizeUrl(postAuthorPhoto) : ''}')"`} title="${post.isOfficial ? 'අපේ පිං පොත පිළිබඳ විස්තර' : `${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න`}"><strong>${Security.escapeHTML(post.isOfficial ? 'අපේ පිං පොත' : postAuthorName)}</strong> විසින් යළි බෙදාගන්නා ලදී</span>
               <span class="repost-time">${Security.escapeHTML(formatRelativeTimeSinhala(post.timestamp, post.date || 'දැන්'))}</span>
             </div>
           </div>
@@ -2459,9 +2477,9 @@ export function renderPostCardHTML(post, user) {
           <div class="quoted-merit-box" onclick="viewOriginalPost('${orig.id}', '${post.id}')" title="සම්පූර්ණ මුල් සටහන බලන්න ක්ලික් කරන්න">
             <div class="quoted-merit-header">
               <div style="display: flex; align-items: center; gap: 8px;">
-                <div class="quoted-avatar" onclick="event.stopPropagation(); viewUserProfile('${orig.uid || ''}', '${Security.escapeHTML(origAuthorName)}', '${origAuthorPhoto ? Security.sanitizeUrl(origAuthorPhoto) : ''}')" style="cursor: pointer;" title="${Security.escapeHTML(origAuthorName)} ගේ Profile එක බලන්න">${origAuthorPhoto ? `<img src="${Security.sanitizeUrl(origAuthorPhoto)}" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover;">` : Security.escapeHTML(origAuthorName.charAt(0))}</div>
+                <div class="quoted-avatar" ${isOrigOfficial ? `onclick="event.stopPropagation(); openPoliciesModal('about');" style="cursor: pointer;" title="අපේ පිං පොත පිළිබඳ විස්තර"` : `onclick="event.stopPropagation(); viewUserProfile('${orig.uid || ''}', '${Security.escapeHTML(origAuthorName)}', '${origAuthorPhoto ? Security.sanitizeUrl(origAuthorPhoto) : ''}')" style="cursor: pointer;" title="${Security.escapeHTML(origAuthorName)} ගේ Profile එක බලන්න"`}>${origAuthorPhoto ? `<img src="${Security.sanitizeUrl(origAuthorPhoto)}" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover;">` : Security.escapeHTML(origAuthorName.charAt(0))}</div>
                 <div>
-                  <div class="author-click-link" onclick="event.stopPropagation(); viewUserProfile('${orig.uid || ''}', '${Security.escapeHTML(origAuthorName)}', '${origAuthorPhoto ? Security.sanitizeUrl(origAuthorPhoto) : ''}')" title="${Security.escapeHTML(origAuthorName)} ගේ Profile එක බලන්න" style="font-weight: 700; font-size: 0.82rem; color: #78350f;">${Security.escapeHTML(origAuthorName)}</div>
+                  <div class="${isOrigOfficial ? '' : 'author-click-link'}" ${isOrigOfficial ? `onclick="event.stopPropagation(); openPoliciesModal('about');"` : `onclick="event.stopPropagation(); viewUserProfile('${orig.uid || ''}', '${Security.escapeHTML(origAuthorName)}', '${origAuthorPhoto ? Security.sanitizeUrl(origAuthorPhoto) : ''}')"`} title="${isOrigOfficial ? 'අපේ පිං පොත පිළිබඳ විස්තර' : `${Security.escapeHTML(origAuthorName)} ගේ Profile එක බලන්න`}" style="font-weight: 700; font-size: 0.82rem; color: #78350f;">${Security.escapeHTML(origAuthorName)}</div>
                   <div style="font-size: 0.68rem; color: #94a3b8;">${Security.escapeHTML(formatRelativeTimeSinhala(orig.timestamp, orig.date || 'මෑතකදී'))} ${orig.location ? '• ' + Security.escapeHTML(orig.location) : ''}</div>
                 </div>
               </div>
@@ -2493,12 +2511,12 @@ export function renderPostCardHTML(post, user) {
         <div class="post-header">
           <div class="post-author-info">
             ${post.isOfficial ? `
-              <div class="post-avatar official-avatar-circle" title="අපේ පිං පොත">
+              <div class="post-avatar official-avatar-circle" onclick="openPoliciesModal('about')" style="cursor: pointer;" title="අපේ පිං පොත පිළිබඳ විස්තර">
                 <i class="fa-solid fa-dharmachakra" style="font-size: 1.35rem; color: #fef3c7; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));"></i>
               </div>
               <div>
                 <div class="post-badges-wrap" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                  <span class="post-author-name official-author-name">අපේ පිං පොත</span>
+                  <span class="post-author-name official-author-name" onclick="openPoliciesModal('about')" style="cursor: pointer;" title="අපේ පිං පොත පිළිබඳ විස්තර">අපේ පිං පොත</span>
                   ${post.visibility === 'private' ? '<span class="post-badge private"><i class="fa-solid fa-lock" style="font-size: 9px;"></i> Private</span>' : ''}
                 </div>
                 <div class="post-meta-sub">
@@ -2800,7 +2818,7 @@ function renderFeed() {
       if (!matchTitle && !matchDesc && !matchLoc && !matchAuthor) return false;
     }
 
-    const isOfficial = StorageService.isOfficialPost ? StorageService.isOfficialPost(post) : Boolean(post.isOfficial || post.author === 'අපේ පිං පොත');
+    const isOfficial = StorageService.isOfficialPost ? StorageService.isOfficialPost(post) : Boolean(post.isOfficial || post.authorRole === 'official' || post.author === 'අපේ පිං පොත' || post.author === 'අපේ පින් පොත');
     post.isOfficial = isOfficial;
 
     const isCategoryMatch = (activeCategory === 'සියල්ල') ||
@@ -2816,9 +2834,10 @@ function renderFeed() {
     if (activeTab === 'mybook') {
       if (post.visibility !== 'private') return false;
       if (!isCategoryMatch) return false;
+      if (isOfficial) return false;
       const isOwner = (user && post.uid === user.uid) ||
                       (user && user.email && post.authorEmail && post.authorEmail.toLowerCase() === user.email.toLowerCase()) ||
-                      (isMaster && (post.uid === 'user_malith' || post.author === 'අපේ පිං පොත'));
+                      (isMaster && post.uid === 'user_malith');
       return isOwner;
     }
 
@@ -3049,7 +3068,7 @@ export function appendNewPostsToFeed(allPosts, prevIdsStr) {
       if (!matchTitle && !matchDesc && !matchLoc && !matchAuthor) return false;
     }
 
-    const isOfficial = StorageService.isOfficialPost ? StorageService.isOfficialPost(post) : Boolean(post.isOfficial || post.author === 'අපේ පිං පොත');
+    const isOfficial = StorageService.isOfficialPost ? StorageService.isOfficialPost(post) : Boolean(post.isOfficial || post.authorRole === 'official' || post.author === 'අපේ පිං පොත' || post.author === 'අපේ පින් පොත');
     post.isOfficial = isOfficial;
 
     const isCategoryMatch = (activeCategory === 'සියල්ල') ||
@@ -3065,9 +3084,10 @@ export function appendNewPostsToFeed(allPosts, prevIdsStr) {
     if (activeTab === 'mybook') {
       if (post.visibility !== 'private') return false;
       if (!isCategoryMatch) return false;
+      if (isOfficial) return false;
       const isOwner = (user && post.uid === user.uid) ||
                       (user && user.email && post.authorEmail && post.authorEmail.toLowerCase() === user.email.toLowerCase()) ||
-                      (isMaster && (post.uid === 'user_malith' || post.author === 'අපේ පිං පොත'));
+                      (isMaster && post.uid === 'user_malith');
       return isOwner;
     }
 
@@ -6632,15 +6652,17 @@ function renderProfileView() {
   const isGuest = !user || !user.email;
   const isMasterUser = Boolean(!isGuest && user && user.email && user.email.trim().toLowerCase() === 'silvadilan9@gmail.com');
   const isMyPost = (p) => {
-    if (!p) return false;
+    if (!p || p.isDeleted || p.deleted) return false;
     if (isGuest) return false;
+    const isOfficial = Boolean(StorageService.isOfficialPost ? StorageService.isOfficialPost(p) : (p.isOfficial || p.authorRole === 'official' || p.author === 'අපේ පිං පොත' || p.author === 'අපේ පින් පොත'));
+    if (isOfficial) return false;
     if (user && user.uid && p.uid === user.uid) return true;
     if (user && user.email && p.authorEmail && p.authorEmail.toLowerCase() === user.email.toLowerCase()) return true;
     if (user && user.name && p.author && p.author.trim().toLowerCase() === user.name.trim().toLowerCase()) return true;
     if (isMasterUser && (
       p.uid === 'user_malith' ||
       p.uid === 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2' ||
-      (p.author && (p.author.includes('මලිත්') || p.author === 'අපේ පිං පොත' || p.author === 'පිං පොත පරිපාලනය'))
+      (p.author && p.author.includes('මලිත්'))
     )) return true;
     return false;
   };
@@ -6903,9 +6925,26 @@ function renderProfileBadges(myPosts, totalSadhu, user) {
 window.setProfileSubTab = function(subTab) {
   activeProfileSubTab = subTab;
   const user = StorageService.currentUser || {};
-  const myPosts = currentPostsData.filter(p => p.uid && user.uid && p.uid === user.uid);
-  const myPrivatePosts = currentPostsData.filter(p => p.uid && user.uid && p.uid === user.uid && p.visibility === 'private');
-  const myPhotosPosts = currentPostsData.filter(p => p.uid && user.uid && p.uid === user.uid && p.image);
+  const isGuest = !user || !user.email;
+  const isMasterUser = Boolean(!isGuest && user && user.email && user.email.trim().toLowerCase() === 'silvadilan9@gmail.com');
+  const isMyPost = (p) => {
+    if (!p || p.isDeleted || p.deleted) return false;
+    if (isGuest) return false;
+    const isOfficial = Boolean(StorageService.isOfficialPost ? StorageService.isOfficialPost(p) : (p.isOfficial || p.authorRole === 'official' || p.author === 'අපේ පිං පොත' || p.author === 'අපේ පින් පොත'));
+    if (isOfficial) return false;
+    if (user && user.uid && p.uid === user.uid) return true;
+    if (user && user.email && p.authorEmail && p.authorEmail.toLowerCase() === user.email.toLowerCase()) return true;
+    if (user && user.name && p.author && p.author.trim().toLowerCase() === user.name.trim().toLowerCase()) return true;
+    if (isMasterUser && (
+      p.uid === 'user_malith' ||
+      p.uid === 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2' ||
+      (p.author && p.author.includes('මලිත්'))
+    )) return true;
+    return false;
+  };
+  const myPosts = currentPostsData.filter(isMyPost);
+  const myPrivatePosts = myPosts.filter(p => p.visibility === 'private');
+  const myPhotosPosts = myPosts.filter(p => p.image || (Array.isArray(p.images) && p.images.length > 0));
   const totalSadhu = myPosts.reduce((acc, p) => acc + (p.sadhuCount || 0), 0);
 
   // Sync state class on profile-content-grid to toggle sidebar visibility
