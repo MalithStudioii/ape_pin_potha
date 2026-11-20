@@ -1688,6 +1688,77 @@
                     <span>තහනම් වචන සුරකින්න</span>
                 </button>
             </div>
+
+            <!-- Base64 to ImgBB Storage Optimizer (Master Admin Only) -->
+            <div class="glass-panel" style="border: 1px solid rgba(16, 185, 129, 0.35); background: linear-gradient(145deg, rgba(30, 41, 59, 0.7), rgba(16, 185, 129, 0.05)); margin-top: 24px;">
+                <div class="panel-header">
+                    <div class="panel-title" style="color: #34d399;">
+                        <i class="fa-solid fa-server"></i>
+                        <span>Base64 පින්තූර පිරිසිදු කිරීම (Storage Optimizer)</span>
+                    </div>
+                </div>
+                <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.5;">
+                    පැරණි සටහන්වල සහ ගිණුම්වල ඇති බරැති Base64 Data URI (<code>data:image/...</code>) පින්තූර හඳුනාගෙන, ඒවා ස්වයංක්‍රීයව ImgBB CDN වෙත මාරු කර (Migrate) Firestore දත්ත ප්‍රමාණය (Payload Size) සුරක්ෂිතව අවම කරයි.
+                </p>
+
+                <!-- Actions Button Row -->
+                <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 18px;">
+                    <button type="button" id="btnScanBase64" class="btn-save-settings" onclick="scanBase64Images()" style="background: linear-gradient(135deg, #0284c7, #0369a1); color: #fff;">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <span>Base64 පින්තූර පරීක්ෂා කරන්න (Scan Only)</span>
+                    </button>
+                    <button type="button" id="btnMigrateBase64" class="btn-save-settings" onclick="startBase64Migration()" disabled style="background: linear-gradient(135deg, #10b981, #059669); color: #fff; opacity: 0.5; cursor: not-allowed;">
+                        <i class="fa-solid fa-rocket"></i>
+                        <span>ImgBB වෙත මාරු කරන්න (Start Migration)</span>
+                    </button>
+                </div>
+
+                <!-- Live Metrics Summary -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 16px;">
+                    <div style="background: rgba(15, 23, 42, 0.6); padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); text-align: center;">
+                        <div style="font-size: 0.72rem; color: #94a3b8; margin-bottom: 4px;">පරීක්ෂා කළ සටහන්</div>
+                        <div id="statBase64Scanned" style="font-size: 1.1rem; font-weight: 800; color: #38bdf8;">0</div>
+                    </div>
+                    <div style="background: rgba(15, 23, 42, 0.6); padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); text-align: center;">
+                        <div style="font-size: 0.72rem; color: #94a3b8; margin-bottom: 4px;">හමු වූ Base64</div>
+                        <div id="statBase64Found" style="font-size: 1.1rem; font-weight: 800; color: #f59e0b;">0</div>
+                    </div>
+                    <div style="background: rgba(15, 23, 42, 0.6); padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); text-align: center;">
+                        <div style="font-size: 0.72rem; color: #94a3b8; margin-bottom: 4px;">මාරු කළ ගණන</div>
+                        <div id="statBase64Migrated" style="font-size: 1.1rem; font-weight: 800; color: #10b981;">0</div>
+                    </div>
+                    <div style="background: rgba(15, 23, 42, 0.6); padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); text-align: center;">
+                        <div style="font-size: 0.72rem; color: #94a3b8; margin-bottom: 4px;">අතහැරි / අසාර්ථක</div>
+                        <div id="statBase64Failed" style="font-size: 1.1rem; font-weight: 800; color: #ef4444;">0</div>
+                    </div>
+                    <div style="background: rgba(15, 23, 42, 0.6); padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); text-align: center;">
+                        <div style="font-size: 0.72rem; color: #94a3b8; margin-bottom: 4px;">ඉතිරි කළ ඉඩ (Est.)</div>
+                        <div id="statBase64Saved" style="font-size: 1.1rem; font-weight: 800; color: #a7f3d0;">0 KB</div>
+                    </div>
+                </div>
+
+                <!-- Progress Bar -->
+                <div id="base64ProgressContainer" style="display: none; margin-bottom: 16px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: #cbd5e1; margin-bottom: 6px;">
+                        <span id="base64ProgressLabel">මාරු කරමින් පවතී...</span>
+                        <span id="base64ProgressPercent">0%</span>
+                    </div>
+                    <div style="width: 100%; height: 10px; background: rgba(15, 23, 42, 0.8); border-radius: 6px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1);">
+                        <div id="base64ProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #10b981, #06b6d4); transition: width 0.3s ease;"></div>
+                    </div>
+                </div>
+
+                <!-- Live Monospace Terminal Log Box -->
+                <div style="margin-top: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <span style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Live Execution Log</span>
+                        <button type="button" onclick="clearBase64Logs()" style="background: none; border: none; color: #64748b; font-size: 0.72rem; cursor: pointer;">පිරිසිදු කරන්න</button>
+                    </div>
+                    <div id="base64LogBox" style="background: #090d16; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px; max-height: 220px; overflow-y: auto; font-family: 'Courier New', Courier, monospace; font-size: 0.75rem; line-height: 1.5; color: #cbd5e1;">
+                        <div style="color: #64748b;">[Ready] "Base64 පින්තූර පරීක්ෂා කරන්න" බොත්තම ඔබා පරීක්ෂාව අරඹන්න.</div>
+                    </div>
+                </div>
+            </div>
         </section>
 
         <!-- ================= TAB: TEMPLE ARTISANS MANAGEMENT (Master Admin Only) ================= -->
@@ -1930,6 +2001,6 @@
     </div>
 
     <!-- ES Module Script for Admin Logic -->
-    <script type="module" src="js/admin.js?v=88"></script>
+    <script type="module" src="js/admin.js?v=89"></script>
 </body>
 </html>

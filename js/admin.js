@@ -9,7 +9,7 @@
 
 import { firebaseConfig, isFirebaseConfigured, COLLECTIONS } from './firebase-config.js?v=22';
 import { Security } from './security.js?v=48';
-import { uploadToImgBB } from './imgbb-service.js?v=66';
+import { uploadToImgBB, getImgBBApiKey } from './imgbb-service.js?v=66';
 
 const MASTER_ADMIN_EMAIL = "silvadilan9@gmail.com";
 const MASTER_ADMIN_EMAILS = [
@@ -1801,5 +1801,343 @@ window.handleAdminArtisanDirectSubmit = async function(e) {
             submitBtn.disabled = false;
             if (btnText) btnText.textContent = editDocId ? "යාවත්කාලීන කරන්න" : "ශිල්පියා සුරකින්න";
         }
+    }
+};
+
+// ============================================================================
+// BASE64 TO IMGBB STORAGE OPTIMIZER & MIGRATOR (MASTER ADMIN ONLY)
+// ============================================================================
+
+let scannedBase64Items = [];
+let isBase64Scanning = false;
+let isBase64Migrating = false;
+
+// Append message line to the monospace terminal log box
+function appendBase64Log(message, type = 'info') {
+    const box = document.getElementById('base64LogBox');
+    if (!box) return;
+    const time = new Date().toLocaleTimeString();
+    let color = '#cbd5e1';
+    if (type === 'success') color = '#34d399';
+    if (type === 'warn') color = '#f59e0b';
+    if (type === 'error') color = '#f87171';
+    if (type === 'info') color = '#38bdf8';
+
+    const line = document.createElement('div');
+    line.style.color = color;
+    line.style.wordBreak = 'break-all';
+    line.innerText = `[${time}] ${message}`;
+    box.appendChild(line);
+    box.scrollTop = box.scrollHeight;
+}
+
+// Clear terminal log box
+window.clearBase64Logs = function() {
+    const box = document.getElementById('base64LogBox');
+    if (box) {
+        box.innerHTML = '<div style="color: #64748b;">[Ready] Logs cleared.</div>';
+    }
+};
+
+// Convert Base64 Data URI to binary Blob
+function dataURItoBlob(dataURI) {
+    const parts = dataURI.split(',');
+    const mimeMatch = parts[0].match(/:(.*?);/);
+    const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+    const b64Data = parts[1];
+    const byteCharacters = atob(b64Data);
+    const byteArrays = [];
+
+    const sliceSize = 512;
+    for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+        const slice = byteCharacters.slice(offset, offset + sliceSize);
+        const byteNumbers = new Array(slice.length);
+        for (let i = 0; i < slice.length; i++) {
+            byteNumbers[i] = slice.charCodeAt(i);
+        }
+        byteArrays.push(new Uint8Array(byteNumbers));
+    }
+    return new Blob(byteArrays, { type: mime });
+}
+
+// Delay helper to prevent rate-limiting
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Scan collections for raw Base64 data URIs
+window.scanBase64Images = async function() {
+    if (!isMasterAdmin || !checkIsMasterAdmin(currentAdminUser)) {
+        alert('මෙම පහසුකම සඳහා අවසර ඇත්තේ Master Admin ට පමණි.');
+        return;
+    }
+    if (isBase64Scanning || isBase64Migrating) return;
+
+    isBase64Scanning = true;
+    const btnScan = document.getElementById('btnScanBase64');
+    const btnMigrate = document.getElementById('btnMigrateBase64');
+    if (btnScan) {
+        btnScan.disabled = true;
+        btnScan.style.opacity = '0.6';
+    }
+    if (btnMigrate) {
+        btnMigrate.disabled = true;
+        btnMigrate.style.opacity = '0.5';
+        btnMigrate.style.cursor = 'not-allowed';
+    }
+
+    appendBase64Log('Scanning merit_posts and users collections for Base64 Data URIs...', 'info');
+
+    scannedBase64Items = [];
+    let scannedDocsCount = 0;
+    let foundItemsCount = 0;
+    let totalBytesFound = 0;
+
+    try {
+        const { collection, getDocs } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+
+        // 1. Scan merit_posts collection
+        appendBase64Log('Reading merit_posts collection...', 'info');
+        const postsSnap = await getDocs(collection(db, COLLECTIONS.POSTS));
+        postsSnap.forEach(docSnap => {
+            scannedDocsCount++;
+            const data = docSnap.data();
+            const docId = docSnap.id;
+
+            // Check single image string fields
+            const singleFields = ['image', 'imageUrl', 'photo', 'mediaUrl', 'thumbnail', 'authorPhoto'];
+            singleFields.forEach(field => {
+                const val = data[field];
+                if (typeof val === 'string' && val.startsWith('data:image/')) {
+                    foundItemsCount++;
+                    totalBytesFound += val.length;
+                    scannedBase64Items.push({
+                        collection: COLLECTIONS.POSTS,
+                        docId: docId,
+                        field: field,
+                        isArray: false,
+                        index: -1,
+                        base64: val,
+                        docTitle: data.title || data.author || docId
+                    });
+                }
+            });
+
+            // Check array fields
+            const arrayFields = ['images', 'media', 'photos'];
+            arrayFields.forEach(field => {
+                const arr = data[field];
+                if (Array.isArray(arr)) {
+                    arr.forEach((item, idx) => {
+                        if (typeof item === 'string' && item.startsWith('data:image/')) {
+                            foundItemsCount++;
+                            totalBytesFound += item.length;
+                            scannedBase64Items.push({
+                                collection: COLLECTIONS.POSTS,
+                                docId: docId,
+                                field: field,
+                                isArray: true,
+                                index: idx,
+                                base64: item,
+                                docTitle: data.title || data.author || docId
+                            });
+                        }
+                    });
+                }
+            });
+        });
+
+        // 2. Scan users collection
+        appendBase64Log('Reading users collection...', 'info');
+        const usersSnap = await getDocs(collection(db, COLLECTIONS.USERS));
+        usersSnap.forEach(docSnap => {
+            scannedDocsCount++;
+            const data = docSnap.data();
+            const docId = docSnap.id;
+            const userFields = ['photo', 'photoURL', 'coverImage'];
+            userFields.forEach(field => {
+                const val = data[field];
+                if (typeof val === 'string' && val.startsWith('data:image/')) {
+                    foundItemsCount++;
+                    totalBytesFound += val.length;
+                    scannedBase64Items.push({
+                        collection: COLLECTIONS.USERS,
+                        docId: docId,
+                        field: field,
+                        isArray: false,
+                        index: -1,
+                        base64: val,
+                        docTitle: data.name || data.email || docId
+                    });
+                }
+            });
+        });
+
+        // Update UI counters
+        const scannedEl = document.getElementById('statBase64Scanned');
+        const foundEl = document.getElementById('statBase64Found');
+        const savedEl = document.getElementById('statBase64Saved');
+        if (scannedEl) scannedEl.innerText = scannedDocsCount;
+        if (foundEl) foundEl.innerText = foundItemsCount;
+
+        const estKb = Math.round(totalBytesFound / 1024);
+        if (savedEl) savedEl.innerText = estKb > 1024 ? `${(estKb / 1024).toFixed(2)} MB` : `${estKb} KB`;
+
+        if (foundItemsCount > 0) {
+            appendBase64Log(`Scan completed: Found ${foundItemsCount} Base64 image(s) across ${scannedDocsCount} documents (~${estKb} KB payload bloat). Ready to migrate.`, 'warn');
+            if (btnMigrate) {
+                btnMigrate.disabled = false;
+                btnMigrate.style.opacity = '1';
+                btnMigrate.style.cursor = 'pointer';
+            }
+        } else {
+            appendBase64Log(`Scan completed: Scanned ${scannedDocsCount} documents. Zero Base64 images found. Database is clean!`, 'success');
+        }
+    } catch (err) {
+        console.error('[Base64 Scan] Error:', err);
+        appendBase64Log(`Scan error: ${err.message}`, 'error');
+    } finally {
+        isBase64Scanning = false;
+        if (btnScan) {
+            btnScan.disabled = false;
+            btnScan.style.opacity = '1';
+        }
+    }
+};
+
+// Migrate scanned Base64 items to ImgBB and update Firestore docs
+window.startBase64Migration = async function() {
+    if (!isMasterAdmin || !checkIsMasterAdmin(currentAdminUser)) {
+        alert('මෙම පහසුකම සඳහා අවසර ඇත්තේ Master Admin ට පමණි.');
+        return;
+    }
+    if (isBase64Migrating || scannedBase64Items.length === 0) return;
+
+    const confirmMigrate = confirm(`හමු වූ Base64 අයිතම ${scannedBase64Items.length} ක් ImgBB වෙත මාරු කිරීම (Migration) ආරම්භ කිරීමට අවශ්‍යද?\n\nමෙම ක්‍රියාවලිය අතරතුර පිටුව Reload නොකරන්න.`);
+    if (!confirmMigrate) return;
+
+    isBase64Migrating = true;
+    const btnScan = document.getElementById('btnScanBase64');
+    const btnMigrate = document.getElementById('btnMigrateBase64');
+    if (btnScan) {
+        btnScan.disabled = true;
+        btnScan.style.opacity = '0.5';
+    }
+    if (btnMigrate) {
+        btnMigrate.disabled = true;
+        btnMigrate.style.opacity = '0.5';
+        btnMigrate.style.cursor = 'not-allowed';
+    }
+
+    const progressContainer = document.getElementById('base64ProgressContainer');
+    const progressBar = document.getElementById('base64ProgressBar');
+    const progressPercent = document.getElementById('base64ProgressPercent');
+    const progressLabel = document.getElementById('base64ProgressLabel');
+    if (progressContainer) progressContainer.style.display = 'block';
+
+    appendBase64Log(`Starting sequential ImgBB migration for ${scannedBase64Items.length} item(s)...`, 'info');
+    await recordAuditLog('Base64 Migration Started', `Starting migration for ${scannedBase64Items.length} base64 items.`);
+
+    let migratedCount = 0;
+    let failedCount = 0;
+    let bytesSavedSoFar = 0;
+
+    const { doc, getDoc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+
+    for (let i = 0; i < scannedBase64Items.length; i++) {
+        const item = scannedBase64Items[i];
+        const itemNum = i + 1;
+        const total = scannedBase64Items.length;
+        const pct = Math.round((itemNum / total) * 100);
+
+        if (progressBar) progressBar.style.width = `${pct}%`;
+        if (progressPercent) progressPercent.innerText = `${pct}% (${itemNum}/${total})`;
+        if (progressLabel) progressLabel.innerText = `Migrating [${item.collection}] ${item.docId} (${item.field})...`;
+
+        try {
+            // 1. Convert Base64 data URI to Blob
+            const blob = dataURItoBlob(item.base64);
+            const uploadName = `migrated_${item.collection}_${item.docId}_${item.field}`;
+
+            // 2. Upload to ImgBB
+            appendBase64Log(`[${itemNum}/${total}] Uploading to ImgBB (${item.docId} -> ${item.field})...`, 'info');
+            const uploadedUrl = await uploadToImgBB(blob, uploadName);
+
+            // 3. Verify returned URL is valid https URL
+            if (!uploadedUrl || !uploadedUrl.startsWith('https://')) {
+                throw new Error('ImgBB did not return a valid https URL (upload failed or returned fallback URI).');
+            }
+
+            // 4. Update the Firestore document strictly replacing the image field
+            const docRef = doc(db, item.collection, item.docId);
+            const docSnap = await getDoc(docRef);
+
+            if (!docSnap.exists()) {
+                throw new Error(`Document ${item.docId} not found in ${item.collection}`);
+            }
+
+            const currentData = docSnap.data();
+
+            if (item.isArray) {
+                const currentArr = Array.isArray(currentData[item.field]) ? [...currentData[item.field]] : [];
+                if (item.index >= 0 && item.index < currentArr.length && currentArr[item.index] === item.base64) {
+                    currentArr[item.index] = uploadedUrl;
+                } else {
+                    const matchIdx = currentArr.indexOf(item.base64);
+                    if (matchIdx !== -1) {
+                        currentArr[matchIdx] = uploadedUrl;
+                    } else if (item.index >= 0 && item.index < currentArr.length) {
+                        currentArr[item.index] = uploadedUrl;
+                    }
+                }
+                await updateDoc(docRef, { [item.field]: currentArr });
+            } else {
+                await updateDoc(docRef, { [item.field]: uploadedUrl });
+            }
+
+            migratedCount++;
+            bytesSavedSoFar += (item.base64.length - uploadedUrl.length);
+            appendBase64Log(`✓ [${itemNum}/${total}] Success: ${item.docId} (${item.field}) -> ${uploadedUrl}`, 'success');
+
+        } catch (err) {
+            failedCount++;
+            console.error(`[Base64 Migration Error] ${item.docId}:`, err);
+            appendBase64Log(`✗ [${itemNum}/${total}] Failed (${item.docId} / ${item.field}): ${err.message}`, 'error');
+        }
+
+        // Update live counters
+        const migEl = document.getElementById('statBase64Migrated');
+        const failEl = document.getElementById('statBase64Failed');
+        const savedEl = document.getElementById('statBase64Saved');
+        if (migEl) migEl.innerText = migratedCount;
+        if (failEl) failEl.innerText = failedCount;
+        const savedKb = Math.round(bytesSavedSoFar / 1024);
+        if (savedEl) savedEl.innerText = savedKb > 1024 ? `${(savedKb / 1024).toFixed(2)} MB` : `${savedKb} KB`;
+
+        // Wait 1200ms before next upload to prevent ImgBB API rate limits
+        if (i < scannedBase64Items.length - 1) {
+            await sleep(1200);
+        }
+    }
+
+    // Invalidate and clear local caches
+    try {
+        localStorage.removeItem('pinPotha_posts');
+        localStorage.removeItem('pinPotha_sandbox_posts');
+        localStorage.removeItem('pinPotha_cached_posts');
+        appendBase64Log('Cleared local post caches (pinPotha_posts, pinPotha_sandbox_posts).', 'info');
+    } catch (e) {
+        console.warn('[Base64 Migration] Cache clear warning:', e);
+    }
+
+    const totalSavedKb = Math.round(bytesSavedSoFar / 1024);
+    const summaryMsg = `Migration completed: Successfully migrated ${migratedCount} item(s) to ImgBB (~${totalSavedKb} KB saved). Failed/Skipped: ${failedCount}.`;
+    appendBase64Log(summaryMsg, migratedCount > 0 ? 'success' : 'warn');
+    await recordAuditLog('Base64 Migration Finished', summaryMsg);
+    alert(summaryMsg);
+
+    isBase64Migrating = false;
+    scannedBase64Items = [];
+    if (btnScan) {
+        btnScan.disabled = false;
+        btnScan.style.opacity = '1';
     }
 };
