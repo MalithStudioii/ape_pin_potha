@@ -283,7 +283,7 @@ export const StorageService = {
   },
 
   /**
-   * Checks whether a user/email/post is Master Admin (silvadilan9@gmail.com, creativeparadise25@gmail.com, user_malith, o2pWiAX7SXTHiMfSiphI8Ln5HAM2)
+   * Checks whether a user/email/post is Master Admin (strictly silvadilan9@gmail.com)
    */
     isMasterAdmin(userOrEmailOrUid) {
     const isMasterEmail = (email) => {

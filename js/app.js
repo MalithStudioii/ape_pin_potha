@@ -541,9 +541,7 @@ export function updateUserInfoUI() {
     const isGuest = !user || !user.email;
     const isMaster = Boolean(!isGuest && user && (
       StorageService.isMasterAdmin(user) ||
-      (user.email && user.email.trim().toLowerCase() === 'silvadilan9@gmail.com') ||
-      user.role === 'admin' ||
-      user.role === 'master_admin'
+      (user.email && user.email.trim().toLowerCase() === 'silvadilan9@gmail.com')
     ));
     const isSub = Boolean(!isGuest && !isMaster && user && StorageService.isSubAdmin(user));
     const isAdminUser = isMaster || isSub;
@@ -665,7 +663,6 @@ export function updateUserInfoUI() {
       user && (
         (user.email && user.email.trim().toLowerCase() === 'silvadilan9@gmail.com') ||
         user.role === 'admin' ||
-        user.role === 'master_admin' ||
         (typeof window !== 'undefined' && window.isStrictMasterAdmin === true)
       )
     );

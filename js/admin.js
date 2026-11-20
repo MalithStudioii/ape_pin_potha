@@ -11,24 +11,18 @@ import { firebaseConfig, isFirebaseConfigured, COLLECTIONS } from './firebase-co
 import { Security } from './security.js?v=48';
 import { uploadToImgBB } from './imgbb-service.js?v=66';
 
-const MASTER_ADMIN_EMAIL = "supportnexiapro@gmail.com";
+const MASTER_ADMIN_EMAIL = "silvadilan9@gmail.com";
 const MASTER_ADMIN_EMAILS = [
-    "supportnexiapro@gmail.com",
-    "silvadilan9@gmail.com",
-    "creativeparadise25@gmail.com"
+    "silvadilan9@gmail.com"
 ];
 
 function checkIsMasterAdmin(emailOrUser) {
     if (!emailOrUser) return false;
     if (typeof emailOrUser === 'string') {
-        const clean = emailOrUser.trim().toLowerCase();
-        return MASTER_ADMIN_EMAILS.some(adm => adm.toLowerCase() === clean);
+        return emailOrUser.trim().toLowerCase() === 'silvadilan9@gmail.com';
     }
     const email = (emailOrUser.email || '').trim().toLowerCase();
-    const uid = emailOrUser.uid || '';
-    return MASTER_ADMIN_EMAILS.some(adm => adm.toLowerCase() === email) ||
-           uid === 'user_malith' ||
-           uid === 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2';
+    return email === 'silvadilan9@gmail.com';
 }
 
 let app = null;
@@ -313,7 +307,8 @@ function updateUserMetrics(users) {
 
     users.forEach(u => {
         const isMaster = checkIsMasterAdmin(u.email);
-        if (isMaster || u.role === 'admin' || u.role === 'master_admin') adminsCount++;
+        const hasAdmin = isMaster || u.role === 'admin' || u.role === 'sub_admin' || u.isAdmin === true || u.isSubAdmin === true;
+        if (hasAdmin) adminsCount++;
         if (u.isBanned) bannedCount++;
     });
 
@@ -353,9 +348,16 @@ function renderUsersTable(usersToRender) {
     }
 
     tbody.innerHTML = usersToRender.map(u => {
-        const email = u.email || 'නැත';
-        const isMaster = checkIsMasterAdmin(email);
-        const isCurrentAdmin = (u.role === 'admin' || isMaster);
+        const rawEmail = u.email || 'නැත';
+        const cleanEmail = (u.email || '').trim().toLowerCase();
+        const isMaster = cleanEmail === 'silvadilan9@gmail.com';
+        const hasAdminPrivilege = !isMaster && (
+            u.role === 'admin' ||
+            u.role === 'sub_admin' ||
+            u.role === 'master_admin' ||
+            u.isAdmin === true ||
+            u.isSubAdmin === true
+        );
         const isBanned = !!u.isBanned;
 
         const isSangha = u.isSangha === true || u.role === 'sangha' || (u.authorRole === 'sangha') || (u.name && (u.name.includes('ස්වාමීන් වහන්සේ') || u.name.includes('හිමි') || u.name.includes('තෙරුන්') || u.name.startsWith('පූජ්‍ය ') || u.name.startsWith('පූජ්‍යපාද ')));
@@ -366,7 +368,7 @@ function renderUsersTable(usersToRender) {
             roleBadge = `<span class="role-badge role-master"><i class="fa-solid fa-crown"></i> Master Admin</span>`;
         } else if (isSangha) {
             roleBadge = `<span class="role-badge" style="background: linear-gradient(135deg, #d97706, #92400e); color: #ffffff; border: 1px solid #fde68a; font-weight: 800; padding: 2px 8px; border-radius: 9999px; font-size: 0.7rem; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-dharmachakra" style="color:#fde68a;"></i> පූජනීය සංඝ</span>`;
-        } else if (u.role === 'admin') {
+        } else if (hasAdminPrivilege) {
             roleBadge = `<span class="role-badge role-admin"><i class="fa-solid fa-shield"></i> Sub-Admin</span>`;
         }
 
@@ -396,9 +398,9 @@ function renderUsersTable(usersToRender) {
                     `;
                 }
 
-                if (u.role === 'admin') {
+                if (hasAdminPrivilege) {
                     actionsHTML += `
-                        <button class="btn-table-action btn-table-demote" onclick="toggleUserRole('${u.uid}', 'member')" title="Admin බලතල ඉවත් කරන්න">
+                        <button class="btn-table-action btn-table-demote" onclick="toggleUserRole('${u.uid}', 'member')" title="Admin බලතල ඉවත් කර සාමාන්‍ය සාමාජිකයෙකු කරන්න">
                             <i class="fa-solid fa-user-minus"></i> Remove Admin
                         </button>
                     `;
@@ -411,8 +413,8 @@ function renderUsersTable(usersToRender) {
                 }
             }
 
-            // Both Master & Admins can Ban/Unban non-admin users
-            if (isMasterAdmin || (!isMaster && u.role !== 'admin')) {
+            // Both Master & Admins can Ban/Unban non-master users
+            if (isMasterAdmin || !hasAdminPrivilege) {
                 if (isBanned) {
                     actionsHTML += `
                         <button class="btn-table-action btn-table-unban" onclick="toggleUserBan('${u.uid}', false)" title="නැවත සක්‍රීය කරන්න">
@@ -476,17 +478,25 @@ window.filterUsersTable = function() {
         const matchesSearch = !searchVal || nameMatch || emailMatch;
 
         let matchesRole = true;
-        const isMaster = checkIsMasterAdmin(u.email);
+        const cleanEmail = (u.email || '').trim().toLowerCase();
+        const isMaster = cleanEmail === 'silvadilan9@gmail.com';
+        const hasAdminPrivilege = !isMaster && (
+            u.role === 'admin' ||
+            u.role === 'sub_admin' ||
+            u.role === 'master_admin' ||
+            u.isAdmin === true ||
+            u.isSubAdmin === true
+        );
         const isSangha = u.isSangha === true || u.role === 'sangha' || (u.authorRole === 'sangha') || (u.name && (u.name.includes('ස්වාමීන් වහන්සේ') || u.name.includes('හිමි') || u.name.includes('තෙරුන්') || u.name.startsWith('පූජ්‍ය ') || u.name.startsWith('පූජ්‍යපාද ')));
 
         if (roleVal === 'master') {
             matchesRole = isMaster;
         } else if (roleVal === 'admin') {
-            matchesRole = (u.role === 'admin' || isMaster);
+            matchesRole = hasAdminPrivilege || isMaster;
         } else if (roleVal === 'sangha') {
             matchesRole = isSangha;
         } else if (roleVal === 'member') {
-            matchesRole = (!isMaster && u.role !== 'admin' && !isSangha);
+            matchesRole = (!isMaster && !hasAdminPrivilege && !isSangha);
         } else if (roleVal === 'banned') {
             matchesRole = !!u.isBanned;
         }
@@ -574,11 +584,30 @@ window.toggleUserRole = async function(uid, newRole) {
 
     try {
         const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
-        await updateDoc(doc(db, COLLECTIONS.USERS, uid), {
+        const updates = {
             role: newRole,
             roleUpdatedBy: currentAdminUser.email,
             roleUpdatedAt: Date.now()
-        });
+        };
+        if (newRole === 'member') {
+            updates.isAdmin = false;
+            updates.isSubAdmin = false;
+        } else if (newRole === 'admin') {
+            updates.isAdmin = true;
+            updates.isSubAdmin = true;
+        }
+
+        await updateDoc(doc(db, COLLECTIONS.USERS, uid), updates);
+
+        // Update local user object immediately so table reflects change
+        user.role = newRole;
+        if (newRole === 'member') {
+            user.isAdmin = false;
+            user.isSubAdmin = false;
+        } else if (newRole === 'admin') {
+            user.isAdmin = true;
+            user.isSubAdmin = true;
+        }
 
         // Dispatch celebratory notification to the user
         if (newRole === 'admin') {
@@ -607,6 +636,7 @@ window.toggleUserRole = async function(uid, newRole) {
         );
 
         alert(`සාර්ථකයි! "${user.name}" ගේ තනතුර ${newRole === 'admin' ? 'Sub-Admin' : 'සාමාන්‍ය සාමාජික'} ලෙස යාවත්කාලීන විය.`);
+        filterUsersTable();
     } catch (err) {
         console.error('[Admin] toggleUserRole error:', err);
         alert('තනතුර වෙනස් කිරීමේදී දෝෂයක් ඇතිවිය: ' + err.message);
