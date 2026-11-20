@@ -44,9 +44,15 @@
             --font-sinhala: 'Noto Serif Sinhala', serif;
         }
 
-        * {
+        *, *::before, *::after {
             margin: 0;
             padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            max-width: 100%;
+            overflow-x: hidden;
             box-sizing: border-box;
         }
 
@@ -62,7 +68,9 @@
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            max-width: 100%;
             overflow-x: hidden;
+            box-sizing: border-box;
         }
 
         /* Custom Scrollbar */
@@ -155,6 +163,12 @@
             gap: 12px;
         }
 
+        .header-buttons-cluster {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
         .user-identity-card {
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid var(--border-subtle);
@@ -245,9 +259,22 @@
             align-items: center;
             gap: 8px;
             overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            flex-wrap: nowrap;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
             padding-bottom: 12px;
             margin-bottom: 24px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .admin-nav-bar::-webkit-scrollbar {
+            display: none;
+            width: 0;
+            height: 0;
         }
 
         .nav-pill-btn {
@@ -262,6 +289,7 @@
             display: inline-flex;
             align-items: center;
             gap: 8px;
+            flex-shrink: 0;
             white-space: nowrap;
             transition: all 0.2s ease;
         }
@@ -543,12 +571,26 @@
         /* Users Table Styling */
         .table-responsive {
             overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            width: 100%;
+            max-width: 100%;
             border-radius: var(--radius-md);
             border: 1px solid var(--border-subtle);
+            box-sizing: border-box;
+            scrollbar-width: thin;
+        }
+
+        .table-responsive::-webkit-scrollbar {
+            height: 6px;
+        }
+        .table-responsive::-webkit-scrollbar-thumb {
+            background: rgba(245, 158, 11, 0.3);
+            border-radius: 3px;
         }
 
         table.admin-table {
             width: 100%;
+            min-width: 660px;
             border-collapse: collapse;
             text-align: left;
             font-size: 0.84rem;
@@ -1039,19 +1081,283 @@
         /* Responsive Breakpoints */
         @media (max-width: 768px) {
             header.admin-header {
-                padding: 10px 16px;
+                padding: 10px 14px;
+                width: 100%;
+                max-width: 100%;
+                box-sizing: border-box;
             }
-            .brand-subtitle, .user-role-label {
+
+            .header-container {
+                display: grid;
+                grid-template-columns: 1fr auto;
+                gap: 8px 10px;
+                align-items: center;
+                width: 100%;
+                max-width: 100%;
+                box-sizing: border-box;
+            }
+
+            .brand-cluster {
+                grid-column: 1;
+                grid-row: 1;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                min-width: 0;
+            }
+
+            .brand-logo-icon {
+                width: 36px;
+                height: 36px;
+                font-size: 1.15rem;
+                border-radius: 10px;
+                flex-shrink: 0;
+            }
+
+            .brand-titles {
+                min-width: 0;
+            }
+
+            .brand-titles h1 {
+                font-size: 1rem;
+                white-space: nowrap;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+
+            .brand-name-text {
+                white-space: nowrap;
+            }
+
+            .admin-badge-pill {
+                font-size: 0.6rem;
+                padding: 2px 7px;
+                letter-spacing: 0.4px;
+                white-space: nowrap;
+                flex-shrink: 0;
+            }
+
+            .brand-subtitle {
                 display: none;
             }
-            main.admin-main {
-                padding: 16px 12px;
+
+            .header-actions {
+                display: contents;
             }
+
+            .header-buttons-cluster {
+                grid-column: 2;
+                grid-row: 1;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                justify-self: end;
+            }
+
+            .header-buttons-cluster .btn-header {
+                padding: 7px 11px;
+                font-size: 0.78rem;
+                border-radius: 8px;
+            }
+
+            .header-buttons-cluster .btn-header-label {
+                display: none;
+            }
+
+            .user-identity-card {
+                grid-column: 1 / -1;
+                grid-row: 2;
+                width: 100%;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                padding: 6px 12px;
+                background: rgba(255, 255, 255, 0.04);
+                border: 1px solid var(--border-subtle);
+                border-radius: 10px;
+                box-sizing: border-box;
+            }
+
+            .user-avatar-mini {
+                width: 28px;
+                height: 28px;
+                font-size: 0.8rem;
+                flex-shrink: 0;
+            }
+
+            .user-info-text {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                min-width: 0;
+                flex: 1;
+                overflow: hidden;
+            }
+
+            .user-name {
+                font-size: 0.8rem;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .user-role-label {
+                display: inline-block !important;
+                font-size: 0.65rem;
+                color: var(--gold-light);
+                white-space: nowrap;
+                flex-shrink: 0;
+            }
+
+            main.admin-main {
+                padding: 14px 12px;
+                width: 100%;
+                max-width: 100%;
+                box-sizing: border-box;
+                overflow-x: hidden;
+            }
+
+            .glass-panel {
+                padding: 16px 12px;
+                border-radius: var(--radius-md);
+                margin-bottom: 16px;
+                max-width: 100%;
+                box-sizing: border-box;
+            }
+
+            .panel-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+
+            .panel-header .btn-header,
+            .panel-header .chart-controls {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .panel-title {
+                font-size: 1rem;
+                line-height: 1.35;
+            }
+
+            .admin-nav-bar {
+                gap: 6px;
+                padding-bottom: 8px;
+                margin-bottom: 16px;
+            }
+
+            .nav-pill-btn {
+                padding: 8px 13px;
+                font-size: 0.78rem;
+                flex-shrink: 0;
+                white-space: nowrap;
+            }
+
             .metrics-grid {
                 grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+                margin-bottom: 16px;
             }
+
+            .metric-card {
+                padding: 12px 12px;
+                border-radius: var(--radius-md);
+            }
+
+            .metric-title {
+                font-size: 0.68rem;
+            }
+
+            .metric-number {
+                font-size: 1.45rem;
+            }
+
+            .metric-icon-wrap {
+                width: 30px;
+                height: 30px;
+                font-size: 0.9rem;
+            }
+
+            .metric-subtext {
+                font-size: 0.65rem;
+            }
+
+            .metrics-grid > .metric-card:nth-child(5),
+            .metrics-grid > .metric-card:last-child:nth-child(odd) {
+                grid-column: 1 / -1;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 12px 16px;
+            }
+
+            .metrics-grid > .metric-card:nth-child(5) .metric-header,
+            .metrics-grid > .metric-card:last-child:nth-child(odd) .metric-header {
+                margin-bottom: 0;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+
+            .metrics-grid > .metric-card:nth-child(5) .metric-subtext,
+            .metrics-grid > .metric-card:last-child:nth-child(odd) .metric-subtext {
+                display: none;
+            }
+
+            .metrics-grid > .metric-card:nth-child(5) .metric-number,
+            .metrics-grid > .metric-card:last-child:nth-child(odd) .metric-number {
+                font-size: 1.5rem;
+                line-height: 1;
+                margin-top: 0;
+            }
+
+            .chart-canvas-wrap {
+                height: 220px;
+                width: 100%;
+                max-width: 100%;
+            }
+
+            .table-toolbar {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+            }
+
+            .search-input-wrap {
+                min-width: 100%;
+                max-width: 100%;
+            }
+
+            .filter-group {
+                width: 100%;
+            }
+
+            .filter-select {
+                width: 100%;
+            }
+
+            .admin-grid-2col,
+            .admin-grid-3col {
+                grid-template-columns: 1fr !important;
+                gap: 10px !important;
+            }
+
             .moderation-grid {
                 grid-template-columns: 1fr;
+                gap: 12px;
+            }
+
+            .audit-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 6px;
+            }
+
+            .audit-time {
+                align-self: flex-end;
             }
         }
     </style>
@@ -1067,7 +1373,7 @@
                 </div>
                 <div class="brand-titles">
                     <h1>
-                        පිං පොත
+                        <span class="brand-name-text">පිං පොත</span>
                         <span class="admin-badge-pill" id="headerRoleBadge">Admin Portal</span>
                     </h1>
                     <div class="brand-subtitle">කල්‍යාණ මිත්‍ර පුණ්‍ය ජාලය • විධායක පාලක පුවරුව</div>
@@ -1083,14 +1389,16 @@
                     </div>
                 </div>
 
-                <a href="index.html" class="btn-header" title="ප්‍රධාන පිං පොත වෙත යන්න">
-                    <i class="fa-solid fa-house"></i>
-                    <span>ප්‍රධාන අඩවිය</span>
-                </a>
+                <div class="header-buttons-cluster">
+                    <a href="index.html" class="btn-header" title="ප්‍රධාන පිං පොත වෙත යන්න">
+                        <i class="fa-solid fa-house"></i>
+                        <span class="btn-header-label">ප්‍රධාන අඩවිය</span>
+                    </a>
 
-                <button class="btn-header btn-header-danger" onclick="adminSignOut()" title="පරිපාලක පුවරුවෙන් නික්මෙන්න">
-                    <i class="fa-solid fa-right-from-bracket"></i>
-                </button>
+                    <button class="btn-header btn-header-danger" onclick="adminSignOut()" title="පරිපාලක පුවරුවෙන් නික්මෙන්න">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                    </button>
+                </div>
             </div>
         </div>
     </header>
@@ -1431,7 +1739,7 @@
                     <form id="adminArtisanDirectForm" onsubmit="handleAdminArtisanDirectSubmit(event)">
                         <input type="hidden" id="adminArtisanEditDocId" value="">
                         
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                        <div class="admin-grid-2col" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
                             <div class="admin-form-group" style="margin-bottom: 0;">
                                 <label class="admin-form-label">ශිල්පියාගේ / ආයතනයේ නම *</label>
                                 <input type="text" id="adminArtisanName" class="admin-form-input" required placeholder="උදා: සෝමපාල කලායතනය">
@@ -1482,7 +1790,7 @@
                             </div>
                         </div>
 
-                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                        <div class="admin-grid-3col" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px;">
                             <div class="admin-form-group" style="margin-bottom: 0;">
                                 <label class="admin-form-label">පළපුරුද්ද (වසර)</label>
                                 <input type="number" id="adminArtisanExperience" class="admin-form-input" min="0" placeholder="15">
@@ -1507,7 +1815,7 @@
                             <textarea id="adminArtisanBio" class="admin-form-textarea" rows="2" placeholder="ශිල්පියාගේ පසුබිම හා කලා නිර්මාණ පිළිබඳ විස්තරයක්..."></textarea>
                         </div>
 
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                        <div class="admin-grid-2col" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
                             <div class="admin-form-group" style="margin-bottom: 0;">
                                 <label class="admin-form-label">ප්‍රොෆයිල් ඡායාරූප URL (හෝ File උඩුගත කරන්න)</label>
                                 <input type="url" id="adminArtisanPhotoUrl" class="admin-form-input" placeholder="https://i.ibb.co/...">
@@ -1622,6 +1930,6 @@
     </div>
 
     <!-- ES Module Script for Admin Logic -->
-    <script type="module" src="js/admin.js?v=87"></script>
+    <script type="module" src="js/admin.js?v=88"></script>
 </body>
 </html>
