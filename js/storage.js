@@ -5,9 +5,20 @@
  */
 
 import { firebaseConfig, isFirebaseConfigured, COLLECTIONS } from './firebase-config.js?v=139';
-import { Security } from './security.js?v=139';
+import { Security } from './security.js?v=160';
 import { INITIAL_ARANYA_LIST, SRI_LANKA_DISTRICTS } from './aranya-data.js';
-import { SEED_POSTS } from './initial-seed.js?v=144';
+
+let _seedPostsCache = null;
+async function getSeedPosts() {
+  if (_seedPostsCache) return _seedPostsCache;
+  try {
+    const mod = await import('./initial-seed.js?v=160');
+    _seedPostsCache = mod.SEED_POSTS || [];
+  } catch (e) {
+    _seedPostsCache = [];
+  }
+  return _seedPostsCache;
+}
 
 let db = null;
 let auth = null;
@@ -42,7 +53,9 @@ const SEED_NOTIFICATIONS = [];
 
 export const StorageService = {
   _cachedPosts: null,
-  FEED_PAGE_SIZE: 20,
+  FEED_PAGE_SIZE: 15,
+  _feedUnsubscribe: null,
+  _officialUnsubscribe: null,
   _lastVisibleDoc: null,
   _hasMorePosts: true,
   _isLoadingMore: false,
@@ -505,7 +518,7 @@ export const StorageService = {
             uid: docSnap.id,
             name: data.name || data.firstName || 'කල්‍යාණ මිත්‍ර',
             photo: data.photo || '',
-            coverImage: data.coverImage || 'assets/banner.jpg',
+            coverImage: data.coverImage || 'assets/banner.webp',
             bio: data.bio || '',
             location: data.location || data.district || '',
             joinedDate: data.joinedDate || '',
@@ -696,9 +709,6 @@ export const StorageService = {
       }
     } catch(e) {}
 
-    // Immediate zero-latency background fast REST sync for official announcements & community directory
-    // Immediate zero-latency fast REST bootstrap for BOTH community feed & official announcements
-    this.fallbackFastFetch().catch(err => console.warn('[Storage] Fast feed REST bootstrap note:', err));
 
     this.fetchUsersViaREST().then(users => {
       if (Array.isArray(users) && users.length > 0) {
@@ -838,8 +848,13 @@ export const StorageService = {
           }
         });
 
-        // Real-time Firestore Feed Subscription - Paginated Stream (Top 20 Posts for ultra-fast startup)
+        // Real-time Firestore Feed Subscription - Paginated Stream (Top 15 Posts for ultra-fast startup)
         try {
+          if (typeof this._feedUnsubscribe === 'function') {
+            try { this._feedUnsubscribe(); } catch (e) {}
+            this._feedUnsubscribe = null;
+          }
+
           const q = query(
             collection(db, COLLECTIONS.POSTS),
             orderBy("timestamp", "desc"),
@@ -847,16 +862,16 @@ export const StorageService = {
           );
 
           let initialSnapshotReceived = false;
-          // Safety timeout (2.5s): unblocks UI if Firestore query hangs or permissions delayed
+          // Safety timeout (3.5s): unblocks UI if Firestore query hangs or permissions delayed
           const feedTimeoutId = setTimeout(() => {
             if (!initialSnapshotReceived) {
-              console.warn('[Firestore] Feed query timed out (2.5s), unblocking with cached/fallback posts...');
+              console.warn('[Firestore] Feed query timed out, unblocking with cached/fallback posts...');
               const fallback = this.getLocalPosts() || [];
               this.notifyListeners(fallback);
             }
-          }, 2500);
+          }, 3500);
 
-          onSnapshot(q, (snapshot) => {
+          this._feedUnsubscribe = onSnapshot(q, (snapshot) => {
             initialSnapshotReceived = true;
             clearTimeout(feedTimeoutId);
 
@@ -961,12 +976,17 @@ export const StorageService = {
 
         // Real-time Firestore Subscription for Official Platform Announcements
         try {
+          if (typeof this._officialUnsubscribe === 'function') {
+            try { this._officialUnsubscribe(); } catch (e) {}
+            this._officialUnsubscribe = null;
+          }
+
           const officialQ = query(
             collection(db, COLLECTIONS.POSTS),
             where("isOfficial", "==", true),
             limit(50)
           );
-          onSnapshot(officialQ, (officialSnap) => {
+          this._officialUnsubscribe = onSnapshot(officialQ, (officialSnap) => {
             const offPosts = [];
             officialSnap.forEach(doc => {
               const data = doc.data();
@@ -993,15 +1013,6 @@ export const StorageService = {
         } catch (offErr) {
           console.warn('[Firestore] Official posts listener init note:', offErr);
         }
-
-        // Feed Watchdog: Guarantee that feed renders within 1200ms even if WebSocket / SDK is blocked
-        setTimeout(() => {
-          const nonOfficialCount = (this._loadedPosts || []).filter(p => !this.isOfficialPost(p)).length;
-          if (nonOfficialCount === 0) {
-            console.log('[Storage] Watchdog: Community posts missing, bootstrapping fast REST feed...');
-            this.fallbackFastFetch();
-          }
-        }, 1200);
 
         // Real-time Firestore Notifications Subscription for authenticated user
         if (this.currentUser && this.currentUser.uid && this.currentUser.email) {
@@ -1064,7 +1075,11 @@ export const StorageService = {
 
     // Default: Local Sandbox Engine
     if (!localStorage.getItem('pinPotha_sandbox_posts')) {
-      this.cacheLocal(SEED_POSTS);
+      getSeedPosts().then(seed => {
+        if (Array.isArray(seed) && seed.length > 0) {
+          this.cacheLocal(seed);
+        }
+      }).catch(() => {});
     }
     if (!localStorage.getItem('pinKetha_notifications')) {
       this.cacheLocalNotifications(SEED_NOTIFICATIONS);
@@ -1231,9 +1246,9 @@ export const StorageService = {
         } catch (e) {}
       }
 
-      // 2. Base community seeds (all 71 genuine Firestore community posts)
-      if (typeof SEED_POSTS !== 'undefined' && Array.isArray(SEED_POSTS) && SEED_POSTS.length > 0) {
-        combined.push(...SEED_POSTS);
+      // 2. Base community seeds (if already cached in memory)
+      if (_seedPostsCache && Array.isArray(_seedPostsCache) && _seedPostsCache.length > 0) {
+        combined.push(..._seedPostsCache);
       }
 
       // 3. Merged local storage cache (updated posts & fresh additions)
@@ -1487,7 +1502,7 @@ export const StorageService = {
     return postObj;
   },
 
-  async fetchPostsViaREST(limitCount = 100, startAfterTimestamp = null) {
+  async fetchPostsViaREST(limitCount = 15, startAfterTimestamp = null) {
     try {
       const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents:runQuery?key=${firebaseConfig.apiKey}`;
       const queryPayload = {
@@ -1598,7 +1613,7 @@ export const StorageService = {
           lastName: lName,
           email,
           photo: f.photo?.stringValue || '',
-          coverImage: f.coverImage?.stringValue || 'assets/banner.jpg',
+          coverImage: f.coverImage?.stringValue || 'assets/banner.webp',
           bio: f.bio?.stringValue || '',
           location: f.location?.stringValue || f.district?.stringValue || '',
           district: f.district?.stringValue || '',
@@ -2754,9 +2769,9 @@ export const StorageService = {
       if (targetPost) allPosts.push(targetPost);
     }
 
-    // Fallback 3: Check SEED_POSTS
-    if (!targetPost && typeof SEED_POSTS !== 'undefined' && Array.isArray(SEED_POSTS)) {
-      targetPost = SEED_POSTS.find(p => String(p.id) === sPostId);
+    // Fallback 3: Check _seedPostsCache
+    if (!targetPost && _seedPostsCache && Array.isArray(_seedPostsCache)) {
+      targetPost = _seedPostsCache.find(p => String(p.id) === sPostId);
       if (targetPost) allPosts.push(targetPost);
     }
 
@@ -3446,7 +3461,7 @@ export const StorageService = {
 
     let userCover = savedProfile.coverImage;
     if (!userCover || userCover.includes('photo-1548013146-72479768bada') || userCover.includes('photo-1582510003544-4d00b7f74220')) {
-      userCover = "assets/banner.jpg";
+      userCover = "assets/banner.webp";
     }
 
     // Resolve user's confirmed name
@@ -3624,7 +3639,7 @@ export const StorageService = {
           uid: found.uid || uid,
           name: found.name || cleanAuthor || 'කල්‍යාණ මිත්‍ර',
           photo: found.photo || null,
-          coverImage: found.coverImage || 'assets/banner.jpg',
+          coverImage: found.coverImage || 'assets/banner.webp',
           bio: found.bio || "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏",
           location: found.location || '',
           occupation: found.occupation || '',
@@ -3654,7 +3669,7 @@ export const StorageService = {
           data.isSangha = data.isSangha === true || data.role === 'sangha' || this.isSangha({ uid, name: data.name });
           data.isAdmin = isMaster;
           data.isSubAdmin = isSub;
-          data.coverImage = data.coverImage || 'assets/banner.jpg';
+          data.coverImage = data.coverImage || 'assets/banner.webp';
           try {
             localStorage.setItem('pinPotha_profile_' + uid, JSON.stringify(data));
           } catch (e) {}
@@ -3672,7 +3687,7 @@ export const StorageService = {
         if (raw) {
           const parsed = JSON.parse(raw);
           if (parsed && (parsed.uid || parsed.name)) {
-            parsed.coverImage = parsed.coverImage || 'assets/banner.jpg';
+            parsed.coverImage = parsed.coverImage || 'assets/banner.webp';
             return parsed;
           }
         }
@@ -3694,7 +3709,7 @@ export const StorageService = {
         uid: userPost.uid || uid,
         name: userPost.author || cleanAuthor || 'කල්‍යාණ මිත්‍ර',
         photo: resolvedPhoto || userPost.authorPhoto || null,
-        coverImage: userPost.authorCover || 'assets/banner.jpg',
+        coverImage: userPost.authorCover || 'assets/banner.webp',
         bio: "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏",
         location: userPost.location || '',
         occupation: '',
@@ -3712,7 +3727,7 @@ export const StorageService = {
         uid: uid || null,
         name: cleanAuthor,
         photo: null,
-        coverImage: 'assets/banner.jpg',
+        coverImage: 'assets/banner.webp',
         bio: "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏",
         location: '',
         occupation: '',
@@ -4528,7 +4543,7 @@ export const StorageService = {
           lastName: this.currentUser.lastName || '',
           email: this.currentUser.email || null,
           photo: this.currentUser.photo || null,
-          coverImage: this.currentUser.coverImage || 'assets/banner.jpg',
+          coverImage: this.currentUser.coverImage || 'assets/banner.webp',
           bio: this.currentUser.bio || '',
           location: this.currentUser.location || '',
           district: this.currentUser.district || '',

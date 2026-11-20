@@ -4,8 +4,8 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=144';
-import { Security } from './security.js?v=144';
+import { StorageService } from './storage.js?v=160';
+import { Security } from './security.js?v=160';
 import { uploadToImgBB } from './imgbb-service.js?v=66';
 import { SoundService, triggerHaptic } from './sound.js?v=66';
 import { FeedAlgorithm } from './algorithm.js?v=144';
@@ -305,50 +305,70 @@ function bootApp() {
       console.warn('[App] renderPoyaUI error caught safely:', e);
     }
 
-    // Subscribe to real-time database updates
+    // Subscribe to real-time database updates with 150ms debounce to prevent multiple consecutive DOM repaints on boot
+    let postUpdateDebounceTimer = null;
     StorageService.onPostsUpdate((posts) => {
-      try {
-        const cleanPosts = (posts || []).filter(p => !StorageService.isDummyTestPost || !StorageService.isDummyTestPost(p));
-        const prevIds = (currentPostsData || []).map(p => p.id).join(',');
-        const newIds = cleanPosts.map(p => p.id).join(',');
-        currentPostsData = cleanPosts;
-        window.currentPostsData = currentPostsData;
+      const handlePostsUpdate = () => {
+        try {
+          const cleanPosts = (posts || []).filter(p => !StorageService.isDummyTestPost || !StorageService.isDummyTestPost(p));
+          const prevIds = (currentPostsData || []).map(p => p.id).join(',');
+          const newIds = cleanPosts.map(p => p.id).join(',');
+          currentPostsData = cleanPosts;
+          window.currentPostsData = currentPostsData;
 
-        const container = document.getElementById('postsContainer');
-        const hasRenderedCards = container && container.children.length > 0 && !container.querySelector('.feed-loading-shimmer');
+          const container = document.getElementById('postsContainer');
+          const hasRenderedCards = container && container.children.length > 0 && !container.querySelector('.feed-loading-shimmer');
 
-        const feedHasImages = Boolean(container && container.querySelector('.photo-collage-container'));
-        const incomingHasImages = cleanPosts.some(p => Boolean(p.image || (Array.isArray(p.images) && p.images.length > 0)));
+          const feedHasImages = Boolean(container && container.querySelector('.photo-collage-container'));
+          const incomingHasImages = cleanPosts.some(p => Boolean(p.image || (Array.isArray(p.images) && p.images.length > 0)));
 
-        if (hasRenderedCards && prevIds.length > 0 && prevIds === newIds) {
-          if (!feedHasImages && incomingHasImages) {
-            renderFeed();
-          } else {
+          if (hasRenderedCards && prevIds.length > 0 && prevIds === newIds) {
+            if (!feedHasImages && incomingHasImages) {
+              renderFeed();
+            } else {
+              updateFeedInPlace(currentPostsData);
+            }
+          } else if (hasRenderedCards && prevIds.length > 0 && isTriggeringLoadMore && newIds.startsWith(prevIds)) {
+            // Posts were appended at the bottom via pagination! Smooth append without resetting DOM or scroll position
+            appendNewPostsToFeed(posts, prevIds);
             updateFeedInPlace(currentPostsData);
+          } else {
+            renderFeed();
           }
-        } else if (hasRenderedCards && prevIds.length > 0 && isTriggeringLoadMore && newIds.startsWith(prevIds)) {
-          // Posts were appended at the bottom via pagination! Smooth append without resetting DOM or scroll position
-          appendNewPostsToFeed(posts, prevIds);
-          updateFeedInPlace(currentPostsData);
-        } else {
-          renderFeed();
-        }
 
-        try { updateUserInfoUI(); } catch (e) {}
-        try { renderSideNeeds(); } catch (e) {}
-        try { updateUserStats(); } catch (e) {}
-        try { renderPcSidebarMembers().catch(() => {}); } catch (e) {}
-        if (activeTab === 'profile') {
-          try { renderProfileView(); } catch (e) {}
+          try { updateUserInfoUI(); } catch (e) {}
+          try { renderSideNeeds(); } catch (e) {}
+          try { updateUserStats(); } catch (e) {}
+          try { renderPcSidebarMembers().catch(() => {}); } catch (e) {}
+          if (activeTab === 'profile') {
+            try { renderProfileView(); } catch (e) {}
+          }
+          // Refresh admin stats if admin modal is open
+          const adminPanel = document.getElementById('settingsContentAdmin');
+          if (adminPanel && !adminPanel.classList.contains('hidden')) {
+            if (typeof window.renderAdminDashboard === 'function') window.renderAdminDashboard();
+          }
+        } catch (onPostsErr) {
+          console.warn('[App] Error in onPostsUpdate handler:', onPostsErr);
+          try { renderFeed(); } catch (e) {}
         }
-        // Refresh admin stats if admin modal is open
-        const adminPanel = document.getElementById('settingsContentAdmin');
-        if (adminPanel && !adminPanel.classList.contains('hidden')) {
-          if (typeof window.renderAdminDashboard === 'function') window.renderAdminDashboard();
+      };
+
+      // Immediate render on initial cold start or when explicitly loading more posts
+      if (!currentPostsData || currentPostsData.length === 0 || isTriggeringLoadMore) {
+        if (postUpdateDebounceTimer) {
+          clearTimeout(postUpdateDebounceTimer);
+          postUpdateDebounceTimer = null;
         }
-      } catch (onPostsErr) {
-        console.warn('[App] Error in onPostsUpdate handler:', onPostsErr);
-        try { renderFeed(); } catch (e) {}
+        handlePostsUpdate();
+      } else {
+        if (postUpdateDebounceTimer) {
+          clearTimeout(postUpdateDebounceTimer);
+        }
+        postUpdateDebounceTimer = setTimeout(() => {
+          postUpdateDebounceTimer = null;
+          handlePostsUpdate();
+        }, 150);
       }
     });
 
@@ -973,7 +993,7 @@ window.viewMemberProfilePhoto = function(e) {
 
 window.viewMemberCoverPhoto = function(e) {
   if (e) e.stopPropagation();
-  const coverUrl = currentViewingMember?.coverImage || document.getElementById('memCoverImg')?.getAttribute('src') || 'assets/banner.jpg';
+  const coverUrl = currentViewingMember?.coverImage || document.getElementById('memCoverImg')?.getAttribute('src') || 'assets/banner.webp';
   if (coverUrl && !coverUrl.includes('data:image/svg+xml')) {
     window.openLightbox([coverUrl], 0);
   }
@@ -1013,7 +1033,7 @@ window.openMemberProfileModal = async function(uid, authorName, authorPhoto = nu
 
   // 1. Immediately reset previous modal content to prevent cross-profile flicker
   const coverImg = document.getElementById('memCoverImg');
-  if (coverImg) coverImg.src = coverImage || cached?.coverImage || 'assets/banner.jpg';
+  if (coverImg) coverImg.src = coverImage || cached?.coverImage || 'assets/banner.webp';
 
   const avatarWrap = document.getElementById('memAvatarWrap');
   if (avatarWrap) {
@@ -1048,7 +1068,7 @@ window.openMemberProfileModal = async function(uid, authorName, authorPhoto = nu
     uid: uid || null,
     name: initialName,
     photo: authorPhoto || cached?.photo || null,
-    coverImage: coverImage || cached?.coverImage || 'assets/banner.jpg',
+    coverImage: coverImage || cached?.coverImage || 'assets/banner.webp',
     bio: "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏",
     location: '',
     occupation: '',
@@ -1074,7 +1094,7 @@ window.openMemberProfileModal = async function(uid, authorName, authorPhoto = nu
   if (authorPhoto && (!member.photo || member.photo.trim().length === 0)) {
     member.photo = authorPhoto;
   }
-  if (coverImage && (!member.coverImage || member.coverImage === 'assets/banner.jpg')) {
+  if (coverImage && (!member.coverImage || member.coverImage === 'assets/banner.webp')) {
     member.coverImage = coverImage;
   }
 
@@ -1093,7 +1113,7 @@ window.openMemberProfileModal = async function(uid, authorName, authorPhoto = nu
 
 currentViewingMember = member;
 
-  if (coverImg) coverImg.src = member.coverImage || 'assets/banner.jpg';
+  if (coverImg) coverImg.src = member.coverImage || 'assets/banner.webp';
 
   const isSangha = StorageService.isSangha(member);
   const isMaster = StorageService.isMasterAdmin();
@@ -1109,7 +1129,7 @@ currentViewingMember = member;
       avatarWrap.classList.add('sangha-framed-avatar');
       avatarWrap.innerHTML = `
         ${innerPhoto}
-        <img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත රාමුව">
+        <img src="assets/sangha-frame.webp" class="sangha-vatapatha-frame" alt="වටාපත රාමුව">
       `;
     } else {
       avatarWrap.classList.remove('sangha-framed-avatar');
@@ -1323,7 +1343,7 @@ currentViewingMember = member;
           <div class="mem-fb-friend-card" onclick="openMemberProfileModal('${f.uid}', '${Security.escapeHTML(f.name)}', '${f.photo ? Security.sanitizeUrl(f.photo) : ''}', '${f.coverImage ? Security.sanitizeUrl(f.coverImage) : ''}')">
             <div class="mem-fb-friend-thumb ${isFSangha ? 'sangha-framed-avatar' : ''}">
               ${f.photo ? `<img src="${Security.sanitizeUrl(f.photo)}" alt="${Security.escapeHTML(f.name)}" onerror="this.parentElement.innerText = '${initial}';">` : initial}
-              ${isFSangha ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත" style="position:absolute; inset:-3px; width:calc(100% + 6px); height:calc(100% + 6px); pointer-events:none;">' : ''}
+              ${isFSangha ? '<img src="assets/sangha-frame.webp" class="sangha-vatapatha-frame" alt="වටාපත" style="position:absolute; inset:-3px; width:calc(100% + 6px); height:calc(100% + 6px); pointer-events:none;">' : ''}
             </div>
             <div class="mem-fb-friend-info">
               <div class="mem-fb-friend-name" title="${Security.escapeHTML(f.name || 'කල්‍යාණ මිත්‍ර')}">
@@ -2281,7 +2301,7 @@ function renderSingleCommentHTML(c, postId, user, index) {
     <div class="comment-bubble ${isAnonComment ? 'comment-bubble-anon' : ''}" id="comment-bubble-${commentKey}">
       <div class="comment-avatar ${isCommentSangha && !isAnonComment ? 'sangha-framed-avatar' : ''} ${isAnonComment ? 'comment-anon-avatar' : ''}" ${isAnonComment ? 'style="cursor: default; background: #f1f5f9;" title="නිර්නාමික කල්‍යාණ මිත්‍රයෙක්"' : `onclick="viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(safeAuthorName)}', '${safeAuthorPhoto ? Security.sanitizeUrl(safeAuthorPhoto) : ''}')" style="cursor: pointer;" title="${Security.escapeHTML(safeAuthorName)} ගේ Profile එක බලන්න"`}>
         ${isAnonComment ? '<i class="fa-solid fa-user-secret" style="color: #64748b; font-size: 0.85rem;"></i>' : (safeAuthorPhoto ? `<img src="${Security.sanitizeUrl(safeAuthorPhoto)}" alt="${Security.escapeHTML(safeAuthorName)}" loading="lazy">` : `<span>${Security.escapeHTML(safeAuthorName.charAt(0) || '👤')}</span>`)}
-        ${isCommentSangha && !isAnonComment ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
+        ${isCommentSangha && !isAnonComment ? '<img src="assets/sangha-frame.webp" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
       </div>
       <div class="comment-text-box">
         <div class="comment-author-row">
@@ -2528,7 +2548,7 @@ export function renderPostCardHTML(post, user) {
             ` : `
               <div class="post-avatar ${isNeed ? 'need' : ''} ${isAuthorSangha ? 'sangha-framed-avatar' : ''}" onclick="viewUserProfile('${post.uid || ''}', '${Security.escapeHTML(postAuthorName)}', '${postAuthorPhoto ? Security.sanitizeUrl(postAuthorPhoto) : ''}')" style="cursor: pointer;" title="${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න">
                 ${postAuthorPhoto ? `<img src="${Security.sanitizeUrl(postAuthorPhoto)}" loading="lazy" decoding="async" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover;">` : `<span>${Security.escapeHTML(postAuthorName.charAt(0))}</span>`}
-                ${isAuthorSangha ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
+                ${isAuthorSangha ? '<img src="assets/sangha-frame.webp" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
               </div>
               <div>
                 <div class="post-badges-wrap">
@@ -6679,7 +6699,7 @@ function renderProfileView() {
   if (coverImg) {
     let activeCover = user.coverImage;
     if (!activeCover || activeCover.includes('photo-1548013146-72479768bada') || activeCover.includes('photo-1582510003544-4d00b7f74220')) {
-      activeCover = "assets/banner.jpg";
+      activeCover = "assets/banner.webp";
     }
     coverImg.src = activeCover;
   }
@@ -7052,7 +7072,7 @@ function renderProfileSubTabContent(user, myPosts, myPhotosPosts, myPrivatePosts
           <div class="mithra-card" style="border-color: #fde68a; background: #fffdf8;">
             <div class="mithra-card-avatar ${isReqSangha ? 'sangha-framed-avatar' : ''}" onclick="openMemberProfileModal('${req.senderUid}', '${Security.escapeHTML(req.senderName)}', '${req.senderPhoto ? Security.sanitizeUrl(req.senderPhoto) : ''}')" style="cursor: pointer;">
               ${req.senderPhoto ? `<img src="${Security.sanitizeUrl(req.senderPhoto)}" alt="${Security.escapeHTML(req.senderName)}" onerror="this.parentElement.innerText = '${initial}';">` : initial}
-              ${isReqSangha ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
+              ${isReqSangha ? '<img src="assets/sangha-frame.webp" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
             </div>
             <div class="mithra-card-details" onclick="openMemberProfileModal('${req.senderUid}', '${Security.escapeHTML(req.senderName)}', '${req.senderPhoto ? Security.sanitizeUrl(req.senderPhoto) : ''}')" style="cursor: pointer;">
               <div class="mithra-card-name">
@@ -7111,7 +7131,7 @@ function renderProfileSubTabContent(user, myPosts, myPhotosPosts, myPrivatePosts
           <div class="mithra-card">
             <div class="mithra-card-avatar ${isMemberSangha ? 'sangha-framed-avatar' : ''}" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}', '${m.photo ? Security.sanitizeUrl(m.photo) : ''}', '${m.coverImage ? Security.sanitizeUrl(m.coverImage) : ''}')" style="cursor: pointer;">
               ${m.photo ? `<img src="${Security.sanitizeUrl(m.photo)}" alt="${Security.escapeHTML(m.name)}" onerror="this.parentElement.innerText = '${initial}';">` : `<span>${initial}</span>`}
-              ${isMemberSangha ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
+              ${isMemberSangha ? '<img src="assets/sangha-frame.webp" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
             </div>
             <div class="mithra-card-details" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}', '${m.photo ? Security.sanitizeUrl(m.photo) : ''}', '${m.coverImage ? Security.sanitizeUrl(m.coverImage) : ''}')" style="cursor: pointer;">
               <div class="mithra-card-name">
@@ -7653,7 +7673,7 @@ window.openCoverModal = function() {
   const currentUser = StorageService.currentUser;
   const currentImg = document.getElementById('coverCurrentPreviewImg');
   if (currentImg && currentUser) {
-    currentImg.src = currentUser.coverImage || 'assets/banner.jpg';
+    currentImg.src = currentUser.coverImage || 'assets/banner.webp';
   }
   const statusText = document.getElementById('coverUploadStatusText');
   if (statusText) {
@@ -8352,7 +8372,7 @@ window.renderCommunityDirectory = async function(filtered = null) {
       <div class="mithra-card directory-member-card" onclick="openPublicProfile('${m.uid}')" style="cursor: pointer;">
         <div class="mithra-card-avatar ${isMemberSangha ? 'sangha-framed-avatar' : ''}" style="cursor: pointer;">
           ${m.photo ? `<img src="${Security.sanitizeUrl(m.photo)}" alt="${Security.escapeHTML(m.name)}" onerror="this.parentElement.innerText = '${initial}';">` : `<span>${initial}</span>`}
-          ${isMemberSangha ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
+          ${isMemberSangha ? '<img src="assets/sangha-frame.webp" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
         </div>
         <div class="mithra-card-details">
           <div class="mithra-card-name" style="cursor: pointer;">
@@ -8402,6 +8422,12 @@ window.filterDirectoryBy = function(type) {
   renderCommunityDirectory(list);
 };
 
+let isPcSidebarExpanded = false;
+window.togglePcSidebarExpanded = function() {
+  isPcSidebarExpanded = !isPcSidebarExpanded;
+  renderPcSidebarMembers(document.getElementById('pcSidebarMemberSearchInput')?.value || '', false);
+};
+
 export async function renderPcSidebarMembers(filterQuery = '', forceRefresh = false) {
   try {
     const container = document.getElementById('pcSidebarMemberList');
@@ -8435,8 +8461,9 @@ export async function renderPcSidebarMembers(filterQuery = '', forceRefresh = fa
     }
 
     if (list.length > 0) {
-      const displayList = list.slice(0, 6);
-      container.innerHTML = displayList.map(m => {
+      const isFiltered = Boolean(filterQuery && filterQuery.trim());
+      const displayList = isFiltered ? list.slice(0, 30) : (isPcSidebarExpanded ? list.slice(0, 48) : list.slice(0, 12));
+      const itemsHtml = displayList.map(m => {
         const isMe = m.uid === currentUser.uid;
         const isFriend = currentMithrayan.includes(m.uid);
         const isSent = currentSent.includes(m.uid);
@@ -8470,8 +8497,8 @@ export async function renderPcSidebarMembers(filterQuery = '', forceRefresh = fa
         return `
           <div class="sidebar-member-item ${isMemberAnon ? 'sidebar-member-anon' : ''}" onclick="openPublicProfile('${m.uid}')" style="cursor: pointer;" title="${Security.escapeHTML(displayName)} ගේ පැතිකඩ බලන්න">
             <div class="sidebar-member-avatar ${isMemberSangha && !isMemberAnon ? 'sangha-framed-avatar' : ''}">
-              ${displayPhoto ? `<img src="${Security.sanitizeUrl(displayPhoto)}" alt="${Security.escapeHTML(displayName)}" onerror="this.parentElement.innerText = '${initial}';">` : `<span>${initial}</span>`}
-              ${isMemberSangha && !isMemberAnon ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
+              ${displayPhoto ? `<img src="${Security.sanitizeUrl(displayPhoto)}" alt="${Security.escapeHTML(displayName)}" loading="lazy" decoding="async" onerror="this.parentElement.innerText = '${initial}';">` : `<span>${initial}</span>`}
+              ${isMemberSangha && !isMemberAnon ? '<img src="assets/sangha-frame.webp" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
             </div>
             <div class="sidebar-member-info">
               <div class="sidebar-member-name">
@@ -8489,6 +8516,20 @@ export async function renderPcSidebarMembers(filterQuery = '', forceRefresh = fa
           </div>
         `;
       }).join('');
+
+      let toggleBtnHtml = '';
+      if (!isFiltered && list.length > 12) {
+        toggleBtnHtml = `
+          <div style="padding: 6px 4px 2px; text-align: center;">
+            <button type="button" class="btn-sidebar-expand-members" onclick="event.stopPropagation(); window.togglePcSidebarExpanded()" style="background: none; border: 1px dashed #cbd5e1; border-radius: 8px; width: 100%; padding: 6px 8px; font-size: 0.72rem; color: #64748b; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s;">
+              <span>${isPcSidebarExpanded ? 'අඩු කරන්න' : 'තවත් සාමාජිකයින් බලන්න (' + (list.length - 12) + ')'}</span>
+              <i class="fa-solid ${isPcSidebarExpanded ? 'fa-chevron-up' : 'fa-chevron-down'}" style="font-size: 0.65rem;"></i>
+            </button>
+          </div>
+        `;
+      }
+
+      container.innerHTML = itemsHtml + toggleBtnHtml;
     } else {
       container.innerHTML = `
         <div style="text-align: center; padding: 16px 8px; color: #94a3b8; font-size: 0.74rem;">
@@ -8952,7 +8993,7 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
           <div class="kmp-avatar-wrap ${isMemberSangha && !isMemberAnon ? 'kmp-sangha-avatar' : ''}" onclick="event.stopPropagation(); openPublicProfile('${m.uid}')" style="cursor: pointer;" title="පැතිකඩ බලන්න">
             ${displayPhoto ? `<img src="${Security.sanitizeUrl(displayPhoto)}" alt="${Security.escapeHTML(displayName)}" class="kmp-avatar-img" onerror="this.parentElement.innerHTML = '<div class=\\\'kmp-avatar-initial\\\'>${initial}</div>';">` : `<div class="kmp-avatar-initial">${initial}</div>`}
             ${m.isOnline ? `<span class="kmp-online-dot" title="දැන් සජීවීව Online"></span>` : ''}
-            ${isMemberSangha && !isMemberAnon ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
+            ${isMemberSangha && !isMemberAnon ? '<img src="assets/sangha-frame.webp" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
           </div>
           <div class="kmp-card-meta">
             <div class="kmp-name-row" onclick="event.stopPropagation(); openPublicProfile('${m.uid}')" style="cursor: pointer;" title="පැතිකඩ බලන්න">
