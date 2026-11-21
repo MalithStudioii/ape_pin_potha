@@ -2538,6 +2538,31 @@ export const StorageService = {
       repostCount: 0
     };
 
+    // Safety guard: ensure no raw Base64 data URI is stored in Firestore
+    if ((postPayload.image && typeof postPayload.image === 'string' && postPayload.image.startsWith('data:image/')) ||
+        (Array.isArray(postPayload.images) && postPayload.images.some(img => typeof img === 'string' && img.startsWith('data:image/')))) {
+      const { uploadToCloudinary } = await import('./imgbb-service.js?v=68');
+      if (postPayload.image && typeof postPayload.image === 'string' && postPayload.image.startsWith('data:image/')) {
+        postPayload.image = await uploadToCloudinary(postPayload.image, `post_guard_${Date.now()}`);
+      }
+      if (Array.isArray(postPayload.images)) {
+        const resolvedList = [];
+        for (let i = 0; i < postPayload.images.length; i++) {
+          const itm = postPayload.images[i];
+          if (typeof itm === 'string' && itm.startsWith('data:image/')) {
+            const upl = await uploadToCloudinary(itm, `post_guard_${Date.now()}_${i}`);
+            resolvedList.push(upl);
+          } else {
+            resolvedList.push(itm);
+          }
+        }
+        postPayload.images = resolvedList;
+        if (!postPayload.image && resolvedList.length > 0) {
+          postPayload.image = resolvedList[0];
+        }
+      }
+    }
+
     // Resilient Optimistic Insertion: ensure immediate feedback in UI and persistent storage
     const localPostId = "post_" + Date.now() + "_" + Math.random().toString(36).substr(2, 6);
     const newPost = {

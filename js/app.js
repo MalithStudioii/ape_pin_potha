@@ -4,9 +4,9 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=160';
+import { StorageService } from './storage.js?v=161';
 import { Security } from './security.js?v=160';
-import { uploadToImgBB, uploadToCloudinary } from './imgbb-service.js?v=67';
+import { uploadToImgBB, uploadToCloudinary } from './imgbb-service.js?v=68';
 import { SoundService, triggerHaptic } from './sound.js?v=66';
 import { FeedAlgorithm } from './algorithm.js?v=144';
 import { SPIRITUAL_AVATARS, renderSpiritualAvatarPicker, selectSpiritualAvatar } from './spiritual-avatars.js?v=144';
@@ -6330,16 +6330,37 @@ function setupEventListeners() {
       isSubmittingPost = true;
       if (submitBtn) {
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> පළවෙමින් පවතී...';
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> පින්තූර පරීක්ෂා කරමින්...';
       }
 
-      const postImages = [...selectedImagesList];
-      let primaryImage = postImages[0] || null;
+      // 1. Upload any attached images (Base64 data URIs) to Cloudinary before creating post
+      const uploadedImages = [];
+      for (let i = 0; i < selectedImagesList.length; i++) {
+        const imgItem = selectedImagesList[i];
+        if (typeof imgItem === 'string' && imgItem.startsWith('data:image/')) {
+          if (submitBtn) {
+            submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> පින්තූරය උඩුගත වෙමින් පවතී (${i + 1}/${selectedImagesList.length})...`;
+          }
+          const cloudUrl = await uploadToCloudinary(imgItem, `post_${Date.now()}_${i}`);
+          if (!cloudUrl || !cloudUrl.startsWith('http')) {
+            throw new Error("පින්තූරය උඩුගත කිරීම අසාර්ථක විය. කරුණාකර නැවත උත්සාහ කරන්න.");
+          }
+          uploadedImages.push(cloudUrl);
+        } else if (typeof imgItem === 'string' && imgItem.startsWith('http')) {
+          uploadedImages.push(imgItem);
+        }
+      }
+
+      let primaryImage = uploadedImages[0] || null;
       if (!primaryImage && parsedVideo && parsedVideo.videoThumbnail) {
         primaryImage = parsedVideo.videoThumbnail;
-        if (postImages.length === 0) {
-          postImages.push(parsedVideo.videoThumbnail);
+        if (uploadedImages.length === 0) {
+          uploadedImages.push(parsedVideo.videoThumbnail);
         }
+      }
+
+      if (submitBtn) {
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> පළවෙමින් පවතී...';
       }
 
       await StorageService.createPost({
@@ -6351,7 +6372,7 @@ function setupEventListeners() {
         contact,
         description,
         image: primaryImage,
-        images: postImages,
+        images: uploadedImages,
         videoUrl: parsedVideo ? parsedVideo.videoUrl : null,
         videoId: parsedVideo ? parsedVideo.videoId : null,
         videoType: parsedVideo ? parsedVideo.type : null,
@@ -6368,7 +6389,9 @@ function setupEventListeners() {
       else if (visibility === 'private') switchTab('mybook');
       else switchTab('feed');
     } catch (err) {
-      alert("දෝෂයකි: " + err.message);
+      console.error("[Post Submit Error]:", err);
+      const isUploadErr = err.message && err.message.includes('උඩුගත');
+      alert(isUploadErr ? err.message : ("දෝෂයකි: " + err.message));
     } finally {
       isSubmittingPost = false;
       if (submitBtn) {
@@ -7490,8 +7513,11 @@ window.applyAndSaveCroppedAvatar = async function() {
       canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.88);
     });
 
-    // 3. Upload to ImgBB (with automatic local fallback)
-    const uploadedUrl = await uploadToImgBB(blob || canvas.toDataURL('image/jpeg', 0.85), `avatar_${Date.now()}`);
+    // 3. Upload to Cloudinary (strictly enforce cloud URL, no Base64 fallback)
+    const uploadedUrl = await uploadToCloudinary(blob, `avatar_${Date.now()}`);
+    if (!uploadedUrl || !uploadedUrl.startsWith('http')) {
+      throw new Error("පින්තූරය උඩුගත කිරීම අසාර්ථක විය. කරුණාකර නැවත උත්සාහ කරන්න.");
+    }
 
     // 4. Save to StorageService and localStorage immediately!
     StorageService.updateProfile({ photo: uploadedUrl });
@@ -7643,8 +7669,11 @@ window.applyAndSaveCroppedCover = async function() {
       canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.85);
     });
 
-    // 3. Upload to ImgBB (with automatic local fallback)
-    const uploadedUrl = await uploadToImgBB(blob || canvas.toDataURL('image/jpeg', 0.82), `cover_${Date.now()}`);
+    // 3. Upload to Cloudinary (strictly enforce cloud URL, no Base64 fallback)
+    const uploadedUrl = await uploadToCloudinary(blob, `cover_${Date.now()}`);
+    if (!uploadedUrl || !uploadedUrl.startsWith('http')) {
+      throw new Error("පින්තූරය උඩුගත කිරීම අසාර්ථක විය. කරුණාකර නැවත උත්සාහ කරන්න.");
+    }
 
     // 4. Save to StorageService
     StorageService.updateProfile({ coverImage: uploadedUrl });
@@ -9602,17 +9631,21 @@ window.submitRepost = async function() {
       const orig = postToPass.originalPost || postToPass;
       const rawImg = orig.image || (orig.images && orig.images[0]);
       if (rawImg && typeof rawImg === 'string' && rawImg.startsWith('data:image')) {
-        const thumb = await createFastThumbnail(rawImg, 420, 0.55);
-        postToPass = {
-          ...postToPass,
-          image: thumb,
-          images: [thumb],
-          originalPost: postToPass.originalPost ? {
-            ...postToPass.originalPost,
-            image: thumb,
-            images: [thumb]
-          } : undefined
-        };
+        try {
+          const cloudThumb = await uploadToCloudinary(rawImg, `repost_${Date.now()}`);
+          postToPass = {
+            ...postToPass,
+            image: cloudThumb,
+            images: [cloudThumb],
+            originalPost: postToPass.originalPost ? {
+              ...postToPass.originalPost,
+              image: cloudThumb,
+              images: [cloudThumb]
+            } : undefined
+          };
+        } catch (e) {
+          console.warn('[Repost] Cloudinary upload for legacy thumbnail failed:', e);
+        }
       }
     }
 
@@ -12110,7 +12143,10 @@ window.handleArtisanRegisterSubmit = async function(e) {
     // Upload profile photo if present
     if (artisanRegPhotoSelected) {
       if (uploadStatusText) uploadStatusText.textContent = "ප්‍රොෆයිල් ඡායාරූපය උඩුගත කෙරේ...";
-      photoUrl = await uploadToImgBB(artisanRegPhotoSelected, `artisan_profile_${Date.now()}`);
+      photoUrl = await uploadToCloudinary(artisanRegPhotoSelected, `artisan_profile_${Date.now()}`);
+      if (!photoUrl || !photoUrl.startsWith('http')) {
+        throw new Error("පින්තූරය උඩුගත කිරීම අසාර්ථක විය. කරුණාකර නැවත උත්සාහ කරන්න.");
+      }
     }
 
     // Upload portfolio images (up to 4)
@@ -12121,8 +12157,11 @@ window.handleArtisanRegisterSubmit = async function(e) {
           uploadStatusText.textContent = `නිර්මාණ ඡායාරූප උඩුගත කෙරේ (${i + 1}/${artisanRegPortfolioSelected.length})...`;
         }
         const imgFile = artisanRegPortfolioSelected[i];
-        const url = await uploadToImgBB(imgFile, `artisan_portfolio_${Date.now()}_${i}`);
-        if (url) portfolioUrls.push(url);
+        const url = await uploadToCloudinary(imgFile, `artisan_portfolio_${Date.now()}_${i}`);
+        if (!url || !url.startsWith('http')) {
+          throw new Error("පින්තූරය උඩුගත කිරීම අසාර්ථක විය. කරුණාකර නැවත උත්සාහ කරන්න.");
+        }
+        portfolioUrls.push(url);
       }
     }
 
@@ -12130,7 +12169,10 @@ window.handleArtisanRegisterSubmit = async function(e) {
     let wildlifeLicenseImageUrl = '';
     if (isElephant && artisanRegWildlifeLicenseSelected) {
       if (uploadStatusText) uploadStatusText.textContent = "වනජීවී බලපත්‍ර ඡායාරූපය උඩුගත කෙරේ...";
-      wildlifeLicenseImageUrl = await uploadToImgBB(artisanRegWildlifeLicenseSelected, `artisan_license_${Date.now()}`);
+      wildlifeLicenseImageUrl = await uploadToCloudinary(artisanRegWildlifeLicenseSelected, `artisan_license_${Date.now()}`);
+      if (!wildlifeLicenseImageUrl || !wildlifeLicenseImageUrl.startsWith('http')) {
+        throw new Error("පින්තූරය උඩුගත කිරීම අසාර්ථක විය. කරුණාකර නැවත උත්සාහ කරන්න.");
+      }
     }
 
     if (uploadStatusText) uploadStatusText.textContent = "අයදුම්පත සුරකිමින් පවතී...";

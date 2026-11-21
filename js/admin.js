@@ -9,7 +9,7 @@
 
 import { firebaseConfig, isFirebaseConfigured, COLLECTIONS } from './firebase-config.js?v=22';
 import { Security } from './security.js?v=48';
-import { uploadToImgBB, uploadToCloudinary, getImgBBApiKey } from './imgbb-service.js?v=67';
+import { uploadToImgBB, uploadToCloudinary, getImgBBApiKey } from './imgbb-service.js?v=68';
 
 const MASTER_ADMIN_EMAIL = "silvadilan9@gmail.com";
 const MASTER_ADMIN_EMAILS = [
