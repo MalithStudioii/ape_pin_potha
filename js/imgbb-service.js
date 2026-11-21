@@ -1,13 +1,19 @@
 /**
  * ============================================================================
- * පිං පොත | ImgBB Cloud Image Upload Service
+ * Ape Pin Potha | Cloud Image Upload Service (Cloudinary & ImgBB)
  * ============================================================================
- * ImgBB API මගින් නොමිලේ ඡායාරූප සත්කාරක පහසුකම (Free Unlimited Image Hosting)
- * API Endpoint: https://api.imgbb.com/1/upload
+ * Primary Image Hosting: Cloudinary (Zero-Transformation Mode)
+ * Preserves high performance while consuming 0 transformation credits.
  */
 
+export const CLOUDINARY_CONFIG = {
+  cloudName: 'xvygfeh6',
+  uploadPreset: 'apepinpotha_uploads',
+  folder: 'apepinpotha',
+  endpoint: 'https://api.cloudinary.com/v1_1/xvygfeh6/image/upload'
+};
+
 export const IMGBB_CONFIG = {
-  // සක්‍රීය ImgBB Free API Key එක
   apiKey: "f048c857d1c61df16a650b4b65074368"
 };
 
@@ -129,47 +135,51 @@ export function fileToCompressedDataURL(file, maxWidth = 1200, quality = 0.82) {
 }
 
 /**
- * Upload an image file to ImgBB and return direct image URL.
- * Falls back seamlessly to compressed base64 if cloud upload fails for any reason.
- * @param {File|Blob} file 
+ * Upload an image file, blob or remote URL to Cloudinary (Zero-Transformation Mode).
+ * Returns the exact direct secure_url without f_auto,q_auto to consume 0 transformation credits.
+ * Falls back seamlessly to compressed base64 if cloud upload fails.
+ * @param {File|Blob|string} fileOrBlob 
  * @param {string} [customName]
- * @returns {Promise<string>} Direct image URL or high-quality compressed Data URL
+ * @returns {Promise<string>} Direct image URL or compressed Data URL fallback
  */
-export async function uploadToImgBB(file, customName = "pinpotha_upload") {
-  // Pre-generate guaranteed offline/safe fallback
+export async function uploadToCloudinary(fileOrBlob, customName = "pinpotha_upload") {
+  // 1. Pre-generate safe fallback if possible
   let fallbackDataUrl = null;
-  try {
-    fallbackDataUrl = await fileToCompressedDataURL(file, 1200, 0.82);
-  } catch (e) {
-    console.warn("[Upload] Could not generate fallback data URL:", e);
+  if (typeof fileOrBlob === 'string' && fileOrBlob.startsWith('data:image/')) {
+    fallbackDataUrl = fileOrBlob;
+  } else if (fileOrBlob instanceof Blob || (typeof File !== 'undefined' && fileOrBlob instanceof File)) {
+    try {
+      fallbackDataUrl = await fileToCompressedDataURL(fileOrBlob, 1200, 0.82);
+    } catch (e) {
+      console.warn("[Cloudinary] Could not generate fallback data URL:", e);
+    }
   }
 
-  const apiKey = getImgBBApiKey();
-
-  // If no API key is set, immediately use crisp local compressed image
-  if (!apiKey) {
-    if (fallbackDataUrl) return fallbackDataUrl;
-    throw new Error("ඡායාරූපය සැකසීමට නොහැකි විය.");
-  }
-
-  // Pre-compress to JPEG for fast upload and ImgBB reliability
-  let uploadBlob = file;
-  try {
-    uploadBlob = await compressImageFile(file, 1200, 0.84);
-  } catch (err) {
-    console.warn("[ImgBB] Pre-compression skipped, uploading original:", err);
-    uploadBlob = file;
+  // 2. Pre-compress to JPEG client-side if it's a file/blob to minimize upload size & speed up transfers
+  let uploadPayload = fileOrBlob;
+  if (fileOrBlob instanceof Blob || (typeof File !== 'undefined' && fileOrBlob instanceof File)) {
+    try {
+      uploadPayload = await compressImageFile(fileOrBlob, 1200, 0.84);
+    } catch (err) {
+      console.warn("[Cloudinary] Pre-compression skipped, uploading original:", err);
+      uploadPayload = fileOrBlob;
+    }
   }
 
   try {
     const formData = new FormData();
-    formData.append('image', uploadBlob, `${customName}.jpg`);
-    // Note: No 'expiration' parameter is appended so images are stored permanently on ImgBB
+    if (uploadPayload instanceof Blob) {
+      formData.append('file', uploadPayload, `${customName}.jpg`);
+    } else {
+      formData.append('file', uploadPayload);
+    }
+    formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+    formData.append('folder', CLOUDINARY_CONFIG.folder);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-    const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
+    const response = await fetch(CLOUDINARY_CONFIG.endpoint, {
       method: 'POST',
       body: formData,
       signal: controller.signal
@@ -178,22 +188,31 @@ export async function uploadToImgBB(file, customName = "pinpotha_upload") {
 
     const resData = await response.json();
 
-    if (response.ok && resData && resData.success && resData.data) {
-      const imageUrl = resData.data.display_url || resData.data.url;
-      if (imageUrl) return imageUrl;
+    if (response.ok && resData && resData.secure_url) {
+      // Return exact secure_url without adding any /f_auto,q_auto/ transformations
+      return resData.secure_url;
     }
 
-    // Cloud upload failed (e.g. ImgBB "Internal upload error" or rate limit)
-    console.warn("[ImgBB] Cloud response indicated failure, utilizing local fallback:", resData?.error?.message);
+    console.warn("[Cloudinary] Upload failed, utilizing fallback:", resData?.error?.message);
     if (fallbackDataUrl) {
       return fallbackDataUrl;
     }
-    throw new Error(resData?.error?.message || "ImgBB upload error");
+    throw new Error(resData?.error?.message || "Cloudinary upload error");
   } catch (err) {
-    console.warn("[ImgBB] Network/API error, falling back to compressed local image:", err.message);
+    console.warn("[Cloudinary] Network/API error, falling back to local compressed image:", err.message);
     if (fallbackDataUrl) {
       return fallbackDataUrl;
     }
     throw err;
   }
+}
+
+/**
+ * Upload an image file to cloud storage (aliased to Cloudinary for backward compatibility).
+ * @param {File|Blob} file 
+ * @param {string} [customName]
+ * @returns {Promise<string>} Direct image URL or high-quality compressed Data URL
+ */
+export async function uploadToImgBB(file, customName = "pinpotha_upload") {
+  return uploadToCloudinary(file, customName);
 }

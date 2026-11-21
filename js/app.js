@@ -6,7 +6,7 @@
 
 import { StorageService } from './storage.js?v=160';
 import { Security } from './security.js?v=160';
-import { uploadToImgBB } from './imgbb-service.js?v=66';
+import { uploadToImgBB, uploadToCloudinary } from './imgbb-service.js?v=67';
 import { SoundService, triggerHaptic } from './sound.js?v=66';
 import { FeedAlgorithm } from './algorithm.js?v=144';
 import { SPIRITUAL_AVATARS, renderSpiritualAvatarPicker, selectSpiritualAvatar } from './spiritual-avatars.js?v=144';
@@ -11330,8 +11330,9 @@ let artisanRegPhotoSelected = null;
 let artisanRegPortfolioSelected = [];
 let artisanRegWildlifeLicenseSelected = null;
 
-// Expose uploadToImgBB to window if needed
+// Expose upload services to window if needed
 window.uploadToImgBB = uploadToImgBB;
+window.uploadToCloudinary = uploadToCloudinary;
 
 window.renderArtisansDirectoryView = async function() {
   const grid = document.getElementById('artisansGrid');

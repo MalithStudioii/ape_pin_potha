@@ -1698,7 +1698,7 @@
                     </div>
                 </div>
                 <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.5;">
-                    පැරණි සටහන්වල සහ ගිණුම්වල ඇති බරැති Base64 Data URI (<code>data:image/...</code>) පින්තූර හඳුනාගෙන, ඒවා ස්වයංක්‍රීයව ImgBB CDN වෙත මාරු කර (Migrate) Firestore දත්ත ප්‍රමාණය (Payload Size) සුරක්ෂිතව අවම කරයි.
+                    පැරණි සටහන්වල සහ ගිණුම්වල ඇති බරැති Base64 Data URI පින්තූර මෙන්ම ImgBB සත්කාරකයේ ඇති පින්තූර Cloudinary (Zero-Transformation Mode) වෙත ආරක්ෂිතව මාරු කර Firestore දත්ත ප්‍රමාණය අවම කරයි.
                 </p>
 
                 <!-- Actions Button Row -->
@@ -1709,11 +1709,19 @@
                     </button>
                     <button type="button" id="btnMigrateBase64" class="btn-save-settings" onclick="startBase64Migration()" disabled style="background: linear-gradient(135deg, #10b981, #059669); color: #fff; opacity: 0.5; cursor: not-allowed;">
                         <i class="fa-solid fa-rocket"></i>
-                        <span>ImgBB වෙත මාරු කරන්න (Start Migration)</span>
+                        <span>Cloudinary වෙත මාරු කරන්න (Base64)</span>
                     </button>
                     <button type="button" id="btnScanBrokenImages" class="btn-save-settings" onclick="scanBrokenImages()" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff;">
                         <i class="fa-solid fa-stethoscope"></i>
                         <span>🩺 කැඩුණු පින්තූර පරීක්ෂා කරන්න (Check Broken Images)</span>
+                    </button>
+                    <button type="button" id="btnScanImgBB" class="btn-save-settings" onclick="scanImgBBImages()" style="background: linear-gradient(135deg, #6366f1, #4f46e5); color: #fff;">
+                        <i class="fa-solid fa-cloud-arrow-down"></i>
+                        <span>🔍 ImgBB පින්තූර පරීක්ෂා කරන්න (Scan ImgBB)</span>
+                    </button>
+                    <button type="button" id="btnMigrateImgBB" class="btn-save-settings" onclick="startImgBBMigration()" disabled style="background: linear-gradient(135deg, #06b6d4, #0891b2); color: #fff; opacity: 0.5; cursor: not-allowed;">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                        <span>☁️ Cloudinary වෙත මාරු කරන්න (Migrate to Cloudinary)</span>
                     </button>
                 </div>
 
@@ -2033,6 +2041,6 @@
     </div>
 
     <!-- ES Module Script for Admin Logic -->
-    <script type="module" src="js/admin.js?v=92"></script>
+    <script type="module" src="js/admin.js?v=93"></script>
 </body>
 </html>

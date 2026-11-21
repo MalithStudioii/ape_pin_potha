@@ -9,7 +9,7 @@
 
 import { firebaseConfig, isFirebaseConfigured, COLLECTIONS } from './firebase-config.js?v=22';
 import { Security } from './security.js?v=48';
-import { uploadToImgBB, getImgBBApiKey } from './imgbb-service.js?v=66';
+import { uploadToImgBB, uploadToCloudinary, getImgBBApiKey } from './imgbb-service.js?v=67';
 
 const MASTER_ADMIN_EMAIL = "silvadilan9@gmail.com";
 const MASTER_ADMIN_EMAILS = [
@@ -2273,17 +2273,87 @@ window.startBase64Migration = async function() {
     }
 };
 
+// Helper to detect whether an ImgBB image URL is the cyan-blue 'image not found' placeholder
+export async function isImgBBNotFoundPlaceholder(url) {
+    if (!url || typeof url !== 'string') return true;
+    const cleanUrl = url.trim();
+    if (!cleanUrl.includes('ibb.co')) return false;
+
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        let settled = false;
+
+        const timer = setTimeout(() => {
+            if (!settled) {
+                settled = true;
+                img.onload = null;
+                img.onerror = null;
+                resolve(true); // Timed out image treated as unreachable/dead
+            }
+        }, 8500);
+
+        img.onload = () => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+
+            if (img.naturalWidth === 0 || img.naturalHeight === 0) {
+                return resolve(true);
+            }
+
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = 20;
+                canvas.height = 20;
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                if (!ctx) return resolve(false);
+
+                ctx.drawImage(img, 0, 0, 20, 20);
+
+                const isCyanBlue = (r, g, b) => (r >= 25 && r <= 65 && g >= 155 && g <= 195 && b >= 210 && b <= 250);
+                const p1 = ctx.getImageData(2, 2, 1, 1).data;
+                const p2 = ctx.getImageData(17, 2, 1, 1).data;
+                const p3 = ctx.getImageData(2, 17, 1, 1).data;
+                const p4 = ctx.getImageData(17, 17, 1, 1).data;
+
+                if (isCyanBlue(p1[0], p1[1], p1[2]) &&
+                    isCyanBlue(p2[0], p2[1], p2[2]) &&
+                    isCyanBlue(p3[0], p3[1], p3[2]) &&
+                    isCyanBlue(p4[0], p4[1], p4[2])) {
+                    return resolve(true); // Matches dead ImgBB placeholder graphic
+                }
+                resolve(false);
+            } catch (canvasErr) {
+                // If canvas reading is blocked by CORS, treat as surviving to prevent false deletion
+                resolve(false);
+            }
+        };
+
+        img.onerror = () => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            resolve(true); // Failed to load
+        };
+
+        img.src = cleanUrl;
+    });
+}
+
 // Helper to extract image URLs from a merit_posts document
 function extractImageUrlsFromPost(data, docId) {
     const urls = [];
     const snippet = (data.title || data.text || data.author || docId || '').toString().substring(0, 40);
+    const author = (data.author || data.authorName || data.userName || 'Unknown').toString();
+    const title = (data.title || data.text || 'Untitled').toString().substring(0, 50);
 
     // Single string fields
     const singleFields = ['image', 'imageUrl', 'mediaUrl', 'photo', 'thumbnail'];
     singleFields.forEach(field => {
         const val = data[field];
         if (typeof val === 'string' && val.trim().length > 0 && !val.startsWith('data:image/')) {
-            urls.push({ docId, field, url: val.trim(), snippet });
+            urls.push({ docId, author, title, field, url: val.trim(), snippet });
         }
     });
 
@@ -2294,11 +2364,11 @@ function extractImageUrlsFromPost(data, docId) {
         if (Array.isArray(arr)) {
             arr.forEach((item, idx) => {
                 if (typeof item === 'string' && item.trim().length > 0 && !item.startsWith('data:image/')) {
-                    urls.push({ docId, field: `${field}[${idx}]`, url: item.trim(), snippet });
+                    urls.push({ docId, author, title, field: `${field}[${idx}]`, url: item.trim(), snippet });
                 } else if (item && typeof item === 'object') {
                     const u = item.url || item.src || item.link;
                     if (typeof u === 'string' && u.trim().length > 0 && !u.startsWith('data:image/')) {
-                        urls.push({ docId, field: `${field}[${idx}].url`, url: u.trim(), snippet });
+                        urls.push({ docId, author, title, field: `${field}[${idx}].url`, url: u.trim(), snippet });
                     }
                 }
             });
@@ -2308,13 +2378,22 @@ function extractImageUrlsFromPost(data, docId) {
     return urls;
 }
 
-// Probes an image URL off-screen to check for load errors or zero dimensions
-function probeImageUrl(url, timeoutMs = 8500) {
-    return new Promise((resolve) => {
-        if (!url || typeof url !== 'string' || !url.trim()) {
-            return resolve({ ok: false, reason: 'empty_url' });
+// Probes an image URL off-screen to check for load errors, zero dimensions, or ImgBB placeholder
+async function probeImageUrl(url, timeoutMs = 8500) {
+    if (!url || typeof url !== 'string' || !url.trim()) {
+        return { ok: false, reason: 'empty_url' };
+    }
+    const trimmed = url.trim();
+
+    // Check ImgBB placeholder detection first if it is an ImgBB URL
+    if (trimmed.includes('ibb.co')) {
+        const isDeadPlaceholder = await isImgBBNotFoundPlaceholder(trimmed);
+        if (isDeadPlaceholder) {
+            return { ok: false, reason: 'imgbb_placeholder_not_found' };
         }
-        const trimmed = url.trim();
+    }
+
+    return new Promise((resolve) => {
         const img = new Image();
         let timer = null;
         let settled = false;
@@ -2365,7 +2444,7 @@ window.scanBrokenImages = async function() {
         alert('මෙම පහසුකම සඳහා අවසර ඇත්තේ Master Admin ට පමණි.');
         return;
     }
-    if (isBrokenImageScanning || isBase64Scanning || isBase64Migrating) return;
+    if (isBrokenImageScanning || isBase64Scanning || isBase64Migrating || isImgBBScanning || isImgBBMigrating) return;
 
     isBrokenImageScanning = true;
     const btn = document.getElementById('btnScanBrokenImages');
@@ -2408,7 +2487,7 @@ window.scanBrokenImages = async function() {
                 checkedCount++;
                 if (!res.ok) {
                     brokenCount++;
-                    appendBase64Log(`✗ [Broken Image] Doc: ${target.docId} | Field: ${target.field} | Snippet: "${target.snippet}" | Reason: ${res.reason} | URL: ${target.url}`, 'error');
+                    appendBase64Log(`✗ [Broken Image] Doc: ${target.docId} | Author: "${target.author}" | Title: "${target.title}" | Field: ${target.field} | Reason: ${res.reason} | URL: ${target.url}`, 'error');
                 }
             });
 
@@ -2436,5 +2515,364 @@ window.scanBrokenImages = async function() {
             btn.disabled = false;
             btn.style.opacity = '1';
         }
+    }
+};
+
+// ============================================================================
+// Rescue Migrator: Surviving ImgBB -> Cloudinary (Zero-Transformation Mode)
+// ============================================================================
+let scannedImgBBItems = [];
+let isImgBBScanning = false;
+let isImgBBMigrating = false;
+
+window.scanImgBBImages = async function() {
+    if (!isMasterAdmin || !checkIsMasterAdmin(currentAdminUser)) {
+        alert('මෙම පහසුකම සඳහා අවසර ඇත්තේ Master Admin ට පමණි.');
+        return;
+    }
+    if (isImgBBScanning || isImgBBMigrating || isBase64Scanning || isBase64Migrating || isBrokenImageScanning) return;
+
+    isImgBBScanning = true;
+    scannedImgBBItems = [];
+
+    const btnScan = document.getElementById('btnScanImgBB');
+    const btnMigrate = document.getElementById('btnMigrateImgBB');
+    if (btnScan) {
+        btnScan.disabled = true;
+        btnScan.style.opacity = '0.5';
+    }
+    if (btnMigrate) {
+        btnMigrate.disabled = true;
+        btnMigrate.style.opacity = '0.5';
+        btnMigrate.style.cursor = 'not-allowed';
+    }
+
+    appendBase64Log('Scanning Firestore collections (merit_posts, users, temple_artisans) for ImgBB hosted images...', 'info');
+
+    try {
+        const { collection, getDocs } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+
+        let totalDocsScanned = 0;
+
+        // 1. Scan merit_posts
+        const postsSnap = await getDocs(collection(db, COLLECTIONS.POSTS));
+        postsSnap.forEach(docSnap => {
+            totalDocsScanned++;
+            const data = docSnap.data();
+            const docId = docSnap.id;
+            const snippet = (data.title || data.text || docId || '').toString().substring(0, 40);
+
+            // Single fields
+            ['image', 'imageUrl', 'mediaUrl', 'photo', 'thumbnail'].forEach(f => {
+                const val = data[f];
+                if (typeof val === 'string' && (val.includes('ibb.co') || val.includes('i.ibb.co'))) {
+                    scannedImgBBItems.push({
+                        collection: COLLECTIONS.POSTS,
+                        docId,
+                        field: f,
+                        isArray: false,
+                        url: val.trim(),
+                        snippet
+                    });
+                }
+            });
+
+            // Array fields
+            ['images', 'media', 'photos'].forEach(f => {
+                const arr = data[f];
+                if (Array.isArray(arr)) {
+                    arr.forEach((item, idx) => {
+                        if (typeof item === 'string' && (item.includes('ibb.co') || item.includes('i.ibb.co'))) {
+                            scannedImgBBItems.push({
+                                collection: COLLECTIONS.POSTS,
+                                docId,
+                                field: f,
+                                isArray: true,
+                                index: idx,
+                                isObjectInArray: false,
+                                url: item.trim(),
+                                snippet
+                            });
+                        } else if (item && typeof item === 'object') {
+                            const u = item.url || item.src || item.link;
+                            const key = item.url ? 'url' : (item.src ? 'src' : 'link');
+                            if (typeof u === 'string' && (u.includes('ibb.co') || u.includes('i.ibb.co'))) {
+                                scannedImgBBItems.push({
+                                    collection: COLLECTIONS.POSTS,
+                                    docId,
+                                    field: f,
+                                    isArray: true,
+                                    index: idx,
+                                    isObjectInArray: true,
+                                    objectKey: key,
+                                    url: u.trim(),
+                                    snippet
+                                });
+                            }
+                        }
+                    });
+                }
+            });
+        });
+
+        // 2. Scan users
+        const usersSnap = await getDocs(collection(db, COLLECTIONS.USERS));
+        usersSnap.forEach(docSnap => {
+            totalDocsScanned++;
+            const data = docSnap.data();
+            const docId = docSnap.id;
+            const snippet = (data.displayName || data.name || docId || '').toString().substring(0, 40);
+
+            ['photoURL', 'avatar', 'coverImage', 'profileImage'].forEach(f => {
+                const val = data[f];
+                if (typeof val === 'string' && (val.includes('ibb.co') || val.includes('i.ibb.co'))) {
+                    scannedImgBBItems.push({
+                        collection: COLLECTIONS.USERS,
+                        docId,
+                        field: f,
+                        isArray: false,
+                        url: val.trim(),
+                        snippet
+                    });
+                }
+            });
+        });
+
+        // 3. Scan temple_artisans
+        const artisansCollectionName = COLLECTIONS.ARTISANS || 'temple_artisans';
+        try {
+            const artisansSnap = await getDocs(collection(db, artisansCollectionName));
+            artisansSnap.forEach(docSnap => {
+                totalDocsScanned++;
+                const data = docSnap.data();
+                const docId = docSnap.id;
+                const snippet = (data.fullName || data.serviceTitle || docId || '').toString().substring(0, 40);
+
+                // Single fields
+                ['photo', 'photoUrl', 'wildlifeLicenseImageUrl', 'licenseUrl'].forEach(f => {
+                    const val = data[f];
+                    if (typeof val === 'string' && (val.includes('ibb.co') || val.includes('i.ibb.co'))) {
+                        scannedImgBBItems.push({
+                            collection: artisansCollectionName,
+                            docId,
+                            field: f,
+                            isArray: false,
+                            url: val.trim(),
+                            snippet
+                        });
+                    }
+                });
+
+                // Array fields
+                ['portfolio', 'portfolioUrls', 'images'].forEach(f => {
+                    const arr = data[f];
+                    if (Array.isArray(arr)) {
+                        arr.forEach((item, idx) => {
+                            if (typeof item === 'string' && (item.includes('ibb.co') || item.includes('i.ibb.co'))) {
+                                scannedImgBBItems.push({
+                                    collection: artisansCollectionName,
+                                    docId,
+                                    field: f,
+                                    isArray: true,
+                                    index: idx,
+                                    isObjectInArray: false,
+                                    url: item.trim(),
+                                    snippet
+                                });
+                            } else if (item && typeof item === 'object') {
+                                const u = item.url || item.src || item.link;
+                                const key = item.url ? 'url' : (item.src ? 'src' : 'link');
+                                if (typeof u === 'string' && (u.includes('ibb.co') || u.includes('i.ibb.co'))) {
+                                    scannedImgBBItems.push({
+                                        collection: artisansCollectionName,
+                                        docId,
+                                        field: f,
+                                        isArray: true,
+                                        index: idx,
+                                        isObjectInArray: true,
+                                        objectKey: key,
+                                        url: u.trim(),
+                                        snippet
+                                    });
+                                }
+                            }
+                        });
+                    }
+                });
+            });
+        } catch (artisanErr) {
+            console.warn('[ImgBB Scan] Could not scan artisans collection:', artisanErr);
+        }
+
+        if (scannedImgBBItems.length > 0) {
+            appendBase64Log(`Found ${scannedImgBBItems.length} ImgBB image(s) across ${totalDocsScanned} documents. Ready for Cloudinary migration!`, 'warn');
+            if (btnMigrate) {
+                btnMigrate.disabled = false;
+                btnMigrate.style.opacity = '1';
+                btnMigrate.style.cursor = 'pointer';
+            }
+        } else {
+            appendBase64Log(`Scan completed: Scanned ${totalDocsScanned} documents. No ImgBB hosted images found!`, 'success');
+        }
+
+    } catch (err) {
+        console.error('[ImgBB Scan] Error:', err);
+        appendBase64Log(`Error scanning ImgBB images: ${err.message}`, 'error');
+        alert('ImgBB පින්තූර පරීක්ෂාවේදී දෝෂයක් සිදුවිය: ' + err.message);
+    } finally {
+        isImgBBScanning = false;
+        if (btnScan) {
+            btnScan.disabled = false;
+            btnScan.style.opacity = '1';
+        }
+    }
+};
+
+window.startImgBBMigration = async function() {
+    if (!isMasterAdmin || !checkIsMasterAdmin(currentAdminUser)) {
+        alert('මෙම පහසුකම සඳහා අවසර ඇත්තේ Master Admin ට පමණි.');
+        return;
+    }
+    if (isImgBBMigrating || scannedImgBBItems.length === 0) return;
+
+    const confirmMigrate = confirm(`හමු වූ ImgBB පින්තූර ${scannedImgBBItems.length} Cloudinary වෙත මාරු කිරීම (Rescue Migration) ආරම්භ කිරීමට අවශ්‍යද?\n\nමියගිය (Dead) ImgBB පින්තූර ස්වයංක්‍රීයව හඳුනාගෙන Skip කරනු ලැබේ.\nමෙම ක්‍රියාවලිය අතරතුර පිටුව Reload නොකරන්න.`);
+    if (!confirmMigrate) return;
+
+    isImgBBMigrating = true;
+    const btnScan = document.getElementById('btnScanImgBB');
+    const btnMigrate = document.getElementById('btnMigrateImgBB');
+    if (btnScan) {
+        btnScan.disabled = true;
+        btnScan.style.opacity = '0.5';
+    }
+    if (btnMigrate) {
+        btnMigrate.disabled = true;
+        btnMigrate.style.opacity = '0.5';
+        btnMigrate.style.cursor = 'not-allowed';
+    }
+
+    const progressContainer = document.getElementById('base64ProgressContainer');
+    const progressBar = document.getElementById('base64ProgressBar');
+    const progressPercent = document.getElementById('base64ProgressPercent');
+    const progressLabel = document.getElementById('base64ProgressLabel');
+    if (progressContainer) progressContainer.style.display = 'block';
+
+    appendBase64Log(`Starting ImgBB -> Cloudinary migration for ${scannedImgBBItems.length} item(s)...`, 'info');
+    await recordAuditLog('ImgBB to Cloudinary Migration Started', `Starting rescue migration for ${scannedImgBBItems.length} ImgBB items.`);
+
+    let migratedCount = 0;
+    let deadSkippedCount = 0;
+    let failedCount = 0;
+
+    const { doc, getDoc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+
+    for (let i = 0; i < scannedImgBBItems.length; i++) {
+        const item = scannedImgBBItems[i];
+        const itemNum = i + 1;
+        const total = scannedImgBBItems.length;
+        const pct = Math.round((itemNum / total) * 100);
+
+        if (progressBar) progressBar.style.width = `${pct}%`;
+        if (progressPercent) progressPercent.innerText = `${pct}% (${itemNum}/${total})`;
+        if (progressLabel) progressLabel.innerText = `Testing [${item.collection}] ${item.docId}...`;
+
+        try {
+            // 1. Test if this is a dead ImgBB placeholder
+            const isDead = await isImgBBNotFoundPlaceholder(item.url);
+            if (isDead) {
+                deadSkippedCount++;
+                appendBase64Log(`⚠ [${itemNum}/${total}] Skipped (Dead ImgBB Placeholder): Doc: ${item.docId} | Snippet: "${item.snippet}" | URL: ${item.url}`, 'warn');
+                continue;
+            }
+
+            // 2. Surviving image: upload directly to Cloudinary via remote URL
+            appendBase64Log(`[${itemNum}/${total}] Migrating to Cloudinary (${item.docId} -> ${item.field})...`, 'info');
+            const formData = new FormData();
+            formData.append('file', item.url);
+            formData.append('upload_preset', 'apepinpotha_uploads');
+            formData.append('folder', 'apepinpotha');
+
+            const response = await fetch('https://api.cloudinary.com/v1_1/xvygfeh6/image/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            const resData = await response.json();
+            if (!response.ok || !resData || !resData.secure_url) {
+                throw new Error(resData?.error?.message || 'Cloudinary upload failed');
+            }
+
+            // Zero-transformation mode: use exact secure_url without f_auto,q_auto
+            const newCloudinaryUrl = resData.secure_url;
+
+            // 3. Update Firestore document
+            const docRef = doc(db, item.collection, item.docId);
+            const docSnap = await getDoc(docRef);
+
+            if (!docSnap.exists()) {
+                throw new Error(`Document ${item.docId} not found in ${item.collection}`);
+            }
+
+            const currentData = docSnap.data();
+
+            if (item.isArray) {
+                const currentArr = Array.isArray(currentData[item.field]) ? [...currentData[item.field]] : [];
+                if (item.isObjectInArray) {
+                    if (currentArr[item.index] && typeof currentArr[item.index] === 'object') {
+                        currentArr[item.index] = { ...currentArr[item.index], [item.objectKey]: newCloudinaryUrl };
+                    }
+                } else {
+                    if (item.index >= 0 && item.index < currentArr.length && currentArr[item.index] === item.url) {
+                        currentArr[item.index] = newCloudinaryUrl;
+                    } else {
+                        const matchIdx = currentArr.indexOf(item.url);
+                        if (matchIdx !== -1) {
+                            currentArr[matchIdx] = newCloudinaryUrl;
+                        } else if (item.index >= 0 && item.index < currentArr.length) {
+                            currentArr[item.index] = newCloudinaryUrl;
+                        }
+                    }
+                }
+                await updateDoc(docRef, { [item.field]: currentArr });
+            } else {
+                await updateDoc(docRef, { [item.field]: newCloudinaryUrl });
+            }
+
+            migratedCount++;
+            appendBase64Log(`✓ [${itemNum}/${total}] Migrated: Doc: ${item.docId} (${item.field}) -> ${newCloudinaryUrl}`, 'success');
+
+        } catch (err) {
+            failedCount++;
+            console.error(`[ImgBB Migration Error] ${item.docId}:`, err);
+            appendBase64Log(`✗ [${itemNum}/${total}] Failed (${item.docId} / ${item.field}): ${err.message}`, 'error');
+        }
+
+        // Wait 600ms between uploads as instructed
+        if (i < scannedImgBBItems.length - 1) {
+            await sleep(600);
+        }
+    }
+
+    // Invalidate and clear local caches
+    try {
+        localStorage.removeItem('pinPotha_posts');
+        localStorage.removeItem('pinPotha_sandbox_posts');
+        localStorage.removeItem('pinPotha_cached_posts');
+        localStorage.removeItem('pinPotha_artisans_cache');
+        appendBase64Log('Cleared local post and artisan caches (pinPotha_posts, pinPotha_sandbox_posts, pinPotha_cached_posts, pinPotha_artisans_cache).', 'info');
+    } catch (e) {
+        console.warn('[ImgBB Migration] Cache clear warning:', e);
+    }
+
+    const summaryMsg = `Migration completed: Successfully migrated ${migratedCount} item(s) to Cloudinary. Skipped dead placeholders: ${deadSkippedCount}. Failed: ${failedCount}.`;
+    appendBase64Log(summaryMsg, migratedCount > 0 ? 'success' : 'warn');
+    await recordAuditLog('ImgBB to Cloudinary Migration Finished', summaryMsg);
+    alert(summaryMsg);
+
+    isImgBBMigrating = false;
+    scannedImgBBItems = [];
+    if (btnScan) {
+        btnScan.disabled = false;
+        btnScan.style.opacity = '1';
     }
 };
