@@ -164,6 +164,7 @@ export async function uploadToImgBB(file, customName = "pinpotha_upload") {
   try {
     const formData = new FormData();
     formData.append('image', uploadBlob, `${customName}.jpg`);
+    // Note: No 'expiration' parameter is appended so images are stored permanently on ImgBB
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 12000);

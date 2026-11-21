@@ -2291,3 +2291,169 @@ window.startBase64Migration = async function() {
         btnScan.style.opacity = '1';
     }
 };
+
+// Helper to extract image URLs from a merit_posts document
+function extractImageUrlsFromPost(data, docId) {
+    const urls = [];
+    const snippet = (data.title || data.text || data.author || docId || '').toString().substring(0, 40);
+
+    // Single string fields
+    const singleFields = ['image', 'imageUrl', 'mediaUrl', 'photo', 'thumbnail'];
+    singleFields.forEach(field => {
+        const val = data[field];
+        if (typeof val === 'string' && val.trim().length > 0 && !val.startsWith('data:image/')) {
+            urls.push({ docId, field, url: val.trim(), snippet });
+        }
+    });
+
+    // Array fields (strings or objects with url)
+    const arrayFields = ['images', 'media', 'photos'];
+    arrayFields.forEach(field => {
+        const arr = data[field];
+        if (Array.isArray(arr)) {
+            arr.forEach((item, idx) => {
+                if (typeof item === 'string' && item.trim().length > 0 && !item.startsWith('data:image/')) {
+                    urls.push({ docId, field: `${field}[${idx}]`, url: item.trim(), snippet });
+                } else if (item && typeof item === 'object') {
+                    const u = item.url || item.src || item.link;
+                    if (typeof u === 'string' && u.trim().length > 0 && !u.startsWith('data:image/')) {
+                        urls.push({ docId, field: `${field}[${idx}].url`, url: u.trim(), snippet });
+                    }
+                }
+            });
+        }
+    });
+
+    return urls;
+}
+
+// Probes an image URL off-screen to check for load errors or zero dimensions
+function probeImageUrl(url, timeoutMs = 8500) {
+    return new Promise((resolve) => {
+        if (!url || typeof url !== 'string' || !url.trim()) {
+            return resolve({ ok: false, reason: 'empty_url' });
+        }
+        const trimmed = url.trim();
+        const img = new Image();
+        let timer = null;
+        let settled = false;
+
+        const cleanup = () => {
+            if (timer) clearTimeout(timer);
+            img.onload = null;
+            img.onerror = null;
+        };
+
+        timer = setTimeout(() => {
+            if (!settled) {
+                settled = true;
+                cleanup();
+                resolve({ ok: false, reason: 'timeout' });
+            }
+        }, timeoutMs);
+
+        img.onload = () => {
+            if (!settled) {
+                settled = true;
+                cleanup();
+                if (img.naturalWidth === 0 || img.naturalHeight === 0) {
+                    resolve({ ok: false, reason: 'zero_dimensions' });
+                } else {
+                    resolve({ ok: true, width: img.naturalWidth, height: img.naturalHeight });
+                }
+            }
+        };
+
+        img.onerror = () => {
+            if (!settled) {
+                settled = true;
+                cleanup();
+                resolve({ ok: false, reason: 'load_error' });
+            }
+        };
+
+        img.src = trimmed;
+    });
+}
+
+// Scans merit_posts image URLs in small parallel batches to detect broken/missing images
+let isBrokenImageScanning = false;
+
+window.scanBrokenImages = async function() {
+    if (!isMasterAdmin || !checkIsMasterAdmin(currentAdminUser)) {
+        alert('මෙම පහසුකම සඳහා අවසර ඇත්තේ Master Admin ට පමණි.');
+        return;
+    }
+    if (isBrokenImageScanning || isBase64Scanning || isBase64Migrating) return;
+
+    isBrokenImageScanning = true;
+    const btn = document.getElementById('btnScanBrokenImages');
+    if (btn) {
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+    }
+
+    appendBase64Log('Starting scan for broken images in merit_posts...', 'info');
+
+    try {
+        const { collection, getDocs } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const postsSnap = await getDocs(collection(db, COLLECTIONS.POSTS));
+
+        const imageTargets = [];
+        let totalDocs = 0;
+
+        postsSnap.forEach(docSnap => {
+            totalDocs++;
+            const data = docSnap.data();
+            const docId = docSnap.id;
+            const items = extractImageUrlsFromPost(data, docId);
+            imageTargets.push(...items);
+        });
+
+        appendBase64Log(`Found ${imageTargets.length} image URL(s) across ${totalDocs} post(s). Testing in parallel batches of 6...`, 'info');
+
+        let checkedCount = 0;
+        let brokenCount = 0;
+        const batchSize = 6;
+
+        for (let i = 0; i < imageTargets.length; i += batchSize) {
+            const batch = imageTargets.slice(i, i + batchSize);
+            const results = await Promise.all(batch.map(async (target) => {
+                const res = await probeImageUrl(target.url, 8500);
+                return { target, res };
+            }));
+
+            results.forEach(({ target, res }) => {
+                checkedCount++;
+                if (!res.ok) {
+                    brokenCount++;
+                    appendBase64Log(`✗ [Broken Image] Doc: ${target.docId} | Field: ${target.field} | Snippet: "${target.snippet}" | Reason: ${res.reason} | URL: ${target.url}`, 'error');
+                }
+            });
+
+            if (i + batchSize < imageTargets.length) {
+                await sleep(150);
+            }
+        }
+
+        const summaryMsg = `Checked ${checkedCount} images across ${totalDocs} posts: ${brokenCount} broken found.`;
+        if (brokenCount > 0) {
+            appendBase64Log(`Scan completed: ${summaryMsg} Details listed above in red.`, 'warn');
+            alert(`පරීක්ෂාව අවසන්: පින්තූර ${checkedCount} න් ${brokenCount} ක් කැඩී ඇත. විස්තර Execution Log හි බලන්න.`);
+        } else {
+            appendBase64Log(`Scan completed: ${summaryMsg} All scanned images loaded successfully!`, 'success');
+            alert(`පරීක්ෂාව අවසන්: සියලුම පින්තූර (${checkedCount}) සාර්ථකව Load විය. කිසිදු කැඩුණු පින්තූරයක් හමු නොවීය!`);
+        }
+
+    } catch (err) {
+        console.error('[Broken Image Scan] Error:', err);
+        appendBase64Log(`Error scanning images: ${err.message}`, 'error');
+        alert('පින්තූර පරීක්ෂා කිරීමේදී දෝෂයක් සිදුවිය: ' + err.message);
+    } finally {
+        isBrokenImageScanning = false;
+        if (btn) {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+        }
+    }
+};
