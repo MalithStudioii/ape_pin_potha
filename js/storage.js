@@ -862,14 +862,14 @@ export const StorageService = {
           );
 
           let initialSnapshotReceived = false;
-          // Safety timeout (3.5s): unblocks UI if Firestore query hangs or permissions delayed
+          // Safety timeout (7.5s): unblocks UI if Firestore query hangs or permissions delayed
           const feedTimeoutId = setTimeout(() => {
             if (!initialSnapshotReceived) {
               console.warn('[Firestore] Feed query timed out, unblocking with cached/fallback posts...');
               const fallback = this.getLocalPosts() || [];
               this.notifyListeners(fallback);
             }
-          }, 3500);
+          }, 7500);
 
           this._feedUnsubscribe = onSnapshot(q, (snapshot) => {
             initialSnapshotReceived = true;

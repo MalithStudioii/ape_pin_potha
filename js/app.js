@@ -4,7 +4,7 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=161';
+import { StorageService } from './storage.js?v=162';
 import { Security } from './security.js?v=160';
 import { uploadToImgBB, uploadToCloudinary } from './imgbb-service.js?v=68';
 import { SoundService, triggerHaptic } from './sound.js?v=66';
@@ -210,6 +210,13 @@ let activeCategory = 'සියල්ල';
 let selectedPostType = 'merit';
 let compressedBase64Image = null;
 let selectedImagesList = [];
+// Expose selectedImagesList globally for inline event handlers and external safety
+Object.defineProperty(window, 'selectedImagesList', {
+  get: () => selectedImagesList,
+  set: (val) => { selectedImagesList = Array.isArray(val) ? val : []; },
+  configurable: true,
+  enumerable: true
+});
 let currentLightboxImages = [];
 let currentLightboxIndex = 0;
 let currentPostsData = [];
@@ -4967,7 +4974,7 @@ function renderComposerThumbnails() {
 
   container.style.display = 'block';
   grid.innerHTML = selectedImagesList.map((img, idx) => `
-    <div class="composer-thumb-item" onclick="openLightbox(selectedImagesList, ${idx})" style="cursor: pointer;" title="විශාල කර බලන්න">
+    <div class="composer-thumb-item" onclick="openComposerLightbox(${idx})" style="cursor: pointer;" title="විශාල කර බලන්න">
       <img src="${img}" alt="තෝරාගත් ඡායාරූපය ${idx + 1}">
       <button type="button" class="composer-thumb-remove" onclick="event.stopPropagation(); removeSelectedComposerImage(${idx})" title="ඉවත් කරන්න">
         <i class="fa-solid fa-xmark"></i>
@@ -4980,6 +4987,14 @@ function renderComposerThumbnails() {
     statsEl.innerText = `ඡායාරූප ${selectedImagesList.length}/5 ක් තෝරාගන්නා ලදී (සම්පීඩිත ධාරිතාව: ~${totalSizeKB} KB) • විශාල කර බැලීමට පින්තූරය ඔබන්න`;
   }
 }
+
+window.openComposerLightbox = function(idx = 0) {
+  if (Array.isArray(selectedImagesList) && selectedImagesList.length > 0) {
+    if (typeof window.openLightbox === 'function') {
+      window.openLightbox(selectedImagesList, Math.max(0, idx));
+    }
+  }
+};
 
 window.removeSelectedComposerImage = function(index) {
   if (index >= 0 && index < selectedImagesList.length) {
