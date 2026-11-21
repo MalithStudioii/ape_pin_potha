@@ -11777,6 +11777,22 @@ window.openArtisanRegisterModal = function() {
   });
   handleArtisanRegSectionChange(currentArtisansSection);
 
+  // Uncheck islandwide service by default
+  const islandWideChk = document.getElementById('artisanRegIslandWide');
+  if (islandWideChk) {
+    islandWideChk.checked = false;
+  }
+
+  // Reset elephant license fields
+  const licenseNumInp = document.getElementById('artisanRegWildlifeLicenseNum');
+  if (licenseNumInp) licenseNumInp.value = '';
+  removeArtisanWildlifeLicenseFile();
+  const confirmChk = document.getElementById('artisanRegWildlifeConfirm');
+  if (confirmChk) confirmChk.checked = false;
+
+  // Re-evaluate license box visibility
+  checkArtisanSpecialtyToggles();
+
   // Attach listeners
   initArtisanModalPhotoListeners();
 
@@ -11786,7 +11802,6 @@ window.openArtisanRegisterModal = function() {
 
 window.handleArtisanRegSectionChange = function(sectionKey) {
   const grid = document.getElementById('artisanRegSpecialtiesGrid');
-  const licenseWrap = document.getElementById('elephantLicenseFieldsWrap');
   if (!grid) return;
 
   const sectionDef = ARTISAN_SECTIONS[sectionKey] || ARTISAN_SECTIONS.temple_art;
@@ -11799,19 +11814,27 @@ window.handleArtisanRegSectionChange = function(sectionKey) {
     </label>
   `).join('');
 
-  if (licenseWrap) {
-    licenseWrap.style.display = 'none';
-  }
+  checkArtisanSpecialtyToggles();
 };
 
 window.checkArtisanSpecialtyToggles = function() {
   const licenseWrap = document.getElementById('elephantLicenseFieldsWrap');
   const checked = Array.from(document.querySelectorAll('input[name="artisanSpecialty"]:checked')).map(cb => cb.value);
+  const isElephant = checked.includes('අලි ඇතුන් සපයන්නන්');
+
   if (licenseWrap) {
-    if (checked.includes('අලි ඇතුන් සපයන්නන්')) {
+    if (isElephant) {
       licenseWrap.style.display = 'block';
+      licenseWrap.classList.remove('hidden');
     } else {
       licenseWrap.style.display = 'none';
+      licenseWrap.classList.add('hidden');
+      // Clear inputs when unchecked or hidden
+      const licenseNumInp = document.getElementById('artisanRegWildlifeLicenseNum');
+      if (licenseNumInp) licenseNumInp.value = '';
+      removeArtisanWildlifeLicenseFile();
+      const confirmChk = document.getElementById('artisanRegWildlifeConfirm');
+      if (confirmChk) confirmChk.checked = false;
     }
   }
 };
@@ -11825,6 +11848,15 @@ window.closeArtisanRegisterModal = function() {
 
   const form = document.getElementById('artisanRegisterForm');
   if (form) form.reset();
+
+  const islandWideChk = document.getElementById('artisanRegIslandWide');
+  if (islandWideChk) islandWideChk.checked = false;
+
+  const confirmChk = document.getElementById('artisanRegWildlifeConfirm');
+  if (confirmChk) confirmChk.checked = false;
+
+  const licenseNumInp = document.getElementById('artisanRegWildlifeLicenseNum');
+  if (licenseNumInp) licenseNumInp.value = '';
 
   const photoPrev = document.getElementById('artisanRegPhotoPreview');
   if (photoPrev) {
@@ -11840,6 +11872,7 @@ window.closeArtisanRegisterModal = function() {
   const licenseWrap = document.getElementById('elephantLicenseFieldsWrap');
   if (licenseWrap) {
     licenseWrap.style.display = 'none';
+    licenseWrap.classList.add('hidden');
   }
 
   const licensePrev = document.getElementById('artisanRegWildlifeLicensePreview');
@@ -11853,6 +11886,17 @@ window.closeArtisanRegisterModal = function() {
 };
 
 function initArtisanModalPhotoListeners() {
+  // Event delegation on specialties checkboxes container
+  const specGrid = document.getElementById('artisanRegSpecialtiesGrid');
+  if (specGrid && !specGrid.dataset.delegationAttached) {
+    specGrid.dataset.delegationAttached = 'true';
+    specGrid.addEventListener('change', (e) => {
+      if (e.target && e.target.name === 'artisanSpecialty') {
+        checkArtisanSpecialtyToggles();
+      }
+    });
+  }
+
   const photoInp = document.getElementById('artisanRegPhotoInput');
   const photoPrev = document.getElementById('artisanRegPhotoPreview');
   if (photoInp && !photoInp.dataset.listenerAttached) {
@@ -12024,14 +12068,25 @@ window.handleArtisanRegisterSubmit = async function(e) {
   // Mandatory Elephant License Verification
   const isElephant = checkedSpecialties.includes('අලි ඇතුන් සපයන්නන්');
   const wildlifeLicenseNum = (document.getElementById('artisanRegWildlifeLicenseNum')?.value || '').trim();
+  const wildlifeConfirmed = Boolean(document.getElementById('artisanRegWildlifeConfirm')?.checked);
 
   if (isElephant) {
     if (!wildlifeLicenseNum) {
       alert("අලි ඇතුන් සපයන්නන් සඳහා වනජීවී දෙපාර්තමේන්තු බලපත්‍ර අංකය ඇතුළත් කිරීම අනිවාර්ය වේ.");
+      const numInp = document.getElementById('artisanRegWildlifeLicenseNum');
+      if (numInp) numInp.focus();
       return;
     }
     if (!artisanRegWildlifeLicenseSelected) {
       alert("අලි ඇතුන් සපයන්නන් සඳහා වනජීවී දෙපාර්තමේන්තු බලපත්‍රයේ පැහැදිලි ඡායාරූපය උඩුගත කිරීම අනිවාර්ය වේ.");
+      const fileInp = document.getElementById('artisanRegWildlifeLicenseFile');
+      if (fileInp) fileInp.focus();
+      return;
+    }
+    if (!wildlifeConfirmed) {
+      alert("අලි ඇතුන් සඳහා වලංගු වනජීවී දෙපාර්තමේන්තු බලපත්‍රයක් ඇති බවට සහතික කිරීමේ කොටුව සලකුණු කිරීම අනිවාර්ය වේ.");
+      const confInp = document.getElementById('artisanRegWildlifeConfirm');
+      if (confInp) confInp.focus();
       return;
     }
   }
@@ -12094,6 +12149,7 @@ window.handleArtisanRegisterSubmit = async function(e) {
       portfolioImages: portfolioUrls,
       wildlifeLicenseNumber: isElephant ? wildlifeLicenseNum : '',
       wildlifeLicenseImage: isElephant ? (wildlifeLicenseImageUrl || '') : '',
+      wildlifeLicenseConfirmed: isElephant ? true : false,
       status: 'pending',
       submittedByUid: user.uid || 'unknown',
       submittedByName: user.name || 'පින්වත් සාමාජිකයෙක්',

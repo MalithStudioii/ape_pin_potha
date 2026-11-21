@@ -1781,7 +1781,7 @@
                         <div>
                             <div style="font-size: 0.84rem; font-weight: 800; color: #065f46;">වනජීවී දෙපාර්තමේන්තු බලපත්‍ර සත්‍යාපනය (Mandatory Elephant License)</div>
                             <div style="font-size: 0.72rem; color: #047857; margin-top: 2px; line-height: 1.4;">
-                                🔒 මෙම බලපත්‍ර තොරතුරු ප්‍රසිද්ධියේ පළ නොකෙරේ. පරිපාලක සත්‍යාපනය (Admin Verification) සඳහා පමණි.
+                                🔒 මෙම බලපත්‍ර තොරතුරු ප්‍රසිද්ධියේ පළ නොකෙරේ — පරිපාලක සත්‍යාපනය (Admin Verification) සඳහා පමණි.
                             </div>
                         </div>
                     </div>
@@ -1791,10 +1791,17 @@
                         <input type="text" id="artisanRegWildlifeLicenseNum" class="form-input" placeholder="උදා: DWC/ELE/2024/..." style="border-color: #86efac; background: #ffffff;">
                     </div>
 
-                    <div class="form-group" style="margin-bottom: 0;">
+                    <div class="form-group" style="margin-bottom: 10px;">
                         <label class="form-label" style="font-size: 0.8rem; font-weight: 700; color: #065f46;">බලපත්‍රයේ පැහැදිලි ඡායාරූපය (License Document / Photo) *</label>
                         <input type="file" id="artisanRegWildlifeLicenseFile" accept="image/*" class="form-control" style="font-size: 0.76rem; border-color: #86efac; background: #ffffff;">
                         <div id="artisanRegWildlifeLicensePreview" style="margin-top: 6px; display: none;"></div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="display: flex; align-items: flex-start; gap: 8px; font-size: 0.78rem; color: #065f46; font-weight: 700; cursor: pointer; line-height: 1.4;">
+                            <input type="checkbox" id="artisanRegWildlifeConfirm" style="accent-color: #059669; width: 17px; height: 17px; margin-top: 2px; flex-shrink: 0;">
+                            <span>මෙම අලි/ඇතුන් සඳහා වලංගු වනජීවී දෙපාර්තමේන්තු බලපත්‍රයක් ඇති බවට සහතික වෙමි. *</span>
+                        </label>
                     </div>
                 </div>
 
@@ -1813,7 +1820,7 @@
 
                 <div class="form-group" style="margin-bottom: 12px;">
                     <label style="display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: #78350f; font-weight: 600; cursor: pointer;">
-                        <input type="checkbox" id="artisanRegIslandWide" checked style="accent-color: #d97706; width: 17px; height: 17px;">
+                        <input type="checkbox" id="artisanRegIslandWide" style="accent-color: #d97706; width: 17px; height: 17px;">
                         <span>දිවයින පුරා සේවය ලබා දේ (Island-wide Service Available)</span>
                     </label>
                 </div>
@@ -3975,6 +3982,6 @@
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=161"></script>
+    <script type="module" src="js/app.js?v=162"></script>
 </body>
 </html>
