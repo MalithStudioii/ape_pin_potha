@@ -1448,25 +1448,6 @@ function renderAdminArtisanApplications() {
             </div>
         `;
     }).join('');
-                                <span><strong>දුරකථන:</strong> <a href="tel:${cleanTel}" style="color: #38bdf8;">${Security.escapeHTML(rawPhone)}</a></span>
-                                <span><strong>WhatsApp:</strong> <a href="https://wa.me/${numWa}" target="_blank" rel="noopener" style="color: #34d399;">${Security.escapeHTML(app.whatsapp || rawPhone)}</a></span>
-                                <span><strong>යොමුකළේ:</strong> ${Security.escapeHTML(app.submittedByName || 'සාමාජික')} (${Security.escapeHTML(app.submittedByEmail || '')})</span>
-                            </div>
-
-                            <div style="display: flex; gap: 8px;">
-                                <button type="button" class="btn-header" style="background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.4); color: #fca5a5;" onclick="adminRejectArtisan('${app.docId}')">
-                                    <i class="fa-solid fa-xmark"></i> ප්‍රතික්ෂේප කරන්න
-                                </button>
-                                <button type="button" class="btn-header" style="background: linear-gradient(135deg, #10b981, #059669); border-color: transparent; color: #fff;" onclick="adminApproveArtisan('${app.docId}')">
-                                    <i class="fa-solid fa-check"></i> අනුමත කර එක්කරන්න
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    }).join('');
 }
 
 function renderAdminVerifiedArtisans() {
