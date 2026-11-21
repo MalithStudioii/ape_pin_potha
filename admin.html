@@ -1812,9 +1812,19 @@
                         
                         <div class="admin-grid-2col" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
                             <div class="admin-form-group" style="margin-bottom: 0;">
+                                <label class="admin-form-label">ප්‍රධාන අංශය (Section) *</label>
+                                <select id="adminArtisanSection" class="admin-form-input" onchange="handleAdminArtisanSectionChange(this.value)" required>
+                                    <option value="temple_art" selected>🏛️ විහාර නිර්මාණ ශිල්පීන් (Temple Art)</option>
+                                    <option value="perahera_culture">🥁 පෙරහැර හා සංස්කෘතික සේවා (Perahera Culture)</option>
+                                </select>
+                            </div>
+                            <div class="admin-form-group" style="margin-bottom: 0;">
                                 <label class="admin-form-label">ශිල්පියාගේ / ආයතනයේ නම *</label>
                                 <input type="text" id="adminArtisanName" class="admin-form-input" required placeholder="උදා: සෝමපාල කලායතනය">
                             </div>
+                        </div>
+
+                        <div class="admin-grid-2col" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
                             <div class="admin-form-group" style="margin-bottom: 0;">
                                 <label class="admin-form-label">ප්‍රධාන දිස්ත්‍රික්කය *</label>
                                 <select id="adminArtisanDistrict" class="admin-form-input" required>
@@ -1846,12 +1856,16 @@
                                     <option value="මුලතිව්">මුලතිව්</option>
                                 </select>
                             </div>
+                            <div class="admin-form-group" style="margin-bottom: 0;">
+                                <label class="admin-form-label">පළපුරුද්ද (වසර)</label>
+                                <input type="number" id="adminArtisanExperience" class="admin-form-input" min="0" placeholder="15">
+                            </div>
                         </div>
 
                         <div class="admin-form-group" style="margin-bottom: 12px;">
-                            <label class="admin-form-label">නිර්මාණ ක්ෂේත්‍ර / Specialties * (කොමා වලින් වෙන්කරන්න හෝ පහතින් තෝරන්න)</label>
-                            <input type="text" id="adminArtisanSpecialtiesText" class="admin-form-input" required placeholder="උදා: විහාර චිත්‍ර හා ප්‍රතිසංස්කරණ, බුදු පිළිම හා මූර්ති නිර්මාණ">
-                            <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;">
+                            <label class="admin-form-label">නිර්මාණ / සේවා ක්ෂේත්‍ර (Specialties) * (කොමා වලින් වෙන්කරන්න හෝ පහතින් තෝරන්න)</label>
+                            <input type="text" id="adminArtisanSpecialtiesText" class="admin-form-input" required placeholder="උදා: විහාර චිත්‍ර හා ප්‍රතිසංස්කරණ, බුදු පිළිම හා මූර්ති නිර්මාණ" oninput="checkAdminElephantLicenseToggle()">
+                            <div id="adminArtisanShortcutsContainer" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;">
                                 <span class="admin-tag-shortcut" onclick="appendAdminArtisanSpecialty('විහාර චිත්‍ර හා ප්‍රතිසංස්කරණ')">+ විහාර චිත්‍ර</span>
                                 <span class="admin-tag-shortcut" onclick="appendAdminArtisanSpecialty('වෙහෙර දාගැබ් හා චෛත්‍ය නිර්මාණ')">+ වෙහෙර දාගැබ්</span>
                                 <span class="admin-tag-shortcut" onclick="appendAdminArtisanSpecialty('බුදු පිළිම හා මූර්ති නිර්මාණ')">+ බුදු පිළිම</span>
@@ -1861,11 +1875,25 @@
                             </div>
                         </div>
 
-                        <div class="admin-grid-3col" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px;">
-                            <div class="admin-form-group" style="margin-bottom: 0;">
-                                <label class="admin-form-label">පළපුරුද්ද (වසර)</label>
-                                <input type="number" id="adminArtisanExperience" class="admin-form-input" min="0" placeholder="15">
+                        <!-- Elephant License Fields (Visible if 'අලි ඇතුන් සපයන්නන්' is in specialties) -->
+                        <div id="adminElephantLicenseWrap" style="display: none; background: rgba(16, 185, 129, 0.08); border: 1.5px dashed rgba(16, 185, 129, 0.4); border-radius: 10px; padding: 12px; margin-bottom: 12px;">
+                            <div style="font-size: 0.8rem; font-weight: 700; color: #34d399; margin-bottom: 8px;">
+                                <i class="fa-solid fa-shield-halved"></i> වනජීවී දෙපාර්තමේන්තු බලපත්‍ර සත්‍යාපන තොරතුරු (Elephant License)
                             </div>
+                            <div class="admin-grid-2col" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                                <div class="admin-form-group" style="margin-bottom: 0;">
+                                    <label class="admin-form-label">බලපත්‍ර අංකය (License No.)</label>
+                                    <input type="text" id="adminArtisanWildlifeLicenseNum" class="admin-form-input" placeholder="උදා: DWC/ELE/2024/...">
+                                </div>
+                                <div class="admin-form-group" style="margin-bottom: 0;">
+                                    <label class="admin-form-label">බලපත්‍ර ඡායාරූප URL (හෝ පහතින් File එකක් තෝරන්න)</label>
+                                    <input type="url" id="adminArtisanWildlifeLicenseUrl" class="admin-form-input" placeholder="https://i.ibb.co/...">
+                                    <input type="file" id="adminArtisanWildlifeLicenseFile" accept="image/*" style="font-size: 0.72rem; margin-top: 5px; color: var(--text-secondary);">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="admin-grid-2col" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
                             <div class="admin-form-group" style="margin-bottom: 0;">
                                 <label class="admin-form-label">දුරකථන අංකය *</label>
                                 <input type="tel" id="adminArtisanPhone" class="admin-form-input" required placeholder="0771234567">
@@ -1877,13 +1905,13 @@
                         </div>
 
                         <div class="admin-form-group" style="margin-bottom: 12px;">
-                            <label class="admin-form-label">දායක වූ ප්‍රකට විහාරස්ථාන</label>
-                            <input type="text" id="adminArtisanTemples" class="admin-form-input" placeholder="උදා: රන්ගිරි දඹුලු රජමහා විහාරය, අස්ගිරි මහා විහාරය">
+                            <label class="admin-form-label">දායක වූ ප්‍රකට විහාරස්ථාන / පෙරහැර</label>
+                            <input type="text" id="adminArtisanTemples" class="admin-form-input" placeholder="උදා: රන්ගිරි දඹුලු රජමහා විහාරය, අස්ගිරි මහා විහාරය, මහනුවර ඇසළ පෙරහැර">
                         </div>
 
                         <div class="admin-form-group" style="margin-bottom: 12px;">
                             <label class="admin-form-label">කෙටි හැඳින්වීමක් / Bio</label>
-                            <textarea id="adminArtisanBio" class="admin-form-textarea" rows="2" placeholder="ශිල්පියාගේ පසුබිම හා කලා නිර්මාණ පිළිබඳ විස්තරයක්..."></textarea>
+                            <textarea id="adminArtisanBio" class="admin-form-textarea" rows="2" placeholder="ශිල්පියාගේ හෝ කණ්ඩායමේ පසුබිම හා කලා නිර්මාණ පිළිබඳ විස්තරයක්..."></textarea>
                         </div>
 
                         <div class="admin-grid-2col" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
@@ -1921,7 +1949,7 @@
                         <thead>
                             <tr>
                                 <th>ශිල්පියා / ආයතනය</th>
-                                <th>ප්‍රධාන දිස්ත්‍රික්කය</th>
+                                <th>අංශය / දිස්ත්‍රික්කය</th>
                                 <th>නිර්මාණ ක්ෂේත්‍ර (Specialties)</th>
                                 <th>දුරකථන / WhatsApp</th>
                                 <th>Portfolio</th>
@@ -2001,6 +2029,6 @@
     </div>
 
     <!-- ES Module Script for Admin Logic -->
-    <script type="module" src="js/admin.js?v=89"></script>
+    <script type="module" src="js/admin.js?v=90"></script>
 </body>
 </html>

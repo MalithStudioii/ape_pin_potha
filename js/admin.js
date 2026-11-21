@@ -1321,6 +1321,11 @@ function renderAdminArtisanApplications() {
     }
 
     container.innerHTML = pendingApps.map(app => {
+        const isPerahera = app.section === 'perahera_culture';
+        const sectionBadge = isPerahera
+            ? '<span style="display: inline-block; padding: 2px 8px; background: rgba(217, 119, 6, 0.2); border: 1px solid rgba(217, 119, 6, 0.4); border-radius: 9999px; font-size: 0.7rem; color: #f59e0b; margin-right: 4px;">🥁 පෙරහැර සේවා</span>'
+            : '<span style="display: inline-block; padding: 2px 8px; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 9999px; font-size: 0.7rem; color: #60a5fa; margin-right: 4px;">🏛️ විහාර නිර්මාණ</span>';
+
         const specs = (app.specialties || []).map(s => `
             <span style="display: inline-block; padding: 2px 7px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 9999px; font-size: 0.72rem; color: #fbbf24; margin: 2px;">
                 ${Security.escapeHTML(s)}
@@ -1344,6 +1349,27 @@ function renderAdminArtisanApplications() {
         if (numWa.startsWith('0')) numWa = '94' + numWa.substring(1);
         else if (!numWa.startsWith('94') && numWa.length === 9) numWa = '94' + numWa;
 
+        const hasElephant = (app.specialties || []).includes('අලි ඇතුන් සපයන්නන්') || Boolean(app.wildlifeLicenseNumber);
+        const licenseHtml = hasElephant ? `
+            <div style="background: rgba(16, 185, 129, 0.12); border: 1.5px solid rgba(16, 185, 129, 0.4); border-radius: 8px; padding: 10px 12px; margin-top: 10px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                    <div>
+                        <div style="font-size: 0.8rem; font-weight: 700; color: #34d399;">
+                            <i class="fa-solid fa-shield-halved"></i> වනජීවී දෙපාර්තමේන්තු බලපත්‍ර සත්‍යාපනය (Elephant License)
+                        </div>
+                        <div style="font-size: 0.76rem; color: #cbd5e1; margin-top: 2px;">
+                            <strong>බලපත්‍ර අංකය:</strong> ${Security.escapeHTML(app.wildlifeLicenseNumber || 'ඇතුළත් කර නැත')}
+                        </div>
+                    </div>
+                    ${app.wildlifeLicenseImage ? `
+                        <a href="${app.wildlifeLicenseImage}" target="_blank" rel="noopener" class="btn-header" style="background: rgba(16, 185, 129, 0.25); border-color: rgba(16, 185, 129, 0.5); color: #34d399; font-size: 0.74rem; padding: 5px 12px; display: inline-flex; align-items: center; gap: 6px;">
+                            <i class="fa-solid fa-file-image"></i> 📄 බලපත්‍රය බලන්න
+                        </a>
+                    ` : '<span style="font-size: 0.72rem; color: #f87171;">(බලපත්‍ර ඡායාරූපයක් නොමැත)</span>'}
+                </div>
+            </div>
+        ` : '';
+
         let createdDateStr = 'මෑතකදී';
         if (app.createdAt) {
             try {
@@ -1361,12 +1387,15 @@ function renderAdminArtisanApplications() {
                         ${app.photo ? `
                             <img src="${app.photo}" style="width: 100%; height: 100%; object-fit: cover;">
                         ` : `
-                            <i class="fa-solid fa-palette" style="font-size: 1.5rem; color: #fbbf24;"></i>
+                            <i class="fa-solid ${isPerahera ? 'fa-drum' : 'fa-palette'}" style="font-size: 1.5rem; color: #fbbf24;"></i>
                         `}
                     </div>
                     <div style="flex: 1; min-width: 250px;">
                         <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
-                            <h4 style="font-size: 1rem; font-weight: 700; color: #fff; margin: 0;">${Security.escapeHTML(app.name)}</h4>
+                            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                ${sectionBadge}
+                                <h4 style="font-size: 1rem; font-weight: 700; color: #fff; margin: 0;">${Security.escapeHTML(app.name)}</h4>
+                            </div>
                             <span style="font-size: 0.72rem; color: var(--text-muted);">🕒 ${createdDateStr}</span>
                         </div>
                         <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; font-size: 0.78rem; color: var(--text-secondary);">
@@ -1381,7 +1410,7 @@ function renderAdminArtisanApplications() {
 
                         ${app.notableTemples ? `
                             <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 6px;">
-                                <strong>දායක වූ ප්‍රකට විහාර:</strong> ${Security.escapeHTML(app.notableTemples)}
+                                <strong>දායක වූ ප්‍රකට විහාර / පෙරහැර:</strong> ${Security.escapeHTML(app.notableTemples)}
                             </div>
                         ` : ''}
 
@@ -1391,6 +1420,8 @@ function renderAdminArtisanApplications() {
                             </div>
                         ` : ''}
 
+                        ${licenseHtml}
+
                         <div style="margin-top: 8px;">
                             <span style="font-size: 0.72rem; color: #fbbf24; font-weight: 600;">Portfolio නිර්මාණ:</span>
                             ${portHtml}
@@ -1398,6 +1429,25 @@ function renderAdminArtisanApplications() {
 
                         <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
                             <div style="font-size: 0.75rem; color: var(--text-secondary); display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                                <span><strong>දුරකථන:</strong> <a href="tel:${cleanTel}" style="color: #38bdf8;">${Security.escapeHTML(rawPhone)}</a></span>
+                                <span><strong>WhatsApp:</strong> <a href="https://wa.me/${numWa}" target="_blank" rel="noopener" style="color: #34d399;">${Security.escapeHTML(app.whatsapp || rawPhone)}</a></span>
+                                <span><strong>යොමුකළේ:</strong> ${Security.escapeHTML(app.submittedByName || 'සාමාජික')} (${Security.escapeHTML(app.submittedByEmail || '')})</span>
+                            </div>
+
+                            <div style="display: flex; gap: 8px;">
+                                <button type="button" class="btn-header" style="background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.4); color: #fca5a5;" onclick="adminRejectArtisan('${app.docId}')">
+                                    <i class="fa-solid fa-xmark"></i> ප්‍රතික්ෂේප කරන්න
+                                </button>
+                                <button type="button" class="btn-header" style="background: linear-gradient(135deg, #10b981, #059669); border-color: transparent; color: #fff;" onclick="adminApproveArtisan('${app.docId}')">
+                                    <i class="fa-solid fa-check"></i> අනුමත කර එක්කරන්න
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
                                 <span><strong>දුරකථන:</strong> <a href="tel:${cleanTel}" style="color: #38bdf8;">${Security.escapeHTML(rawPhone)}</a></span>
                                 <span><strong>WhatsApp:</strong> <a href="https://wa.me/${numWa}" target="_blank" rel="noopener" style="color: #34d399;">${Security.escapeHTML(app.whatsapp || rawPhone)}</a></span>
                                 <span><strong>යොමුකළේ:</strong> ${Security.escapeHTML(app.submittedByName || 'සාමාජික')} (${Security.escapeHTML(app.submittedByEmail || '')})</span>
@@ -1435,6 +1485,11 @@ function renderAdminVerifiedArtisans() {
     }
 
     tbody.innerHTML = allVerifiedArtisans.map(item => {
+        const isPerahera = item.section === 'perahera_culture';
+        const sectionBadge = isPerahera
+            ? '<span style="display: block; width: fit-content; padding: 1px 7px; background: rgba(217, 119, 6, 0.2); border: 1px solid rgba(217, 119, 6, 0.4); border-radius: 9999px; font-size: 0.68rem; color: #fbbf24; margin-bottom: 3px;">🥁 පෙරහැර</span>'
+            : '<span style="display: block; width: fit-content; padding: 1px 7px; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 9999px; font-size: 0.68rem; color: #60a5fa; margin-bottom: 3px;">🏛️ විහාර</span>';
+
         const specs = (item.specialties || []).map(s => `
             <span style="display: inline-block; padding: 2px 6px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 9999px; font-size: 0.7rem; color: #fbbf24; margin: 1px;">
                 ${Security.escapeHTML(s)}
@@ -1449,6 +1504,18 @@ function renderAdminVerifiedArtisans() {
 
         const portCount = Array.isArray(item.portfolioImages) ? item.portfolioImages.length : 0;
 
+        const hasElephant = (item.specialties || []).includes('අලි ඇතුන් සපයන්නන්') || Boolean(item.wildlifeLicenseNumber);
+        const elephantBadge = hasElephant ? `
+            <div style="margin-top: 4px;">
+                <span style="display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 9999px; font-size: 0.68rem; color: #34d399;">
+                    <i class="fa-solid fa-shield-halved"></i> බලපත්‍රලාභී
+                </span>
+                ${item.wildlifeLicenseImage ? `
+                    <a href="${item.wildlifeLicenseImage}" target="_blank" rel="noopener" style="font-size: 0.68rem; color: #38bdf8; margin-left: 4px; text-decoration: underline;" title="බලපත්‍රය පරීක්ෂා කරන්න">[📄 බලපත්‍රය]</a>
+                ` : ''}
+            </div>
+        ` : '';
+
         return `
             <tr>
                 <td>
@@ -1457,7 +1524,7 @@ function renderAdminVerifiedArtisans() {
                             ${item.photo ? `
                                 <img src="${item.photo}" style="width: 100%; height: 100%; object-fit: cover;">
                             ` : `
-                                <i class="fa-solid fa-palette" style="font-size: 1rem; color: #fbbf24;"></i>
+                                <i class="fa-solid ${isPerahera ? 'fa-drum' : 'fa-palette'}" style="font-size: 1rem; color: #fbbf24;"></i>
                             `}
                         </div>
                         <div>
@@ -1467,11 +1534,13 @@ function renderAdminVerifiedArtisans() {
                     </div>
                 </td>
                 <td>
+                    ${sectionBadge}
                     <div style="font-size: 0.8rem; color: var(--text-secondary);">${Security.escapeHTML(item.district || 'ශ්‍රී ලංකා')}</div>
                     ${item.islandWide ? `<div style="font-size: 0.7rem; color: #34d399;">දිවයින පුරා</div>` : ''}
                 </td>
                 <td>
                     <div style="max-width: 280px;">${specs}</div>
+                    ${elephantBadge}
                 </td>
                 <td>
                     <div style="font-size: 0.78rem;">
@@ -1518,6 +1587,7 @@ window.adminApproveArtisan = async function(appId) {
         // 1. Add to verified artisans collection
         const artisanPayload = {
             name: app.name || '',
+            section: app.section || 'temple_art',
             specialties: app.specialties || [],
             experience: Number(app.experience) || 0,
             district: app.district || '',
@@ -1528,6 +1598,8 @@ window.adminApproveArtisan = async function(appId) {
             bio: app.bio || '',
             photo: app.photo || '',
             portfolioImages: app.portfolioImages || [],
+            wildlifeLicenseNumber: app.wildlifeLicenseNumber || '',
+            wildlifeLicenseImage: app.wildlifeLicenseImage || '',
             isVerified: true,
             approvedBy: currentAdminUser ? currentAdminUser.email : 'Master Admin',
             createdAt: serverTimestamp(),
@@ -1553,7 +1625,7 @@ window.adminApproveArtisan = async function(appId) {
         // 4. Record audit log
         await recordAuditLog('Artisan Application Approved', `Approved artisan "${app.name}" into directory.`);
 
-        alert(`සාර්ථකයි! "${app.name}" විහාර නිර්මාණ ශිල්පියා ප්‍රධාන නාමාවලියට සාර්ථකව එක්කරන ලදී. 🙏`);
+        alert(`සාර්ථකයි! "${app.name}" ශිල්පියා ප්‍රධාන නාමාවලියට සාර්ථකව එක්කරන ලදී. 🙏`);
     } catch (err) {
         console.error('[Admin] adminApproveArtisan error:', err);
         alert("අනුමත කිරීමේදී දෝෂයක් සිදුවිය: " + err.message);
@@ -1598,15 +1670,63 @@ window.toggleAdminArtisanDirectForm = function() {
     }
 };
 
+window.handleAdminArtisanSectionChange = function(sec) {
+    const container = document.getElementById('adminArtisanShortcutsContainer');
+    if (!container) return;
+
+    if (sec === 'perahera_culture') {
+        container.innerHTML = `
+            <span class="admin-tag-shortcut" onclick="appendAdminArtisanSpecialty('හේවිසි හා තූර්ය වාදක (බෙර වාදක)')">+ හේවිසි / බෙර වාදක</span>
+            <span class="admin-tag-shortcut" onclick="appendAdminArtisanSpecialty('නර්තන කණ්ඩායම් (උඩරට / පහතරට / සබරගමු)')">+ නර්තන කණ්ඩායම්</span>
+            <span class="admin-tag-shortcut" onclick="appendAdminArtisanSpecialty('කස කරුවන් හා ගිනි බෝල')">+ කස කරුවන් / ගිනි බෝල</span>
+            <span class="admin-tag-shortcut" onclick="appendAdminArtisanSpecialty('අලි ඇතුන් සපයන්නන්')">+ අලි ඇතුන් සපයන්නන්</span>
+            <span class="admin-tag-shortcut" onclick="appendAdminArtisanSpecialty('සේසත්, පාවඩ හා මණ්ඩප සැරසිලි')">+ සේසත් / පාවඩ / සැරසිලි</span>
+        `;
+    } else {
+        container.innerHTML = `
+            <span class="admin-tag-shortcut" onclick="appendAdminArtisanSpecialty('විහාර චිත්‍ර හා ප්‍රතිසංස්කරණ')">+ විහාර චිත්‍ර</span>
+            <span class="admin-tag-shortcut" onclick="appendAdminArtisanSpecialty('වෙහෙර දාගැබ් හා චෛත්‍ය නිර්මාණ')">+ වෙහෙර දාගැබ්</span>
+            <span class="admin-tag-shortcut" onclick="appendAdminArtisanSpecialty('බුදු පිළිම හා මූර්ති නිර්මාණ')">+ බුදු පිළිම</span>
+            <span class="admin-tag-shortcut" onclick="appendAdminArtisanSpecialty('ලී කැටයම් හා මකර තොරණ')">+ ලී කැටයම්</span>
+            <span class="admin-tag-shortcut" onclick="appendAdminArtisanSpecialty('විහාර ගෘහ නිර්මාණ හා වාස්තු')">+ ගෘහ නිර්මාණ</span>
+            <span class="admin-tag-shortcut" onclick="appendAdminArtisanSpecialty('ගල් කැටයම්, කොත් වහන්සේ හා ලෝහ කර්මාන්ත')">+ ගල් කැටයම්</span>
+        `;
+    }
+    checkAdminElephantLicenseToggle();
+};
+
+window.checkAdminElephantLicenseToggle = function() {
+    const specInp = document.getElementById('adminArtisanSpecialtiesText');
+    const licenseWrap = document.getElementById('adminElephantLicenseWrap');
+    if (!licenseWrap) return;
+
+    const val = (specInp?.value || '').trim();
+    if (val.includes('අලි ඇතුන් සපයන්නන්')) {
+        licenseWrap.style.display = 'block';
+    } else {
+        const licenseNum = document.getElementById('adminArtisanWildlifeLicenseNum')?.value || '';
+        if (!licenseNum) {
+            licenseWrap.style.display = 'none';
+        }
+    }
+};
+
 window.cancelAdminArtisanEdit = function() {
     const wrap = document.getElementById('adminArtisanDirectFormWrap');
     const form = document.getElementById('adminArtisanDirectForm');
     const title = document.getElementById('adminArtisanFormTitle');
     const editDoc = document.getElementById('adminArtisanEditDocId');
     const btnText = document.getElementById('btnAdminSaveArtisanText');
+    const licenseWrap = document.getElementById('adminElephantLicenseWrap');
+    const secSelect = document.getElementById('adminArtisanSection');
 
     if (form) form.reset();
     if (editDoc) editDoc.value = '';
+    if (secSelect) {
+        secSelect.value = 'temple_art';
+        handleAdminArtisanSectionChange('temple_art');
+    }
+    if (licenseWrap) licenseWrap.style.display = 'none';
     if (title) title.textContent = '+ නව විහාර ශිල්පියෙකු සෘජුව ඇතුළත් කිරීම';
     if (btnText) btnText.textContent = 'ශිල්පියා සුරකින්න';
     if (wrap) wrap.style.display = 'none';
@@ -1625,6 +1745,7 @@ window.appendAdminArtisanSpecialty = function(spec) {
             input.value = parts.join(', ');
         }
     }
+    checkAdminElephantLicenseToggle();
 };
 
 window.adminEditArtisan = function(docId) {
@@ -1639,6 +1760,7 @@ window.adminEditArtisan = function(docId) {
     const btnText = document.getElementById('btnAdminSaveArtisanText');
 
     const editDoc = document.getElementById('adminArtisanEditDocId');
+    const secInp = document.getElementById('adminArtisanSection');
     const nameInp = document.getElementById('adminArtisanName');
     const distInp = document.getElementById('adminArtisanDistrict');
     const specInp = document.getElementById('adminArtisanSpecialtiesText');
@@ -1650,8 +1772,15 @@ window.adminEditArtisan = function(docId) {
     const photoInp = document.getElementById('adminArtisanPhotoUrl');
     const portInp = document.getElementById('adminArtisanPortfolioUrls');
     const islandInp = document.getElementById('adminArtisanIslandWide');
+    const licenseNumInp = document.getElementById('adminArtisanWildlifeLicenseNum');
+    const licenseUrlInp = document.getElementById('adminArtisanWildlifeLicenseUrl');
+    const licenseWrap = document.getElementById('adminElephantLicenseWrap');
 
     if (editDoc) editDoc.value = item.docId;
+    if (secInp) {
+        secInp.value = item.section || 'temple_art';
+        handleAdminArtisanSectionChange(item.section || 'temple_art');
+    }
     if (nameInp) nameInp.value = item.name || '';
     if (distInp) distInp.value = item.district || '';
     if (specInp) specInp.value = (item.specialties || []).join(', ');
@@ -1663,8 +1792,15 @@ window.adminEditArtisan = function(docId) {
     if (photoInp) photoInp.value = item.photo || '';
     if (portInp) portInp.value = (item.portfolioImages || []).join(', ');
     if (islandInp) islandInp.checked = Boolean(item.islandWide);
+    if (licenseNumInp) licenseNumInp.value = item.wildlifeLicenseNumber || '';
+    if (licenseUrlInp) licenseUrlInp.value = item.wildlifeLicenseImage || '';
 
-    if (title) title.textContent = '✏️ ශිල්පියාගේ තොරතුරු සංස්කරණය';
+    if (licenseWrap) {
+        const hasElephant = (item.specialties || []).includes('අලි ඇතුන් සපයන්නන්') || Boolean(item.wildlifeLicenseNumber);
+        licenseWrap.style.display = hasElephant ? 'block' : 'none';
+    }
+
+    if (title) title.textContent = '✏️ ශිල්පියාගේ / සේවාවේ තොරතුරු සංස්කරණය';
     if (btnText) btnText.textContent = 'යාවත්කාලීන කරන්න';
     if (wrap) {
         wrap.style.display = 'block';
@@ -1707,6 +1843,7 @@ window.handleAdminArtisanDirectSubmit = async function(e) {
     }
 
     const editDocId = (document.getElementById('adminArtisanEditDocId')?.value || '').trim();
+    const section = (document.getElementById('adminArtisanSection')?.value || 'temple_art').trim();
     const name = (document.getElementById('adminArtisanName')?.value || '').trim();
     const district = (document.getElementById('adminArtisanDistrict')?.value || '').trim();
     const specialtiesRaw = (document.getElementById('adminArtisanSpecialtiesText')?.value || '').trim();
@@ -1719,9 +1856,12 @@ window.handleAdminArtisanDirectSubmit = async function(e) {
     let photoUrl = (document.getElementById('adminArtisanPhotoUrl')?.value || '').trim();
     const portUrlsRaw = (document.getElementById('adminArtisanPortfolioUrls')?.value || '').trim();
     const islandWide = Boolean(document.getElementById('adminArtisanIslandWide')?.checked);
+    let wildlifeLicenseNumber = (document.getElementById('adminArtisanWildlifeLicenseNum')?.value || '').trim();
+    let wildlifeLicenseUrl = (document.getElementById('adminArtisanWildlifeLicenseUrl')?.value || '').trim();
 
     const photoFileInput = document.getElementById('adminArtisanPhotoFile');
     const portFilesInput = document.getElementById('adminArtisanPortfolioFiles');
+    const licenseFileInput = document.getElementById('adminArtisanWildlifeLicenseFile');
     const submitBtn = document.getElementById('btnAdminSaveArtisan');
     const btnText = document.getElementById('btnAdminSaveArtisanText');
 
@@ -1756,10 +1896,18 @@ window.handleAdminArtisanDirectSubmit = async function(e) {
             }
         }
 
+        // Upload elephant license file if provided
+        if (licenseFileInput && licenseFileInput.files && licenseFileInput.files[0]) {
+            if (btnText) btnText.textContent = "බලපත්‍ර ඡායාරූපය උඩුගත කෙරේ...";
+            const uploadedLicense = await uploadToImgBB(licenseFileInput.files[0], `admin_license_${Date.now()}`);
+            if (uploadedLicense) wildlifeLicenseUrl = uploadedLicense;
+        }
+
         const { collection, addDoc, doc, setDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
 
         const artisanData = {
             name,
+            section,
             specialties,
             experience: experience || 0,
             district,
@@ -1770,6 +1918,8 @@ window.handleAdminArtisanDirectSubmit = async function(e) {
             bio,
             photo: photoUrl || '',
             portfolioImages: portfolioImages.slice(0, 4),
+            wildlifeLicenseNumber: wildlifeLicenseNumber || '',
+            wildlifeLicenseImage: wildlifeLicenseUrl || '',
             isVerified: true,
             updatedAt: serverTimestamp()
         };
@@ -1777,13 +1927,13 @@ window.handleAdminArtisanDirectSubmit = async function(e) {
         if (editDocId) {
             await setDoc(doc(db, COLLECTIONS.ARTISANS || 'temple_artisans', editDocId), artisanData, { merge: true });
             await recordAuditLog('Artisan Updated', `Updated artisan "${name}" (ID: ${editDocId}).`);
-            alert(`"${name}" ශිල්පියාගේ තොරතුරු සාර්ථකව යාවත්කාලීන විය!`);
+            alert(`"${name}" තොරතුරු සාර්ථකව යාවත්කාලීන විය!`);
         } else {
             artisanData.createdAt = serverTimestamp();
             artisanData.addedBy = currentAdminUser ? currentAdminUser.email : 'Master Admin';
             const newDoc = await addDoc(collection(db, COLLECTIONS.ARTISANS || 'temple_artisans'), artisanData);
             await recordAuditLog('Artisan Added Direct', `Added new verified artisan "${name}" (ID: ${newDoc.id}).`);
-            alert(`"${name}" ශිල්පියා සාර්ථකව නාමාවලියට ඇතුළත් කරන ලදී!`);
+            alert(`"${name}" සාර්ථකව නාමාවලියට ඇතුළත් කරන ලදී!`);
         }
 
         try {

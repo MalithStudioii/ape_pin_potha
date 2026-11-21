@@ -11288,32 +11288,53 @@ window.togglePoliciesSound = function(e) {
 };
 
 /* ============================================================================
- * TEMPLE ARTISANS DIRECTORY & REGISTRATION LOGIC
+ * TEMPLE ARTISANS & PERAHERA CULTURAL SERVICES DIRECTORY LOGIC
  * ============================================================================ */
 
-const ARTISAN_CATEGORIES = [
-  'සියල්ල',
-  'විහාර චිත්‍ර හා ප්‍රතිසංස්කරණ',
-  'වෙහෙර දාගැබ් හා චෛත්‍ය නිර්මාණ',
-  'බුදු පිළිම හා මූර්ති නිර්මාණ',
-  'ලී කැටයම් හා මකර තොරණ',
-  'විහාර ගෘහ නිර්මාණ හා වාස්තු',
-  'ගල් කැටයම්, කොත් වහන්සේ හා ලෝහ කර්මාන්ත'
-];
+const ARTISAN_SECTIONS = {
+  temple_art: {
+    key: 'temple_art',
+    label: 'විහාර නිර්මාණ ශිල්පීන්',
+    icon: '🏛️',
+    categories: [
+      'සියල්ල',
+      'විහාර චිත්‍ර හා ප්‍රතිසංස්කරණ',
+      'වෙහෙර දාගැබ් හා චෛත්‍ය නිර්මාණ',
+      'බුදු පිළිම හා මූර්ති නිර්මාණ',
+      'ලී කැටයම් හා මකර තොරණ',
+      'විහාර ගෘහ නිර්මාණ හා වාස්තු',
+      'ගල් කැටයම්, කොත් වහන්සේ හා ලෝහ කර්මාන්ත'
+    ]
+  },
+  perahera_culture: {
+    key: 'perahera_culture',
+    label: 'පෙරහැර හා සංස්කෘතික සේවා',
+    icon: '🥁',
+    categories: [
+      'සියල්ල',
+      'හේවිසි හා තූර්ය වාදක (බෙර වාදක)',
+      'නර්තන කණ්ඩායම් (උඩරට / පහතරට / සබරගමු)',
+      'කස කරුවන් හා ගිනි බෝල',
+      'අලි ඇතුන් සපයන්නන්',
+      'සේසත්, පාවඩ හා මණ්ඩප සැරසිලි'
+    ]
+  }
+};
 
 let allArtisansList = [];
+let currentArtisansSection = 'temple_art';
 let currentArtisansCategory = 'සියල්ල';
 let currentArtisansDistrict = 'සියල්ල';
 let currentArtisansSearch = '';
 let artisanRegPhotoSelected = null;
 let artisanRegPortfolioSelected = [];
+let artisanRegWildlifeLicenseSelected = null;
 
 // Expose uploadToImgBB to window if needed
 window.uploadToImgBB = uploadToImgBB;
 
 window.renderArtisansDirectoryView = async function() {
   const grid = document.getElementById('artisansGrid');
-  const countEl = document.getElementById('artisansResultsCount');
 
   // Purge any legacy demo artisan cache if present
   try {
@@ -11329,7 +11350,7 @@ window.renderArtisansDirectoryView = async function() {
     grid.innerHTML = `
       <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #d97706;">
         <i class="fa-solid fa-spinner fa-spin" style="font-size: 1.8rem; margin-bottom: 10px;"></i>
-        <p style="font-weight: 600; font-size: 0.9rem;">විහාර නිර්මාණ ශිල්පීන් නාමාවලිය පූරණය වෙමින්...</p>
+        <p style="font-weight: 600; font-size: 0.9rem;">ශිල්පීන් හා සංස්කෘතික සේවා නාමාවලිය පූරණය වෙමින්...</p>
       </div>
     `;
   }
@@ -11344,10 +11365,48 @@ window.renderArtisansDirectoryView = async function() {
   // Populate district dropdown
   populateArtisansDistrictDropdown();
 
-  // Render categories bar
+  // Update tab counters
+  updateArtisansSectionTabCounts();
+
+  // Render categories bar for active section
   renderArtisansCategoriesBar();
 
   // Filter & Render Cards
+  filterAndRenderArtisanCards();
+};
+
+function updateArtisansSectionTabCounts() {
+  const badgeTemple = document.getElementById('tabBadgeTempleArt');
+  const badgePerahera = document.getElementById('tabBadgePeraheraCulture');
+  const templeCount = allArtisansList.filter(a => (a.section || 'temple_art') === 'temple_art').length;
+  const peraheraCount = allArtisansList.filter(a => a.section === 'perahera_culture').length;
+  if (badgeTemple) badgeTemple.textContent = templeCount;
+  if (badgePerahera) badgePerahera.textContent = peraheraCount;
+}
+
+window.switchArtisansSection = function(sectionKey) {
+  triggerHaptic(12);
+  currentArtisansSection = (sectionKey === 'perahera_culture') ? 'perahera_culture' : 'temple_art';
+  currentArtisansCategory = 'සියල්ල';
+
+  const tabTemple = document.getElementById('tabBtnTempleArt');
+  const tabPerahera = document.getElementById('tabBtnPeraheraCulture');
+
+  if (tabTemple && tabPerahera) {
+    if (currentArtisansSection === 'temple_art') {
+      tabTemple.classList.add('active');
+      tabTemple.setAttribute('aria-selected', 'true');
+      tabPerahera.classList.remove('active');
+      tabPerahera.setAttribute('aria-selected', 'false');
+    } else {
+      tabPerahera.classList.add('active');
+      tabPerahera.setAttribute('aria-selected', 'true');
+      tabTemple.classList.remove('active');
+      tabTemple.setAttribute('aria-selected', 'false');
+    }
+  }
+
+  renderArtisansCategoriesBar();
   filterAndRenderArtisanCards();
 };
 
@@ -11375,12 +11434,18 @@ function renderArtisansCategoriesBar() {
   const bar = document.getElementById('artisansCategoriesBar');
   if (!bar) return;
 
-  bar.innerHTML = ARTISAN_CATEGORIES.map(cat => {
+  const sectionDef = ARTISAN_SECTIONS[currentArtisansSection] || ARTISAN_SECTIONS.temple_art;
+  const categories = sectionDef.categories;
+
+  // Filter items in active section for category counting
+  const sectionItems = allArtisansList.filter(a => (a.section || 'temple_art') === currentArtisansSection);
+
+  bar.innerHTML = categories.map(cat => {
     let count = 0;
     if (cat === 'සියල්ල') {
-      count = allArtisansList.length;
+      count = sectionItems.length;
     } else {
-      count = allArtisansList.filter(a => Array.isArray(a.specialties) && a.specialties.includes(cat)).length;
+      count = sectionItems.filter(a => Array.isArray(a.specialties) && a.specialties.includes(cat)).length;
     }
 
     const isActive = currentArtisansCategory === cat;
@@ -11467,7 +11532,7 @@ function formatArtisanWhatsAppUrl(phone, whatsapp) {
   } else if (!num.startsWith('94') && num.length === 9) {
     num = '94' + num;
   }
-  const defaultMsg = encodeURIComponent("නමෝ බුද්ධාය! මා අපේ පිං පොත (Ape Pin Potha) විහාර නිර්මාණ ශිල්පීන් නාමාවලිය හරහා සම්බන්ධ වන්නේ විහාරස්ථාන කටයුත්තක් පිළිබඳව තොරතුරු විමසීමටයි.");
+  const defaultMsg = encodeURIComponent("නමෝ බුද්ධාය! මා අපේ පිං පොත (Ape Pin Potha) නාමාවලිය හරහා සම්බන්ධ වන්නේ තොරතුරු විමසීමටයි.");
   return `https://wa.me/${num}?text=${defaultMsg}`;
 }
 
@@ -11477,7 +11542,8 @@ function filterAndRenderArtisanCards() {
   const countEl = document.getElementById('artisansResultsCount');
   if (!grid) return;
 
-  let filtered = [...allArtisansList];
+  // Filter primarily by active section
+  let filtered = allArtisansList.filter(a => (a.section || 'temple_art') === currentArtisansSection);
 
   // Category filter
   if (currentArtisansCategory !== 'සියල්ල') {
@@ -11504,25 +11570,38 @@ function filterAndRenderArtisanCards() {
 
   // Update counter
   if (countEl) {
-    countEl.innerText = `ශිල්පීන් ${filtered.length} ක් හමුවිය`;
+    const unitLabel = currentArtisansSection === 'perahera_culture' ? 'සංස්කෘතික සේවාවන්' : 'ශිල්පීන්';
+    countEl.innerText = `${unitLabel} ${filtered.length} ක් හමුවිය`;
   }
+
+  const sectionTotalCount = allArtisansList.filter(a => (a.section || 'temple_art') === currentArtisansSection).length;
 
   if (filtered.length === 0) {
     grid.innerHTML = '';
     if (emptyState) {
       emptyState.style.display = 'block';
-      if (allArtisansList.length === 0) {
-        // Welcoming empty state when no artisans exist in directory yet
+      if (sectionTotalCount === 0) {
+        // Welcoming empty state for empty section
+        const isPerahera = currentArtisansSection === 'perahera_culture';
+        const emptyIcon = isPerahera ? 'fa-drum' : 'fa-palette';
+        const emptyTitle = isPerahera 
+          ? 'තවමත් සත්‍යාපිත පෙරහැර හා සංස්කෘතික සේවා ඇතුළත් කර නොමැත' 
+          : 'තවමත් සත්‍යාපිත විහාර ශිල්පීන් ඇතුළත් කර නොමැත';
+        const emptyDesc = isPerahera
+          ? 'හේවිසි, තූර්ය වාදක, නර්තන කණ්ඩායම්, කස කරුවන් හෝ බලපත්‍රලාභී අලි ඇතුන් සපයන කණ්ඩායමක් ඔබ දන්නේ නම්, දැන්ම නොමිලේ ලියාපදිංචි කර සම්බුද්ධ ශාසනයට දායක වන්න.'
+          : 'විහාර චිත්‍ර, වෙහෙර දාගැබ් හෝ කැටයම් නිර්මාණ ක්ෂේත්‍රයේ දක්ෂ ශිල්පියෙකු ඔබ දන්නේ නම්, දැන්ම නොමිලේ ලියාපදිංචි කර ශාසනික මෙහෙවරට දායක වන්න.';
+        const emptyBtnText = isPerahera ? '+ පළමු සේවාව ලියාපදිංචි කරන්න' : '+ පළමු ශිල්පියා ලියාපදිංචි කරන්න';
+
         emptyState.innerHTML = `
           <div style="padding: 10px 8px;">
-            <i class="fa-solid fa-palette" style="font-size: 2.6rem; color: #d97706; margin-bottom: 14px; display: block;"></i>
-            <h3 style="font-size: 1.15rem; font-weight: 800; color: #451a03; margin-bottom: 8px;">තවමත් සත්‍යාපිත ශිල්පීන් ඇතුළත් කර නොමැත</h3>
+            <i class="fa-solid ${emptyIcon}" style="font-size: 2.6rem; color: #d97706; margin-bottom: 14px; display: block;"></i>
+            <h3 style="font-size: 1.15rem; font-weight: 800; color: #451a03; margin-bottom: 8px;">${emptyTitle}</h3>
             <p style="font-size: 0.85rem; color: #64748b; max-width: 520px; margin: 0 auto 18px; line-height: 1.6;">
-              විහාර චිත්‍ර, වෙහෙර දාගැබ් හෝ කැටයම් නිර්මාණ ක්ෂේත්‍රයේ දක්ෂ ශිල්පියෙකු ඔබ දන්නේ නම්, දැන්ම නොමිලේ ලියාපදිංචි කර ශාසනික මෙහෙවරට දායක වන්න.
+              ${emptyDesc}
             </p>
             <button type="button" class="btn-register-artisan" onclick="openArtisanRegisterModal()" style="margin: 0 auto; display: inline-flex; align-items: center; gap: 8px; padding: 10px 22px; font-weight: 700; font-size: 0.9rem; border-radius: 9999px; box-shadow: 0 4px 14px rgba(217, 119, 6, 0.3);">
               <i class="fa-solid fa-circle-plus"></i>
-              <span>+ පළමු ශිල්පියා ලියාපදිංචි කරන්න</span>
+              <span>${emptyBtnText}</span>
             </button>
           </div>
         `;
@@ -11531,10 +11610,10 @@ function filterAndRenderArtisanCards() {
         emptyState.innerHTML = `
           <div style="padding: 10px 8px;">
             <i class="fa-solid fa-magnifying-glass" style="font-size: 2.2rem; color: #d97706; margin-bottom: 12px; display: block;"></i>
-            <h3 style="font-size: 1.1rem; color: #451a03; margin-bottom: 6px;">කිසිදු ශිල්පියෙකු හමු නොවීය</h3>
+            <h3 style="font-size: 1.1rem; color: #451a03; margin-bottom: 6px;">කිසිදු තොරතුරක් හමු නොවීය</h3>
             <p style="font-size: 0.82rem; color: #64748b; margin-bottom: 16px;">ඔබ සොයන නිර්මාණ ක්ෂේත්‍රය හෝ දිස්ත්‍රික්කය වෙනස් කර නැවත සොයන්න.</p>
             <button type="button" class="btn-profile-primary" onclick="resetArtisansFilters()" style="margin: 0 auto;">
-              <i class="fa-solid fa-rotate-left"></i> සියලු ශිල්පීන් පෙන්වන්න
+              <i class="fa-solid fa-rotate-left"></i> සියල්ල නැවත පෙන්වන්න
             </button>
           </div>
         `;
@@ -11549,6 +11628,10 @@ function filterAndRenderArtisanCards() {
     const rawPhone = item.phone || '';
     const cleanTel = rawPhone.replace(/[^0-9]/g, '');
     const waUrl = formatArtisanWhatsAppUrl(item.phone, item.whatsapp);
+
+    const isElephantProvider = Array.isArray(item.specialties) && item.specialties.includes('අලි ඇතුන් සපයන්නන්');
+    const isPerahera = item.section === 'perahera_culture';
+    const fallbackAvatar = isPerahera ? '🥁' : '🎨';
 
     const specialtiesHtml = (item.specialties || []).map(s => `
       <span class="artisan-specialty-tag">${Security.escapeHTML(s)}</span>
@@ -11578,21 +11661,30 @@ function filterAndRenderArtisanCards() {
         <div class="artisan-card-header">
           <div class="artisan-avatar-wrap">
             ${item.photo ? `
-              <img src="${item.photo}" alt="${Security.escapeHTML(item.name)}" class="artisan-avatar-img" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'artisan-avatar-placeholder\\'>🎨</div>';">
+              <img src="${item.photo}" alt="${Security.escapeHTML(item.name)}" class="artisan-avatar-img" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'artisan-avatar-placeholder\\'>${fallbackAvatar}</div>';">
             ` : `
-              <div class="artisan-avatar-placeholder">🎨</div>
+              <div class="artisan-avatar-placeholder">${fallbackAvatar}</div>
             `}
           </div>
           <div class="artisan-meta-header">
             <div class="artisan-badges-row">
               <span class="artisan-badge-verified">
                 <i class="fa-solid fa-circle-check"></i>
-                <span>සත්‍යාපිත ශිල්පී</span>
+                <span>සත්‍යාපිතයි</span>
+              </span>
+              ${isElephantProvider ? `
+                <span class="artisan-elephant-license-badge">
+                  <i class="fa-solid fa-shield-halved"></i>
+                  <span>වනජීවී බලපත්‍රය සත්‍යාපිතයි</span>
+                </span>
+              ` : ''}
+              <span class="artisan-section-pill">
+                ${isPerahera ? '🥁 පෙරහැර' : '🏛️ විහාර'}
               </span>
               ${item.islandWide ? `
                 <span class="artisan-islandwide-pill">
                   <i class="fa-solid fa-earth-asia"></i>
-                  <span>දිවයින පුරා සේවය</span>
+                  <span>දිවයින පුරා</span>
                 </span>
               ` : ''}
             </div>
@@ -11617,7 +11709,7 @@ function filterAndRenderArtisanCards() {
         ${item.notableTemples ? `
           <div class="artisan-notable-temples">
             <i class="fa-solid fa-place-of-worship"></i>
-            <span><strong>දායක වූ ප්‍රකට විහාර:</strong> ${Security.escapeHTML(item.notableTemples)}</span>
+            <span><strong>දායක වූ ප්‍රකට විහාර / පෙරහැර:</strong> ${Security.escapeHTML(item.notableTemples)}</span>
           </div>
         ` : ''}
 
@@ -11676,11 +11768,52 @@ window.openArtisanRegisterModal = function() {
     }
   }
 
-  // Attach photo and portfolio change listeners once
+  // Sync default modal section with current directory section
+  const sectionRadios = document.querySelectorAll('input[name="artisanRegSection"]');
+  sectionRadios.forEach(r => {
+    if (r.value === currentArtisansSection) {
+      r.checked = true;
+    }
+  });
+  handleArtisanRegSectionChange(currentArtisansSection);
+
+  // Attach listeners
   initArtisanModalPhotoListeners();
 
   const modal = document.getElementById('artisanRegisterModal');
   if (modal) modal.classList.remove('hidden');
+};
+
+window.handleArtisanRegSectionChange = function(sectionKey) {
+  const grid = document.getElementById('artisanRegSpecialtiesGrid');
+  const licenseWrap = document.getElementById('elephantLicenseFieldsWrap');
+  if (!grid) return;
+
+  const sectionDef = ARTISAN_SECTIONS[sectionKey] || ARTISAN_SECTIONS.temple_art;
+  const specialties = sectionDef.categories.filter(c => c !== 'සියල්ල');
+
+  grid.innerHTML = specialties.map(s => `
+    <label class="artisan-checkbox-item">
+      <input type="checkbox" name="artisanSpecialty" value="${s}" onchange="checkArtisanSpecialtyToggles()">
+      <span>${s}</span>
+    </label>
+  `).join('');
+
+  if (licenseWrap) {
+    licenseWrap.style.display = 'none';
+  }
+};
+
+window.checkArtisanSpecialtyToggles = function() {
+  const licenseWrap = document.getElementById('elephantLicenseFieldsWrap');
+  const checked = Array.from(document.querySelectorAll('input[name="artisanSpecialty"]:checked')).map(cb => cb.value);
+  if (licenseWrap) {
+    if (checked.includes('අලි ඇතුන් සපයන්නන්')) {
+      licenseWrap.style.display = 'block';
+    } else {
+      licenseWrap.style.display = 'none';
+    }
+  }
 };
 
 window.closeArtisanRegisterModal = function() {
@@ -11688,17 +11821,33 @@ window.closeArtisanRegisterModal = function() {
   if (modal) modal.classList.add('hidden');
   artisanRegPhotoSelected = null;
   artisanRegPortfolioSelected = [];
+  artisanRegWildlifeLicenseSelected = null;
+
   const form = document.getElementById('artisanRegisterForm');
   if (form) form.reset();
+
   const photoPrev = document.getElementById('artisanRegPhotoPreview');
   if (photoPrev) {
     photoPrev.innerHTML = '';
     photoPrev.style.display = 'none';
   }
+
   const portPrev = document.getElementById('artisanRegPortfolioPreviewGrid');
   if (portPrev) {
     portPrev.innerHTML = '';
   }
+
+  const licenseWrap = document.getElementById('elephantLicenseFieldsWrap');
+  if (licenseWrap) {
+    licenseWrap.style.display = 'none';
+  }
+
+  const licensePrev = document.getElementById('artisanRegWildlifeLicensePreview');
+  if (licensePrev) {
+    licensePrev.innerHTML = '';
+    licensePrev.style.display = 'none';
+  }
+
   const uploadStatus = document.getElementById('artisanRegUploadStatus');
   if (uploadStatus) uploadStatus.style.display = 'none';
 };
@@ -11752,6 +11901,31 @@ function initArtisanModalPhotoListeners() {
       portInp.value = '';
     });
   }
+
+  const licenseInp = document.getElementById('artisanRegWildlifeLicenseFile');
+  const licensePrev = document.getElementById('artisanRegWildlifeLicensePreview');
+  if (licenseInp && !licenseInp.dataset.listenerAttached) {
+    licenseInp.dataset.listenerAttached = 'true';
+    licenseInp.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) {
+        artisanRegWildlifeLicenseSelected = file;
+        const reader = new FileReader();
+        reader.onload = (re) => {
+          if (licensePrev) {
+            licensePrev.style.display = 'block';
+            licensePrev.innerHTML = `
+              <div style="position: relative; width: 70px; height: 70px; border-radius: 8px; overflow: hidden; border: 2px solid #059669; margin-top: 6px;">
+                <img src="${re.target.result}" style="width: 100%; height: 100%; object-fit: cover;">
+                <button type="button" onclick="removeArtisanWildlifeLicenseFile()" style="position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.6); color: #fff; border: none; border-radius: 9999px; width: 20px; height: 20px; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center;">&times;</button>
+              </div>
+            `;
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  }
 }
 
 window.removeArtisanRegPhoto = function() {
@@ -11762,6 +11936,17 @@ window.removeArtisanRegPhoto = function() {
   if (photoPrev) {
     photoPrev.innerHTML = '';
     photoPrev.style.display = 'none';
+  }
+};
+
+window.removeArtisanWildlifeLicenseFile = function() {
+  artisanRegWildlifeLicenseSelected = null;
+  const licenseInp = document.getElementById('artisanRegWildlifeLicenseFile');
+  if (licenseInp) licenseInp.value = '';
+  const licensePrev = document.getElementById('artisanRegWildlifeLicensePreview');
+  if (licensePrev) {
+    licensePrev.innerHTML = '';
+    licensePrev.style.display = 'none';
   }
 };
 
@@ -11801,6 +11986,7 @@ window.handleArtisanRegisterSubmit = async function(e) {
     return;
   }
 
+  const selectedSection = document.querySelector('input[name="artisanRegSection"]:checked')?.value || 'temple_art';
   const name = (document.getElementById('artisanRegName')?.value || '').trim();
   const expVal = document.getElementById('artisanRegExperience')?.value;
   const experience = expVal ? parseInt(expVal, 10) : 0;
@@ -11823,7 +12009,7 @@ window.handleArtisanRegisterSubmit = async function(e) {
     return;
   }
   if (checkedSpecialties.length === 0) {
-    alert("කරුණාකර අවම වශයෙන් එක් නිර්මාණ ක්ෂේත්‍රයක් (Specialty) තෝරන්න.");
+    alert("කරුණාකර අවම වශයෙන් එක් නිර්මාණ හෝ සේවා ක්ෂේත්‍රයක් තෝරන්න.");
     return;
   }
   if (!district) {
@@ -11833,6 +12019,21 @@ window.handleArtisanRegisterSubmit = async function(e) {
   if (!phone) {
     alert("කරුණාකර වලංගු දුරකථන අංකයක් ඇතුළත් කරන්න.");
     return;
+  }
+
+  // Mandatory Elephant License Verification
+  const isElephant = checkedSpecialties.includes('අලි ඇතුන් සපයන්නන්');
+  const wildlifeLicenseNum = (document.getElementById('artisanRegWildlifeLicenseNum')?.value || '').trim();
+
+  if (isElephant) {
+    if (!wildlifeLicenseNum) {
+      alert("අලි ඇතුන් සපයන්නන් සඳහා වනජීවී දෙපාර්තමේන්තු බලපත්‍ර අංකය ඇතුළත් කිරීම අනිවාර්ය වේ.");
+      return;
+    }
+    if (!artisanRegWildlifeLicenseSelected) {
+      alert("අලි ඇතුන් සපයන්නන් සඳහා වනජීවී දෙපාර්තමේන්තු බලපත්‍රයේ පැහැදිලි ඡායාරූපය උඩුගත කිරීම අනිවාර්ය වේ.");
+      return;
+    }
   }
 
   const submitBtn = document.getElementById('btnSubmitArtisanReg');
@@ -11869,10 +12070,18 @@ window.handleArtisanRegisterSubmit = async function(e) {
       }
     }
 
+    // Upload Wildlife License image if elephant provider
+    let wildlifeLicenseImageUrl = '';
+    if (isElephant && artisanRegWildlifeLicenseSelected) {
+      if (uploadStatusText) uploadStatusText.textContent = "වනජීවී බලපත්‍ර ඡායාරූපය උඩුගත කෙරේ...";
+      wildlifeLicenseImageUrl = await uploadToImgBB(artisanRegWildlifeLicenseSelected, `artisan_license_${Date.now()}`);
+    }
+
     if (uploadStatusText) uploadStatusText.textContent = "අයදුම්පත සුරකිමින් පවතී...";
 
     const applicationData = {
       name,
+      section: selectedSection,
       specialties: checkedSpecialties,
       experience: experience || 0,
       district,
@@ -11883,6 +12092,8 @@ window.handleArtisanRegisterSubmit = async function(e) {
       bio,
       photo: photoUrl || '',
       portfolioImages: portfolioUrls,
+      wildlifeLicenseNumber: isElephant ? wildlifeLicenseNum : '',
+      wildlifeLicenseImage: isElephant ? (wildlifeLicenseImageUrl || '') : '',
       status: 'pending',
       submittedByUid: user.uid || 'unknown',
       submittedByName: user.name || 'පින්වත් සාමාජිකයෙක්',

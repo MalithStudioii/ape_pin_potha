@@ -11237,6 +11237,124 @@ body.drawer-open {
   background: rgba(255, 255, 255, 0.22);
 }
 
+.artisans-section-tabs-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.artisans-section-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 13px 18px;
+  border-radius: var(--radius-lg);
+  border: 2px solid #fed7aa;
+  background: #ffffff;
+  color: #78350f;
+  font-size: 0.95rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.artisans-section-tab:hover {
+  border-color: #f59e0b;
+  background: #fffdf8;
+  transform: translateY(-1px);
+}
+
+.artisans-section-tab.active {
+  background: linear-gradient(135deg, #78350f 0%, #92400e 100%);
+  color: #ffffff;
+  border-color: #78350f;
+  box-shadow: 0 4px 14px rgba(120, 53, 15, 0.28);
+}
+
+.section-tab-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.section-tab-title {
+  letter-spacing: 0.2px;
+}
+
+.section-tab-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.artisans-section-tab.active .section-tab-badge {
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+
+.artisan-elephant-license-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #6ee7b7;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.artisan-section-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 0.66rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  border: 1px solid #fde68a;
+}
+
+.artisan-section-radio-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  cursor: pointer;
+  background: #ffffff;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #334155;
+  transition: all 0.2s ease;
+}
+
+.artisan-section-radio-label:hover {
+  border-color: #f59e0b;
+  background: #fffdf8;
+}
+
+.artisan-section-radio-label input:checked + span {
+  color: #92400e;
+}
+
+.artisan-section-radio-label:has(input:checked) {
+  border-color: #d97706;
+  background: #fffbeb;
+  box-shadow: 0 0 0 1px #d97706;
+}
+
 .artisans-search-filter-card {
   background: #ffffff;
   border-radius: var(--radius-lg);
@@ -11670,6 +11788,14 @@ body.drawer-open {
   }
   .artisans-hero-title {
     font-size: 1.35rem;
+  }
+  .artisans-section-tabs-bar {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .artisans-section-tab {
+    padding: 11px 14px;
+    font-size: 0.88rem;
   }
   .artisans-grid {
     grid-template-columns: 1fr;

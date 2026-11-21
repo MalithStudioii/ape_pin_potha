@@ -51,7 +51,7 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=161">
+    <link rel="stylesheet" href="css/styles.css?v=162">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
@@ -1061,11 +1061,11 @@
                 <div class="artisans-hero-content">
                     <div class="artisans-hero-badge">
                         <i class="fa-solid fa-palette"></i>
-                        <span>සම්ප්‍රදායික විහාර කලා හා නිර්මාණ</span>
+                        <span>සම්ප්‍රදායික විහාර කලා හා සංස්කෘතික සේවා</span>
                     </div>
-                    <h1 class="artisans-hero-title">ශ්‍රී ලංකා විහාර නිර්මාණ හා කලා ශිල්පීන් නාමාවලිය</h1>
+                    <h1 class="artisans-hero-title">ශ්‍රී ලංකා විහාර නිර්මාණ හා පෙරහැර කලා ශිල්පීන් නාමාවලිය</h1>
                     <p class="artisans-hero-desc">
-                        විහාර බිතුසිතුවම්, වෙහෙර දාගැබ්, බුදු පිළිම, ලී හා ගල් කැටයම්, මකර තොරණ සහ වාස්තු නිර්මාණ ශිල්පීන් පිළිබඳ සත්‍යාපිත තොරතුරු සහ සෘජු සබඳතා.
+                        විහාර බිතුසිතුවම්, දාගැබ්, බුදු පිළිම, කැටයම් මෙන්ම පෙරහැර තූර්ය වාදක, නර්තන කණ්ඩායම්, කස කරුවන් හා බලපත්‍රලාභී අලි ඇතුන් සපයන්නන් පිළිබඳ සත්‍යාපිත තොරතුරු.
                     </p>
                     <div class="artisans-hero-actions">
                         <button type="button" class="btn-register-artisan" onclick="openArtisanRegisterModal()">
@@ -1079,6 +1079,20 @@
                     </div>
                 </div>
                 <img src="assets/artisan-banner-buddha.webp" alt="Lord Buddha Statue Artwork" class="artisans-hero-buddha-bg" aria-hidden="true" loading="lazy">
+            </div>
+
+            <!-- Section Switcher Tabs: Temple Art vs Perahera Cultural Services -->
+            <div class="artisans-section-tabs-bar" role="tablist">
+                <button type="button" id="tabBtnTempleArt" class="artisans-section-tab active" onclick="switchArtisansSection('temple_art')" role="tab" aria-selected="true">
+                    <span class="section-tab-icon">🏛️</span>
+                    <span class="section-tab-title">විහාර නිර්මාණ ශිල්පීන්</span>
+                    <span class="section-tab-badge" id="tabBadgeTempleArt">0</span>
+                </button>
+                <button type="button" id="tabBtnPeraheraCulture" class="artisans-section-tab" onclick="switchArtisansSection('perahera_culture')" role="tab" aria-selected="false">
+                    <span class="section-tab-icon">🥁</span>
+                    <span class="section-tab-title">පෙරහැර හා සංස්කෘතික සේවා</span>
+                    <span class="section-tab-badge" id="tabBadgePeraheraCulture">0</span>
+                </button>
             </div>
 
             <!-- Search & Filter Controls -->
@@ -1698,7 +1712,7 @@
             <div class="modal-header" style="position: sticky; top: 0; background: #fff; z-index: 10; padding: 14px 18px; border-bottom: 1.5px solid #fde68a;">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <i class="fa-solid fa-palette" style="color: #d97706; font-size: 1.15rem;"></i>
-                    <h3 class="modal-title" style="font-size: 1rem; color: #451a03; font-weight: 800;">විහාර කලා ශිල්පියෙකු ලෙස ලියාපදිංචි වන්න</h3>
+                    <h3 class="modal-title" style="font-size: 1rem; color: #451a03; font-weight: 800;">ශිල්පියෙකු හෝ සංස්කෘතික සේවාවක් ලියාපදිංචි කරන්න</h3>
                 </div>
                 <button type="button" onclick="closeArtisanRegisterModal()" class="modal-close-btn" title="වසන්න">
                     <i class="fa-solid fa-xmark"></i>
@@ -1715,8 +1729,23 @@
                     <input type="text" id="artisanRegName" class="form-input" required maxlength="100" placeholder="උදා: සෝමපාල කලායතනය / ඩබ්ලිව්. එම්. සුනිල් ශාන්ත">
                 </div>
 
+                <!-- Section Selector -->
                 <div class="form-group" style="margin-bottom: 12px;">
-                    <label class="form-label" style="font-size: 0.82rem; font-weight: 700; color: #334155; margin-bottom: 6px; display: block;">නිර්මාණ ක්ෂේත්‍ර / Specialties * (අවම වශයෙන් 1ක් තෝරන්න)</label>
+                    <label class="form-label" style="font-size: 0.82rem; font-weight: 700; color: #334155; margin-bottom: 6px; display: block;">ප්‍රධාන අංශය (Category Section) *</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <label class="artisan-section-radio-label">
+                            <input type="radio" name="artisanRegSection" value="temple_art" checked onchange="handleArtisanRegSectionChange(this.value)">
+                            <span>🏛️ විහාර නිර්මාණ</span>
+                        </label>
+                        <label class="artisan-section-radio-label">
+                            <input type="radio" name="artisanRegSection" value="perahera_culture" onchange="handleArtisanRegSectionChange(this.value)">
+                            <span>🥁 පෙරහැර සේවා</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label class="form-label" style="font-size: 0.82rem; font-weight: 700; color: #334155; margin-bottom: 6px; display: block;">නිර්මාණ / සේවා ක්ෂේත්‍ර * (අවම වශයෙන් 1ක් තෝරන්න)</label>
                     <div id="artisanRegSpecialtiesGrid" class="artisan-specialties-checkboxes-grid">
                         <label class="artisan-checkbox-item">
                             <input type="checkbox" name="artisanSpecialty" value="විහාර චිත්‍ර හා ප්‍රතිසංස්කරණ">
@@ -1742,6 +1771,30 @@
                             <input type="checkbox" name="artisanSpecialty" value="ගල් කැටයම්, කොත් වහන්සේ හා ලෝහ කර්මාන්ත">
                             <span>ගල් කැටයම්, කොත් වහන්සේ හා ලෝහ කර්මාන්ත</span>
                         </label>
+                    </div>
+                </div>
+
+                <!-- Conditional Elephant License Verification Box (Strictly for අලි ඇතුන් සපයන්නන්) -->
+                <div id="elephantLicenseFieldsWrap" class="hidden" style="display: none; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 12px; padding: 14px; margin-bottom: 14px;">
+                    <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 10px;">
+                        <i class="fa-solid fa-shield-halved" style="color: #059669; font-size: 1.1rem; margin-top: 2px;"></i>
+                        <div>
+                            <div style="font-size: 0.84rem; font-weight: 800; color: #065f46;">වනජීවී දෙපාර්තමේන්තු බලපත්‍ර සත්‍යාපනය (Mandatory Elephant License)</div>
+                            <div style="font-size: 0.72rem; color: #047857; margin-top: 2px; line-height: 1.4;">
+                                🔒 මෙම බලපත්‍ර තොරතුරු ප්‍රසිද්ධියේ පළ නොකෙරේ. පරිපාලක සත්‍යාපනය (Admin Verification) සඳහා පමණි.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label class="form-label" style="font-size: 0.8rem; font-weight: 700; color: #065f46;">වනජීවී දෙපාර්තමේන්තු බලපත්‍ර අංකය (License No.) *</label>
+                        <input type="text" id="artisanRegWildlifeLicenseNum" class="form-input" placeholder="උදා: DWC/ELE/2024/..." style="border-color: #86efac; background: #ffffff;">
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" style="font-size: 0.8rem; font-weight: 700; color: #065f46;">බලපත්‍රයේ පැහැදිලි ඡායාරූපය (License Document / Photo) *</label>
+                        <input type="file" id="artisanRegWildlifeLicenseFile" accept="image/*" class="form-control" style="font-size: 0.76rem; border-color: #86efac; background: #ffffff;">
+                        <div id="artisanRegWildlifeLicensePreview" style="margin-top: 6px; display: none;"></div>
                     </div>
                 </div>
 
@@ -3922,6 +3975,6 @@
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=160"></script>
+    <script type="module" src="js/app.js?v=161"></script>
 </body>
 </html>
