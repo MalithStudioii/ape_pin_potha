@@ -2876,3 +2876,259 @@ window.startImgBBMigration = async function() {
         btnScan.style.opacity = '1';
     }
 };
+
+// ============================================================================
+// Safe Dead Link Cleaner: Strip dead ImgBB placeholder links without deleting posts
+// ============================================================================
+let isDeadLinkCleaning = false;
+
+window.cleanDeadImgBBLinks = async function() {
+    if (!isMasterAdmin || !checkIsMasterAdmin(currentAdminUser)) {
+        alert('මෙම පහසුකම සඳහා අවසර ඇත්තේ Master Admin ට පමණි.');
+        return;
+    }
+    if (isDeadLinkCleaning || isImgBBScanning || isImgBBMigrating || isBase64Scanning || isBase64Migrating || isBrokenImageScanning) return;
+
+    const confirmClean = confirm(
+        "මැකුණු (Dead) ImgBB ඡායාරූප ලින්ක් පමණක් Firestore වෙතින් ආරක්ෂිතව ඉවත් කිරීමට අවශ්‍යද?\n\n" +
+        "සැලකිය යුතුයි: කිසිදු සටහනක් (Post), සාධුකාර ගණනක්, අදහසක් (Comment) හෝ ක්‍රියාකාරී Cloudinary ඡායාරූපයක් මැකී නොයන අතර, මැකුණු ImgBB ලින්ක් පමණක් ඉවත් කෙරේ."
+    );
+    if (!confirmClean) return;
+
+    isDeadLinkCleaning = true;
+    const btnClean = document.getElementById('btnCleanDeadImgBB');
+    if (btnClean) {
+        btnClean.disabled = true;
+        btnClean.style.opacity = '0.5';
+    }
+
+    const progressContainer = document.getElementById('base64ProgressContainer');
+    const progressBar = document.getElementById('base64ProgressBar');
+    const progressPercent = document.getElementById('base64ProgressPercent');
+    const progressLabel = document.getElementById('base64ProgressLabel');
+    if (progressContainer) progressContainer.style.display = 'block';
+
+    appendBase64Log('Starting safe cleanup of dead ImgBB placeholder links...', 'info');
+    await recordAuditLog('Dead ImgBB Cleanup Started', 'Scanning and stripping dead ImgBB placeholder links from Firestore.');
+
+    let totalDocsScanned = 0;
+    let cleanedDocsCount = 0;
+    let cleanedLinksCount = 0;
+
+    // Cache image probe results in memory to avoid redundant network/canvas checks
+    const deadUrlTestCache = new Map();
+
+    async function checkIsDead(url) {
+        if (!url || typeof url !== 'string') return false;
+        const trimmed = url.trim();
+        if (!trimmed.includes('ibb.co')) return false;
+        if (deadUrlTestCache.has(trimmed)) {
+            return deadUrlTestCache.get(trimmed);
+        }
+        const isDead = await isImgBBNotFoundPlaceholder(trimmed);
+        deadUrlTestCache.set(trimmed, isDead);
+        return isDead;
+    }
+
+    try {
+        const { collection, getDocs, doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+
+        const targetsToProcess = [];
+
+        // 1. Collect candidate documents across merit_posts, users, and temple_artisans
+        const postsSnap = await getDocs(collection(db, COLLECTIONS.POSTS));
+        postsSnap.forEach(d => {
+            targetsToProcess.push({
+                collection: COLLECTIONS.POSTS,
+                docId: d.id,
+                data: d.data(),
+                snippet: (d.data().title || d.data().text || d.id || '').toString().substring(0, 40)
+            });
+        });
+
+        const usersSnap = await getDocs(collection(db, COLLECTIONS.USERS));
+        usersSnap.forEach(d => {
+            targetsToProcess.push({
+                collection: COLLECTIONS.USERS,
+                docId: d.id,
+                data: d.data(),
+                snippet: (d.data().displayName || d.data().name || d.id || '').toString().substring(0, 40)
+            });
+        });
+
+        const artisansCollectionName = COLLECTIONS.ARTISANS || 'temple_artisans';
+        try {
+            const artisansSnap = await getDocs(collection(db, artisansCollectionName));
+            artisansSnap.forEach(d => {
+                targetsToProcess.push({
+                    collection: artisansCollectionName,
+                    docId: d.id,
+                    data: d.data(),
+                    snippet: (d.data().fullName || d.data().serviceTitle || d.id || '').toString().substring(0, 40)
+                });
+            });
+        } catch (err) {
+            console.warn('[Dead Link Cleanup] Could not fetch artisans collection:', err);
+        }
+
+        totalDocsScanned = targetsToProcess.length;
+        appendBase64Log(`Scanned ${totalDocsScanned} total documents. Checking for dead ImgBB links...`, 'info');
+
+        const singleFields = ['image', 'imageUrl', 'photo', 'photoURL', 'mediaUrl', 'thumbnail', 'authorPhoto', 'coverImage', 'avatar', 'profileImage', 'wildlifeLicenseImageUrl', 'licenseUrl'];
+        const arrayFields = ['images', 'media', 'photos', 'portfolio', 'portfolioUrls'];
+
+        for (let i = 0; i < targetsToProcess.length; i++) {
+            const item = targetsToProcess[i];
+            const itemNum = i + 1;
+            const pct = Math.round((itemNum / totalDocsScanned) * 100);
+
+            if (progressBar) progressBar.style.width = `${pct}%`;
+            if (progressPercent) progressPercent.innerText = `${pct}% (${itemNum}/${totalDocsScanned})`;
+            if (progressLabel) progressLabel.innerText = `Checking [${item.collection}] ${item.docId}...`;
+
+            const data = item.data;
+            const docId = item.docId;
+
+            // Collect all ibb.co URLs present in this document
+            const ibbUrlsInDoc = new Set();
+
+            singleFields.forEach(f => {
+                const val = data[f];
+                if (typeof val === 'string' && val.includes('ibb.co')) {
+                    ibbUrlsInDoc.add(val.trim());
+                }
+            });
+
+            arrayFields.forEach(f => {
+                const arr = data[f];
+                if (Array.isArray(arr)) {
+                    arr.forEach(entry => {
+                        if (typeof entry === 'string' && entry.includes('ibb.co')) {
+                            ibbUrlsInDoc.add(entry.trim());
+                        } else if (entry && typeof entry === 'object') {
+                            const u = entry.url || entry.src || entry.link;
+                            if (typeof u === 'string' && u.includes('ibb.co')) {
+                                ibbUrlsInDoc.add(u.trim());
+                            }
+                        }
+                    });
+                }
+            });
+
+            if (ibbUrlsInDoc.size === 0) continue;
+
+            // Verify each URL against isImgBBNotFoundPlaceholder
+            const deadUrlsInThisDoc = new Set();
+            for (const url of ibbUrlsInDoc) {
+                const isDead = await checkIsDead(url);
+                if (isDead) {
+                    deadUrlsInThisDoc.add(url);
+                }
+            }
+
+            if (deadUrlsInThisDoc.size === 0) continue;
+
+            // Prepare safe updates for affected fields only
+            const updates = {};
+            const cleanedArrays = {};
+
+            // 1. Clean array fields: filter out only dead URLs
+            arrayFields.forEach(f => {
+                const arr = data[f];
+                if (Array.isArray(arr)) {
+                    let arrayChanged = false;
+                    const filtered = arr.filter(entry => {
+                        if (typeof entry === 'string') {
+                            if (deadUrlsInThisDoc.has(entry.trim())) {
+                                arrayChanged = true;
+                                return false;
+                            }
+                            return true;
+                        } else if (entry && typeof entry === 'object') {
+                            const u = (entry.url || entry.src || entry.link || '').trim();
+                            if (deadUrlsInThisDoc.has(u)) {
+                                arrayChanged = true;
+                                return false;
+                            }
+                            return true;
+                        }
+                        return true;
+                    });
+
+                    if (arrayChanged) {
+                        updates[f] = filtered;
+                        cleanedArrays[f] = filtered;
+                    } else {
+                        cleanedArrays[f] = arr;
+                    }
+                }
+            });
+
+            // 2. Clean single string fields
+            // Determine surviving fallback image from images array if available
+            const survivingImagesArr = cleanedArrays['images'] || (Array.isArray(data['images']) ? data['images'] : []);
+            let fallbackImage = '';
+            if (survivingImagesArr.length > 0) {
+                const first = survivingImagesArr[0];
+                if (typeof first === 'string' && first.trim()) {
+                    fallbackImage = first.trim();
+                } else if (first && typeof first === 'object') {
+                    fallbackImage = (first.url || first.src || first.link || '').trim();
+                }
+            }
+
+            singleFields.forEach(f => {
+                const val = data[f];
+                if (typeof val === 'string' && deadUrlsInThisDoc.has(val.trim())) {
+                    if (f === 'image' || f === 'imageUrl') {
+                        updates[f] = fallbackImage || '';
+                    } else {
+                        updates[f] = '';
+                    }
+                }
+            });
+
+            // 3. Atomically update Firestore document
+            if (Object.keys(updates).length > 0) {
+                const docRef = doc(db, item.collection, docId);
+                await updateDoc(docRef, updates);
+
+                cleanedDocsCount++;
+                cleanedLinksCount += deadUrlsInThisDoc.size;
+
+                const changedFieldsStr = Object.keys(updates).join(', ');
+                appendBase64Log(`✓ Cleaned [${item.collection}] ${docId} | Snippet: "${item.snippet}" | Removed ${deadUrlsInThisDoc.size} dead link(s) | Fields: ${changedFieldsStr}`, 'success');
+
+                // Small delay to maintain UI responsiveness
+                await sleep(50);
+            }
+        }
+
+        // 4. Invalidate and clear local caches
+        try {
+            localStorage.removeItem('pinPotha_posts');
+            localStorage.removeItem('pinPotha_sandbox_posts');
+            localStorage.removeItem('pinPotha_cached_posts');
+            localStorage.removeItem('pinPotha_artisans_cache');
+            appendBase64Log('Cleared local post and artisan caches (pinPotha_posts, pinPotha_sandbox_posts, pinPotha_cached_posts, pinPotha_artisans_cache).', 'info');
+        } catch (e) {
+            console.warn('[Dead Link Cleanup] Cache clear warning:', e);
+        }
+
+        const summaryMsg = `Cleanup completed: Removed ${cleanedLinksCount} dead ImgBB link(s) across ${cleanedDocsCount} document(s). Post text and valid Cloudinary images preserved!`;
+        appendBase64Log(summaryMsg, cleanedDocsCount > 0 ? 'success' : 'info');
+        await recordAuditLog('Dead ImgBB Cleanup Finished', summaryMsg);
+        alert(summaryMsg);
+
+    } catch (err) {
+        console.error('[Dead Link Cleanup] Error:', err);
+        appendBase64Log(`Error cleaning dead ImgBB links: ${err.message}`, 'error');
+        alert('මැකුණු ලින්ක් ඉවත් කිරීමේදී දෝෂයක් සිදුවිය: ' + err.message);
+    } finally {
+        isDeadLinkCleaning = false;
+        if (btnClean) {
+            btnClean.disabled = false;
+            btnClean.style.opacity = '1';
+        }
+    }
+};
