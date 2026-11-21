@@ -86,6 +86,15 @@
         }
       })();
     </script>
+
+    <!-- Early PWA Install Prompt Capture -->
+    <script>
+      window.__deferredInstallPrompt = null;
+      window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        window.__deferredInstallPrompt = e;
+      });
+    </script>
 </head>
 <body>
 
@@ -173,6 +182,17 @@
                                     <i class="fa-solid fa-xmark"></i>
                                 </button>
                             </div>
+                        </div>
+
+                        <!-- OS Push Notifications Permission Bar -->
+                        <div id="notifPermissionBanner" style="display: none; padding: 7px 12px; background: rgba(245, 158, 11, 0.12); border-bottom: 1px solid rgba(245, 158, 11, 0.2); font-size: 0.74rem; align-items: center; justify-content: space-between; gap: 8px;">
+                            <span style="color: #cbd5e1; display: flex; align-items: center; gap: 6px;">
+                                <i class="fa-solid fa-bell-ring" style="color: #f59e0b;"></i>
+                                <span>දුරකථන දැනුම්දීම්</span>
+                            </span>
+                            <button type="button" id="btnEnablePushNotifs" onclick="requestNotificationPermission()" class="notif-filter-chip" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #ffffff; border: none; font-size: 0.7rem; padding: 3px 10px; font-weight: 700; cursor: pointer;">
+                                🔔 සක්‍රීය කරන්න
+                            </button>
                         </div>
 
                         <!-- Filter Chips -->
@@ -3709,12 +3729,16 @@
                     <strong>පිං පොත App එක ස්ථාපනය කරන්න</strong>
                     <span class="pwa-badge">නොමිලේ</span>
                 </div>
-                <p class="pwa-banner-desc">දුරකථනයට පහසුවෙන් Install කර ඉක්මනින් පින්කම් සටහන් කරගන්න.</p>
+                <p class="pwa-banner-desc" id="pwaBannerDesc">දුරකථනයට පහසුවෙන් Install කර ඉක්මනින් පින්කම් සටහන් කරගන්න.</p>
+                <div id="pwaManualSteps" style="display: none; margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(245, 158, 11, 0.4); font-size: 0.74rem; color: #fde68a; line-height: 1.45;">
+                    <div>1. බ්‍රවුසරයේ ඉහළ දකුණු කෙළවරේ ඇති <strong>⋮</strong> මෙනුව ඔබන්න.</div>
+                    <div>2. <strong>"Install App"</strong> හෝ <strong>"Add to Home screen"</strong> තෝරන්න.</div>
+                </div>
             </div>
             <div class="pwa-banner-actions">
-                <button type="button" class="btn-pwa-install" onclick="triggerPWAInstall()">
+                <button type="button" class="btn-pwa-install" id="btnPwaAction" onclick="triggerPWAInstall()">
                     <i class="fa-solid fa-cloud-arrow-down"></i>
-                    <span>Install</span>
+                    <span>📲 ස්ථාපනය කරන්න</span>
                 </button>
                 <button type="button" class="btn-pwa-dismiss" onclick="dismissPWAInstallBanner()" title="පසුව">
                     <i class="fa-solid fa-xmark"></i>
@@ -3730,35 +3754,38 @@
                 <img src="assets/icon-192.png" alt="පිං පොත" class="pwa-ios-icon">
                 <div>
                     <h3 style="margin: 0; font-size: 1.05rem; font-family: var(--font-serif); color: #1e293b;">Apple iPhone / iPad වෙත ස්ථාපනය</h3>
-                    <span style="font-size: 0.72rem; color: #d97706; font-weight: 700;">පියවර 3කින් Home Screen එකට Add කරගන්න</span>
+                    <span style="font-size: 0.72rem; color: #d97706; font-weight: 700;">පියවර 2කින් Home Screen එකට Add කරගන්න</span>
                 </div>
                 <button type="button" class="modal-close-btn" onclick="closePwaIosModal()" style="margin-left: auto;">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
+            <div id="pwaIosBrowserNote" style="display: none; background: #fffbeb; border: 1px solid #fde68a; padding: 8px 12px; border-radius: 10px; margin-bottom: 14px; font-size: 0.75rem; color: #92400e; line-height: 1.4;">
+                <i class="fa-solid fa-circle-info" style="color: #d97706; margin-right: 4px;"></i>
+                <span>හොඳම ප්‍රතිඵල සඳහා Safari බ්‍රවුසරයෙන් විවෘත කරන්න.</span>
+            </div>
             <div class="pwa-ios-steps">
                 <div class="pwa-ios-step">
                     <div class="pwa-step-num">1</div>
                     <div class="pwa-step-text">
-                        Safari බ්‍රවුසරයේ පහළ ඇති <strong>Share බොත්තම (<i class="fa-solid fa-arrow-up-from-bracket" style="color: #0284c7;"></i>)</strong> ඔබන්න.
+                        පහළ ඇති <strong>Share (<i class="fa-solid fa-arrow-up-from-bracket" style="color: #0284c7;"></i> ⬆️)</strong> අයිකනය ඔබන්න.
                     </div>
                 </div>
                 <div class="pwa-ios-step">
                     <div class="pwa-step-num">2</div>
                     <div class="pwa-step-text">
-                        මෙනුවෙන් පහළට ගොස් <strong>"Add to Home Screen" (මුල් තිරයට එක් කරන්න <i class="fa-regular fa-square-plus" style="color: #d97706;"></i>)</strong> තෝරන්න.
-                    </div>
-                </div>
-                <div class="pwa-ios-step">
-                    <div class="pwa-step-num">3</div>
-                    <div class="pwa-step-text">
-                        ඉහළ දකුණු කෙළවරේ ඇති <strong>"Add"</strong> ඔබන්න. එවිට ඔබගේ iPhone එකේ App එකක් ලෙස ස්ථාපනය වේ!
+                        මෙනුවෙන් <strong>"Add to Home Screen" (<i class="fa-regular fa-square-plus" style="color: #d97706;"></i> ➕)</strong> තෝරා <strong>"Add"</strong> ඔබන්න.
                     </div>
                 </div>
             </div>
-            <button type="button" class="btn-profile-primary" onclick="closePwaIosModal()" style="width: 100%; justify-content: center; margin-top: 16px;">
-                <i class="fa-solid fa-circle-check"></i> තේරුම් ගත්තා
-            </button>
+            <div style="display: flex; gap: 8px; margin-top: 16px;">
+                <button type="button" class="btn-profile-primary" onclick="closePwaIosModal()" style="flex: 1; justify-content: center;">
+                    <i class="fa-solid fa-circle-check"></i> තේරුම් ගත්තා
+                </button>
+                <button type="button" onclick="dismissPwaIosModal24h()" class="btn-profile-secondary" style="padding: 0 16px; font-size: 0.78rem;">
+                    පසුව
+                </button>
+            </div>
         </div>
     </div>
 
@@ -3930,6 +3957,6 @@
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=165"></script>
+    <script type="module" src="js/app.js?v=166"></script>
 </body>
 </html>

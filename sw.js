@@ -1,11 +1,11 @@
-// Ape Pin Potha Service Worker (v165)
+// Ape Pin Potha Service Worker (v166)
 // Strategy: Network-First for HTML, JS, CSS to guarantee instant updates; Stale-While-Revalidate for media assets
-const CACHE_NAME = 'pin-potha-cache-v165';
+const CACHE_NAME = 'pin-potha-cache-v166';
 const STATIC_ASSETS = [
   './',
   './index.html',
-  './css/styles.css?v=161',
-  './js/app.js?v=165',
+  './css/styles.css?v=162',
+  './js/app.js?v=166',
   './js/storage.js?v=162',
   './js/imgbb-service.js?v=68',
   './js/aranya-data.js',
@@ -36,10 +36,23 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Message listener to trigger immediate update activation
+// Message listener for skip waiting and badge synchronization
 self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
+  if (!event.data) return;
+
+  if (event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
+  } else if (event.data.type === 'SET_BADGE') {
+    const count = parseInt(event.data.count || 0, 10);
+    try {
+      if ('setAppBadge' in self.navigator) {
+        if (count > 0) {
+          self.navigator.setAppBadge(count).catch(() => {});
+        } else {
+          self.navigator.clearAppBadge().catch(() => {});
+        }
+      }
+    } catch (e) {}
   }
 });
 
@@ -134,3 +147,23 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+
+// Notification click listener: Focus open window or open new window
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) ? event.notification.data.url : './';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+    })
+  );
+});
+

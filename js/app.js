@@ -380,10 +380,34 @@ function bootApp() {
     });
 
     // Subscribe to real-time notifications
+    let hasLoadedInitialNotifs = false;
     StorageService.onNotificationsUpdate((notifs) => {
       try {
-        currentNotifications = notifs || [];
+        const prevNotifs = currentNotifications || [];
+        const nextNotifs = notifs || [];
+        currentNotifications = nextNotifs;
         renderNotificationsList();
+
+        // Check for newly arrived unread notifications after initial load
+        if (hasLoadedInitialNotifs && nextNotifs.length > prevNotifs.length) {
+          const prevIds = new Set(prevNotifs.map(n => n.id));
+          const newUnreads = nextNotifs.filter(n => !n.read && !prevIds.has(n.id));
+          if (newUnreads.length > 0 && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+            const latest = newUnreads[0];
+            const senderName = latest.senderName || latest.authorName || 'කෙනෙක්';
+            let notifText = 'ඔබගේ පින්කමකට අලුත් ප්‍රතිචාරයක් ලැබුණි.';
+            if (latest.type === 'sadhu') {
+              notifText = `${senderName} ඔබගේ පින්කමට සාදුකාරයක් එක් කළා.`;
+            } else if (latest.type === 'comment') {
+              notifText = `${senderName}: "${latest.text ? (latest.text.length > 50 ? latest.text.substring(0, 50) + '...' : latest.text) : 'පුණ්‍යානුමෝදනාවක් කළා'}"`;
+            }
+            showLocalOSNotification('පිං පොත - නව දැනුම්දීමක්! 🙏', {
+              body: notifText,
+              tag: 'pin-potha-notif-' + (latest.id || Date.now())
+            });
+          }
+        }
+        hasLoadedInitialNotifs = true;
       } catch (e) {}
     });
 
@@ -7844,6 +7868,95 @@ function formatTimeAgo(timestamp) {
   return `සති ${diffWeeks}කට පෙර`;
 }
 
+// App Icon Badge Synchronization (PWA Badging API & Service Worker)
+export function updateAppNotificationBadge(unreadCount) {
+  const count = parseInt(unreadCount || 0, 10);
+  try {
+    if (typeof navigator !== 'undefined') {
+      if ('setAppBadge' in navigator) {
+        if (count > 0) {
+          navigator.setAppBadge(count).catch(() => {});
+        } else {
+          navigator.clearAppBadge().catch(() => {});
+        }
+      }
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'SET_BADGE',
+          count: count
+        });
+      }
+    }
+  } catch (e) {}
+}
+window.updateAppNotificationBadge = updateAppNotificationBadge;
+
+// Check notification permission and toggle permission banner
+export function checkNotificationPermissionStatus() {
+  const banner = document.getElementById('notifPermissionBanner');
+  if (!banner) return;
+  if (typeof window === 'undefined' || !('Notification' in window)) {
+    banner.style.display = 'none';
+    return;
+  }
+  if (Notification.permission === 'default') {
+    banner.style.display = 'flex';
+  } else {
+    banner.style.display = 'none';
+  }
+}
+window.checkNotificationPermissionStatus = checkNotificationPermissionStatus;
+
+// Request OS Push Notification Permission
+export async function requestNotificationPermission() {
+  triggerHaptic(20);
+  if (typeof window === 'undefined' || !('Notification' in window)) return;
+  try {
+    const permission = await Notification.requestPermission();
+    checkNotificationPermissionStatus();
+    if (permission === 'granted') {
+      showLocalOSNotification('පිං පොත දැනුම්දීම් සක්‍රීය විය! 🙏', {
+        body: 'ඔබගේ පින්කම් සඳහා ලැබෙන සාදුකාර සහ පුණ්‍යානුමෝදනා ක්ෂණිකව ඔබට ලැබෙනු ඇත.',
+        tag: 'pin-potha-welcome'
+      });
+    }
+  } catch (err) {
+    console.warn('[PWA] Notification permission request error:', err);
+  }
+}
+window.requestNotificationPermission = requestNotificationPermission;
+
+// Display local OS alert via Service Worker or Notification constructor
+export function showLocalOSNotification(title, options = {}) {
+  if (typeof window === 'undefined' || !('Notification' in window)) return;
+  if (Notification.permission !== 'granted') return;
+
+  const defaultOptions = {
+    icon: 'assets/icon-192.png',
+    badge: 'assets/icon-192.png',
+    vibrate: [100, 50, 100],
+    data: { url: './' }
+  };
+  const finalOptions = { ...defaultOptions, ...options };
+
+  try {
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.ready.then((reg) => {
+        reg.showNotification(title, finalOptions).catch(() => {
+          new Notification(title, finalOptions);
+        });
+      }).catch(() => {
+        new Notification(title, finalOptions);
+      });
+    } else {
+      new Notification(title, finalOptions);
+    }
+  } catch (e) {
+    console.warn('[PWA] showLocalOSNotification error:', e);
+  }
+}
+window.showLocalOSNotification = showLocalOSNotification;
+
 window.toggleNotificationDropdown = function(e) {
   if (e) e.stopPropagation();
   const dropdown = document.getElementById('notificationsDropdown');
@@ -7857,9 +7970,11 @@ window.toggleNotificationDropdown = function(e) {
     dropdown.classList.remove('hidden');
     if (btn) btn.classList.add('active');
     if (mobBtn) mobBtn.classList.add('active');
+    checkNotificationPermissionStatus();
     renderNotificationsList();
     // Mark notifications as read so badge clears and notifications do not reappear as unread
     StorageService.markAllNotificationsAsRead();
+    updateAppNotificationBadge(0);
   } else {
     dropdown.style.display = 'none';
     dropdown.classList.add('hidden');
@@ -7903,6 +8018,9 @@ export function renderNotificationsList() {
 
   const notifs = currentNotifications || [];
   const unreadCount = notifs.filter(n => !n.read).length;
+
+  // Sync PWA app icon badge
+  updateAppNotificationBadge(unreadCount);
 
   // Update Badge in Navbar & Mobile Bottom Bar
   const mobBadgeEl = document.getElementById('mobNotifBadge');
@@ -10365,13 +10483,26 @@ let newWorkerWaiting = null;
 function initPWAEngine() {
   // Check standalone mode safely
   const isStandalone = (typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)')?.matches) || 
-                       (window.navigator && window.navigator.standalone === true);
+                       (window.navigator && window.navigator.standalone === true) ||
+                       (typeof document !== 'undefined' && document.referrer && document.referrer.includes('android-app://'));
 
-  // iOS Safari detection safely
-  const isIos = (typeof window !== 'undefined' && window.navigator && /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase())) && !window.MSStream;
+  // 24-hour dismiss cooldown check
+  const PWA_DISMISS_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+  const lastDismissed = localStorage.getItem('pinPotha_pwa_dismiss_timestamp');
+  const isDismissCooldownActive = lastDismissed && (Date.now() - parseInt(lastDismissed, 10) < PWA_DISMISS_COOLDOWN_MS);
+
+  // iOS Safari and in-app browser detection safely
+  const isIos = (typeof window !== 'undefined' && window.navigator && (
+    /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()) ||
+    (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1)
+  ));
+  const isNonSafariIos = isIos && (
+    /crios|fxios|optios|edgios|fban|fbav|instagram|line|micromessenger/i.test(window.navigator.userAgent) ||
+    (!/safari/i.test(window.navigator.userAgent))
+  );
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v139';
+  const ACTIVE_BUILD = 'v166';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
@@ -10387,35 +10518,24 @@ function initPWAEngine() {
 
   // Register Service Worker safely
   if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-    const registerSW = () => {
-      navigator.serviceWorker.register('./sw.js?v=139', { updateViaCache: 'none' });
-    };
-    if (document.readyState === 'complete') {
-      registerSW();
-    } else {
-      window.addEventListener('load', registerSW);
-    }
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=139', { updateViaCache: 'none' })
+    const swUrl = './sw.js?v=166';
+    const registerWorker = () => {
+      navigator.serviceWorker.register(swUrl, { updateViaCache: 'none' })
         .then((registration) => {
-          // Immediately check for service worker updates
           try { registration.update(); } catch (e) {}
 
-          // Also check for updates when window becomes visible
           document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
               try { registration.update(); } catch (e) {}
             }
           });
 
-          // Track updates
           registration.addEventListener('updatefound', () => {
             const installingWorker = registration.installing;
             if (!installingWorker) return;
 
             installingWorker.addEventListener('statechange', () => {
               if ((installingWorker.state === 'installed' || installingWorker.state === 'activated') && navigator.serviceWorker.controller) {
-                // New update is available!
                 newWorkerWaiting = installingWorker;
                 showPwaUpdateToast();
               }
@@ -10425,47 +10545,65 @@ function initPWAEngine() {
         .catch((error) => {
           console.warn('[PWA] Service Worker registration failed:', error);
         });
-    });
+    };
 
-    // Log when new service worker takes over (no auto-reload loop)
+    if (document.readyState === 'complete') {
+      registerWorker();
+    } else {
+      window.addEventListener('load', registerWorker);
+    }
+
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       console.log('[PWA] Service Worker controller updated');
     });
+  }
+
+  // Sync deferred prompt from early capture in head
+  if (window.__deferredInstallPrompt) {
+    deferredPwaPrompt = window.__deferredInstallPrompt;
   }
 
   // Handle Chrome / Android PWA Install Event
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPwaPrompt = e;
+    window.__deferredInstallPrompt = e;
 
-    // Show header install button
     const headerBtn = document.getElementById('headerInstallBtn');
-    if (headerBtn) {
+    if (headerBtn && !isStandalone) {
       headerBtn.classList.remove('hidden');
-    }
-
-    // Auto-display floating install prompt after 3.5 seconds if not dismissed
-    const isDismissed = sessionStorage.getItem('pinPotha_pwa_dismissed') === 'true';
-    if (!isStandalone && !isDismissed) {
-      setTimeout(() => {
-        showPWAInstallBanner();
-      }, 3500);
     }
   });
 
-  // iOS Safari setup: Show install button in header if not already installed
-  if (isIos && !isStandalone) {
+  // Header button display for non-standalone devices
+  if (!isStandalone) {
     const headerBtn = document.getElementById('headerInstallBtn');
     if (headerBtn) {
       headerBtn.classList.remove('hidden');
     }
+  }
 
-    const isDismissed = sessionStorage.getItem('pinPotha_pwa_dismissed') === 'true';
-    if (!isDismissed) {
-      setTimeout(() => {
+  // Auto-display floating install prompt after 1.6s if not standalone and not in cooldown
+  if (!isStandalone && !isDismissCooldownActive) {
+    setTimeout(() => {
+      const currentlyStandalone = (typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)')?.matches) || 
+                                  (window.navigator && window.navigator.standalone === true);
+      const currentCooldown = localStorage.getItem('pinPotha_pwa_dismiss_timestamp');
+      if (currentlyStandalone || (currentCooldown && (Date.now() - parseInt(currentCooldown, 10) < PWA_DISMISS_COOLDOWN_MS))) {
+        return;
+      }
+
+      if (isIos) {
+        const modal = document.getElementById('pwaIosModal');
+        if (modal) {
+          const noteEl = document.getElementById('pwaIosBrowserNote');
+          if (noteEl) noteEl.style.display = isNonSafariIos ? 'block' : 'none';
+          modal.classList.remove('hidden');
+        }
+      } else {
         showPWAInstallBanner();
-      }, 4000);
-    }
+      }
+    }, 1600);
   }
 
   // App installed listener
@@ -10474,6 +10612,7 @@ function initPWAEngine() {
     const headerBtn = document.getElementById('headerInstallBtn');
     if (headerBtn) headerBtn.classList.add('hidden');
     deferredPwaPrompt = null;
+    window.__deferredInstallPrompt = null;
     triggerHaptic([40, 80, 40]);
     console.log('[PWA] Pin Potha installed successfully!');
   });
@@ -10484,31 +10623,63 @@ window.triggerPWAInstall = async function () {
   triggerHaptic(20);
   SoundService?.playClick?.();
 
-  if (deferredPwaPrompt) {
-    deferredPwaPrompt.prompt();
-    const { outcome } = await deferredPwaPrompt.userChoice;
-    if (outcome === 'accepted') {
-      hidePWAInstallBanner();
+  const isStandalone = (typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)')?.matches) || 
+                       (window.navigator && window.navigator.standalone === true);
+  if (isStandalone) {
+    if (typeof showCustomToast === 'function') {
+      showCustomToast('ඔබ දැනටමත් "පිං පොත" App එක ඔබගේ දුරකථනයේ හෝ පරිගණකයේ ස්ථාපනය කරගෙන ඇත. සාදු! 🙏', 'success');
+    } else {
+      alert('ඔබ දැනටමත් "පිං පොත" App එක ඔබගේ දුරකථනයේ හෝ පරිගණකයේ ස්ථාපනය කරගෙන ඇත. සාදු! 🙏');
     }
-    deferredPwaPrompt = null;
+    hidePWAInstallBanner();
     return;
   }
 
-  // If iOS Safari
-  const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()) && !window.MSStream;
+  // 1. Native deferred prompt
+  const promptEvent = window.__deferredInstallPrompt || deferredPwaPrompt;
+  if (promptEvent && typeof promptEvent.prompt === 'function') {
+    try {
+      promptEvent.prompt();
+      const choice = await promptEvent.userChoice;
+      if (choice && choice.outcome === 'accepted') {
+        hidePWAInstallBanner();
+        window.__deferredInstallPrompt = null;
+        deferredPwaPrompt = null;
+      }
+    } catch (err) {
+      console.warn('[PWA] Native prompt error:', err);
+    }
+    return;
+  }
+
+  // 2. iOS Safari / WebKit
+  const isIos = (typeof window !== 'undefined' && window.navigator && (
+    /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()) ||
+    (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1)
+  ));
   if (isIos) {
     hidePWAInstallBanner();
     const modal = document.getElementById('pwaIosModal');
-    if (modal) modal.classList.remove('hidden');
+    if (modal) {
+      const isNonSafariIos = /crios|fxios|optios|edgios|fban|fbav|instagram|line|micromessenger/i.test(window.navigator.userAgent) || (!/safari/i.test(window.navigator.userAgent));
+      const noteEl = document.getElementById('pwaIosBrowserNote');
+      if (noteEl) noteEl.style.display = isNonSafariIos ? 'block' : 'none';
+      modal.classList.remove('hidden');
+    }
     return;
   }
 
-  // If standalone / already installed
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-  if (isStandalone) {
-    alert('ඔබ දැනටමත් "පිං පොත" App එක ඔබගේ දුරකථනයේ හෝ පරිගණකයේ ස්ථාපනය කරගෙන ඇත. සාදු! 🙏');
-  } else {
-    alert('ඔබගේ බ්‍රවුසරයේ ඉහළ ලිපින තීරුවේ (Address Bar) ඇති "Install" ලාංඡනයෙන් හෝ බ්‍රවුසර් මෙනුවේ "Install / Add to Home screen" තෝරා App එක පහසුවෙන්ම දමාගත හැක. 🙏');
+  // 3. Fallback for older Android / in-app browsers
+  const manualSteps = document.getElementById('pwaManualSteps');
+  const btnAction = document.getElementById('btnPwaAction');
+  if (manualSteps) {
+    manualSteps.style.display = 'block';
+    if (btnAction) {
+      btnAction.innerHTML = '<i class="fa-solid fa-check"></i><span>තේරුම් ගත්තා</span>';
+      btnAction.onclick = function() {
+        dismissPWAInstallBanner();
+      };
+    }
   }
 };
 
@@ -10538,8 +10709,18 @@ window.hidePWAInstallBanner = hidePWAInstallBanner;
 
 window.dismissPWAInstallBanner = function () {
   triggerHaptic(15);
-  sessionStorage.setItem('pinPotha_pwa_dismissed', 'true');
+  try {
+    localStorage.setItem('pinPotha_pwa_dismiss_timestamp', Date.now().toString());
+  } catch (e) {}
   hidePWAInstallBanner();
+};
+
+window.dismissPwaIosModal24h = function () {
+  triggerHaptic(15);
+  try {
+    localStorage.setItem('pinPotha_pwa_dismiss_timestamp', Date.now().toString());
+  } catch (e) {}
+  window.closePwaIosModal();
 };
 
 window.closePwaIosModal = function () {
@@ -10550,7 +10731,7 @@ window.closePwaIosModal = function () {
 
 window.closePwaIosModalOnBackdrop = function (e) {
   if (e && e.target && e.target.id === 'pwaIosModal') {
-    closePwaIosModal();
+    window.closePwaIosModal();
   }
 };
 
