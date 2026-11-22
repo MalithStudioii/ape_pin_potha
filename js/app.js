@@ -4,7 +4,7 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=163';
+import { StorageService } from './storage.js?v=164';
 import { Security } from './security.js?v=160';
 import { uploadToImgBB, uploadToCloudinary } from './imgbb-service.js?v=68';
 import { SoundService, triggerHaptic } from './sound.js?v=66';
@@ -226,6 +226,7 @@ let currentNotifications = [];
 let activeNotifFilter = 'all';
 let currentFeedSort = 'trending';
 let allArtisansList = [];
+let artisansFetchPromise = null;
 
 window.setFeedSort = function(sortMode) {
   triggerHaptic(15);
@@ -326,20 +327,7 @@ function bootApp() {
 
     // Warm / refresh artisans cache in background (respects 15-min TTL)
     try {
-      if (typeof StorageService.getTempleArtisansList === 'function') {
-        StorageService.getTempleArtisansList().then(list => {
-          if (Array.isArray(list) && list.length > 0) {
-            const prevCount = (allArtisansList || []).length;
-            allArtisansList = list;
-            if (prevCount === 0 && activeTab === 'feed' && !document.getElementById('searchInput')?.value?.trim() && activeCategory === 'සියල්ල') {
-              const spotlightEl = document.getElementById('feedArtisansSpotlight');
-              if (!spotlightEl) {
-                renderFeed();
-              }
-            }
-          }
-        }).catch(() => {});
-      }
+      ensureVerifiedArtisansLoaded().catch(() => {});
     } catch (e) {}
 
     // Subscribe to real-time database updates with 150ms debounce to prevent multiple consecutive DOM repaints on boot
@@ -2968,7 +2956,7 @@ function renderFeedArtisanSpotlightHTML(verifiedArtisans) {
   }).join('');
 
   return `
-    <div class="feed-artisan-spotlight-card" id="feedArtisansSpotlight">
+    <div class="feed-artisan-spotlight-card" id="artisanSpotlightStrip">
       <div class="spotlight-strip-header">
         <div class="spotlight-title-wrap">
           <div class="spotlight-main-title">
@@ -2987,6 +2975,27 @@ function renderFeedArtisanSpotlightHTML(verifiedArtisans) {
       </div>
     </div>
   `;
+}
+
+function ensureVerifiedArtisansLoaded() {
+  const verified = getVerifiedArtisansList();
+  if (verified.length > 0) {
+    return Promise.resolve(verified);
+  }
+  if (!artisansFetchPromise) {
+    artisansFetchPromise = StorageService.getTempleArtisansList().then(list => {
+      artisansFetchPromise = null;
+      if (Array.isArray(list) && list.length > 0) {
+        allArtisansList = list;
+      }
+      return getVerifiedArtisansList();
+    }).catch(err => {
+      artisansFetchPromise = null;
+      console.warn('[Artisans] Background fetch error:', err);
+      return [];
+    });
+  }
+  return artisansFetchPromise;
 }
 
 // Render Newsfeed
@@ -3141,6 +3150,12 @@ function renderFeed() {
     ranked.length > 0
   );
 
+  // Cleanly remove any existing spotlight strip from DOM before inserting or re-rendering
+  const existingSpotlight = document.getElementById('artisanSpotlightStrip') || document.getElementById('feedArtisansSpotlight');
+  if (existingSpotlight) {
+    existingSpotlight.remove();
+  }
+
   let spotlightInjected = false;
   const verifiedArtisans = shouldInjectSpotlight ? getVerifiedArtisansList() : [];
   const spotlightHtml = (shouldInjectSpotlight && verifiedArtisans.length > 0)
@@ -3171,6 +3186,50 @@ function renderFeed() {
 
   container.innerHTML = cardsHtmlArr.join('') + sentinelHtml;
   setupInfiniteScrollObserver();
+
+  // If spotlight should be displayed but artisans are not loaded yet, fetch and dynamically insert
+  if (shouldInjectSpotlight && (!verifiedArtisans || verifiedArtisans.length === 0)) {
+    ensureVerifiedArtisansLoaded().then(loadedArtisans => {
+      // Re-verify user is still on unfiltered home feed
+      const currentSearchQ = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
+      if (activeTab !== 'feed' || currentSearchQ || activeCategory !== 'සියල්ල') return;
+      if (!loadedArtisans || loadedArtisans.length === 0) return;
+
+      const currentContainer = document.getElementById('postsContainer');
+      if (!currentContainer) return;
+
+      // Prevent duplicate insertion
+      if (document.getElementById('artisanSpotlightStrip') || document.getElementById('feedArtisansSpotlight')) {
+        return;
+      }
+
+      const stripHtml = renderFeedArtisanSpotlightHTML(loadedArtisans);
+      if (!stripHtml) return;
+
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = stripHtml.trim();
+      const spotlightEl = tempDiv.firstElementChild;
+      if (!spotlightEl) return;
+
+      // Find post card elements in feed container
+      const postCards = Array.from(currentContainer.children).filter(el => {
+        return el && el.id && el.id.startsWith('post-elem-');
+      });
+
+      if (postCards.length >= 4) {
+        postCards[3].after(spotlightEl);
+      } else if (postCards.length > 0) {
+        postCards[postCards.length - 1].after(spotlightEl);
+      } else {
+        const sentinel = document.getElementById('infiniteScrollSentinel');
+        if (sentinel) {
+          currentContainer.insertBefore(spotlightEl, sentinel);
+        } else {
+          currentContainer.appendChild(spotlightEl);
+        }
+      }
+    }).catch(() => {});
+  }
 }
 
 // ============================================================================
@@ -10648,6 +10707,10 @@ window.checkInSpiritualChallenge = async function(challengeId) {
    ========================================================================== */
 let deferredPwaPrompt = null;
 let newWorkerWaiting = null;
+let updateBannerShown = false;
+let updateBannerDismissed = false;
+let isRefreshing = false;
+let swRegistrationRef = null;
 
 function initPWAEngine() {
   // Check standalone mode safely
@@ -10671,7 +10734,7 @@ function initPWAEngine() {
   );
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v169';
+  const ACTIVE_BUILD = 'v170';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
@@ -10687,10 +10750,12 @@ function initPWAEngine() {
 
   // Register Service Worker safely
   if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-    const swUrl = './sw.js?v=169';
+    const swUrl = './sw.js?v=170';
     const registerWorker = () => {
       navigator.serviceWorker.register(swUrl, { updateViaCache: 'none' })
         .then((registration) => {
+          swRegistrationRef = registration;
+
           try { registration.update(); } catch (e) {}
 
           document.addEventListener('visibilitychange', () => {
@@ -10699,14 +10764,27 @@ function initPWAEngine() {
             }
           });
 
+          // Check if a worker is already waiting
+          if (registration.waiting && navigator.serviceWorker.controller) {
+            newWorkerWaiting = registration.waiting;
+            if (!updateBannerShown && !updateBannerDismissed) {
+              updateBannerShown = true;
+              showPwaUpdateToast();
+            }
+          }
+
           registration.addEventListener('updatefound', () => {
             const installingWorker = registration.installing;
             if (!installingWorker) return;
 
             installingWorker.addEventListener('statechange', () => {
-              if ((installingWorker.state === 'installed' || installingWorker.state === 'activated') && navigator.serviceWorker.controller) {
+              // Trigger ONLY when state transitions to installed (waiting to activate)
+              if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
                 newWorkerWaiting = installingWorker;
-                showPwaUpdateToast();
+                if (!updateBannerShown && !updateBannerDismissed) {
+                  updateBannerShown = true;
+                  showPwaUpdateToast();
+                }
               }
             });
           });
@@ -10723,7 +10801,10 @@ function initPWAEngine() {
     }
 
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      console.log('[PWA] Service Worker controller updated');
+      // Never trigger update toast here. Only reload if user initiated update.
+      if (isRefreshing) return;
+      isRefreshing = true;
+      window.location.reload();
     });
   }
 
@@ -10905,6 +10986,7 @@ window.closePwaIosModalOnBackdrop = function (e) {
 };
 
 window.showPwaUpdateToast = function () {
+  if (updateBannerDismissed) return;
   const toast = document.getElementById('pwaUpdateToast');
   if (toast) {
     toast.classList.remove('hidden');
@@ -10916,6 +10998,7 @@ window.showPwaUpdateToast = function () {
 
 window.dismissPwaUpdateToast = function () {
   triggerHaptic(15);
+  updateBannerDismissed = true;
   const toast = document.getElementById('pwaUpdateToast');
   if (toast) {
     toast.classList.remove('visible');
@@ -10928,19 +11011,39 @@ window.dismissPwaUpdateToast = function () {
 window.applyPwaUpdate = function () {
   triggerHaptic(30);
   SoundService?.playClick?.();
+
+  // 1. Immediately hide/remove the toast and disable the button
   const toast = document.getElementById('pwaUpdateToast');
   if (toast) {
+    const btn = toast.querySelector('button');
+    if (btn) btn.disabled = true;
     toast.classList.remove('visible');
     toast.classList.add('hidden');
   }
-  if (newWorkerWaiting) {
-    try {
-      newWorkerWaiting.postMessage({ type: 'SKIP_WAITING' });
-    } catch (e) {}
-  }
-  setTimeout(() => {
+
+  // 2. Attach a single guarded controllerchange listener
+  let reloadDone = false;
+  const doReload = () => {
+    if (reloadDone) return;
+    reloadDone = true;
+    isRefreshing = true;
     window.location.reload();
-  }, 150);
+  };
+
+  navigator.serviceWorker?.addEventListener?.('controllerchange', doReload, { once: true });
+
+  // 3. If registration.waiting exists, send SKIP_WAITING
+  const targetWorker = newWorkerWaiting || swRegistrationRef?.waiting;
+  if (targetWorker) {
+    try {
+      targetWorker.postMessage({ type: 'SKIP_WAITING' });
+    } catch (e) {
+      console.warn('[PWA] PostMessage to waiting worker failed:', e);
+    }
+  }
+
+  // 1500ms fallback in case controllerchange does not fire on older browsers
+  setTimeout(doReload, 1500);
 };
 
 // ============================================================================

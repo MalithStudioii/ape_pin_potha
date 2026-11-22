@@ -4869,7 +4869,7 @@ export const StorageService = {
             localStorage.removeItem(CACHE_KEY);
           } else {
             const cached = JSON.parse(raw);
-            if (cached && cached.timestamp && (Date.now() - cached.timestamp < TTL_MS) && Array.isArray(cached.data)) {
+            if (cached && cached.timestamp && (Date.now() - cached.timestamp < TTL_MS) && Array.isArray(cached.data) && cached.data.length > 0) {
               return cached.data;
             }
           }
@@ -4880,6 +4880,14 @@ export const StorageService = {
     }
 
     let list = [];
+
+    // Wait briefly if Firebase cloud connection is initializing
+    if (!isCloudReady && !db) {
+      const waitStart = Date.now();
+      while (!isCloudReady && (Date.now() - waitStart < 3500)) {
+        await new Promise(r => setTimeout(r, 100));
+      }
+    }
 
     if (isCloudReady && db) {
       try {
@@ -4894,12 +4902,15 @@ export const StorageService = {
       }
     }
 
-    try {
-      localStorage.setItem(CACHE_KEY, JSON.stringify({
-        timestamp: Date.now(),
-        data: list
-      }));
-    } catch (e) {}
+    // Only cache if valid items were retrieved
+    if (list.length > 0) {
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify({
+          timestamp: Date.now(),
+          data: list
+        }));
+      } catch (e) {}
+    }
 
     return list;
   },

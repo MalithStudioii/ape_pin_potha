@@ -1,12 +1,12 @@
-// Ape Pin Potha Service Worker (v169)
+// Ape Pin Potha Service Worker (v170)
 // Strategy: Network-First for HTML, JS, CSS to guarantee instant updates; Stale-While-Revalidate for media assets
-const CACHE_NAME = 'pin-potha-cache-v169';
+const CACHE_NAME = 'pin-potha-cache-v170';
 const STATIC_ASSETS = [
   './',
   './index.html',
   './css/styles.css?v=165',
-  './js/app.js?v=169',
-  './js/storage.js?v=163',
+  './js/app.js?v=170',
+  './js/storage.js?v=164',
   './js/imgbb-service.js?v=68',
   './js/aranya-data.js',
   './js/spiritual-avatars.js?v=147',
@@ -24,9 +24,8 @@ const STATIC_ASSETS = [
   './assets/nexiapro-logo.webp'
 ];
 
-// Install: Cache critical shell assets and immediately activate (Instant <50ms install)
+// Install: Cache critical shell assets
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(STATIC_ASSETS).catch((err) => {
