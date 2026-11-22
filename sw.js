@@ -21,6 +21,7 @@ const STATIC_ASSETS = [
   './assets/official-welcome-banner.webp',
   './assets/sangha-frame.webp',
   './assets/artisan-banner-buddha.webp',
+  './assets/Watermark.png',
   './assets/banner.webp',
   './assets/nexiapro-logo.webp'
 ];

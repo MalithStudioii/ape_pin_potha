@@ -14227,13 +14227,239 @@ window.handleLibraryPdfDownload = function(itemId) {
   }
 };
 
-// Print / Save to PDF trigger
+// Dedicated Multi-Page A4 PDF / Print Exporter via hidden <iframe>
 window.printLibraryItem = function(itemId) {
+  triggerHaptic(12);
   const targetId = itemId || activeReadingItemId;
-  if (targetId && targetId !== activeReadingItemId) {
-    openReadingModal(targetId);
+  const items = window.DHAMMA_LIBRARY_ITEMS || DHAMMA_LIBRARY_ITEMS || [];
+  const item = items.find(i => i.id === targetId);
+  if (!item) return;
+
+  // Remove existing print iframe if any
+  const existingIframe = document.getElementById('dhammaPrintIframe');
+  if (existingIframe) {
+    existingIframe.remove();
   }
-  setTimeout(() => {
-    window.print();
-  }, 150);
+
+  // Create clean hidden iframe
+  const iframe = document.createElement('iframe');
+  iframe.id = 'dhammaPrintIframe';
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  iframe.style.visibility = 'hidden';
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentWindow.document;
+
+  const sectionsHtml = (item.sections || []).map((sec, idx) => {
+    return `
+      <section class="print-section">
+        <h3 class="print-heading">
+          <span class="heading-num">${idx + 1}.</span> ${sec.heading}
+        </h3>
+        <div class="print-pali">${sec.pali}</div>
+        ${sec.sinhalaMeaning ? `
+        <div class="print-meaning">
+          <div class="meaning-title">සිංහල අර්ථය:</div>
+          <div class="meaning-text">${sec.sinhalaMeaning}</div>
+        </div>` : ''}
+      </section>
+    `;
+  }).join('');
+
+  const htmlContent = `<!DOCTYPE html>
+<html lang="si">
+<head>
+  <meta charset="utf-8">
+  <title>${item.title} - අපේ පිං පොත (Ape Pin Potha)</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 18mm 16mm;
+    }
+    *, *::before, *::after {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+      color: #1e293b;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Sinhala", "Iskoola Pota", Arial, sans-serif;
+      font-size: 11pt;
+      line-height: 1.6;
+    }
+    /* Repeating Watermark on every printed page */
+    .print-watermark {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 115mm;
+      max-width: 80%;
+      opacity: 0.08;
+      z-index: 0;
+      pointer-events: none;
+    }
+    .print-content-wrapper {
+      position: relative;
+      z-index: 1;
+      height: auto;
+      overflow: visible;
+    }
+    /* Clean Header on first page */
+    .print-header {
+      border-bottom: 2px solid #7c2d12;
+      padding-bottom: 12px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+    .print-title {
+      font-size: 18pt;
+      font-weight: 800;
+      color: #7c2d12;
+      margin: 0 0 4px;
+      line-height: 1.25;
+    }
+    .print-subtitle {
+      font-size: 9.5pt;
+      color: #64748b;
+      margin: 0;
+      line-height: 1.4;
+    }
+    .print-site-brand {
+      text-align: right;
+      flex-shrink: 0;
+      margin-left: 16px;
+    }
+    .print-site-name {
+      font-size: 10pt;
+      font-weight: 800;
+      color: #9a3412;
+      display: block;
+    }
+    .print-site-url {
+      font-size: 8.5pt;
+      color: #78350f;
+    }
+    /* Section / Verse Styling with Page Break Avoidance */
+    .print-section {
+      break-inside: avoid;
+      page-break-inside: avoid;
+      margin-bottom: 18px;
+      padding: 12px 14px;
+      background: #fafaf9;
+      border: 1px solid #e7e5e4;
+      border-radius: 8px;
+    }
+    .print-heading {
+      font-size: 12.5pt;
+      font-weight: 800;
+      color: #7c2d12;
+      margin: 0 0 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px dashed #d6d3d1;
+    }
+    .heading-num {
+      color: #c2410c;
+      margin-right: 4px;
+    }
+    .print-pali {
+      font-size: 11pt;
+      font-weight: 700;
+      color: #431407;
+      line-height: 1.85;
+      white-space: pre-line;
+      margin-bottom: 10px;
+    }
+    .print-meaning {
+      background: #ffffff;
+      border-left: 3px solid #ea580c;
+      border-radius: 4px;
+      padding: 8px 12px;
+      margin-top: 8px;
+      font-size: 9.5pt;
+      line-height: 1.6;
+      color: #334155;
+    }
+    .meaning-title {
+      font-weight: 700;
+      font-size: 8.5pt;
+      color: #9a3412;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .meaning-text {
+      white-space: pre-line;
+    }
+    /* Footer */
+    .print-footer {
+      break-inside: avoid;
+      page-break-inside: avoid;
+      margin-top: 24px;
+      padding-top: 10px;
+      border-top: 1px solid #e2e8f0;
+      text-align: center;
+      font-size: 8.5pt;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+  <img src="assets/Watermark.png" class="print-watermark" id="watermarkImg" alt="" />
+  <div class="print-content-wrapper">
+    <header class="print-header">
+      <div>
+        <h1 class="print-title">${item.title}</h1>
+        <p class="print-subtitle">${item.subtitle}</p>
+      </div>
+      <div class="print-site-brand">
+        <span class="print-site-name">අපේ පිං පොත</span>
+        <span class="print-site-url">apepinpotha.lk</span>
+      </div>
+    </header>
+
+    ${sectionsHtml}
+
+    <footer class="print-footer">
+      ශ්‍රී සද්ධර්ම පුස්තකාලය • අපේ පිං පොත (apepinpotha.lk) • සැමට ධර්ම දානය පිණිසයි
+    </footer>
+  </div>
+</body>
+</html>`;
+
+  doc.open();
+  doc.write(htmlContent);
+  doc.close();
+
+  // Wait for watermark image to load before triggering print
+  const watermarkImg = doc.getElementById('watermarkImg');
+  const triggerPrint = () => {
+    try {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    } catch (e) {
+      console.error('[Print] Iframe print failed, falling back to window.print():', e);
+      window.print();
+    }
+  };
+
+  if (watermarkImg) {
+    if (watermarkImg.complete) {
+      setTimeout(triggerPrint, 150);
+    } else {
+      watermarkImg.onload = () => setTimeout(triggerPrint, 150);
+      watermarkImg.onerror = () => setTimeout(triggerPrint, 150);
+    }
+  } else {
+    setTimeout(triggerPrint, 150);
+  }
 };
