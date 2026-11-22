@@ -51,7 +51,7 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=166">
+    <link rel="stylesheet" href="css/styles.css?v=167">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
@@ -2605,6 +2605,59 @@
     </div>
 
     <!-- ========================================================================= -->
+    <!-- Reusable Crop & Zoom Modal for Avatar & Cover Banner                      -->
+    <!-- ========================================================================= -->
+    <div id="universalCropModal" class="modal-overlay hidden" style="z-index: 1060;" onclick="if(event.target === this) closeUniversalCropModal()">
+        <div class="modal-box crop-modal-container" id="universalCropBox" style="max-width: 620px !important;">
+            <div class="modal-header">
+                <h3 class="modal-title" id="universalCropTitle">
+                    <i class="fa-solid fa-crop-simple" style="color: #d97706;"></i>
+                    <span id="universalCropTitleText">පින්තූරය සකසන්න (Crop & Zoom)</span>
+                </h3>
+                <button type="button" onclick="closeUniversalCropModal()" class="modal-close-btn" title="වසන්න">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <p id="universalCropSubtitle" style="font-size: 0.78rem; color: #64748b; margin: 4px 0 12px; line-height: 1.4;">
+                රාමුව තුළට අවශ්‍ය කොටස පැමිණෙන පරිදි ඡායාරූපය Zoom කර සකසන්න:
+            </p>
+
+            <!-- Image Cropping Area -->
+            <div class="crop-area-container" id="universalCropArea" style="height: 290px; max-height: 52vh; background: #0f172a; border-radius: 12px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                <img id="universalImageToCrop" src="" alt="Crop preview" style="max-width: 100%; max-height: 100%; display: block;">
+            </div>
+
+            <!-- Zoom & Pan Controls -->
+            <div class="crop-controls-wrapper" style="margin-top: 12px;">
+                <div style="display: flex; align-items: center; gap: 10px; width: 100%;">
+                    <button type="button" class="btn-crop-ctrl" onclick="zoomUniversalCropper(-0.1)" title="Zoom Out">
+                        <i class="fa-solid fa-magnifying-glass-minus"></i>
+                    </button>
+                    <input type="range" id="universalCropperZoomRange" min="0.1" max="3" step="0.05" value="1" class="crop-zoom-slider" oninput="setUniversalCropperZoom(this.value)" style="flex: 1;">
+                    <button type="button" class="btn-crop-ctrl" onclick="zoomUniversalCropper(0.1)" title="Zoom In">
+                        <i class="fa-solid fa-magnifying-glass-plus"></i>
+                    </button>
+                    <button type="button" class="btn-crop-ctrl" onclick="resetUniversalCropper()" title="මුල් තත්වයට (Reset)">
+                        <i class="fa-solid fa-arrows-rotate"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modal Action Buttons -->
+            <div style="display: flex; gap: 10px; margin-top: 16px;">
+                <button type="button" onclick="closeUniversalCropModal()" class="btn-crop-cancel" style="flex: 1;">
+                    අවලංගු කරන්න
+                </button>
+                <button type="button" id="btnUniversalCropSave" onclick="confirmUniversalCrop()" class="btn-submit-merit" style="flex: 2; margin: 0; background: linear-gradient(135deg, #f59e0b, #d97706);">
+                    <i class="fa-solid fa-scissors"></i>
+                    <span id="btnUniversalCropSaveText">✂️ සකසා උඩුගත කරන්න</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
     <!-- Settings & Policies Modal Dialog                                         -->
     <!-- ========================================================================= -->
     <div id="settingsModal" class="modal-overlay hidden" onclick="if(event.target === this) closeSettingsModal()">
@@ -3988,6 +4041,6 @@
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=172"></script>
+    <script type="module" src="js/app.js?v=173"></script>
 </body>
 </html>

@@ -1926,12 +1926,25 @@ window.handleAdminArtisanDirectSubmit = async function(e) {
         };
 
         if (editDocId) {
+            // Strictly clear ownerUid and linking fields if ownerEmail is blank or cleared
+            if (!ownerEmail) {
+                artisanData.ownerEmail = '';
+                artisanData.ownerUid = '';
+                artisanData.userId = '';
+                artisanData.submittedByUid = '';
+                artisanData.submittedByEmail = '';
+            }
             await setDoc(doc(db, COLLECTIONS.ARTISANS || 'temple_artisans', editDocId), artisanData, { merge: true });
             await recordAuditLog('Artisan Updated', `Updated artisan "${name}" (ID: ${editDocId}).`);
             alert(`"${name}" තොරතුරු සාර්ථකව යාවත්කාලීන විය!`);
         } else {
             artisanData.createdAt = serverTimestamp();
             artisanData.addedBy = currentAdminUser ? currentAdminUser.email : 'Master Admin';
+            // Never auto-populate ownerUid or ownerEmail with logged-in Admin credentials
+            artisanData.ownerUid = '';
+            artisanData.userId = '';
+            artisanData.submittedByUid = '';
+            artisanData.submittedByEmail = '';
             const newDoc = await addDoc(collection(db, COLLECTIONS.ARTISANS || 'temple_artisans'), artisanData);
             await recordAuditLog('Artisan Added Direct', `Added new verified artisan "${name}" (ID: ${newDoc.id}).`);
             alert(`"${name}" සාර්ථකව නාමාවලියට ඇතුළත් කරන ලදී!`);

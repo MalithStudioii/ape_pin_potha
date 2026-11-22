@@ -10842,7 +10842,7 @@ function initPWAEngine() {
   );
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v172';
+  const ACTIVE_BUILD = 'v173';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
@@ -10858,7 +10858,7 @@ function initPWAEngine() {
 
   // Register Service Worker safely
   if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-    const swUrl = './sw.js?v=172';
+    const swUrl = './sw.js?v=173';
     const registerWorker = () => {
       navigator.serviceWorker.register(swUrl, { updateViaCache: 'none' })
         .then((registration) => {
@@ -12946,68 +12946,226 @@ function compressSquareAvatar(file, size = 400, quality = 0.88) {
   });
 }
 
+// ============================================================================
+// Interactive Universal Crop & Zoom Modal (Cropper.js)
+// ============================================================================
+
+let universalCropperInstance = null;
+let universalCropConfirmCallback = null;
+let universalCropActiveOptions = null;
+
+window.openUniversalCropModal = function(options) {
+  if (!options || !options.file) return;
+  const file = options.file;
+  if (file.type && !file.type.startsWith('image/')) {
+    alert("කරුණාකර වලංගු ඡායාරූපයක් (Image file) තෝරන්න.");
+    return;
+  }
+
+  universalCropActiveOptions = options;
+  universalCropConfirmCallback = options.onConfirm || null;
+
+  const titleText = document.getElementById('universalCropTitleText');
+  const subtitleEl = document.getElementById('universalCropSubtitle');
+  const cropImg = document.getElementById('universalImageToCrop');
+  const modal = document.getElementById('universalCropModal');
+  const zoomSlider = document.getElementById('universalCropperZoomRange');
+
+  if (titleText) titleText.textContent = options.title || 'පින්තූරය සකසන්න (Crop & Zoom)';
+  if (subtitleEl) subtitleEl.textContent = options.subtitle || 'රාමුව තුළට අවශ්‍ය කොටස පැමිණෙන පරිදි ඡායාරූපය Zoom කර සකසන්න:';
+  if (zoomSlider) zoomSlider.value = 1;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    if (!cropImg || !modal) return;
+
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+
+    if (universalCropperInstance) {
+      universalCropperInstance.destroy();
+      universalCropperInstance = null;
+    }
+
+    cropImg.onload = function() {
+      if (universalCropperInstance) {
+        universalCropperInstance.destroy();
+        universalCropperInstance = null;
+      }
+
+      const aspectRatio = typeof options.aspectRatio === 'number' ? options.aspectRatio : (1 / 1);
+
+      universalCropperInstance = new Cropper(cropImg, {
+        aspectRatio: aspectRatio,
+        viewMode: 1,
+        dragMode: 'move',
+        autoCropArea: 0.92,
+        restore: false,
+        guides: true,
+        center: true,
+        highlight: false,
+        cropBoxMovable: true,
+        cropBoxResizable: true,
+        toggleDragModeOnDblclick: false,
+        responsive: true,
+        ready() {
+          if (zoomSlider) zoomSlider.value = 1;
+        },
+        zoom(ev) {
+          if (zoomSlider && ev && ev.detail) {
+            zoomSlider.value = Math.min(Math.max(ev.detail.ratio, 0.1), 3);
+          }
+        }
+      });
+    };
+    cropImg.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+};
+
+window.closeUniversalCropModal = function() {
+  const modal = document.getElementById('universalCropModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
+  if (universalCropperInstance) {
+    universalCropperInstance.destroy();
+    universalCropperInstance = null;
+  }
+  universalCropConfirmCallback = null;
+  universalCropActiveOptions = null;
+};
+
+window.zoomUniversalCropper = function(delta) {
+  if (universalCropperInstance) {
+    universalCropperInstance.zoom(delta);
+  }
+};
+
+window.setUniversalCropperZoom = function(val) {
+  if (universalCropperInstance) {
+    universalCropperInstance.zoomTo(parseFloat(val));
+  }
+};
+
+window.resetUniversalCropper = function() {
+  if (universalCropperInstance) {
+    universalCropperInstance.reset();
+    const zoomSlider = document.getElementById('universalCropperZoomRange');
+    if (zoomSlider) zoomSlider.value = 1;
+  }
+};
+
+window.confirmUniversalCrop = async function() {
+  if (!universalCropperInstance || typeof universalCropConfirmCallback !== 'function') return;
+
+  const btn = document.getElementById('btnUniversalCropSave');
+  const btnText = document.getElementById('btnUniversalCropSaveText');
+  const originalHtml = btnText ? btnText.innerHTML : '✂️ සකසා උඩුගත කරන්න';
+
+  const outputWidth = universalCropActiveOptions?.outputWidth || 500;
+  const aspectRatio = typeof universalCropActiveOptions?.aspectRatio === 'number' ? universalCropActiveOptions.aspectRatio : 1;
+  const outputHeight = Math.round(outputWidth / aspectRatio);
+
+  try {
+    if (btn) btn.disabled = true;
+    if (btnText) btnText.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>සකසමින් පවතී...</span>`;
+
+    let canvas = null;
+    try {
+      canvas = universalCropperInstance.getCroppedCanvas({
+        width: outputWidth,
+        height: outputHeight,
+        imageSmoothingEnabled: true,
+        imageSmoothingQuality: 'high'
+      });
+    } catch (cErr) {
+      console.warn('[Cropper] getCroppedCanvas failed:', cErr);
+    }
+
+    if (!canvas) {
+      const cropImg = document.getElementById('universalImageToCrop');
+      canvas = document.createElement('canvas');
+      canvas.width = outputWidth;
+      canvas.height = outputHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(cropImg, 0, 0, outputWidth, outputHeight);
+    }
+
+    const blob = await new Promise((resolve) => {
+      canvas.toBlob((b) => {
+        if (b) resolve(b);
+        else canvas.toBlob((jb) => resolve(jb), 'image/jpeg', 0.85);
+      }, 'image/webp', 0.85);
+    });
+
+    if (!blob) {
+      throw new Error("ඡායාරූපය සකස් කිරීම අසාර්ථක විය.");
+    }
+
+    if (btnText) btnText.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>උඩුගත වෙමින් පවතී...</span>`;
+
+    await universalCropConfirmCallback(blob);
+
+    closeUniversalCropModal();
+  } catch (err) {
+    console.error('[Cropper] Save error:', err);
+    alert("ඡායාරූපය සුරැකීමේදී දෝෂයක් සිදුවිය: " + (err.message || 'නැවත උත්සාහ කරන්න.'));
+  } finally {
+    if (btn) btn.disabled = false;
+    if (btnText) btnText.innerHTML = originalHtml;
+  }
+};
+
 window.triggerArtisanCoverUpload = function() {
   const input = document.getElementById('artisanCoverFileInput');
   if (input) input.click();
 };
 
-window.handleArtisanCoverFileChange = async function(input) {
+window.handleArtisanCoverFileChange = function(input) {
   if (!input || !input.files || input.files.length === 0) return;
   const file = input.files[0];
   const artisanId = currentArtisanProfileId;
   const artisan = (allArtisansList || []).find(a => (a.id || a.docId) === artisanId);
   if (!artisan || !checkIsArtisanOwner(artisan)) {
     alert("මෙම පැතිකඩෙහි කවරය වෙනස් කිරීමට ඔබට අවසර නොමැත.");
+    input.value = '';
     return;
   }
 
-  const editBtn = document.querySelector('.btn-artisan-cover-edit');
-  const originalHtml = editBtn ? editBtn.innerHTML : '';
-  if (editBtn) {
-    editBtn.disabled = true;
-    editBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>උඩුගත වෙමින් පවතී...</span>`;
-  }
+  triggerHaptic(12);
+  openUniversalCropModal({
+    file,
+    title: 'පින්තූරය සකසන්න (Crop & Zoom) - ශිල්පී කවරයේ ඡායාරූපය',
+    subtitle: 'කවරයේ රාමුවට ගැලපෙන ලෙස ඡායාරූපය Zoom කර අවශ්‍ය කොටස සකසන්න:',
+    aspectRatio: 3 / 1,
+    outputWidth: 1200,
+    onConfirm: async (blob) => {
+      const cloudUrl = await uploadToCloudinary(blob, `artisan_banner_${artisanId}_${Date.now()}`);
+      if (!cloudUrl || !cloudUrl.startsWith('http')) {
+        throw new Error("කවරයේ ඡායාරූපය උඩුගත කිරීම අසාර්ථක විය.");
+      }
 
-  try {
-    triggerHaptic(12);
-    let payload = file;
-    try {
-      const compressed = await compressBannerImage(file);
-      if (compressed) payload = compressed;
-    } catch (e) {
-      console.warn('[Artisan] Cover compression fallback:', e);
-    }
+      await StorageService.updateArtisan(artisanId, { bannerUrl: cloudUrl });
 
-    const cloudUrl = await uploadToCloudinary(payload, `artisan_banner_${artisanId}_${Date.now()}`);
-    if (!cloudUrl || !cloudUrl.startsWith('http')) {
-      throw new Error("කවරයේ ඡායාරූපය උඩුගත කිරීම අසාර්ථක විය.");
-    }
+      artisan.bannerUrl = cloudUrl;
+      const cacheIdx = (allArtisansList || []).findIndex(a => (a.id || a.docId) === artisanId);
+      if (cacheIdx !== -1) {
+        allArtisansList[cacheIdx].bannerUrl = cloudUrl;
+      }
+      try {
+        localStorage.removeItem('pinPotha_artisans_cache');
+      } catch (e) {}
 
-    await StorageService.updateArtisan(artisanId, { bannerUrl: cloudUrl });
+      renderArtisanProfileModal(artisan);
+      if (typeof showCustomToast === 'function') {
+        showCustomToast("කවරයේ ඡායාරූපය සාර්ථකව යාවත්කාලීන විය! 🙏", "success");
+      }
+    }
+  });
 
-    artisan.bannerUrl = cloudUrl;
-    const cacheIdx = (allArtisansList || []).findIndex(a => (a.id || a.docId) === artisanId);
-    if (cacheIdx !== -1) {
-      allArtisansList[cacheIdx].bannerUrl = cloudUrl;
-    }
-    try {
-      localStorage.removeItem('pinPotha_artisans_cache');
-    } catch (e) {}
-
-    renderArtisanProfileModal(artisan);
-    if (typeof showCustomToast === 'function') {
-      showCustomToast("කවරයේ ඡායාරූපය සාර්ථකව යාවත්කාලීන විය! 🙏", "success");
-    }
-  } catch (err) {
-    console.error('[Artisan] Cover upload failed:', err);
-    alert("කවරයේ ඡායාරූපය උඩුගත කිරීම අසාර්ථක විය: " + (err.message || 'නැවත උත්සාහ කරන්න.'));
-  } finally {
-    if (editBtn) {
-      editBtn.disabled = false;
-      editBtn.innerHTML = originalHtml || `<i class="fa-solid fa-camera"></i> <span>කවරය වෙනස් කරන්න</span>`;
-    }
-    input.value = '';
-  }
+  input.value = '';
 };
 
 window.triggerArtisanAvatarUpload = function() {
@@ -13015,64 +13173,50 @@ window.triggerArtisanAvatarUpload = function() {
   if (input) input.click();
 };
 
-window.handleArtisanAvatarFileChange = async function(input) {
+window.handleArtisanAvatarFileChange = function(input) {
   if (!input || !input.files || input.files.length === 0) return;
   const file = input.files[0];
   const artisanId = currentArtisanProfileId;
   const artisan = (allArtisansList || []).find(a => (a.id || a.docId) === artisanId);
   if (!artisan || !checkIsArtisanOwner(artisan)) {
     alert("මෙම පැතිකඩෙහි ඡායාරූපය වෙනස් කිරීමට ඔබට අවසර නොමැත.");
+    input.value = '';
     return;
   }
 
-  const avatarBtn = document.querySelector('.btn-artisan-avatar-edit');
-  const originalHtml = avatarBtn ? avatarBtn.innerHTML : '';
-  if (avatarBtn) {
-    avatarBtn.disabled = true;
-    avatarBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>`;
-  }
+  triggerHaptic(12);
+  openUniversalCropModal({
+    file,
+    title: 'පින්තූරය සකසන්න (Crop & Zoom) - ශිල්පී පැතිකඩ ඡායාරූපය',
+    subtitle: 'රවුම් රාමුවට ගැලපෙන ලෙස ඡායාරූපය Zoom කර සකසන්න:',
+    aspectRatio: 1 / 1,
+    outputWidth: 500,
+    onConfirm: async (blob) => {
+      const cloudUrl = await uploadToCloudinary(blob, `artisan_avatar_${artisanId}_${Date.now()}`);
+      if (!cloudUrl || !cloudUrl.startsWith('http')) {
+        throw new Error("පැතිකඩ ඡායාරූපය උඩුගත කිරීම අසාර්ථක විය.");
+      }
 
-  try {
-    triggerHaptic(12);
-    let payload = file;
-    try {
-      const compressed = await compressSquareAvatar(file);
-      if (compressed) payload = compressed;
-    } catch (e) {
-      console.warn('[Artisan] Avatar compression fallback:', e);
-    }
+      await StorageService.updateArtisan(artisanId, { photo: cloudUrl });
 
-    const cloudUrl = await uploadToCloudinary(payload, `artisan_avatar_${artisanId}_${Date.now()}`);
-    if (!cloudUrl || !cloudUrl.startsWith('http')) {
-      throw new Error("පැතිකඩ ඡායාරූපය උඩුගත කිරීම අසාර්ථක විය.");
-    }
+      artisan.photo = cloudUrl;
+      const cacheIdx = (allArtisansList || []).findIndex(a => (a.id || a.docId) === artisanId);
+      if (cacheIdx !== -1) {
+        allArtisansList[cacheIdx].photo = cloudUrl;
+      }
+      try {
+        localStorage.removeItem('pinPotha_artisans_cache');
+      } catch (e) {}
 
-    await StorageService.updateArtisan(artisanId, { photo: cloudUrl });
+      renderArtisanProfileModal(artisan);
+      renderArtisansDirectoryView();
+      if (typeof showCustomToast === 'function') {
+        showCustomToast("පැතිකඩ ඡායාරූපය සාර්ථකව යාවත්කාලීන විය! 🙏", "success");
+      }
+    }
+  });
 
-    artisan.photo = cloudUrl;
-    const cacheIdx = (allArtisansList || []).findIndex(a => (a.id || a.docId) === artisanId);
-    if (cacheIdx !== -1) {
-      allArtisansList[cacheIdx].photo = cloudUrl;
-    }
-    try {
-      localStorage.removeItem('pinPotha_artisans_cache');
-    } catch (e) {}
-
-    renderArtisanProfileModal(artisan);
-    renderArtisansDirectoryView();
-    if (typeof showCustomToast === 'function') {
-      showCustomToast("පැතිකඩ ඡායාරූපය සාර්ථකව යාවත්කාලීන විය! 🙏", "success");
-    }
-  } catch (err) {
-    console.error('[Artisan] Avatar upload failed:', err);
-    alert("පැතිකඩ ඡායාරූපය උඩුගත කිරීම අසාර්ථක විය: " + (err.message || 'නැවත උත්සාහ කරන්න.'));
-  } finally {
-    if (avatarBtn) {
-      avatarBtn.disabled = false;
-      avatarBtn.innerHTML = originalHtml || `<i class="fa-solid fa-camera"></i>`;
-    }
-    input.value = '';
-  }
+  input.value = '';
 };
 
 // Modal handling

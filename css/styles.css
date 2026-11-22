@@ -11871,11 +11871,18 @@ body.drawer-open {
   height: 150px;
   background: linear-gradient(135deg, #78350f 0%, #92400e 40%, #b45309 100%);
   position: relative;
+  z-index: 1;
   display: flex;
   align-items: flex-start;
   justify-content: flex-end;
   padding: 14px 18px;
   overflow: hidden;
+}
+
+@media (min-width: 640px) {
+  .artisan-profile-modal-cover {
+    height: 180px;
+  }
 }
 
 .artisan-profile-cover-img {
@@ -11955,26 +11962,32 @@ body.drawer-open {
 }
 
 .artisan-profile-modal-body {
-  padding: 0 24px 28px;
+  padding: 0 20px 24px;
   position: relative;
+  z-index: 5;
+  background: #ffffff;
 }
 
 .artisan-profile-header-card {
   display: flex;
   gap: 16px;
   align-items: flex-start;
-  margin-top: -46px;
+  margin-top: 0;
   margin-bottom: 18px;
+  position: relative;
+  z-index: 5;
 }
 
 .artisan-profile-avatar-large {
   position: relative;
-  width: 88px;
-  height: 88px;
+  z-index: 10;
+  margin-top: -46px;
+  width: 92px;
+  height: 92px;
   border-radius: 22px;
   overflow: visible;
   border: 4px solid #ffffff;
-  box-shadow: 0 8px 24px rgba(120, 53, 15, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   background: #fffbeb;
   flex-shrink: 0;
   display: flex;
@@ -12013,12 +12026,16 @@ body.drawer-open {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  border-radius: 18px;
 }
 
 .artisan-profile-details {
   flex: 1;
   min-width: 0;
   padding-top: 10px;
+  margin-top: 0;
+  position: relative;
+  z-index: 5;
 }
 
 .artisan-profile-name {
@@ -12028,6 +12045,7 @@ body.drawer-open {
   color: #451a03;
   margin: 0 0 6px;
   line-height: 1.25;
+  word-break: break-word;
 }
 
 .artisan-profile-badges-row {
@@ -12046,6 +12064,26 @@ body.drawer-open {
   font-size: 0.78rem;
   color: #64748b;
   margin-bottom: 14px;
+}
+
+@media (max-width: 480px) {
+  .artisan-profile-modal-body {
+    padding: 0 16px 20px;
+  }
+  .artisan-profile-header-card {
+    gap: 12px;
+  }
+  .artisan-profile-avatar-large {
+    width: 86px;
+    height: 86px;
+    margin-top: -43px;
+  }
+  .artisan-profile-details {
+    padding-top: 8px;
+  }
+  .artisan-profile-name {
+    font-size: 1.18rem;
+  }
 }
 
 .artisan-profile-actions-bar {
