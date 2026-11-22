@@ -10502,7 +10502,7 @@ function initPWAEngine() {
   );
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v166';
+  const ACTIVE_BUILD = 'v167';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
@@ -10518,7 +10518,7 @@ function initPWAEngine() {
 
   // Register Service Worker safely
   if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-    const swUrl = './sw.js?v=166';
+    const swUrl = './sw.js?v=167';
     const registerWorker = () => {
       navigator.serviceWorker.register(swUrl, { updateViaCache: 'none' })
         .then((registration) => {
