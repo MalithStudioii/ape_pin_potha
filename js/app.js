@@ -4,7 +4,7 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=164';
+import { StorageService } from './storage.js?v=165';
 import { Security } from './security.js?v=160';
 import { uploadToImgBB, uploadToCloudinary } from './imgbb-service.js?v=68';
 import { SoundService, triggerHaptic } from './sound.js?v=66';
@@ -559,10 +559,72 @@ function bootApp() {
       }
     });
 
-    // Check URL query params for direct post sharing (?post=POST_ID)
-    try { checkUrlDirectPost(); } catch (e) {}
+    // Route incoming deep links for both query params (?a=, ?p=, ?post=) and hashes (#artisan_, #post_)
+    try { handleUrlDeepLinks(); } catch (e) {}
+    try { window.addEventListener('hashchange', handleUrlDeepLinks); } catch (e) {}
   } catch (bootErr) {
     console.warn('[App] bootApp error caught safely:', bootErr);
+  }
+}
+
+// Build clean production-ready share URLs (e.g. https://apepinpotha.lk/?a=ID or /?p=ID)
+function buildCleanShareUrl(paramKey, paramValue, extraParams = {}) {
+  const origin = window.location.origin || '';
+  let path = (window.location.pathname || '/').replace(/\/index\.html?$/i, '');
+  if (!path.endsWith('/')) {
+    path += '/';
+  }
+  const params = new URLSearchParams();
+  if (paramKey && paramValue) {
+    params.set(paramKey, String(paramValue).trim());
+  }
+  if (extraParams && typeof extraParams === 'object') {
+    Object.keys(extraParams).forEach(k => {
+      if (extraParams[k]) params.set(k, String(extraParams[k]).trim());
+    });
+  }
+  const qs = params.toString();
+  return `${origin}${path}${qs ? '?' + qs : ''}`;
+}
+
+// Parse deep link parameters from URL search query or hash
+function extractDeepLinkTargets() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const hash = window.location.hash || '';
+
+  let artisanId = urlParams.get('a') || urlParams.get('artisan') || '';
+  if (!artisanId && hash.startsWith('#artisan_')) {
+    artisanId = hash.replace(/^#artisan_/, '').trim();
+  }
+
+  let postId = urlParams.get('p') || urlParams.get('post') || '';
+  if (!postId && hash.startsWith('#post_')) {
+    postId = hash.replace(/^#post_/, '').trim();
+  }
+
+  return {
+    artisanId: artisanId ? decodeURIComponent(artisanId) : null,
+    postId: postId ? decodeURIComponent(postId) : null,
+    tab: urlParams.get('tab') || null
+  };
+}
+
+// Route arriving deep links for artisans and posts
+function handleUrlDeepLinks() {
+  const targets = extractDeepLinkTargets();
+  if (targets.artisanId) {
+    if (typeof window.openArtisanProfileModal === 'function') {
+      window.openArtisanProfileModal(targets.artisanId);
+    } else {
+      setTimeout(() => {
+        if (typeof window.openArtisanProfileModal === 'function') {
+          window.openArtisanProfileModal(targets.artisanId);
+        }
+      }, 350);
+    }
+  }
+  if (targets.postId) {
+    checkUrlDirectPost(targets.postId);
   }
 }
 
@@ -4411,11 +4473,9 @@ window.shareToFacebookFromModal = function() {
   const realDesc = (isRepost && orig && orig.description) ? orig.description : (post.description || '');
   const realPhone = (isRepost && orig && orig.contact) ? orig.contact : (post.contact || '');
 
-  const origin = window.location.origin;
-  const pathname = window.location.pathname;
   const targetId = (isRepost && orig && orig.id) ? orig.id : post.id;
-  const tabParam = isNeed ? '&tab=needs' : '';
-  const postUrl = `${origin}${pathname}?post=${encodeURIComponent(targetId)}${tabParam}`;
+  const extra = isNeed ? { tab: 'needs' } : {};
+  const postUrl = buildCleanShareUrl('p', targetId, extra);
 
   try {
     StorageService.incrementShare(targetId);
@@ -4549,10 +4609,8 @@ window.generateWhatsAppStatusCardFromModal = async function() {
         ? `<img src="${authorAvatar}" style="width: 100%; height: 100%; object-fit: cover; display: block;" crossorigin="anonymous">`
         : `<span style="font-family: serif; font-size: 1.3rem; font-weight: 700; color: #ffffff;">${authorInitial}</span>`);
 
-    const origin = window.location.origin;
-    const pathname = window.location.pathname;
     const targetId = (isRepost && orig && orig.id) ? orig.id : post.id;
-    const postUrl = `${origin}${pathname}?post=${encodeURIComponent(targetId)}`;
+    const postUrl = buildCleanShareUrl('p', targetId);
 
     const renderBox = document.getElementById('viralStatusCardRenderBox');
     if (!renderBox) throw new Error('Render box not found');
@@ -4775,9 +4833,7 @@ window.openWhatsAppForStatusShare = function() {
   const postId = currentShareTargetPostId;
   const allPosts = StorageService.getLocalPosts() || [];
   const post = allPosts.find(p => p.id === postId) || {};
-  const origin = window.location.origin;
-  const pathname = window.location.pathname;
-  const postUrl = `${origin}${pathname}?post=${encodeURIComponent(postId || '')}`;
+  const postUrl = buildCleanShareUrl('p', postId || '');
   const isOfficial = !!post.isOfficial;
   const authorName = StorageService.resolveAuthorName(post);
   const shareText = isOfficial
@@ -4812,10 +4868,8 @@ window.executeNativeOrWhatsAppShare = async function() {
   const realDesc = (isRepost && orig && orig.description) ? orig.description : (post.description || '');
   const realImage = (isRepost && orig ? (orig.image || (orig.images && orig.images[0])) : (post.image || (post.images && post.images[0]))) || null;
 
-  const origin = window.location.origin;
-  const pathname = window.location.pathname;
   const targetId = (isRepost && orig && orig.id) ? orig.id : post.id;
-  const postUrl = `${origin}${pathname}?post=${encodeURIComponent(targetId)}`;
+  const postUrl = buildCleanShareUrl('p', targetId);
 
   try {
     StorageService.incrementShare(targetId);
@@ -4880,23 +4934,31 @@ window.executeNativeOrWhatsAppShare = async function() {
 window.copyPostLinkFromModal = async function() {
   closeShareChoiceModal();
   const postId = currentShareTargetPostId;
-  const origin = window.location.origin;
-  const pathname = window.location.pathname;
-  const postUrl = `${origin}${pathname}?post=${encodeURIComponent(postId || '')}`;
+  const postUrl = buildCleanShareUrl('p', postId || '');
   try {
     if (navigator.clipboard) {
       await navigator.clipboard.writeText(postUrl);
     }
-    alert('ලිපිනය (Link) සාර්ථකව Copy කරගන්නා ලදී! 🎉');
+    if (typeof showCustomToast === 'function') {
+      showCustomToast('ලිපිනය (Link) සාර්ථකව Copy කරගන්නා ලදී! 📋', 'success');
+    } else {
+      alert('ලිපිනය (Link) සාර්ථකව Copy කරගන්නා ලදී! 🎉');
+    }
   } catch (e) {
     prompt('මෙම Link එක Copy කරගන්න:', postUrl);
   }
 };
 
-// Check for deep-linked post in URL query (?post=post_123) - Instant Facebook / Social traffic arrival
-async function checkUrlDirectPost() {
+// Check for deep-linked post in URL query (?p=, ?post=) or hash (#post_...) - Instant Facebook / Social traffic arrival
+async function checkUrlDirectPost(explicitPostId = null) {
   const urlParams = new URLSearchParams(window.location.search);
-  const targetPostId = urlParams.get('post');
+  let targetPostId = explicitPostId || urlParams.get('p') || urlParams.get('post');
+  if (!targetPostId) {
+    const hash = window.location.hash || '';
+    if (hash.startsWith('#post_')) {
+      targetPostId = hash.replace(/^#post_/, '').trim();
+    }
+  }
   if (!targetPostId) return;
 
   const tabParam = urlParams.get('tab');
@@ -6348,7 +6410,7 @@ window.handleReelShare = async function(postId, btnEl) {
 
   const shareTitle = reel?.title || 'අපේ පින් පොත - Reels';
   const shareText = `ධර්ම කරුණක් / පින්කමක් නරඹන්න: ${reel?.title || 'දහම් Reels'}`;
-  const shareUrl = `${window.location.origin}${window.location.pathname}?post=${encodeURIComponent(postId)}`;
+  const shareUrl = buildCleanShareUrl('p', postId);
 
   // Increment share count atomically
   try {
@@ -10847,7 +10909,7 @@ function initPWAEngine() {
   );
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v174';
+  const ACTIVE_BUILD = 'v175';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
@@ -10863,7 +10925,7 @@ function initPWAEngine() {
 
   // Register Service Worker safely
   if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-    const swUrl = './sw.js?v=174';
+    const swUrl = './sw.js?v=175';
     const registerWorker = () => {
       navigator.serviceWorker.register(swUrl, { updateViaCache: 'none' })
         .then((registration) => {
@@ -12457,28 +12519,84 @@ window.openArtisanProfileModal = async function(artisanId) {
       artisan = (allArtisansList || []).find(a => (a.id || a.docId) === artisanId);
     } catch (e) {}
   }
-  if (!artisan) {
+
+  // 1. Immediately render cached data if available (zero UI delay)
+  if (artisan) {
+    renderArtisanProfileModal(artisan);
+    const modal = document.getElementById('artisanProfileModal');
+    if (modal) {
+      modal.classList.remove('hidden');
+      modal.style.display = 'flex';
+    }
+  }
+
+  // 2. Concurrently fetch fresh artisan data directly from Firestore
+  if (typeof StorageService.getArtisanById === 'function') {
+    (async () => {
+      try {
+        const freshArtisan = await StorageService.getArtisanById(artisanId, true);
+        if (freshArtisan) {
+          if (Array.isArray(allArtisansList)) {
+            const idx = allArtisansList.findIndex(a => (a.id || a.docId) === artisanId);
+            if (idx >= 0) {
+              allArtisansList[idx] = freshArtisan;
+            } else {
+              allArtisansList.push(freshArtisan);
+            }
+            try {
+              localStorage.setItem('pinPotha_artisans_cache', JSON.stringify({
+                timestamp: Date.now(),
+                data: allArtisansList
+              }));
+            } catch (e) {}
+          }
+          // If modal is currently displaying this artisan, update it live
+          if (currentArtisanProfileId === artisanId) {
+            renderArtisanProfileModal(freshArtisan);
+            const modal = document.getElementById('artisanProfileModal');
+            if (modal && modal.classList.contains('hidden')) {
+              modal.classList.remove('hidden');
+              modal.style.display = 'flex';
+            }
+          }
+        } else if (!artisan) {
+          if (typeof showCustomToast === 'function') {
+            showCustomToast("ශිල්පියාගේ තොරතුරු සොයාගත නොහැක.", "warning");
+          }
+        }
+      } catch (err) {
+        console.warn('[ArtisanProfile] Live fetch error:', err);
+        if (!artisan && typeof showCustomToast === 'function') {
+          showCustomToast("ශිල්පියාගේ තොරතුරු ලබාගැනීමේදී දෝෂයක් සිදුවිය.", "warning");
+        }
+      }
+    })();
+  } else if (!artisan) {
     if (typeof showCustomToast === 'function') {
       showCustomToast("ශිල්පියාගේ තොරතුරු සොයාගත නොහැක.", "warning");
     }
-    return;
-  }
-
-  renderArtisanProfileModal(artisan);
-  const modal = document.getElementById('artisanProfileModal');
-  if (modal) {
-    modal.classList.remove('hidden');
-    modal.style.display = 'flex';
   }
 };
 
 window.closeArtisanProfileModal = function() {
   triggerHaptic(10);
+  currentArtisanProfileId = null;
   const modal = document.getElementById('artisanProfileModal');
   if (modal) {
     modal.classList.add('hidden');
     modal.style.display = 'none';
   }
+  try {
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('a') || url.searchParams.has('artisan') || url.hash.startsWith('#artisan_')) {
+      url.searchParams.delete('a');
+      url.searchParams.delete('artisan');
+      if (url.hash.startsWith('#artisan_')) {
+        url.hash = '';
+      }
+      window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+    }
+  } catch (e) {}
 };
 
 function renderArtisanProfileModal(artisan) {
@@ -12495,16 +12613,18 @@ function renderArtisanProfileModal(artisan) {
   // Update Cover Banner image and Edit button
   const coverImg = document.getElementById('artisanProfileCoverImg');
   const coverEditWrap = document.getElementById('artisanCoverEditBtnWrap');
-  const bannerUrl = artisan.bannerUrl || artisan.coverImage || '';
+  const bannerUrl = (artisan.bannerUrl || artisan.coverImage || '').trim();
   if (coverImg) {
     if (bannerUrl) {
       coverImg.src = bannerUrl;
       coverImg.classList.remove('hidden');
       coverImg.style.display = 'block';
+      coverImg.style.setProperty('display', 'block', 'important');
     } else {
       coverImg.src = '';
       coverImg.classList.add('hidden');
       coverImg.style.display = 'none';
+      coverImg.style.setProperty('display', 'none', 'important');
     }
   }
   if (coverEditWrap) {
@@ -12874,22 +12994,37 @@ window.deleteArtisanPortfolioPhoto = async function(artisanId, photoIndex) {
 
 window.copyArtisanProfileLink = function(artisanId, artisanName) {
   triggerHaptic(15);
-  const shareUrl = window.location.origin + window.location.pathname + '#artisan_' + artisanId;
-  const shareText = `ශ්‍රී ලංකා විහාර නිර්මාණ හා පෙරහැර කලා ශිල්පී නාමාවලිය - ${artisanName}`;
+  const artisan = (allArtisansList || []).find(a => (a.id || a.docId) === artisanId) || {};
+  const name = artisanName || artisan.name || 'ශිල්පී';
+  const isPerahera = artisan.section === 'perahera_culture';
+  const role = isPerahera ? 'සත්‍යාපිත පෙරහැර කලා ශිල්පී' : 'සත්‍යාපිත විහාර කලා ශිල්පී';
+  const district = artisan.district ? `(${artisan.district})` : '(ශ්‍රී ලංකා)';
+  const specialties = Array.isArray(artisan.specialties) && artisan.specialties.length > 0
+    ? `\n🎨 ක්ෂේත්‍ර: ${artisan.specialties.slice(0, 3).join(', ')}`
+    : '';
+  const shareUrl = buildCleanShareUrl('a', artisanId);
+
+  const shareTitle = `🏛️ ${name} — ${role} ${district}`;
+  const shareText = `🏛️ ${name} — ${role} ${district}${specialties}\n\n🙏 අපේ පිං පොත විහාර කලා හා පෙරහැර ශිල්පී නාමාවලිය ඔස්සේ සම්පූර්ණ පැතිකඩ සහ නිර්මාණ එකතුව (Portfolio) දැකබලා ගැනීමට:\n👉 ${shareUrl}`;
+
   if (navigator.share) {
     navigator.share({
-      title: shareText,
+      title: shareTitle,
       text: shareText,
       url: shareUrl
     }).catch(() => {});
   } else if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(shareUrl).then(() => {
+    navigator.clipboard.writeText(shareText).then(() => {
       if (typeof showCustomToast === 'function') {
-        showCustomToast("පැතිකඩ ලින්ක් එක කොපි විය! 📋", "success");
+        showCustomToast("පැතිකඩ සබැඳිය සාර්ථකව පිටපත් විය! 📋", "success");
       } else {
-        alert("පැතිකඩ ලින්ක් එක කොපි විය! 📋");
+        alert("පැතිකඩ සබැඳිය සාර්ථකව පිටපත් විය! 📋");
       }
-    }).catch(() => {});
+    }).catch(() => {
+      prompt('මෙම සබැඳිය Copy කරගන්න:', shareUrl);
+    });
+  } else {
+    prompt('මෙම සබැඳිය Copy කරගන්න:', shareUrl);
   }
 };
 

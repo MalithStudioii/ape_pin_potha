@@ -5129,6 +5129,48 @@ export const StorageService = {
   },
 
   /**
+   * Fetches an artisan document by ID from memory, cache, or Firestore
+   * @param {string} artisanId
+   * @param {boolean} [forceCloud=false]
+   * @returns {Promise<Object|null>}
+   */
+  async getArtisanById(artisanId, forceCloud = false) {
+    if (!artisanId) return null;
+
+    if (!forceCloud) {
+      try {
+        const raw = localStorage.getItem('pinPotha_artisans_cache');
+        if (raw) {
+          const cached = JSON.parse(raw);
+          const list = Array.isArray(cached) ? cached : (Array.isArray(cached.data) ? cached.data : []);
+          const found = list.find(a => (a.id || a.docId) === artisanId);
+          if (found) return found;
+        }
+      } catch (e) {}
+    }
+
+    try {
+      if (!isCloudReady && !db) {
+        const waitStart = Date.now();
+        while (!isCloudReady && (Date.now() - waitStart < 2500)) {
+          await new Promise(r => setTimeout(r, 100));
+        }
+      }
+      if (db && COLLECTIONS && COLLECTIONS.ARTISANS) {
+        const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const snap = await getDoc(doc(db, COLLECTIONS.ARTISANS, artisanId));
+        if (snap && snap.exists()) {
+          const data = { id: snap.id, docId: snap.id, ...snap.data() };
+          return data;
+        }
+      }
+    } catch (e) {
+      console.warn('[Storage] getArtisanById error:', e);
+    }
+    return null;
+  },
+
+  /**
    * Updates an artisan document in Firestore
    * @param {string} docId
    * @param {Object} updateData
