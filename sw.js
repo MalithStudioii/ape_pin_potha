@@ -1,11 +1,11 @@
-// Ape Pin Potha Service Worker (v170)
+// Ape Pin Potha Service Worker (v171)
 // Strategy: Network-First for HTML, JS, CSS to guarantee instant updates; Stale-While-Revalidate for media assets
-const CACHE_NAME = 'pin-potha-cache-v170';
+const CACHE_NAME = 'pin-potha-cache-v171';
 const STATIC_ASSETS = [
   './',
   './index.html',
   './css/styles.css?v=165',
-  './js/app.js?v=170',
+  './js/app.js?v=171',
   './js/storage.js?v=164',
   './js/imgbb-service.js?v=68',
   './js/aranya-data.js',
@@ -55,22 +55,19 @@ self.addEventListener('message', (event) => {
   }
 });
 
-// Activate: Clean up old caches immediately and take control of all clients
+// Activate: Clean up old caches immediately
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    Promise.all([
-      self.clients.claim(),
-      caches.keys().then((keys) => {
-        return Promise.all(
-          keys.map((key) => {
-            if (key !== CACHE_NAME) {
-              console.log('[SW] Deleting old cache:', key);
-              return caches.delete(key);
-            }
-          })
-        );
-      })
-    ])
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys.map((key) => {
+          if (key !== CACHE_NAME) {
+            console.log('[SW] Deleting old cache:', key);
+            return caches.delete(key);
+          }
+        })
+      );
+    })
   );
 });
 

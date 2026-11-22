@@ -10709,8 +10709,29 @@ let deferredPwaPrompt = null;
 let newWorkerWaiting = null;
 let updateBannerShown = false;
 let updateBannerDismissed = false;
+let userRequestedSwReload = false;
 let isRefreshing = false;
 let swRegistrationRef = null;
+
+function safePerformSwReload() {
+  const LAST_RELOAD_KEY = 'pinpotha_sw_reloaded_at';
+  try {
+    const lastReloadStr = sessionStorage.getItem(LAST_RELOAD_KEY);
+    if (lastReloadStr) {
+      const lastReload = parseInt(lastReloadStr, 10);
+      if (Date.now() - lastReload < 15000) {
+        console.warn('[PWA] Aborting reload: already reloaded within last 15s to prevent loop.');
+        window.dismissPwaUpdateToast();
+        return;
+      }
+    }
+    sessionStorage.setItem(LAST_RELOAD_KEY, String(Date.now()));
+  } catch (e) {}
+
+  if (isRefreshing) return;
+  isRefreshing = true;
+  window.location.reload();
+}
 
 function initPWAEngine() {
   // Check standalone mode safely
@@ -10734,7 +10755,7 @@ function initPWAEngine() {
   );
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v170';
+  const ACTIVE_BUILD = 'v171';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
@@ -10750,7 +10771,7 @@ function initPWAEngine() {
 
   // Register Service Worker safely
   if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-    const swUrl = './sw.js?v=170';
+    const swUrl = './sw.js?v=171';
     const registerWorker = () => {
       navigator.serviceWorker.register(swUrl, { updateViaCache: 'none' })
         .then((registration) => {
@@ -10801,10 +10822,9 @@ function initPWAEngine() {
     }
 
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      // Never trigger update toast here. Only reload if user initiated update.
-      if (isRefreshing) return;
-      isRefreshing = true;
-      window.location.reload();
+      // Strictly ignore controllerchange unless user explicitly clicked Reload on the update toast
+      if (!userRequestedSwReload || isRefreshing) return;
+      safePerformSwReload();
     });
   }
 
@@ -11012,6 +11032,9 @@ window.applyPwaUpdate = function () {
   triggerHaptic(30);
   SoundService?.playClick?.();
 
+  // Mark that user explicitly requested a reload
+  userRequestedSwReload = true;
+
   // 1. Immediately hide/remove the toast and disable the button
   const toast = document.getElementById('pwaUpdateToast');
   if (toast) {
@@ -11021,18 +11044,7 @@ window.applyPwaUpdate = function () {
     toast.classList.add('hidden');
   }
 
-  // 2. Attach a single guarded controllerchange listener
-  let reloadDone = false;
-  const doReload = () => {
-    if (reloadDone) return;
-    reloadDone = true;
-    isRefreshing = true;
-    window.location.reload();
-  };
-
-  navigator.serviceWorker?.addEventListener?.('controllerchange', doReload, { once: true });
-
-  // 3. If registration.waiting exists, send SKIP_WAITING
+  // 2. If waiting worker exists, send SKIP_WAITING
   const targetWorker = newWorkerWaiting || swRegistrationRef?.waiting;
   if (targetWorker) {
     try {
@@ -11042,8 +11054,12 @@ window.applyPwaUpdate = function () {
     }
   }
 
-  // 1500ms fallback in case controllerchange does not fire on older browsers
-  setTimeout(doReload, 1500);
+  // 3. Fallback reload after 1200ms in case controllerchange does not fire or is delayed
+  setTimeout(() => {
+    if (userRequestedSwReload && !isRefreshing) {
+      safePerformSwReload();
+    }
+  }, 1200);
 };
 
 // ============================================================================
