@@ -54,6 +54,7 @@
 
 html {
   scrollbar-gutter: stable;
+  overflow-x: clip;
 }
 
 body {
@@ -63,6 +64,8 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   padding-bottom: 85px;
+  overflow-x: clip;
+  width: 100%;
 }
 
 @media (min-width: 1024px) {
@@ -999,24 +1002,59 @@ body {
 
 /* Main Grid Layout */
 .main-layout {
+  width: 100%;
   max-width: 1240px;
   margin: 0 auto;
   padding: 20px 16px;
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 20px;
+  box-sizing: border-box;
 }
 
 @media (min-width: 1024px) {
   .main-layout {
-    grid-template-columns: 280px 1fr 310px;
+    grid-template-columns: 280px minmax(0, 1fr) 310px;
     align-items: start;
+    width: 100%;
+    max-width: 1240px;
+    box-sizing: border-box;
   }
+}
+
+/* Ensure ALL direct children of 3-column grid never expand past their track */
+.main-layout > * {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.main-feed-area {
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Ensure feed children, post cards, composer, and sort bars stay within bounds */
+.main-feed-area > *,
+#postsContainer,
+#postsContainer > *,
+.composer-card,
+.feed-sort-bar,
+.post-card,
+.post-media-container {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* Sidebar & Sticky Cards */
 .sidebar {
   display: none;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 @media (min-width: 1024px) {
@@ -5996,6 +6034,10 @@ html, body {
   box-shadow: 0 2px 8px rgba(245, 158, 11, 0.06);
   flex-wrap: wrap;
   gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .feed-sort-label {
@@ -12392,7 +12434,9 @@ body.drawer-open {
 /* ==========================================================================
    In-Feed "Verified Artisans & Perahera Services" Spotlight Strip
    ========================================================================== */
-.feed-artisan-spotlight-card {
+.feed-artisan-spotlight-card,
+#artisanSpotlightStrip,
+.artisan-spotlight-strip {
   background: linear-gradient(135deg, #fffdf8, #fff8ea);
   border: 1px solid rgba(245, 158, 11, 0.28);
   border-radius: var(--radius-lg, 16px);
@@ -12401,6 +12445,10 @@ body.drawer-open {
   box-shadow: 0 4px 18px rgba(180, 83, 9, 0.06);
   position: relative;
   overflow: hidden;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .feed-artisan-spotlight-card::before {
@@ -12479,12 +12527,17 @@ body.drawer-open {
   display: flex;
   gap: 14px;
   overflow-x: auto;
+  overflow-y: hidden;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   padding: 4px 2px 10px 2px;
-  margin: 0 -4px;
+  margin: 0;
   scrollbar-width: thin;
   scrollbar-color: rgba(217, 119, 6, 0.3) transparent;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .spotlight-cards-track::-webkit-scrollbar {
