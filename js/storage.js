@@ -4920,6 +4920,8 @@ export const StorageService = {
       submittedByUid: this.currentUser?.uid || '',
       submittedByName: this.currentUser?.name || 'කල්‍යාණ මිත්‍ර සාමාජික',
       submittedByEmail: this.currentUser?.email || '',
+      ownerUid: data.ownerUid || this.currentUser?.uid || '',
+      ownerEmail: data.ownerEmail || this.currentUser?.email || '',
       timestamp: Date.now(),
       createdAt: Date.now()
     };
@@ -5008,6 +5010,8 @@ export const StorageService = {
       ...artisanData,
       isVerified: true,
       status: 'approved',
+      ownerUid: artisanData.ownerUid || artisanData.submittedByUid || '',
+      ownerEmail: artisanData.ownerEmail || artisanData.submittedByEmail || '',
       approvedAt: Date.now(),
       updatedAt: Date.now(),
       createdAt: artisanData.createdAt || Date.now()
@@ -5109,6 +5113,31 @@ export const StorageService = {
       }
     }
 
+    localStorage.removeItem('pinPotha_artisans_cache');
+    return true;
+  },
+
+  /**
+   * Updates an artisan document in Firestore
+   * @param {string} docId
+   * @param {Object} updateData
+   * @returns {Promise<boolean>}
+   */
+  async updateArtisan(docId, updateData) {
+    if (!docId || !updateData) return false;
+    const payload = {
+      ...updateData,
+      updatedAt: Date.now()
+    };
+    if (isCloudReady && db) {
+      try {
+        const { doc, setDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        await setDoc(doc(db, COLLECTIONS.ARTISANS, docId), payload, { merge: true });
+      } catch (err) {
+        console.error('[Storage] Update artisan error:', err);
+        throw err;
+      }
+    }
     localStorage.removeItem('pinPotha_artisans_cache');
     return true;
   },

@@ -1511,6 +1511,7 @@ function renderAdminVerifiedArtisans() {
                         <div>
                             <div style="font-weight: 700; color: #fff;">${Security.escapeHTML(item.name)}</div>
                             ${item.experience ? `<div style="font-size: 0.72rem; color: var(--text-muted);">වසර ${item.experience}+ පළපුරුද්ද</div>` : ''}
+                            ${item.ownerEmail ? `<div style="font-size: 0.7rem; color: #38bdf8; margin-top: 2px;"><i class="fa-solid fa-user-check"></i> ${Security.escapeHTML(item.ownerEmail)}</div>` : ''}
                         </div>
                     </div>
                 </td>
@@ -1581,6 +1582,8 @@ window.adminApproveArtisan = async function(appId) {
             portfolioImages: app.portfolioImages || [],
             wildlifeLicenseNumber: app.wildlifeLicenseNumber || '',
             wildlifeLicenseImage: app.wildlifeLicenseImage || '',
+            ownerUid: app.ownerUid || app.submittedByUid || '',
+            ownerEmail: app.ownerEmail || app.submittedByEmail || '',
             isVerified: true,
             approvedBy: currentAdminUser ? currentAdminUser.email : 'Master Admin',
             createdAt: serverTimestamp(),
@@ -1756,6 +1759,7 @@ window.adminEditArtisan = function(docId) {
     const licenseNumInp = document.getElementById('adminArtisanWildlifeLicenseNum');
     const licenseUrlInp = document.getElementById('adminArtisanWildlifeLicenseUrl');
     const licenseWrap = document.getElementById('adminElephantLicenseWrap');
+    const ownerEmailInp = document.getElementById('adminArtisanOwnerEmail');
 
     if (editDoc) editDoc.value = item.docId;
     if (secInp) {
@@ -1775,6 +1779,7 @@ window.adminEditArtisan = function(docId) {
     if (islandInp) islandInp.checked = Boolean(item.islandWide);
     if (licenseNumInp) licenseNumInp.value = item.wildlifeLicenseNumber || '';
     if (licenseUrlInp) licenseUrlInp.value = item.wildlifeLicenseImage || '';
+    if (ownerEmailInp) ownerEmailInp.value = item.ownerEmail || item.submittedByEmail || '';
 
     if (licenseWrap) {
         const hasElephant = (item.specialties || []).includes('අලි ඇතුන් සපයන්නන්') || Boolean(item.wildlifeLicenseNumber);
@@ -1836,6 +1841,7 @@ window.handleAdminArtisanDirectSubmit = async function(e) {
     const bio = (document.getElementById('adminArtisanBio')?.value || '').trim();
     let photoUrl = (document.getElementById('adminArtisanPhotoUrl')?.value || '').trim();
     const portUrlsRaw = (document.getElementById('adminArtisanPortfolioUrls')?.value || '').trim();
+    const ownerEmail = (document.getElementById('adminArtisanOwnerEmail')?.value || '').trim();
     const islandWide = Boolean(document.getElementById('adminArtisanIslandWide')?.checked);
     let wildlifeLicenseNumber = (document.getElementById('adminArtisanWildlifeLicenseNum')?.value || '').trim();
     let wildlifeLicenseUrl = (document.getElementById('adminArtisanWildlifeLicenseUrl')?.value || '').trim();
@@ -1898,9 +1904,10 @@ window.handleAdminArtisanDirectSubmit = async function(e) {
             notableTemples,
             bio,
             photo: photoUrl || '',
-            portfolioImages: portfolioImages.slice(0, 4),
+            portfolioImages: portfolioImages.slice(0, 15),
             wildlifeLicenseNumber: wildlifeLicenseNumber || '',
             wildlifeLicenseImage: wildlifeLicenseUrl || '',
+            ownerEmail: ownerEmail || '',
             isVerified: true,
             updatedAt: serverTimestamp()
         };

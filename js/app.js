@@ -4,7 +4,7 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=162';
+import { StorageService } from './storage.js?v=163';
 import { Security } from './security.js?v=160';
 import { uploadToImgBB, uploadToCloudinary } from './imgbb-service.js?v=68';
 import { SoundService, triggerHaptic } from './sound.js?v=66';
@@ -10502,7 +10502,7 @@ function initPWAEngine() {
   );
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v167';
+  const ACTIVE_BUILD = 'v168';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
@@ -10518,7 +10518,7 @@ function initPWAEngine() {
 
   // Register Service Worker safely
   if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-    const swUrl = './sw.js?v=167';
+    const swUrl = './sw.js?v=168';
     const registerWorker = () => {
       navigator.serviceWorker.register(swUrl, { updateViaCache: 'none' })
         .then((registration) => {
@@ -11868,7 +11868,8 @@ function filterAndRenderArtisanCards() {
     `).join('');
 
     const portfolioImages = Array.isArray(item.portfolioImages) ? item.portfolioImages.slice(0, 4) : [];
-    const encodedPortfolio = encodeURIComponent(JSON.stringify(portfolioImages));
+    const cleanPortfolioUrls = portfolioImages.map(img => typeof img === 'object' && img.url ? img.url : img);
+    const encodedPortfolio = encodeURIComponent(JSON.stringify(cleanPortfolioUrls));
 
     const portfolioHtml = portfolioImages.length > 0 ? `
       <div class="artisan-portfolio-wrap" style="margin-top: 12px;">
@@ -11876,19 +11877,22 @@ function filterAndRenderArtisanCards() {
           <i class="fa-solid fa-camera" style="margin-right: 4px;"></i> නිර්මාණ එකතුව (Portfolio - ඡායාරූප ${portfolioImages.length}ක්)
         </span>
         <div class="artisan-portfolio-grid">
-          ${portfolioImages.map((img, idx) => `
+          ${portfolioImages.map((imgItem, idx) => {
+            const imgUrl = typeof imgItem === 'object' && imgItem.url ? imgItem.url : imgItem;
+            return `
             <div class="artisan-portfolio-thumb" onclick="openArtisanPortfolioGallery('${encodedPortfolio}', ${idx})" title="විශාල කර බලන්න">
-              <img src="${img}" alt="නිර්මාණ සාම්පලය ${idx + 1}" loading="lazy">
+              <img src="${imgUrl}" alt="නිර්මාණ සාම්පලය ${idx + 1}" loading="lazy">
               <span class="portfolio-zoom-indicator"><i class="fa-solid fa-magnifying-glass-plus"></i></span>
             </div>
-          `).join('')}
+            `;
+          }).join('')}
         </div>
       </div>
     ` : '';
 
     return `
       <div class="artisan-card" id="artisan_${item.id || item.docId}">
-        <div class="artisan-card-header">
+        <div class="artisan-card-header" onclick="openArtisanProfileModal('${item.id || item.docId}')" style="cursor: pointer;" title="ශිල්පියාගේ සම්පූර්ණ පැතිකඩ බලන්න">
           <div class="artisan-avatar-wrap">
             ${item.photo ? `
               <img src="${item.photo}" alt="${Security.escapeHTML(item.name)}" class="artisan-avatar-img" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'artisan-avatar-placeholder\\'>${fallbackAvatar}</div>';">
@@ -11918,7 +11922,7 @@ function filterAndRenderArtisanCards() {
                 </span>
               ` : ''}
             </div>
-            <h3 class="artisan-name">${Security.escapeHTML(item.name)}</h3>
+            <h3 class="artisan-name" onclick="openArtisanProfileModal('${item.id || item.docId}')" style="cursor: pointer;">${Security.escapeHTML(item.name)}</h3>
             <div class="artisan-sub-row">
               <span class="artisan-district-pill">
                 <i class="fa-solid fa-location-dot"></i>
@@ -11948,10 +11952,14 @@ function filterAndRenderArtisanCards() {
         ${portfolioHtml}
 
         <div class="artisan-actions">
+          <button type="button" class="btn-artisan-profile" onclick="openArtisanProfileModal('${item.id || item.docId}')" title="ශිල්පියාගේ සම්පූර්ණ පැතිකඩ සහ නිර්මාණ එකතුව බලන්න">
+            <i class="fa-solid fa-address-card"></i>
+            <span>පැතිකඩ</span>
+          </button>
           ${cleanTel ? `
             <a href="tel:${cleanTel}" class="btn-artisan-call" title="සෘජු ඇමතුමක් ලබාගන්න">
               <i class="fa-solid fa-phone"></i>
-              <span>${Security.escapeHTML(rawPhone)}</span>
+              <span>ඇමතුම්</span>
             </a>
           ` : ''}
           <a href="${waUrl}" target="_blank" rel="noopener" class="btn-artisan-whatsapp" title="WhatsApp පණිවිඩයක් යොමු කරන්න">
@@ -11963,6 +11971,433 @@ function filterAndRenderArtisanCards() {
     `;
   }).join('');
 }
+
+// ============================================================================
+// Artisan Dedicated Profile Modal & Owner Portfolio Management
+// ============================================================================
+
+function checkIsArtisanOwner(artisan) {
+  if (!artisan) return false;
+  const currentUser = StorageService.currentUser;
+  if (!currentUser) return false;
+  if (typeof StorageService.isMasterAdmin === 'function' && StorageService.isMasterAdmin()) return true;
+  if (artisan.ownerUid && artisan.ownerUid === currentUser.uid) return true;
+  if (artisan.submittedByUid && artisan.submittedByUid === currentUser.uid) return true;
+  if (artisan.userId && artisan.userId === currentUser.uid) return true;
+  const userEmail = (currentUser.email || '').trim().toLowerCase();
+  if (userEmail) {
+    if (artisan.ownerEmail && artisan.ownerEmail.trim().toLowerCase() === userEmail) return true;
+    if (artisan.submittedByEmail && artisan.submittedByEmail.trim().toLowerCase() === userEmail) return true;
+  }
+  return false;
+}
+
+window.openArtisanProfileModal = function(artisanId) {
+  triggerHaptic(12);
+  const artisan = (allArtisansList || []).find(a => (a.id || a.docId) === artisanId);
+  if (!artisan) {
+    if (typeof showCustomToast === 'function') {
+      showCustomToast("ශිල්පියාගේ තොරතුරු සොයාගත නොහැක.", "warning");
+    }
+    return;
+  }
+
+  renderArtisanProfileModal(artisan);
+  const modal = document.getElementById('artisanProfileModal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+  }
+};
+
+window.closeArtisanProfileModal = function() {
+  triggerHaptic(10);
+  const modal = document.getElementById('artisanProfileModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
+};
+
+function renderArtisanProfileModal(artisan) {
+  const container = document.getElementById('artisanProfileModalContent');
+  if (!container || !artisan) return;
+
+  const artisanId = artisan.id || artisan.docId || '';
+  const isOwner = checkIsArtisanOwner(artisan);
+  const isPerahera = artisan.section === 'perahera_culture';
+  const fallbackAvatar = isPerahera ? '🥁' : '🎨';
+  const isElephantProvider = Array.isArray(artisan.specialties) && artisan.specialties.includes('අලි ඇතුන් සපයන්නන්');
+
+  const rawPhone = artisan.phone || '';
+  const cleanTel = rawPhone.replace(/[^0-9]/g, '');
+  const waUrl = formatArtisanWhatsAppUrl(artisan.phone, artisan.whatsapp);
+
+  // Portfolio list normalization (safe against strings or objects)
+  const allPortfolio = Array.isArray(artisan.portfolioImages) ? artisan.portfolioImages : (Array.isArray(artisan.portfolio) ? artisan.portfolio : []);
+  const cleanPortfolioUrls = allPortfolio.map(img => typeof img === 'object' && img.url ? img.url : img);
+  const encodedPortfolio = encodeURIComponent(JSON.stringify(cleanPortfolioUrls));
+
+  const specialtiesHtml = (artisan.specialties || []).map(s => `
+    <span class="artisan-specialty-tag">${Security.escapeHTML(s)}</span>
+  `).join('');
+
+  const quotaRemaining = Math.max(0, 15 - allPortfolio.length);
+
+  container.innerHTML = `
+    <div class="artisan-profile-header-card">
+      <div class="artisan-profile-avatar-large">
+        ${artisan.photo ? `
+          <img src="${artisan.photo}" alt="${Security.escapeHTML(artisan.name)}" onerror="this.onerror=null; this.parentElement.innerHTML='${fallbackAvatar}';">
+        ` : `
+          <span>${fallbackAvatar}</span>
+        `}
+      </div>
+      <div class="artisan-profile-details">
+        <div class="artisan-profile-badges-row">
+          <span class="artisan-badge-verified">
+            <i class="fa-solid fa-circle-check"></i>
+            <span>සත්‍යාපිතයි</span>
+          </span>
+          ${isElephantProvider ? `
+            <span class="artisan-elephant-license-badge">
+              <i class="fa-solid fa-shield-halved"></i>
+              <span>වනජීවී බලපත්‍රය සත්‍යාපිතයි</span>
+            </span>
+          ` : ''}
+          <span class="artisan-section-pill">
+            ${isPerahera ? '🥁 පෙරහැර සේවා' : '🏛️ විහාර නිර්මාණ'}
+          </span>
+          ${artisan.islandWide ? `
+            <span class="artisan-islandwide-pill">
+              <i class="fa-solid fa-earth-asia"></i>
+              <span>දිවයින පුරා සේවා</span>
+            </span>
+          ` : ''}
+        </div>
+        <h2 class="artisan-profile-name">${Security.escapeHTML(artisan.name)}</h2>
+        <div class="artisan-profile-meta-row">
+          <span class="artisan-district-pill">
+            <i class="fa-solid fa-location-dot"></i>
+            <span>${Security.escapeHTML(artisan.district || 'ශ්‍රී ලංකා')}</span>
+          </span>
+          ${artisan.experience ? `
+            <span class="artisan-experience-badge">
+              <i class="fa-solid fa-clock-rotate-left"></i>
+              <span>වසර ${Number(artisan.experience)}+ පළපුරුද්ද</span>
+            </span>
+          ` : ''}
+        </div>
+      </div>
+    </div>
+
+    <!-- Direct Contact & Share Actions -->
+    <div class="artisan-profile-actions-bar">
+      ${cleanTel ? `
+        <a href="tel:${cleanTel}" class="btn-artisan-profile-call" title="සෘජු ඇමතුමක් ලබාගන්න">
+          <i class="fa-solid fa-phone"></i>
+          <span>ඇමතුම් ගන්න</span>
+        </a>
+      ` : ''}
+      <a href="${waUrl}" target="_blank" rel="noopener" class="btn-artisan-profile-wa" title="WhatsApp පණිවිඩයක් යොමු කරන්න">
+        <i class="fa-brands fa-whatsapp"></i>
+        <span>WhatsApp</span>
+      </a>
+      <button type="button" class="btn-artisan-profile-share" onclick="copyArtisanProfileLink('${artisanId}', '${Security.escapeHTML(artisan.name).replace(/'/g, "\\'")}')" title="පැතිකඩ බෙදාගන්න">
+        <i class="fa-solid fa-share-nodes"></i>
+        <span>බෙදාගන්න</span>
+      </button>
+    </div>
+
+    <!-- Specialties Box -->
+    ${specialtiesHtml ? `
+      <div class="artisan-info-card">
+        <div class="artisan-info-title">
+          <i class="fa-solid fa-shapes"></i>
+          <span>නිර්මාණ හා සේවා ක්ෂේත්‍ර</span>
+        </div>
+        <div class="artisan-profile-specialties-wrap">${specialtiesHtml}</div>
+      </div>
+    ` : ''}
+
+    <!-- Notable Temples / Perahera -->
+    ${artisan.notableTemples ? `
+      <div class="artisan-info-card">
+        <div class="artisan-info-title">
+          <i class="fa-solid fa-place-of-worship"></i>
+          <span>දායක වූ ප්‍රකට විහාර / පෙරහැර</span>
+        </div>
+        <p style="margin: 0; font-size: 0.84rem; color: #475569; line-height: 1.5;">${Security.escapeHTML(artisan.notableTemples)}</p>
+      </div>
+    ` : ''}
+
+    <!-- Bio Description -->
+    ${artisan.bio ? `
+      <div class="artisan-info-card">
+        <div class="artisan-info-title">
+          <i class="fa-solid fa-scroll"></i>
+          <span>කෙටි හැඳින්වීම (Bio)</span>
+        </div>
+        <p style="margin: 0; font-size: 0.84rem; color: #475569; line-height: 1.6;">${Security.escapeHTML(artisan.bio)}</p>
+      </div>
+    ` : ''}
+
+    <!-- Complete Portfolio Gallery Section -->
+    <div style="margin-top: 24px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <h3 style="font-size: 1.05rem; font-weight: 800; color: #451a03; margin: 0;">
+            <i class="fa-solid fa-camera-retro" style="color: #d97706;"></i> නිර්මාණ එකතුව (Portfolio)
+          </h3>
+          <span style="font-size: 0.74rem; font-weight: 700; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; padding: 2px 8px; border-radius: 9999px;">
+            ${allPortfolio.length} / 15
+          </span>
+        </div>
+      </div>
+
+      <!-- Owner Self-Service Upload Toolbar -->
+      ${isOwner ? `
+        <div class="artisan-owner-toolbar">
+          <div class="artisan-owner-header">
+            <div class="artisan-owner-title">
+              <i class="fa-solid fa-star" style="color: #f59e0b;"></i>
+              <span>ඔබ මෙම ශිල්පී පැතිකඩෙහි හිමිකරු වේ</span>
+            </div>
+            <span class="artisan-photo-quota-pill">
+              ${quotaRemaining > 0 ? `තවත් පින්තූර ${quotaRemaining}ක් එක් කළ හැක` : 'උපරිම සීමාව සම්පූර්ණයි (15/15)'}
+            </span>
+          </div>
+
+          ${quotaRemaining > 0 ? `
+            <div class="artisan-owner-upload-form">
+              <input type="text" id="artisanOwnerPortCaption" class="artisan-caption-input" placeholder="විහාරය හෝ නිර්මාණය ගැන කෙටි විස්තරයක් (අවශ්‍ය නම් පමණක්)..." maxlength="120">
+              <div class="artisan-upload-actions">
+                <input type="file" id="artisanOwnerPortFiles" accept="image/*" multiple style="display: none;" onchange="handleArtisanOwnerFileSelect(this)">
+                <button type="button" class="btn-owner-upload" onclick="document.getElementById('artisanOwnerPortFiles').click()">
+                  <i class="fa-solid fa-images"></i> <span>ඡායාරූප තෝරන්න</span>
+                </button>
+                <span id="artisanOwnerSelectedCount" style="font-size: 0.78rem; color: #92400e; font-weight: 700; display: none;"></span>
+                <button type="button" id="btnUploadArtisanOwnerPhotos" class="btn-owner-upload" style="display: none; background: linear-gradient(135deg, #10b981, #059669);" onclick="submitArtisanOwnerPhotos('${artisanId}')">
+                  <i class="fa-solid fa-cloud-arrow-up"></i> <span>උඩුගත කරන්න</span>
+                </button>
+              </div>
+              <div id="artisanOwnerUploadStatus" style="display: none; font-size: 0.78rem; color: #d97706; font-weight: 600; padding: 4px 0;"></div>
+            </div>
+          ` : `
+            <div style="font-size: 0.78rem; color: #92400e; background: #fff; padding: 8px 12px; border-radius: 8px; border: 1px solid #fed7aa;">
+              <i class="fa-solid fa-circle-info"></i> ඔබ උපරිම ඡායාරූප 15ක සීමාව සම්පූර්ණ කර ඇත. නව ඡායාරූප එක් කිරීමට අවශ්‍ය නම් පහතින් ඇති අනවශ්‍ය ඡායාරූපයක් ඉවත් කරන්න (🗑️).
+            </div>
+          `}
+        </div>
+      ` : ''}
+
+      <!-- Portfolio Photos Grid -->
+      ${allPortfolio.length > 0 ? `
+        <div class="artisan-full-portfolio-grid">
+          ${allPortfolio.map((item, idx) => {
+            const imgUrl = typeof item === 'object' && item.url ? item.url : item;
+            const caption = typeof item === 'object' && item.caption ? item.caption : '';
+            return `
+              <div class="artisan-portfolio-item-card" onclick="openArtisanPortfolioGallery('${encodedPortfolio}', ${idx})" title="${Security.escapeHTML(caption || 'විශාල කර බලන්න')}">
+                <img src="${imgUrl}" alt="නිර්මාණ සාම්පලය ${idx + 1}" loading="lazy">
+                ${caption ? `<div class="artisan-portfolio-item-caption">${Security.escapeHTML(caption)}</div>` : ''}
+                ${isOwner ? `
+                  <button type="button" class="btn-artisan-photo-del" onclick="event.stopPropagation(); deleteArtisanPortfolioPhoto('${artisanId}', ${idx})" title="මෙම ඡායාරූපය ඉවත් කරන්න">
+                    <i class="fa-solid fa-trash-can"></i>
+                  </button>
+                ` : ''}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      ` : `
+        <div style="text-align: center; padding: 30px 16px; background: #fffdf8; border: 1.5px dashed #fed7aa; border-radius: 16px; color: #94a3b8;">
+          <i class="fa-regular fa-images" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 8px; display: block;"></i>
+          <span style="font-size: 0.82rem; color: #64748b;">තවමත් නිර්මාණ ඡායාරූප ඇතුළත් කර නොමැත.</span>
+          ${isOwner ? `
+            <div style="font-size: 0.78rem; color: #d97706; margin-top: 6px; font-weight: 700;">ඉහතින් ඇති බොත්තම මඟින් ඔබගේ නිර්මාණ ඡායාරූප එක් කරන්න.</div>
+          ` : ''}
+        </div>
+      `}
+    </div>
+  `;
+}
+
+window.handleArtisanOwnerFileSelect = function(input) {
+  if (!input || !input.files || input.files.length === 0) return;
+  const countEl = document.getElementById('artisanOwnerSelectedCount');
+  const submitBtn = document.getElementById('btnUploadArtisanOwnerPhotos');
+  if (countEl) {
+    countEl.textContent = `තෝරාගත් ඡායාරූප ${input.files.length}ක්`;
+    countEl.style.display = 'inline-block';
+  }
+  if (submitBtn) {
+    submitBtn.style.display = 'inline-flex';
+  }
+};
+
+window.submitArtisanOwnerPhotos = async function(artisanId) {
+  triggerHaptic(15);
+  const artisan = (allArtisansList || []).find(a => (a.id || a.docId) === artisanId);
+  if (!artisan) return;
+  if (!checkIsArtisanOwner(artisan)) {
+    alert("මෙම පැතිකඩට ඡායාරූප එක් කිරීමට ඔබට අවසර නොමැත.");
+    return;
+  }
+
+  const fileInput = document.getElementById('artisanOwnerPortFiles');
+  if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+    alert("කරුණාකර අවම වශයෙන් එක් ඡායාරූපයක් හෝ තෝරන්න.");
+    return;
+  }
+
+  const existing = Array.isArray(artisan.portfolioImages) ? artisan.portfolioImages : (Array.isArray(artisan.portfolio) ? artisan.portfolio : []);
+  if (existing.length >= 15) {
+    alert("උපරිම ඡායාරූප සීමාව (15) සම්පූර්ණ වී ඇත.");
+    return;
+  }
+
+  const allowedSlots = 15 - existing.length;
+  const filesToUpload = Array.from(fileInput.files).slice(0, allowedSlots);
+  const caption = (document.getElementById('artisanOwnerPortCaption')?.value || '').trim();
+
+  const submitBtn = document.getElementById('btnUploadArtisanOwnerPhotos');
+  const statusBox = document.getElementById('artisanOwnerUploadStatus');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>උඩුගත වෙමින් පවතී...</span>`;
+  }
+  if (statusBox) {
+    statusBox.style.display = 'block';
+    statusBox.textContent = "ඡායාරූප සම්පීඩනය කරමින් සහ Cloudinary වෙත උඩුගත කරමින් පවතී...";
+  }
+
+  try {
+    const uploadedItems = [];
+    for (let i = 0; i < filesToUpload.length; i++) {
+      if (statusBox) {
+        statusBox.textContent = `ඡායාරූප උඩුගත කෙරේ (${i + 1}/${filesToUpload.length})...`;
+      }
+      const file = filesToUpload[i];
+      let uploadPayload = file;
+      try {
+        const compressed = await compressSingleImageFile(file);
+        if (compressed) uploadPayload = compressed;
+      } catch (cErr) {
+        console.warn('[Artisan] Compression fallback to raw file:', cErr);
+      }
+
+      const cloudUrl = await uploadToCloudinary(uploadPayload, `artisan_portfolio_${artisanId}_${Date.now()}_${i}`);
+      if (!cloudUrl || !cloudUrl.startsWith('http')) {
+        throw new Error("ඡායාරූපය උඩුගත කිරීම අසාර්ථක විය.");
+      }
+
+      if (caption) {
+        uploadedItems.push({ url: cloudUrl, caption, addedAt: Date.now() });
+      } else {
+        uploadedItems.push(cloudUrl);
+      }
+    }
+
+    const updatedPortfolio = [...existing, ...uploadedItems];
+    await StorageService.updateArtisan(artisanId, { portfolioImages: updatedPortfolio });
+
+    // Update in-memory artisan and directory state
+    artisan.portfolioImages = updatedPortfolio;
+    const cacheIdx = (allArtisansList || []).findIndex(a => (a.id || a.docId) === artisanId);
+    if (cacheIdx !== -1) {
+      allArtisansList[cacheIdx].portfolioImages = updatedPortfolio;
+    }
+    try {
+      localStorage.removeItem('pinPotha_artisans_cache');
+    } catch (e) {}
+
+    // Re-render modal and directory cards
+    renderArtisanProfileModal(artisan);
+    renderArtisansDirectoryView();
+
+    triggerHaptic([30, 60, 30]);
+    if (typeof showCustomToast === 'function') {
+      showCustomToast(`සාදු! නව ඡායාරූප ${uploadedItems.length}ක් සාර්ථකව ඇතුළත් විය. 🙏`, 'success');
+    } else {
+      alert(`සාදු! නව ඡායාරූප ${uploadedItems.length}ක් සාර්ථකව ඇතුළත් විය. 🙏`);
+    }
+  } catch (err) {
+    console.error('[Artisan] Portfolio upload error:', err);
+    alert("ඡායාරූප උඩුගත කිරීමේදී දෝෂයක් සිදුවිය: " + (err.message || 'නැවත උත්සාහ කරන්න.'));
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> <span>උඩුගත කරන්න</span>`;
+    }
+    if (statusBox) {
+      statusBox.style.display = 'none';
+    }
+  }
+};
+
+window.deleteArtisanPortfolioPhoto = async function(artisanId, photoIndex) {
+  triggerHaptic(15);
+  const artisan = (allArtisansList || []).find(a => (a.id || a.docId) === artisanId);
+  if (!artisan) return;
+  if (!checkIsArtisanOwner(artisan)) {
+    alert("මෙම ඡායාරූපය ඉවත් කිරීමට ඔබට අවසර නොමැත.");
+    return;
+  }
+
+  if (!confirm("මෙම නිර්මාණ ඡායාරූපය ඔබගේ පැතිකඩෙන් ඉවත් කිරීමට ඔබට විශ්වාසද?")) {
+    return;
+  }
+
+  const existing = Array.isArray(artisan.portfolioImages) ? [...artisan.portfolioImages] : (Array.isArray(artisan.portfolio) ? [...artisan.portfolio] : []);
+  if (photoIndex < 0 || photoIndex >= existing.length) return;
+
+  existing.splice(photoIndex, 1);
+
+  try {
+    await StorageService.updateArtisan(artisanId, { portfolioImages: existing });
+    artisan.portfolioImages = existing;
+    const cacheIdx = (allArtisansList || []).findIndex(a => (a.id || a.docId) === artisanId);
+    if (cacheIdx !== -1) {
+      allArtisansList[cacheIdx].portfolioImages = existing;
+    }
+    try {
+      localStorage.removeItem('pinPotha_artisans_cache');
+    } catch (e) {}
+
+    renderArtisanProfileModal(artisan);
+    renderArtisansDirectoryView();
+
+    triggerHaptic(20);
+    if (typeof showCustomToast === 'function') {
+      showCustomToast("ඡායාරූපය සාර්ථකව ඉවත් කරන ලදී.", "info");
+    }
+  } catch (err) {
+    console.error('[Artisan] Delete photo error:', err);
+    alert("ඡායාරූපය ඉවත් කිරීමේදී දෝෂයක් සිදුවිය: " + (err.message || 'නැවත උත්සාහ කරන්න.'));
+  }
+};
+
+window.copyArtisanProfileLink = function(artisanId, artisanName) {
+  triggerHaptic(15);
+  const shareUrl = window.location.origin + window.location.pathname + '#artisan_' + artisanId;
+  const shareText = `ශ්‍රී ලංකා විහාර නිර්මාණ හා පෙරහැර කලා ශිල්පී නාමාවලිය - ${artisanName}`;
+  if (navigator.share) {
+    navigator.share({
+      title: shareText,
+      text: shareText,
+      url: shareUrl
+    }).catch(() => {});
+  } else if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      if (typeof showCustomToast === 'function') {
+        showCustomToast("පැතිකඩ ලින්ක් එක කොපි විය! 📋", "success");
+      } else {
+        alert("පැතිකඩ ලින්ක් එක කොපි විය! 📋");
+      }
+    }).catch(() => {});
+  }
+};
 
 // Modal handling
 window.openArtisanRegisterModal = function() {
@@ -12390,6 +12825,8 @@ window.handleArtisanRegisterSubmit = async function(e) {
       wildlifeLicenseImage: isElephant ? (wildlifeLicenseImageUrl || '') : '',
       wildlifeLicenseConfirmed: isElephant ? true : false,
       status: 'pending',
+      ownerUid: user.uid || 'unknown',
+      ownerEmail: user.email || '',
       submittedByUid: user.uid || 'unknown',
       submittedByName: user.name || 'පින්වත් සාමාජිකයෙක්',
       submittedByEmail: user.email || ''
