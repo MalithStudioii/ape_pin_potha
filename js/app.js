@@ -4,9 +4,9 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=144';
-import { Security } from './security.js?v=144';
-import { uploadToImgBB } from './imgbb-service.js?v=66';
+import { StorageService } from './storage.js?v=165';
+import { Security } from './security.js?v=160';
+import { uploadToImgBB, uploadToCloudinary } from './imgbb-service.js?v=68';
 import { SoundService, triggerHaptic } from './sound.js?v=66';
 import { FeedAlgorithm } from './algorithm.js?v=144';
 import { SPIRITUAL_AVATARS, renderSpiritualAvatarPicker, selectSpiritualAvatar } from './spiritual-avatars.js?v=144';
@@ -210,6 +210,13 @@ let activeCategory = 'සියල්ල';
 let selectedPostType = 'merit';
 let compressedBase64Image = null;
 let selectedImagesList = [];
+// Expose selectedImagesList globally for inline event handlers and external safety
+Object.defineProperty(window, 'selectedImagesList', {
+  get: () => selectedImagesList,
+  set: (val) => { selectedImagesList = Array.isArray(val) ? val : []; },
+  configurable: true,
+  enumerable: true
+});
 let currentLightboxImages = [];
 let currentLightboxIndex = 0;
 let currentPostsData = [];
@@ -218,6 +225,8 @@ let activeProfileSubTab = 'timeline';
 let currentNotifications = [];
 let activeNotifFilter = 'all';
 let currentFeedSort = 'trending';
+let allArtisansList = [];
+let artisansFetchPromise = null;
 
 window.setFeedSort = function(sortMode) {
   triggerHaptic(15);
@@ -263,11 +272,23 @@ function bootApp() {
   try {
     try { initSmartHeaderScroll(); } catch (e) {}
     try { initMobileBottomBarLock(); } catch (e) {}
+    try { initFeatureDiscoveryBadge(); } catch (e) {}
 
     // 1. INSTANT ZERO-LATENCY PAINT:
     // Render immediately from localStorage/seed so users see the feed instantaneously in <50ms!
     try {
       StorageService.purgeDummyPostsFromStorage();
+    } catch (e) {}
+
+    // Initialize cached artisans synchronously for fast spotlight render
+    try {
+      const cachedArtisans = localStorage.getItem('pinPotha_artisans_cache');
+      if (cachedArtisans) {
+        const parsed = JSON.parse(cachedArtisans);
+        if (parsed && Array.isArray(parsed.data) && parsed.data.length > 0) {
+          allArtisansList = parsed.data;
+        }
+      }
     } catch (e) {}
 
     currentPostsData = (StorageService.getLocalPosts() || []).filter(p => !StorageService.isDummyTestPost || !StorageService.isDummyTestPost(p));
@@ -305,58 +326,107 @@ function bootApp() {
       console.warn('[App] renderPoyaUI error caught safely:', e);
     }
 
-    // Subscribe to real-time database updates
+    // Warm / refresh artisans cache in background (respects 15-min TTL)
+    try {
+      ensureVerifiedArtisansLoaded().catch(() => {});
+    } catch (e) {}
+
+    // Subscribe to real-time database updates with 150ms debounce to prevent multiple consecutive DOM repaints on boot
+    let postUpdateDebounceTimer = null;
     StorageService.onPostsUpdate((posts) => {
-      try {
-        const cleanPosts = (posts || []).filter(p => !StorageService.isDummyTestPost || !StorageService.isDummyTestPost(p));
-        const prevIds = (currentPostsData || []).map(p => p.id).join(',');
-        const newIds = cleanPosts.map(p => p.id).join(',');
-        currentPostsData = cleanPosts;
-        window.currentPostsData = currentPostsData;
+      const handlePostsUpdate = () => {
+        try {
+          const cleanPosts = (posts || []).filter(p => !StorageService.isDummyTestPost || !StorageService.isDummyTestPost(p));
+          const prevIds = (currentPostsData || []).map(p => p.id).join(',');
+          const newIds = cleanPosts.map(p => p.id).join(',');
+          currentPostsData = cleanPosts;
+          window.currentPostsData = currentPostsData;
 
-        const container = document.getElementById('postsContainer');
-        const hasRenderedCards = container && container.children.length > 0 && !container.querySelector('.feed-loading-shimmer');
+          const container = document.getElementById('postsContainer');
+          const hasRenderedCards = container && container.children.length > 0 && !container.querySelector('.feed-loading-shimmer');
 
-        const feedHasImages = Boolean(container && container.querySelector('.photo-collage-container'));
-        const incomingHasImages = cleanPosts.some(p => Boolean(p.image || (Array.isArray(p.images) && p.images.length > 0)));
+          const feedHasImages = Boolean(container && container.querySelector('.photo-collage-container'));
+          const incomingHasImages = cleanPosts.some(p => Boolean(p.image || (Array.isArray(p.images) && p.images.length > 0)));
 
-        if (hasRenderedCards && prevIds.length > 0 && prevIds === newIds) {
-          if (!feedHasImages && incomingHasImages) {
-            renderFeed();
-          } else {
+          if (hasRenderedCards && prevIds.length > 0 && prevIds === newIds) {
+            if (!feedHasImages && incomingHasImages) {
+              renderFeed();
+            } else {
+              updateFeedInPlace(currentPostsData);
+            }
+          } else if (hasRenderedCards && prevIds.length > 0 && isTriggeringLoadMore && newIds.startsWith(prevIds)) {
+            // Posts were appended at the bottom via pagination! Smooth append without resetting DOM or scroll position
+            appendNewPostsToFeed(posts, prevIds);
             updateFeedInPlace(currentPostsData);
+          } else {
+            renderFeed();
           }
-        } else if (hasRenderedCards && prevIds.length > 0 && isTriggeringLoadMore && newIds.startsWith(prevIds)) {
-          // Posts were appended at the bottom via pagination! Smooth append without resetting DOM or scroll position
-          appendNewPostsToFeed(posts, prevIds);
-          updateFeedInPlace(currentPostsData);
-        } else {
-          renderFeed();
-        }
 
-        try { updateUserInfoUI(); } catch (e) {}
-        try { renderSideNeeds(); } catch (e) {}
-        try { updateUserStats(); } catch (e) {}
-        try { renderPcSidebarMembers().catch(() => {}); } catch (e) {}
-        if (activeTab === 'profile') {
-          try { renderProfileView(); } catch (e) {}
+          try { updateUserInfoUI(); } catch (e) {}
+          try { renderSideNeeds(); } catch (e) {}
+          try { updateUserStats(); } catch (e) {}
+          try { renderPcSidebarMembers().catch(() => {}); } catch (e) {}
+          if (activeTab === 'profile') {
+            try { renderProfileView(); } catch (e) {}
+          }
+          // Refresh admin stats if admin modal is open
+          const adminPanel = document.getElementById('settingsContentAdmin');
+          if (adminPanel && !adminPanel.classList.contains('hidden')) {
+            if (typeof window.renderAdminDashboard === 'function') window.renderAdminDashboard();
+          }
+        } catch (onPostsErr) {
+          console.warn('[App] Error in onPostsUpdate handler:', onPostsErr);
+          try { renderFeed(); } catch (e) {}
         }
-        // Refresh admin stats if admin modal is open
-        const adminPanel = document.getElementById('settingsContentAdmin');
-        if (adminPanel && !adminPanel.classList.contains('hidden')) {
-          if (typeof window.renderAdminDashboard === 'function') window.renderAdminDashboard();
+      };
+
+      // Immediate render on initial cold start or when explicitly loading more posts
+      if (!currentPostsData || currentPostsData.length === 0 || isTriggeringLoadMore) {
+        if (postUpdateDebounceTimer) {
+          clearTimeout(postUpdateDebounceTimer);
+          postUpdateDebounceTimer = null;
         }
-      } catch (onPostsErr) {
-        console.warn('[App] Error in onPostsUpdate handler:', onPostsErr);
-        try { renderFeed(); } catch (e) {}
+        handlePostsUpdate();
+      } else {
+        if (postUpdateDebounceTimer) {
+          clearTimeout(postUpdateDebounceTimer);
+        }
+        postUpdateDebounceTimer = setTimeout(() => {
+          postUpdateDebounceTimer = null;
+          handlePostsUpdate();
+        }, 150);
       }
     });
 
     // Subscribe to real-time notifications
+    let hasLoadedInitialNotifs = false;
     StorageService.onNotificationsUpdate((notifs) => {
       try {
-        currentNotifications = notifs || [];
+        const prevNotifs = currentNotifications || [];
+        const nextNotifs = notifs || [];
+        currentNotifications = nextNotifs;
         renderNotificationsList();
+
+        // Check for newly arrived unread notifications after initial load
+        if (hasLoadedInitialNotifs && nextNotifs.length > prevNotifs.length) {
+          const prevIds = new Set(prevNotifs.map(n => n.id));
+          const newUnreads = nextNotifs.filter(n => !n.read && !prevIds.has(n.id));
+          if (newUnreads.length > 0 && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+            const latest = newUnreads[0];
+            const senderName = latest.senderName || latest.authorName || 'කෙනෙක්';
+            let notifText = 'ඔබගේ පින්කමකට අලුත් ප්‍රතිචාරයක් ලැබුණි.';
+            if (latest.type === 'sadhu') {
+              notifText = `${senderName} ඔබගේ පින්කමට සාදුකාරයක් එක් කළා.`;
+            } else if (latest.type === 'comment') {
+              notifText = `${senderName}: "${latest.text ? (latest.text.length > 50 ? latest.text.substring(0, 50) + '...' : latest.text) : 'පුණ්‍යානුමෝදනාවක් කළා'}"`;
+            }
+            showLocalOSNotification('පිං පොත - නව දැනුම්දීමක්! 🙏', {
+              body: notifText,
+              tag: 'pin-potha-notif-' + (latest.id || Date.now())
+            });
+          }
+        }
+        hasLoadedInitialNotifs = true;
       } catch (e) {}
     });
 
@@ -489,10 +559,72 @@ function bootApp() {
       }
     });
 
-    // Check URL query params for direct post sharing (?post=POST_ID)
-    try { checkUrlDirectPost(); } catch (e) {}
+    // Route incoming deep links for both query params (?a=, ?p=, ?post=) and hashes (#artisan_, #post_)
+    try { handleUrlDeepLinks(); } catch (e) {}
+    try { window.addEventListener('hashchange', handleUrlDeepLinks); } catch (e) {}
   } catch (bootErr) {
     console.warn('[App] bootApp error caught safely:', bootErr);
+  }
+}
+
+// Build clean production-ready share URLs (e.g. https://apepinpotha.lk/?a=ID or /?p=ID)
+function buildCleanShareUrl(paramKey, paramValue, extraParams = {}) {
+  const origin = window.location.origin || '';
+  let path = (window.location.pathname || '/').replace(/\/index\.html?$/i, '');
+  if (!path.endsWith('/')) {
+    path += '/';
+  }
+  const params = new URLSearchParams();
+  if (paramKey && paramValue) {
+    params.set(paramKey, String(paramValue).trim());
+  }
+  if (extraParams && typeof extraParams === 'object') {
+    Object.keys(extraParams).forEach(k => {
+      if (extraParams[k]) params.set(k, String(extraParams[k]).trim());
+    });
+  }
+  const qs = params.toString();
+  return `${origin}${path}${qs ? '?' + qs : ''}`;
+}
+
+// Parse deep link parameters from URL search query or hash
+function extractDeepLinkTargets() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const hash = window.location.hash || '';
+
+  let artisanId = urlParams.get('a') || urlParams.get('artisan') || '';
+  if (!artisanId && hash.startsWith('#artisan_')) {
+    artisanId = hash.replace(/^#artisan_/, '').trim();
+  }
+
+  let postId = urlParams.get('p') || urlParams.get('post') || '';
+  if (!postId && hash.startsWith('#post_')) {
+    postId = hash.replace(/^#post_/, '').trim();
+  }
+
+  return {
+    artisanId: artisanId ? decodeURIComponent(artisanId) : null,
+    postId: postId ? decodeURIComponent(postId) : null,
+    tab: urlParams.get('tab') || null
+  };
+}
+
+// Route arriving deep links for artisans and posts
+function handleUrlDeepLinks() {
+  const targets = extractDeepLinkTargets();
+  if (targets.artisanId) {
+    if (typeof window.openArtisanProfileModal === 'function') {
+      window.openArtisanProfileModal(targets.artisanId);
+    } else {
+      setTimeout(() => {
+        if (typeof window.openArtisanProfileModal === 'function') {
+          window.openArtisanProfileModal(targets.artisanId);
+        }
+      }, 350);
+    }
+  }
+  if (targets.postId) {
+    checkUrlDirectPost(targets.postId);
   }
 }
 
@@ -541,9 +673,7 @@ export function updateUserInfoUI() {
     const isGuest = !user || !user.email;
     const isMaster = Boolean(!isGuest && user && (
       StorageService.isMasterAdmin(user) ||
-      (user.email && user.email.trim().toLowerCase() === 'silvadilan9@gmail.com') ||
-      user.role === 'admin' ||
-      user.role === 'master_admin'
+      (user.email && user.email.trim().toLowerCase() === 'silvadilan9@gmail.com')
     ));
     const isSub = Boolean(!isGuest && !isMaster && user && StorageService.isSubAdmin(user));
     const isAdminUser = isMaster || isSub;
@@ -665,7 +795,6 @@ export function updateUserInfoUI() {
       user && (
         (user.email && user.email.trim().toLowerCase() === 'silvadilan9@gmail.com') ||
         user.role === 'admin' ||
-        user.role === 'master_admin' ||
         (typeof window !== 'undefined' && window.isStrictMasterAdmin === true)
       )
     );
@@ -785,21 +914,23 @@ export function updateUserStats() {
 
     const isMasterUser = Boolean(user && user.email && user.email.trim().toLowerCase() === 'silvadilan9@gmail.com');
     const myPosts = currentPostsData.filter(p => {
-      if (!p) return false;
+      if (!p || p.isDeleted || p.deleted) return false;
+      const isOfficial = Boolean(StorageService.isOfficialPost ? StorageService.isOfficialPost(p) : (p.isOfficial || p.authorRole === 'official' || p.author === 'අපේ පිං පොත' || p.author === 'අපේ පින් පොත'));
+      if (isOfficial) return false;
       if (user && user.uid && p.uid === user.uid) return true;
       if (user && user.email && p.authorEmail && p.authorEmail.toLowerCase() === user.email.toLowerCase()) return true;
       if (user && user.name && p.author && p.author.trim().toLowerCase() === user.name.trim().toLowerCase()) return true;
       if (isMasterUser && (
         p.uid === 'user_malith' ||
         p.uid === 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2' ||
-        (p.author && (p.author.includes('මලිත්') || p.author === 'අපේ පිං පොත' || p.author === 'පිං පොත පරිපාලනය'))
+        (p.author && p.author.includes('මලිත්'))
       )) return true;
       return false;
     });
     const totalSadhu = myPosts.reduce((acc, p) => acc + (p.sadhuCount || 0), 0);
 
-    const finalPosts = isMasterUser ? Math.max(myPosts.length, 17) : myPosts.length;
-    const finalSadhu = isMasterUser ? Math.max(totalSadhu, 146) : totalSadhu;
+    const finalPosts = myPosts.length;
+    const finalSadhu = totalSadhu;
 
     if (statPostsEl) statPostsEl.innerText = finalPosts;
     if (statSadhuEl) statSadhuEl.innerText = finalSadhu;
@@ -895,6 +1026,12 @@ window.openPublicProfile = async function(targetUid, optName = null, optPhoto = 
     return;
   }
 
+  // Intercept official platform identity clicks and open Policies/About modal
+  if (optName === 'අපේ පිං පොත' || optName === 'අපේ පින් පොත' || optName === 'පිං පොත පරිපාලනය' || optName === 'පිං පොත නිල නිවේදනය' || targetUid === 'official_pin_potha') {
+    if (typeof openPoliciesModal === 'function') openPoliciesModal('about');
+    return;
+  }
+
   const currentUser = StorageService.currentUser;
   const isMe = Boolean(currentUser && currentUser.uid && String(currentUser.uid) === String(targetUid));
 
@@ -938,7 +1075,8 @@ window.viewUserProfile = async function(uid, authorName, authorPhoto = null, cov
 
   if (uid === 'undefined' || uid === 'null' || !uid) uid = null;
 
-  if (uid === 'official_pin_potha' || authorName === 'අපේ පිං පොත' || authorName === 'පිං පොත පරිපාලනය' || authorName === 'පිං පොත නිල නිවේදනය') {
+  if (uid === 'official_pin_potha' || authorName === 'අපේ පිං පොත' || authorName === 'අපේ පින් පොත' || authorName === 'පිං පොත පරිපාලනය' || authorName === 'පිං පොත නිල නිවේදනය') {
+    if (typeof openPoliciesModal === 'function') openPoliciesModal('about');
     return;
   }
 
@@ -967,7 +1105,7 @@ window.viewMemberProfilePhoto = function(e) {
 
 window.viewMemberCoverPhoto = function(e) {
   if (e) e.stopPropagation();
-  const coverUrl = currentViewingMember?.coverImage || document.getElementById('memCoverImg')?.getAttribute('src') || 'assets/banner.jpg';
+  const coverUrl = currentViewingMember?.coverImage || document.getElementById('memCoverImg')?.getAttribute('src') || 'assets/banner.webp';
   if (coverUrl && !coverUrl.includes('data:image/svg+xml')) {
     window.openLightbox([coverUrl], 0);
   }
@@ -979,6 +1117,12 @@ window.openMemberProfileModal = async function(uid, authorName, authorPhoto = nu
 
   if (uid === 'undefined' || uid === 'null' || !uid) uid = null;
   if (!uid && !authorName) return;
+
+  // Intercept official platform identity clicks and open Policies/About modal
+  if (authorName === 'අපේ පිං පොත' || authorName === 'අපේ පින් පොත' || authorName === 'පිං පොත පරිපාලනය' || authorName === 'පිං පොත නිල නිවේදනය' || uid === 'official_pin_potha') {
+    if (typeof openPoliciesModal === 'function') openPoliciesModal('about');
+    return;
+  }
 
   // Self check: If viewing own profile, redirect to editable profile tab
   const currentUser = StorageService.currentUser;
@@ -1001,7 +1145,7 @@ window.openMemberProfileModal = async function(uid, authorName, authorPhoto = nu
 
   // 1. Immediately reset previous modal content to prevent cross-profile flicker
   const coverImg = document.getElementById('memCoverImg');
-  if (coverImg) coverImg.src = coverImage || cached?.coverImage || 'assets/banner.jpg';
+  if (coverImg) coverImg.src = coverImage || cached?.coverImage || 'assets/banner.webp';
 
   const avatarWrap = document.getElementById('memAvatarWrap');
   if (avatarWrap) {
@@ -1036,7 +1180,7 @@ window.openMemberProfileModal = async function(uid, authorName, authorPhoto = nu
     uid: uid || null,
     name: initialName,
     photo: authorPhoto || cached?.photo || null,
-    coverImage: coverImage || cached?.coverImage || 'assets/banner.jpg',
+    coverImage: coverImage || cached?.coverImage || 'assets/banner.webp',
     bio: "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏",
     location: '',
     occupation: '',
@@ -1062,7 +1206,7 @@ window.openMemberProfileModal = async function(uid, authorName, authorPhoto = nu
   if (authorPhoto && (!member.photo || member.photo.trim().length === 0)) {
     member.photo = authorPhoto;
   }
-  if (coverImage && (!member.coverImage || member.coverImage === 'assets/banner.jpg')) {
+  if (coverImage && (!member.coverImage || member.coverImage === 'assets/banner.webp')) {
     member.coverImage = coverImage;
   }
 
@@ -1081,7 +1225,7 @@ window.openMemberProfileModal = async function(uid, authorName, authorPhoto = nu
 
 currentViewingMember = member;
 
-  if (coverImg) coverImg.src = member.coverImage || 'assets/banner.jpg';
+  if (coverImg) coverImg.src = member.coverImage || 'assets/banner.webp';
 
   const isSangha = StorageService.isSangha(member);
   const isMaster = StorageService.isMasterAdmin();
@@ -1097,7 +1241,7 @@ currentViewingMember = member;
       avatarWrap.classList.add('sangha-framed-avatar');
       avatarWrap.innerHTML = `
         ${innerPhoto}
-        <img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත රාමුව">
+        <img src="assets/sangha-frame.webp" class="sangha-vatapatha-frame" alt="වටාපත රාමුව">
       `;
     } else {
       avatarWrap.classList.remove('sangha-framed-avatar');
@@ -1126,6 +1270,38 @@ currentViewingMember = member;
     } else {
       badgeEl.className = 'verified-pill';
       badgeEl.innerHTML = `<i class="fa-solid fa-seedling"></i> <span>පිංවත් සාමාජික</span>`;
+    }
+  }
+
+  // Verified Artisan Badge on Member Profile Modal
+  const memArtisanWrap = document.getElementById('memArtisanBadgeWrap');
+  if (memArtisanWrap) {
+    const matchedArtisan = findUserArtisanListing(member);
+    if (matchedArtisan) {
+      const isPerahera = matchedArtisan.section === 'perahera_culture';
+      const badgeIcon = isPerahera ? '🥁' : '🎨';
+      const badgeText = isPerahera ? 'සත්‍යාපිත පෙරහැර කලා ශිල්පී' : 'සත්‍යාපිත විහාර කලා ශිල්පී';
+      const pillClass = isPerahera ? 'pill-perahera' : 'pill-temple';
+      const artId = matchedArtisan.id || matchedArtisan.docId || '';
+
+      memArtisanWrap.innerHTML = `
+        <div class="artisan-member-pill-group">
+          <span class="member-artisan-pill ${pillClass}">
+            <span>${badgeIcon}</span>
+            <span>${badgeText}</span>
+          </span>
+          <button type="button" class="btn-view-artisan-profile-link" onclick="openArtisanProfileModal('${artId}')" title="ශිල්පී පැතිකඩ බලන්න">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+            <span>ශිල්පී පැතිකඩ</span>
+          </button>
+        </div>
+      `;
+      memArtisanWrap.classList.remove('hidden');
+      memArtisanWrap.style.display = 'inline-flex';
+    } else {
+      memArtisanWrap.innerHTML = '';
+      memArtisanWrap.classList.add('hidden');
+      memArtisanWrap.style.display = 'none';
     }
   }
 
@@ -1161,7 +1337,7 @@ currentViewingMember = member;
     joinedEl.innerText = rawJoined.includes('සිට') ? rawJoined : `${rawJoined} සිට සාමාජික`;
   }
 
-  // Filter public posts for this member (strictly non-private and not deleted)
+  // Filter public posts for this member (strictly non-private, non-official and not deleted)
   const allPosts = (Array.isArray(currentPostsData) && currentPostsData.length > 0)
     ? currentPostsData
     : (StorageService.getLocalPosts() || []);
@@ -1169,6 +1345,8 @@ currentViewingMember = member;
   const memberPosts = allPosts.filter(p => {
     if (!p || p.isDeleted || p.deleted) return false;
     if (p.visibility === 'private') return false;
+    const isOfficial = Boolean(StorageService.isOfficialPost ? StorageService.isOfficialPost(p) : (p.isOfficial || p.authorRole === 'official' || p.author === 'අපේ පිං පොත' || p.author === 'අපේ පින් පොත'));
+    if (isOfficial) return false;
     const matchUid = Boolean(uid && p.uid && String(p.uid) === String(uid));
     const resolvedName = StorageService.resolveAuthorName ? StorageService.resolveAuthorName(p) : (p.author || p.authorName);
     const matchAuthor = Boolean(
@@ -1309,7 +1487,7 @@ currentViewingMember = member;
           <div class="mem-fb-friend-card" onclick="openMemberProfileModal('${f.uid}', '${Security.escapeHTML(f.name)}', '${f.photo ? Security.sanitizeUrl(f.photo) : ''}', '${f.coverImage ? Security.sanitizeUrl(f.coverImage) : ''}')">
             <div class="mem-fb-friend-thumb ${isFSangha ? 'sangha-framed-avatar' : ''}">
               ${f.photo ? `<img src="${Security.sanitizeUrl(f.photo)}" alt="${Security.escapeHTML(f.name)}" onerror="this.parentElement.innerText = '${initial}';">` : initial}
-              ${isFSangha ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත" style="position:absolute; inset:-3px; width:calc(100% + 6px); height:calc(100% + 6px); pointer-events:none;">' : ''}
+              ${isFSangha ? '<img src="assets/sangha-frame.webp" class="sangha-vatapatha-frame" alt="වටාපත" style="position:absolute; inset:-3px; width:calc(100% + 6px); height:calc(100% + 6px); pointer-events:none;">' : ''}
             </div>
             <div class="mem-fb-friend-info">
               <div class="mem-fb-friend-name" title="${Security.escapeHTML(f.name || 'කල්‍යාණ මිත්‍ර')}">
@@ -1380,7 +1558,7 @@ window.switchTab = function(tab, pushHistory = true) {
   document.querySelector('.app-header')?.classList.remove('header-hidden');
 
   // Update navigation buttons (both desktop & mobile)
-  ['feed', 'profile', 'mybook', 'needs', 'friends', 'aranya', 'policies'].forEach(t => {
+  ['feed', 'profile', 'mybook', 'needs', 'friends', 'aranya', 'policies', 'artisans'].forEach(t => {
     const dBtn = document.getElementById(`desk-tab-${t}`);
     const mBtn = document.getElementById(`mob-tab-${t}`);
     if (dBtn) {
@@ -1397,6 +1575,12 @@ window.switchTab = function(tab, pushHistory = true) {
   if (sideAranyaBtn) {
     if (tab === 'aranya') sideAranyaBtn.classList.add('active');
     else sideAranyaBtn.classList.remove('active');
+  }
+
+  const sideArtisansBtn = document.getElementById('side-btn-artisans');
+  if (sideArtisansBtn) {
+    if (tab === 'artisans') sideArtisansBtn.classList.add('active');
+    else sideArtisansBtn.classList.remove('active');
   }
 
   const headerAranyaBtn = document.getElementById('headerAranyaBtn');
@@ -1416,6 +1600,7 @@ window.switchTab = function(tab, pushHistory = true) {
   const aranyaContainer = document.getElementById('aranyaPageContainer');
   const friendsContainer = document.getElementById('friendsPageContainer');
   const policiesContainer = document.getElementById('policiesPageContainer');
+  const artisansContainer = document.getElementById('artisansPageContainer');
   const banner = document.getElementById('tabHeaderBanner');
 
   if (tab === 'policies') {
@@ -1439,6 +1624,10 @@ window.switchTab = function(tab, pushHistory = true) {
     if (friendsContainer) {
       friendsContainer.classList.add('hidden');
       friendsContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (artisansContainer) {
+      artisansContainer.classList.add('hidden');
+      artisansContainer.style.setProperty('display', 'none', 'important');
     }
     if (policiesContainer) {
       policiesContainer.classList.remove('hidden');
@@ -1471,6 +1660,10 @@ window.switchTab = function(tab, pushHistory = true) {
     if (policiesContainer) {
       policiesContainer.classList.add('hidden');
       policiesContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (artisansContainer) {
+      artisansContainer.classList.add('hidden');
+      artisansContainer.style.setProperty('display', 'none', 'important');
     }
     if (profileContainer) {
       profileContainer.classList.remove('hidden');
@@ -1505,6 +1698,10 @@ window.switchTab = function(tab, pushHistory = true) {
       policiesContainer.classList.add('hidden');
       policiesContainer.style.setProperty('display', 'none', 'important');
     }
+    if (artisansContainer) {
+      artisansContainer.classList.add('hidden');
+      artisansContainer.style.setProperty('display', 'none', 'important');
+    }
     if (aranyaContainer) {
       aranyaContainer.classList.remove('hidden');
       aranyaContainer.style.setProperty('display', 'block', 'important');
@@ -1515,6 +1712,44 @@ window.switchTab = function(tab, pushHistory = true) {
       renderAranyaDirectoryView();
     } catch (err) {
       console.error('[Aranya] Error rendering aranya view:', err);
+    }
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+
+  if (tab === 'artisans') {
+    stopKmpLivePolling();
+    if (feedLayout) {
+      feedLayout.classList.add('hidden');
+      feedLayout.style.setProperty('display', 'none', 'important');
+    }
+    if (profileContainer) {
+      profileContainer.classList.add('hidden');
+      profileContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (aranyaContainer) {
+      aranyaContainer.classList.add('hidden');
+      aranyaContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (friendsContainer) {
+      friendsContainer.classList.add('hidden');
+      friendsContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (policiesContainer) {
+      policiesContainer.classList.add('hidden');
+      policiesContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (artisansContainer) {
+      artisansContainer.classList.remove('hidden');
+      artisansContainer.style.setProperty('display', 'block', 'important');
+    }
+    if (banner) banner.style.display = 'none';
+
+    try {
+      renderArtisansDirectoryView();
+    } catch (err) {
+      console.error('[Artisans] Error rendering artisans view:', err);
     }
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1538,6 +1773,10 @@ window.switchTab = function(tab, pushHistory = true) {
     if (policiesContainer) {
       policiesContainer.classList.add('hidden');
       policiesContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (artisansContainer) {
+      artisansContainer.classList.add('hidden');
+      artisansContainer.style.setProperty('display', 'none', 'important');
     }
     if (friendsContainer) {
       friendsContainer.classList.remove('hidden');
@@ -1578,6 +1817,10 @@ window.switchTab = function(tab, pushHistory = true) {
   if (policiesContainer) {
     policiesContainer.classList.add('hidden');
     policiesContainer.style.setProperty('display', 'none', 'important');
+  }
+  if (artisansContainer) {
+    artisansContainer.classList.add('hidden');
+    artisansContainer.style.setProperty('display', 'none', 'important');
   }
 
   // Context banner
@@ -2202,7 +2445,7 @@ function renderSingleCommentHTML(c, postId, user, index) {
     <div class="comment-bubble ${isAnonComment ? 'comment-bubble-anon' : ''}" id="comment-bubble-${commentKey}">
       <div class="comment-avatar ${isCommentSangha && !isAnonComment ? 'sangha-framed-avatar' : ''} ${isAnonComment ? 'comment-anon-avatar' : ''}" ${isAnonComment ? 'style="cursor: default; background: #f1f5f9;" title="නිර්නාමික කල්‍යාණ මිත්‍රයෙක්"' : `onclick="viewUserProfile('${c.uid || ''}', '${Security.escapeHTML(safeAuthorName)}', '${safeAuthorPhoto ? Security.sanitizeUrl(safeAuthorPhoto) : ''}')" style="cursor: pointer;" title="${Security.escapeHTML(safeAuthorName)} ගේ Profile එක බලන්න"`}>
         ${isAnonComment ? '<i class="fa-solid fa-user-secret" style="color: #64748b; font-size: 0.85rem;"></i>' : (safeAuthorPhoto ? `<img src="${Security.sanitizeUrl(safeAuthorPhoto)}" alt="${Security.escapeHTML(safeAuthorName)}" loading="lazy">` : `<span>${Security.escapeHTML(safeAuthorName.charAt(0) || '👤')}</span>`)}
-        ${isCommentSangha && !isAnonComment ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
+        ${isCommentSangha && !isAnonComment ? '<img src="assets/sangha-frame.webp" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
       </div>
       <div class="comment-text-box">
         <div class="comment-author-row">
@@ -2313,7 +2556,7 @@ function updatePostCommentCountUI(postId) {
 // Reusable Post Card HTML Generator
 export function renderPostCardHTML(post, user) {
   if (!post) return '';
-  const isOfficial = Boolean(StorageService.isOfficialPost ? StorageService.isOfficialPost(post) : (post.isOfficial || post.author === 'අපේ පිං පොත'));
+  const isOfficial = Boolean(StorageService.isOfficialPost ? StorageService.isOfficialPost(post) : (post.isOfficial || post.authorRole === 'official' || post.author === 'අපේ පිං පොත' || post.author === 'අපේ පින් පොත'));
   post.isOfficial = isOfficial;
   const isMaster = StorageService.isMasterAdmin();
   const isOwner = Boolean(user && user.uid && post.uid === user.uid);
@@ -2324,6 +2567,7 @@ export function renderPostCardHTML(post, user) {
   const isGeneral = post.type === 'general';
   const isRepost = post.type === 'repost' || post.isRepost === true || !!post.originalPost;
   const orig = post.originalPost;
+  const isOrigOfficial = orig ? Boolean(StorageService.isOfficialPost ? StorageService.isOfficialPost(orig) : (orig.isOfficial || orig.authorRole === 'official' || orig.author === 'අපේ පිං පොත' || orig.author === 'අපේ පින් පොත')) : false;
   const currentUserUid = user && user.uid ? user.uid : 'anonymous';
   const sadhuUsers = Array.isArray(post.sadhuUsers) ? post.sadhuUsers : [];
   const hasGivenSadhu = sadhuUsers.includes(currentUserUid) || StorageService.hasUserGivenSadhu(post, currentUserUid);
@@ -2362,11 +2606,11 @@ export function renderPostCardHTML(post, user) {
       ${isRepost ? `
         <div class="repost-header-tag">
           <div style="display: flex; align-items: center; gap: 8px;">
-            <div class="repost-icon-circle" onclick="viewUserProfile('${post.uid || ''}', '${Security.escapeHTML(postAuthorName)}', '${postAuthorPhoto ? Security.sanitizeUrl(postAuthorPhoto) : ''}')" style="cursor: pointer;" title="${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න">
+            <div class="repost-icon-circle" ${post.isOfficial ? `onclick="openPoliciesModal('about')" title="අපේ පිං පොත පිළිබඳ විස්තර"` : `onclick="viewUserProfile('${post.uid || ''}', '${Security.escapeHTML(postAuthorName)}', '${postAuthorPhoto ? Security.sanitizeUrl(postAuthorPhoto) : ''}')" title="${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න"`} style="cursor: pointer;">
               <i class="fa-solid fa-repeat"></i>
             </div>
             <div>
-              <span class="repost-actor-name ${post.isOfficial ? '' : 'author-click-link'}" ${post.isOfficial ? '' : `onclick="viewUserProfile('${post.uid || ''}', '${Security.escapeHTML(postAuthorName)}', '${postAuthorPhoto ? Security.sanitizeUrl(postAuthorPhoto) : ''}')"`} title="${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න"><strong>${Security.escapeHTML(post.isOfficial ? 'අපේ පිං පොත' : postAuthorName)}</strong> විසින් යළි බෙදාගන්නා ලදී</span>
+              <span class="repost-actor-name ${post.isOfficial ? '' : 'author-click-link'}" ${post.isOfficial ? `onclick="openPoliciesModal('about')"` : `onclick="viewUserProfile('${post.uid || ''}', '${Security.escapeHTML(postAuthorName)}', '${postAuthorPhoto ? Security.sanitizeUrl(postAuthorPhoto) : ''}')"`} title="${post.isOfficial ? 'අපේ පිං පොත පිළිබඳ විස්තර' : `${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න`}"><strong>${Security.escapeHTML(post.isOfficial ? 'අපේ පිං පොත' : postAuthorName)}</strong> විසින් යළි බෙදාගන්නා ලදී</span>
               <span class="repost-time">${Security.escapeHTML(formatRelativeTimeSinhala(post.timestamp, post.date || 'දැන්'))}</span>
             </div>
           </div>
@@ -2397,9 +2641,9 @@ export function renderPostCardHTML(post, user) {
           <div class="quoted-merit-box" onclick="viewOriginalPost('${orig.id}', '${post.id}')" title="සම්පූර්ණ මුල් සටහන බලන්න ක්ලික් කරන්න">
             <div class="quoted-merit-header">
               <div style="display: flex; align-items: center; gap: 8px;">
-                <div class="quoted-avatar" onclick="event.stopPropagation(); viewUserProfile('${orig.uid || ''}', '${Security.escapeHTML(origAuthorName)}', '${origAuthorPhoto ? Security.sanitizeUrl(origAuthorPhoto) : ''}')" style="cursor: pointer;" title="${Security.escapeHTML(origAuthorName)} ගේ Profile එක බලන්න">${origAuthorPhoto ? `<img src="${Security.sanitizeUrl(origAuthorPhoto)}" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover;">` : Security.escapeHTML(origAuthorName.charAt(0))}</div>
+                <div class="quoted-avatar" ${isOrigOfficial ? `onclick="event.stopPropagation(); openPoliciesModal('about');" style="cursor: pointer;" title="අපේ පිං පොත පිළිබඳ විස්තර"` : `onclick="event.stopPropagation(); viewUserProfile('${orig.uid || ''}', '${Security.escapeHTML(origAuthorName)}', '${origAuthorPhoto ? Security.sanitizeUrl(origAuthorPhoto) : ''}')" style="cursor: pointer;" title="${Security.escapeHTML(origAuthorName)} ගේ Profile එක බලන්න"`}>${origAuthorPhoto ? `<img src="${Security.sanitizeUrl(origAuthorPhoto)}" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover;">` : Security.escapeHTML(origAuthorName.charAt(0))}</div>
                 <div>
-                  <div class="author-click-link" onclick="event.stopPropagation(); viewUserProfile('${orig.uid || ''}', '${Security.escapeHTML(origAuthorName)}', '${origAuthorPhoto ? Security.sanitizeUrl(origAuthorPhoto) : ''}')" title="${Security.escapeHTML(origAuthorName)} ගේ Profile එක බලන්න" style="font-weight: 700; font-size: 0.82rem; color: #78350f;">${Security.escapeHTML(origAuthorName)}</div>
+                  <div class="${isOrigOfficial ? '' : 'author-click-link'}" ${isOrigOfficial ? `onclick="event.stopPropagation(); openPoliciesModal('about');"` : `onclick="event.stopPropagation(); viewUserProfile('${orig.uid || ''}', '${Security.escapeHTML(origAuthorName)}', '${origAuthorPhoto ? Security.sanitizeUrl(origAuthorPhoto) : ''}')"`} title="${isOrigOfficial ? 'අපේ පිං පොත පිළිබඳ විස්තර' : `${Security.escapeHTML(origAuthorName)} ගේ Profile එක බලන්න`}" style="font-weight: 700; font-size: 0.82rem; color: #78350f;">${Security.escapeHTML(origAuthorName)}</div>
                   <div style="font-size: 0.68rem; color: #94a3b8;">${Security.escapeHTML(formatRelativeTimeSinhala(orig.timestamp, orig.date || 'මෑතකදී'))} ${orig.location ? '• ' + Security.escapeHTML(orig.location) : ''}</div>
                 </div>
               </div>
@@ -2431,12 +2675,12 @@ export function renderPostCardHTML(post, user) {
         <div class="post-header">
           <div class="post-author-info">
             ${post.isOfficial ? `
-              <div class="post-avatar official-avatar-circle" title="අපේ පිං පොත">
+              <div class="post-avatar official-avatar-circle" onclick="openPoliciesModal('about')" style="cursor: pointer;" title="අපේ පිං පොත පිළිබඳ විස්තර">
                 <i class="fa-solid fa-dharmachakra" style="font-size: 1.35rem; color: #fef3c7; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));"></i>
               </div>
               <div>
                 <div class="post-badges-wrap" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                  <span class="post-author-name official-author-name">අපේ පිං පොත</span>
+                  <span class="post-author-name official-author-name" onclick="openPoliciesModal('about')" style="cursor: pointer;" title="අපේ පිං පොත පිළිබඳ විස්තර">අපේ පිං පොත</span>
                   ${post.visibility === 'private' ? '<span class="post-badge private"><i class="fa-solid fa-lock" style="font-size: 9px;"></i> Private</span>' : ''}
                 </div>
                 <div class="post-meta-sub">
@@ -2448,7 +2692,7 @@ export function renderPostCardHTML(post, user) {
             ` : `
               <div class="post-avatar ${isNeed ? 'need' : ''} ${isAuthorSangha ? 'sangha-framed-avatar' : ''}" onclick="viewUserProfile('${post.uid || ''}', '${Security.escapeHTML(postAuthorName)}', '${postAuthorPhoto ? Security.sanitizeUrl(postAuthorPhoto) : ''}')" style="cursor: pointer;" title="${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න">
                 ${postAuthorPhoto ? `<img src="${Security.sanitizeUrl(postAuthorPhoto)}" loading="lazy" decoding="async" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover;">` : `<span>${Security.escapeHTML(postAuthorName.charAt(0))}</span>`}
-                ${isAuthorSangha ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
+                ${isAuthorSangha ? '<img src="assets/sangha-frame.webp" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
               </div>
               <div>
                 <div class="post-badges-wrap">
@@ -2716,6 +2960,166 @@ function updateFeedInPlace(posts) {
   });
 }
 
+// ============================================================================
+// Verified Artisans Spotlight Strip for Merit Feed
+// ============================================================================
+
+function getVerifiedArtisansList() {
+  if (Array.isArray(allArtisansList) && allArtisansList.length > 0) {
+    return allArtisansList.filter(a => a && a.isVerified !== false && a.status !== 'rejected');
+  }
+  try {
+    const raw = localStorage.getItem('pinPotha_artisans_cache');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && Array.isArray(parsed.data) && parsed.data.length > 0) {
+        allArtisansList = parsed.data;
+        return allArtisansList.filter(a => a && a.isVerified !== false && a.status !== 'rejected');
+      }
+    }
+  } catch (e) {}
+  return [];
+}
+
+// Matches user or member profile to an approved artisan listing
+function findUserArtisanListing(userOrMember) {
+  if (!userOrMember) return null;
+  const verifiedList = getVerifiedArtisansList();
+  if (!Array.isArray(verifiedList) || verifiedList.length === 0) return null;
+  const targetUid = userOrMember.uid ? String(userOrMember.uid).trim() : '';
+  const targetEmail = userOrMember.email ? String(userOrMember.email).trim().toLowerCase() : '';
+  return verifiedList.find(a => {
+    if (!a) return false;
+    const artisanEmail = (a.ownerEmail || a.submittedByEmail || '').trim().toLowerCase();
+
+    // Prioritize explicit owner email - do NOT match stale UIDs when owner email is set
+    if (artisanEmail) {
+      return Boolean(targetEmail && artisanEmail === targetEmail);
+    }
+
+    // Fall back to UIDs strictly when artisan owner email is empty/missing
+    if (targetUid) {
+      if (a.ownerUid && String(a.ownerUid).trim() === targetUid) return true;
+      if (a.userId && String(a.userId).trim() === targetUid) return true;
+      if (a.submittedByUid && String(a.submittedByUid).trim() === targetUid) return true;
+    }
+
+    return false;
+  }) || null;
+}
+
+function renderFeedArtisanSpotlightHTML(verifiedArtisans) {
+  if (!Array.isArray(verifiedArtisans) || verifiedArtisans.length === 0) return '';
+
+  // Sort: prioritize artisans with portfolio images, then newest
+  const sorted = [...verifiedArtisans].sort((a, b) => {
+    const aHasImg = (Array.isArray(a.portfolioImages) && a.portfolioImages.length > 0) || Boolean(a.photo);
+    const bHasImg = (Array.isArray(b.portfolioImages) && b.portfolioImages.length > 0) || Boolean(b.photo);
+    if (aHasImg && !bHasImg) return -1;
+    if (!aHasImg && bHasImg) return 1;
+    return (b.createdAt || 0) - (a.createdAt || 0);
+  });
+
+  const spotlightItems = sorted.slice(0, 6);
+  if (spotlightItems.length === 0) return '';
+
+  const cardsHtml = spotlightItems.map(item => {
+    const itemId = item.id || item.docId || '';
+    const isPerahera = item.section === 'perahera_culture';
+
+    // Cover image extraction (portfolio image or profile photo) - NO license images
+    let coverUrl = '';
+    if (Array.isArray(item.portfolioImages) && item.portfolioImages.length > 0) {
+      const first = item.portfolioImages[0];
+      coverUrl = typeof first === 'object' && first.url ? first.url : first;
+    }
+    if (!coverUrl && item.photo) {
+      coverUrl = item.photo;
+    }
+
+    // Primary specialty text
+    let specialtyText = '';
+    if (Array.isArray(item.specialties) && item.specialties.length > 0) {
+      specialtyText = item.specialties.slice(0, 2).join(' • ');
+    } else if (item.specialties && typeof item.specialties === 'string') {
+      specialtyText = item.specialties;
+    } else {
+      specialtyText = isPerahera ? 'පෙරහැර සංස්කෘතික සේවා' : 'විහාර නිර්මාණ ශිල්පී';
+    }
+
+    const districtText = item.district ? `📍 ${item.district}` : '📍 ශ්‍රී ලංකා';
+
+    return `
+      <div class="spotlight-mini-card" onclick="openArtisanProfileModal('${itemId}')" title="${Security.escapeHTML(item.name)} - පැතිකඩ බලන්න">
+        <div class="spotlight-card-cover-wrap">
+          ${coverUrl ? `
+            <img src="${coverUrl}" alt="${Security.escapeHTML(item.name)}" class="spotlight-card-cover-img" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'spotlight-card-cover-placeholder\\'><span class=\\'spotlight-cover-icon\\'>${isPerahera ? '🥁' : '🏛️'}</span></div>';">
+          ` : `
+            <div class="spotlight-card-cover-placeholder">
+              <span class="spotlight-cover-icon">${isPerahera ? '🥁' : '🏛️'}</span>
+            </div>
+          `}
+          <div class="spotlight-cover-badges">
+            <span class="spotlight-badge-section">${isPerahera ? '🥁 පෙරහැර' : '🏛️ විහාර'}</span>
+            <span class="spotlight-badge-verified"><i class="fa-solid fa-circle-check"></i> සත්‍යාපිතයි</span>
+          </div>
+        </div>
+        <div class="spotlight-card-body">
+          <h4 class="spotlight-artisan-name">${Security.escapeHTML(item.name)}</h4>
+          <div class="spotlight-artisan-specialty" title="${Security.escapeHTML(specialtyText)}">${Security.escapeHTML(specialtyText)}</div>
+          <div class="spotlight-artisan-district">${Security.escapeHTML(districtText)}</div>
+          <button type="button" class="btn-spotlight-card-action" onclick="event.stopPropagation(); openArtisanProfileModal('${itemId}')" title="ශිල්පියාගේ සම්පූර්ණ පැතිකඩ බලන්න">
+            <i class="fa-solid fa-address-card"></i>
+            <span>පැතිකඩ බලන්න</span>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="feed-artisan-spotlight-card" id="artisanSpotlightStrip">
+      <div class="spotlight-strip-header">
+        <div class="spotlight-title-wrap">
+          <div class="spotlight-main-title">
+            <span class="spotlight-icon">🏛️</span>
+            <span class="spotlight-title-text">සත්‍යාපිත විහාර කලා හා පෙරහැර ශිල්පීන්</span>
+          </div>
+          <div class="spotlight-subtitle">විහාර නිර්මාණ හා සංස්කෘතික සේවා නාමාවලිය</div>
+        </div>
+        <button type="button" class="btn-spotlight-view-all" onclick="switchTab('artisans')" title="සියලුම ශිල්පීන් බලන්න">
+          <span>සියල්ල බලන්න</span>
+          <i class="fa-solid fa-arrow-right"></i>
+        </button>
+      </div>
+      <div class="spotlight-cards-track">
+        ${cardsHtml}
+      </div>
+    </div>
+  `;
+}
+
+function ensureVerifiedArtisansLoaded() {
+  const verified = getVerifiedArtisansList();
+  if (verified.length > 0) {
+    return Promise.resolve(verified);
+  }
+  if (!artisansFetchPromise) {
+    artisansFetchPromise = StorageService.getTempleArtisansList().then(list => {
+      artisansFetchPromise = null;
+      if (Array.isArray(list) && list.length > 0) {
+        allArtisansList = list;
+      }
+      return getVerifiedArtisansList();
+    }).catch(err => {
+      artisansFetchPromise = null;
+      console.warn('[Artisans] Background fetch error:', err);
+      return [];
+    });
+  }
+  return artisansFetchPromise;
+}
+
 // Render Newsfeed
 function renderFeed() {
   const container = document.getElementById('postsContainer');
@@ -2738,7 +3142,7 @@ function renderFeed() {
       if (!matchTitle && !matchDesc && !matchLoc && !matchAuthor) return false;
     }
 
-    const isOfficial = StorageService.isOfficialPost ? StorageService.isOfficialPost(post) : Boolean(post.isOfficial || post.author === 'අපේ පිං පොත');
+    const isOfficial = StorageService.isOfficialPost ? StorageService.isOfficialPost(post) : Boolean(post.isOfficial || post.authorRole === 'official' || post.author === 'අපේ පිං පොත' || post.author === 'අපේ පින් පොත');
     post.isOfficial = isOfficial;
 
     const isCategoryMatch = (activeCategory === 'සියල්ල') ||
@@ -2754,9 +3158,10 @@ function renderFeed() {
     if (activeTab === 'mybook') {
       if (post.visibility !== 'private') return false;
       if (!isCategoryMatch) return false;
+      if (isOfficial) return false;
       const isOwner = (user && post.uid === user.uid) ||
                       (user && user.email && post.authorEmail && post.authorEmail.toLowerCase() === user.email.toLowerCase()) ||
-                      (isMaster && (post.uid === 'user_malith' || post.author === 'අපේ පිං පොත'));
+                      (isMaster && post.uid === 'user_malith');
       return isOwner;
     }
 
@@ -2860,16 +3265,93 @@ function renderFeed() {
   }
 
   const cardsHtmlArr = [];
-  for (const post of ranked) {
+  const shouldInjectSpotlight = (
+    activeTab === 'feed' &&
+    !searchQ &&
+    activeCategory === 'සියල්ල' &&
+    ranked.length > 0
+  );
+
+  // Cleanly remove any existing spotlight strip from DOM before inserting or re-rendering
+  const existingSpotlight = document.getElementById('artisanSpotlightStrip') || document.getElementById('feedArtisansSpotlight');
+  if (existingSpotlight) {
+    existingSpotlight.remove();
+  }
+
+  let spotlightInjected = false;
+  const verifiedArtisans = shouldInjectSpotlight ? getVerifiedArtisansList() : [];
+  const spotlightHtml = (shouldInjectSpotlight && verifiedArtisans.length > 0)
+    ? renderFeedArtisanSpotlightHTML(verifiedArtisans)
+    : '';
+
+  for (let i = 0; i < ranked.length; i++) {
+    const post = ranked[i];
     try {
       const cardHtml = renderPostCardHTML(post, user);
       if (cardHtml) cardsHtmlArr.push(cardHtml);
     } catch (cardErr) {
       console.warn('[Feed] Error rendering card for post', post?.id, cardErr);
     }
+
+    // Inject Spotlight Strip right after the 4th post (index 3)
+    if (spotlightHtml && i === 3) {
+      cardsHtmlArr.push(spotlightHtml);
+      spotlightInjected = true;
+    }
   }
+
+  // If fewer than 4 posts exist and spotlight was not injected yet, inject at the end
+  if (spotlightHtml && !spotlightInjected) {
+    cardsHtmlArr.push(spotlightHtml);
+    spotlightInjected = true;
+  }
+
   container.innerHTML = cardsHtmlArr.join('') + sentinelHtml;
   setupInfiniteScrollObserver();
+
+  // If spotlight should be displayed but artisans are not loaded yet, fetch and dynamically insert
+  if (shouldInjectSpotlight && (!verifiedArtisans || verifiedArtisans.length === 0)) {
+    ensureVerifiedArtisansLoaded().then(loadedArtisans => {
+      // Re-verify user is still on unfiltered home feed
+      const currentSearchQ = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
+      if (activeTab !== 'feed' || currentSearchQ || activeCategory !== 'සියල්ල') return;
+      if (!loadedArtisans || loadedArtisans.length === 0) return;
+
+      const currentContainer = document.getElementById('postsContainer');
+      if (!currentContainer) return;
+
+      // Prevent duplicate insertion
+      if (document.getElementById('artisanSpotlightStrip') || document.getElementById('feedArtisansSpotlight')) {
+        return;
+      }
+
+      const stripHtml = renderFeedArtisanSpotlightHTML(loadedArtisans);
+      if (!stripHtml) return;
+
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = stripHtml.trim();
+      const spotlightEl = tempDiv.firstElementChild;
+      if (!spotlightEl) return;
+
+      // Find post card elements in feed container
+      const postCards = Array.from(currentContainer.children).filter(el => {
+        return el && el.id && el.id.startsWith('post-elem-');
+      });
+
+      if (postCards.length >= 4) {
+        postCards[3].after(spotlightEl);
+      } else if (postCards.length > 0) {
+        postCards[postCards.length - 1].after(spotlightEl);
+      } else {
+        const sentinel = document.getElementById('infiniteScrollSentinel');
+        if (sentinel) {
+          currentContainer.insertBefore(spotlightEl, sentinel);
+        } else {
+          currentContainer.appendChild(spotlightEl);
+        }
+      }
+    }).catch(() => {});
+  }
 }
 
 // ============================================================================
@@ -2987,7 +3469,7 @@ export function appendNewPostsToFeed(allPosts, prevIdsStr) {
       if (!matchTitle && !matchDesc && !matchLoc && !matchAuthor) return false;
     }
 
-    const isOfficial = StorageService.isOfficialPost ? StorageService.isOfficialPost(post) : Boolean(post.isOfficial || post.author === 'අපේ පිං පොත');
+    const isOfficial = StorageService.isOfficialPost ? StorageService.isOfficialPost(post) : Boolean(post.isOfficial || post.authorRole === 'official' || post.author === 'අපේ පිං පොත' || post.author === 'අපේ පින් පොත');
     post.isOfficial = isOfficial;
 
     const isCategoryMatch = (activeCategory === 'සියල්ල') ||
@@ -3003,9 +3485,10 @@ export function appendNewPostsToFeed(allPosts, prevIdsStr) {
     if (activeTab === 'mybook') {
       if (post.visibility !== 'private') return false;
       if (!isCategoryMatch) return false;
+      if (isOfficial) return false;
       const isOwner = (user && post.uid === user.uid) ||
                       (user && user.email && post.authorEmail && post.authorEmail.toLowerCase() === user.email.toLowerCase()) ||
-                      (isMaster && (post.uid === 'user_malith' || post.author === 'අපේ පිං පොත'));
+                      (isMaster && post.uid === 'user_malith');
       return isOwner;
     }
 
@@ -3990,11 +4473,9 @@ window.shareToFacebookFromModal = function() {
   const realDesc = (isRepost && orig && orig.description) ? orig.description : (post.description || '');
   const realPhone = (isRepost && orig && orig.contact) ? orig.contact : (post.contact || '');
 
-  const origin = window.location.origin;
-  const pathname = window.location.pathname;
   const targetId = (isRepost && orig && orig.id) ? orig.id : post.id;
-  const tabParam = isNeed ? '&tab=needs' : '';
-  const postUrl = `${origin}${pathname}?post=${encodeURIComponent(targetId)}${tabParam}`;
+  const extra = isNeed ? { tab: 'needs' } : {};
+  const postUrl = buildCleanShareUrl('p', targetId, extra);
 
   try {
     StorageService.incrementShare(targetId);
@@ -4128,10 +4609,8 @@ window.generateWhatsAppStatusCardFromModal = async function() {
         ? `<img src="${authorAvatar}" style="width: 100%; height: 100%; object-fit: cover; display: block;" crossorigin="anonymous">`
         : `<span style="font-family: serif; font-size: 1.3rem; font-weight: 700; color: #ffffff;">${authorInitial}</span>`);
 
-    const origin = window.location.origin;
-    const pathname = window.location.pathname;
     const targetId = (isRepost && orig && orig.id) ? orig.id : post.id;
-    const postUrl = `${origin}${pathname}?post=${encodeURIComponent(targetId)}`;
+    const postUrl = buildCleanShareUrl('p', targetId);
 
     const renderBox = document.getElementById('viralStatusCardRenderBox');
     if (!renderBox) throw new Error('Render box not found');
@@ -4354,9 +4833,7 @@ window.openWhatsAppForStatusShare = function() {
   const postId = currentShareTargetPostId;
   const allPosts = StorageService.getLocalPosts() || [];
   const post = allPosts.find(p => p.id === postId) || {};
-  const origin = window.location.origin;
-  const pathname = window.location.pathname;
-  const postUrl = `${origin}${pathname}?post=${encodeURIComponent(postId || '')}`;
+  const postUrl = buildCleanShareUrl('p', postId || '');
   const isOfficial = !!post.isOfficial;
   const authorName = StorageService.resolveAuthorName(post);
   const shareText = isOfficial
@@ -4391,10 +4868,8 @@ window.executeNativeOrWhatsAppShare = async function() {
   const realDesc = (isRepost && orig && orig.description) ? orig.description : (post.description || '');
   const realImage = (isRepost && orig ? (orig.image || (orig.images && orig.images[0])) : (post.image || (post.images && post.images[0]))) || null;
 
-  const origin = window.location.origin;
-  const pathname = window.location.pathname;
   const targetId = (isRepost && orig && orig.id) ? orig.id : post.id;
-  const postUrl = `${origin}${pathname}?post=${encodeURIComponent(targetId)}`;
+  const postUrl = buildCleanShareUrl('p', targetId);
 
   try {
     StorageService.incrementShare(targetId);
@@ -4459,23 +4934,31 @@ window.executeNativeOrWhatsAppShare = async function() {
 window.copyPostLinkFromModal = async function() {
   closeShareChoiceModal();
   const postId = currentShareTargetPostId;
-  const origin = window.location.origin;
-  const pathname = window.location.pathname;
-  const postUrl = `${origin}${pathname}?post=${encodeURIComponent(postId || '')}`;
+  const postUrl = buildCleanShareUrl('p', postId || '');
   try {
     if (navigator.clipboard) {
       await navigator.clipboard.writeText(postUrl);
     }
-    alert('ලිපිනය (Link) සාර්ථකව Copy කරගන්නා ලදී! 🎉');
+    if (typeof showCustomToast === 'function') {
+      showCustomToast('ලිපිනය (Link) සාර්ථකව Copy කරගන්නා ලදී! 📋', 'success');
+    } else {
+      alert('ලිපිනය (Link) සාර්ථකව Copy කරගන්නා ලදී! 🎉');
+    }
   } catch (e) {
     prompt('මෙම Link එක Copy කරගන්න:', postUrl);
   }
 };
 
-// Check for deep-linked post in URL query (?post=post_123) - Instant Facebook / Social traffic arrival
-async function checkUrlDirectPost() {
+// Check for deep-linked post in URL query (?p=, ?post=) or hash (#post_...) - Instant Facebook / Social traffic arrival
+async function checkUrlDirectPost(explicitPostId = null) {
   const urlParams = new URLSearchParams(window.location.search);
-  const targetPostId = urlParams.get('post');
+  let targetPostId = explicitPostId || urlParams.get('p') || urlParams.get('post');
+  if (!targetPostId) {
+    const hash = window.location.hash || '';
+    if (hash.startsWith('#post_')) {
+      targetPostId = hash.replace(/^#post_/, '').trim();
+    }
+  }
   if (!targetPostId) return;
 
   const tabParam = urlParams.get('tab');
@@ -4865,7 +5348,7 @@ function renderComposerThumbnails() {
 
   container.style.display = 'block';
   grid.innerHTML = selectedImagesList.map((img, idx) => `
-    <div class="composer-thumb-item" onclick="openLightbox(selectedImagesList, ${idx})" style="cursor: pointer;" title="විශාල කර බලන්න">
+    <div class="composer-thumb-item" onclick="openComposerLightbox(${idx})" style="cursor: pointer;" title="විශාල කර බලන්න">
       <img src="${img}" alt="තෝරාගත් ඡායාරූපය ${idx + 1}">
       <button type="button" class="composer-thumb-remove" onclick="event.stopPropagation(); removeSelectedComposerImage(${idx})" title="ඉවත් කරන්න">
         <i class="fa-solid fa-xmark"></i>
@@ -4878,6 +5361,14 @@ function renderComposerThumbnails() {
     statsEl.innerText = `ඡායාරූප ${selectedImagesList.length}/5 ක් තෝරාගන්නා ලදී (සම්පීඩිත ධාරිතාව: ~${totalSizeKB} KB) • විශාල කර බැලීමට පින්තූරය ඔබන්න`;
   }
 }
+
+window.openComposerLightbox = function(idx = 0) {
+  if (Array.isArray(selectedImagesList) && selectedImagesList.length > 0) {
+    if (typeof window.openLightbox === 'function') {
+      window.openLightbox(selectedImagesList, Math.max(0, idx));
+    }
+  }
+};
 
 window.removeSelectedComposerImage = function(index) {
   if (index >= 0 && index < selectedImagesList.length) {
@@ -5919,7 +6410,7 @@ window.handleReelShare = async function(postId, btnEl) {
 
   const shareTitle = reel?.title || 'අපේ පින් පොත - Reels';
   const shareText = `ධර්ම කරුණක් / පින්කමක් නරඹන්න: ${reel?.title || 'දහම් Reels'}`;
-  const shareUrl = `${window.location.origin}${window.location.pathname}?post=${encodeURIComponent(postId)}`;
+  const shareUrl = buildCleanShareUrl('p', postId);
 
   // Increment share count atomically
   try {
@@ -6228,16 +6719,37 @@ function setupEventListeners() {
       isSubmittingPost = true;
       if (submitBtn) {
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> පළවෙමින් පවතී...';
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> පින්තූර පරීක්ෂා කරමින්...';
       }
 
-      const postImages = [...selectedImagesList];
-      let primaryImage = postImages[0] || null;
+      // 1. Upload any attached images (Base64 data URIs) to Cloudinary before creating post
+      const uploadedImages = [];
+      for (let i = 0; i < selectedImagesList.length; i++) {
+        const imgItem = selectedImagesList[i];
+        if (typeof imgItem === 'string' && imgItem.startsWith('data:image/')) {
+          if (submitBtn) {
+            submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> පින්තූරය උඩුගත වෙමින් පවතී (${i + 1}/${selectedImagesList.length})...`;
+          }
+          const cloudUrl = await uploadToCloudinary(imgItem, `post_${Date.now()}_${i}`);
+          if (!cloudUrl || !cloudUrl.startsWith('http')) {
+            throw new Error("පින්තූරය උඩුගත කිරීම අසාර්ථක විය. කරුණාකර නැවත උත්සාහ කරන්න.");
+          }
+          uploadedImages.push(cloudUrl);
+        } else if (typeof imgItem === 'string' && imgItem.startsWith('http')) {
+          uploadedImages.push(imgItem);
+        }
+      }
+
+      let primaryImage = uploadedImages[0] || null;
       if (!primaryImage && parsedVideo && parsedVideo.videoThumbnail) {
         primaryImage = parsedVideo.videoThumbnail;
-        if (postImages.length === 0) {
-          postImages.push(parsedVideo.videoThumbnail);
+        if (uploadedImages.length === 0) {
+          uploadedImages.push(parsedVideo.videoThumbnail);
         }
+      }
+
+      if (submitBtn) {
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> පළවෙමින් පවතී...';
       }
 
       await StorageService.createPost({
@@ -6249,7 +6761,7 @@ function setupEventListeners() {
         contact,
         description,
         image: primaryImage,
-        images: postImages,
+        images: uploadedImages,
         videoUrl: parsedVideo ? parsedVideo.videoUrl : null,
         videoId: parsedVideo ? parsedVideo.videoId : null,
         videoType: parsedVideo ? parsedVideo.type : null,
@@ -6266,7 +6778,9 @@ function setupEventListeners() {
       else if (visibility === 'private') switchTab('mybook');
       else switchTab('feed');
     } catch (err) {
-      alert("දෝෂයකි: " + err.message);
+      console.error("[Post Submit Error]:", err);
+      const isUploadErr = err.message && err.message.includes('උඩුගත');
+      alert(isUploadErr ? err.message : ("දෝෂයකි: " + err.message));
     } finally {
       isSubmittingPost = false;
       if (submitBtn) {
@@ -6570,15 +7084,17 @@ function renderProfileView() {
   const isGuest = !user || !user.email;
   const isMasterUser = Boolean(!isGuest && user && user.email && user.email.trim().toLowerCase() === 'silvadilan9@gmail.com');
   const isMyPost = (p) => {
-    if (!p) return false;
+    if (!p || p.isDeleted || p.deleted) return false;
     if (isGuest) return false;
+    const isOfficial = Boolean(StorageService.isOfficialPost ? StorageService.isOfficialPost(p) : (p.isOfficial || p.authorRole === 'official' || p.author === 'අපේ පිං පොත' || p.author === 'අපේ පින් පොත'));
+    if (isOfficial) return false;
     if (user && user.uid && p.uid === user.uid) return true;
     if (user && user.email && p.authorEmail && p.authorEmail.toLowerCase() === user.email.toLowerCase()) return true;
     if (user && user.name && p.author && p.author.trim().toLowerCase() === user.name.trim().toLowerCase()) return true;
     if (isMasterUser && (
       p.uid === 'user_malith' ||
       p.uid === 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2' ||
-      (p.author && (p.author.includes('මලිත්') || p.author === 'අපේ පිං පොත' || p.author === 'පිං පොත පරිපාලනය'))
+      (p.author && p.author.includes('මලිත්'))
     )) return true;
     return false;
   };
@@ -6595,7 +7111,7 @@ function renderProfileView() {
   if (coverImg) {
     let activeCover = user.coverImage;
     if (!activeCover || activeCover.includes('photo-1548013146-72479768bada') || activeCover.includes('photo-1582510003544-4d00b7f74220')) {
-      activeCover = "assets/banner.jpg";
+      activeCover = "assets/banner.webp";
     }
     coverImg.src = activeCover;
   }
@@ -6648,6 +7164,38 @@ function renderProfileView() {
       badgeEl.style.color = '#92400e';
       badgeEl.style.borderColor = '#fde68a';
       badgeEl.innerHTML = `<i class="fa-solid fa-seedling"></i> <span>පිංවත් සාමාජික</span>`;
+    }
+  }
+
+  // Verified Artisan Badge on Own Profile View
+  const profArtisanWrap = document.getElementById('profArtisanBadgeWrap');
+  if (profArtisanWrap) {
+    const matchedArtisan = findUserArtisanListing(user);
+    if (matchedArtisan) {
+      const isPerahera = matchedArtisan.section === 'perahera_culture';
+      const badgeIcon = isPerahera ? '🥁' : '🎨';
+      const badgeText = isPerahera ? 'සත්‍යාපිත පෙරහැර කලා ශිල්පී' : 'සත්‍යාපිත විහාර කලා ශිල්පී';
+      const pillClass = isPerahera ? 'pill-perahera' : 'pill-temple';
+      const artId = matchedArtisan.id || matchedArtisan.docId || '';
+
+      profArtisanWrap.innerHTML = `
+        <div class="artisan-member-pill-group">
+          <span class="member-artisan-pill ${pillClass}">
+            <span>${badgeIcon}</span>
+            <span>${badgeText}</span>
+          </span>
+          <button type="button" class="btn-view-artisan-profile-link" onclick="openArtisanProfileModal('${artId}')" title="ශිල්පී පැතිකඩ බලන්න">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+            <span>ශිල්පී පැතිකඩ</span>
+          </button>
+        </div>
+      `;
+      profArtisanWrap.classList.remove('hidden');
+      profArtisanWrap.style.display = 'inline-flex';
+    } else {
+      profArtisanWrap.innerHTML = '';
+      profArtisanWrap.classList.add('hidden');
+      profArtisanWrap.style.display = 'none';
     }
   }
 
@@ -6841,9 +7389,26 @@ function renderProfileBadges(myPosts, totalSadhu, user) {
 window.setProfileSubTab = function(subTab) {
   activeProfileSubTab = subTab;
   const user = StorageService.currentUser || {};
-  const myPosts = currentPostsData.filter(p => p.uid && user.uid && p.uid === user.uid);
-  const myPrivatePosts = currentPostsData.filter(p => p.uid && user.uid && p.uid === user.uid && p.visibility === 'private');
-  const myPhotosPosts = currentPostsData.filter(p => p.uid && user.uid && p.uid === user.uid && p.image);
+  const isGuest = !user || !user.email;
+  const isMasterUser = Boolean(!isGuest && user && user.email && user.email.trim().toLowerCase() === 'silvadilan9@gmail.com');
+  const isMyPost = (p) => {
+    if (!p || p.isDeleted || p.deleted) return false;
+    if (isGuest) return false;
+    const isOfficial = Boolean(StorageService.isOfficialPost ? StorageService.isOfficialPost(p) : (p.isOfficial || p.authorRole === 'official' || p.author === 'අපේ පිං පොත' || p.author === 'අපේ පින් පොත'));
+    if (isOfficial) return false;
+    if (user && user.uid && p.uid === user.uid) return true;
+    if (user && user.email && p.authorEmail && p.authorEmail.toLowerCase() === user.email.toLowerCase()) return true;
+    if (user && user.name && p.author && p.author.trim().toLowerCase() === user.name.trim().toLowerCase()) return true;
+    if (isMasterUser && (
+      p.uid === 'user_malith' ||
+      p.uid === 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2' ||
+      (p.author && p.author.includes('මලිත්'))
+    )) return true;
+    return false;
+  };
+  const myPosts = currentPostsData.filter(isMyPost);
+  const myPrivatePosts = myPosts.filter(p => p.visibility === 'private');
+  const myPhotosPosts = myPosts.filter(p => p.image || (Array.isArray(p.images) && p.images.length > 0));
   const totalSadhu = myPosts.reduce((acc, p) => acc + (p.sadhuCount || 0), 0);
 
   // Sync state class on profile-content-grid to toggle sidebar visibility
@@ -6951,7 +7516,7 @@ function renderProfileSubTabContent(user, myPosts, myPhotosPosts, myPrivatePosts
           <div class="mithra-card" style="border-color: #fde68a; background: #fffdf8;">
             <div class="mithra-card-avatar ${isReqSangha ? 'sangha-framed-avatar' : ''}" onclick="openMemberProfileModal('${req.senderUid}', '${Security.escapeHTML(req.senderName)}', '${req.senderPhoto ? Security.sanitizeUrl(req.senderPhoto) : ''}')" style="cursor: pointer;">
               ${req.senderPhoto ? `<img src="${Security.sanitizeUrl(req.senderPhoto)}" alt="${Security.escapeHTML(req.senderName)}" onerror="this.parentElement.innerText = '${initial}';">` : initial}
-              ${isReqSangha ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
+              ${isReqSangha ? '<img src="assets/sangha-frame.webp" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
             </div>
             <div class="mithra-card-details" onclick="openMemberProfileModal('${req.senderUid}', '${Security.escapeHTML(req.senderName)}', '${req.senderPhoto ? Security.sanitizeUrl(req.senderPhoto) : ''}')" style="cursor: pointer;">
               <div class="mithra-card-name">
@@ -7010,7 +7575,7 @@ function renderProfileSubTabContent(user, myPosts, myPhotosPosts, myPrivatePosts
           <div class="mithra-card">
             <div class="mithra-card-avatar ${isMemberSangha ? 'sangha-framed-avatar' : ''}" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}', '${m.photo ? Security.sanitizeUrl(m.photo) : ''}', '${m.coverImage ? Security.sanitizeUrl(m.coverImage) : ''}')" style="cursor: pointer;">
               ${m.photo ? `<img src="${Security.sanitizeUrl(m.photo)}" alt="${Security.escapeHTML(m.name)}" onerror="this.parentElement.innerText = '${initial}';">` : `<span>${initial}</span>`}
-              ${isMemberSangha ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
+              ${isMemberSangha ? '<img src="assets/sangha-frame.webp" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
             </div>
             <div class="mithra-card-details" onclick="openMemberProfileModal('${m.uid}', '${Security.escapeHTML(m.name)}', '${m.photo ? Security.sanitizeUrl(m.photo) : ''}', '${m.coverImage ? Security.sanitizeUrl(m.coverImage) : ''}')" style="cursor: pointer;">
               <div class="mithra-card-name">
@@ -7369,8 +7934,11 @@ window.applyAndSaveCroppedAvatar = async function() {
       canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.88);
     });
 
-    // 3. Upload to ImgBB (with automatic local fallback)
-    const uploadedUrl = await uploadToImgBB(blob || canvas.toDataURL('image/jpeg', 0.85), `avatar_${Date.now()}`);
+    // 3. Upload to Cloudinary (strictly enforce cloud URL, no Base64 fallback)
+    const uploadedUrl = await uploadToCloudinary(blob, `avatar_${Date.now()}`);
+    if (!uploadedUrl || !uploadedUrl.startsWith('http')) {
+      throw new Error("පින්තූරය උඩුගත කිරීම අසාර්ථක විය. කරුණාකර නැවත උත්සාහ කරන්න.");
+    }
 
     // 4. Save to StorageService and localStorage immediately!
     StorageService.updateProfile({ photo: uploadedUrl });
@@ -7522,8 +8090,11 @@ window.applyAndSaveCroppedCover = async function() {
       canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.85);
     });
 
-    // 3. Upload to ImgBB (with automatic local fallback)
-    const uploadedUrl = await uploadToImgBB(blob || canvas.toDataURL('image/jpeg', 0.82), `cover_${Date.now()}`);
+    // 3. Upload to Cloudinary (strictly enforce cloud URL, no Base64 fallback)
+    const uploadedUrl = await uploadToCloudinary(blob, `cover_${Date.now()}`);
+    if (!uploadedUrl || !uploadedUrl.startsWith('http')) {
+      throw new Error("පින්තූරය උඩුගත කිරීම අසාර්ථක විය. කරුණාකර නැවත උත්සාහ කරන්න.");
+    }
 
     // 4. Save to StorageService
     StorageService.updateProfile({ coverImage: uploadedUrl });
@@ -7552,7 +8123,7 @@ window.openCoverModal = function() {
   const currentUser = StorageService.currentUser;
   const currentImg = document.getElementById('coverCurrentPreviewImg');
   if (currentImg && currentUser) {
-    currentImg.src = currentUser.coverImage || 'assets/banner.jpg';
+    currentImg.src = currentUser.coverImage || 'assets/banner.webp';
   }
   const statusText = document.getElementById('coverUploadStatusText');
   if (statusText) {
@@ -7679,6 +8250,95 @@ function formatTimeAgo(timestamp) {
   return `සති ${diffWeeks}කට පෙර`;
 }
 
+// App Icon Badge Synchronization (PWA Badging API & Service Worker)
+export function updateAppNotificationBadge(unreadCount) {
+  const count = parseInt(unreadCount || 0, 10);
+  try {
+    if (typeof navigator !== 'undefined') {
+      if ('setAppBadge' in navigator) {
+        if (count > 0) {
+          navigator.setAppBadge(count).catch(() => {});
+        } else {
+          navigator.clearAppBadge().catch(() => {});
+        }
+      }
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'SET_BADGE',
+          count: count
+        });
+      }
+    }
+  } catch (e) {}
+}
+window.updateAppNotificationBadge = updateAppNotificationBadge;
+
+// Check notification permission and toggle permission banner
+export function checkNotificationPermissionStatus() {
+  const banner = document.getElementById('notifPermissionBanner');
+  if (!banner) return;
+  if (typeof window === 'undefined' || !('Notification' in window)) {
+    banner.style.display = 'none';
+    return;
+  }
+  if (Notification.permission === 'default') {
+    banner.style.display = 'flex';
+  } else {
+    banner.style.display = 'none';
+  }
+}
+window.checkNotificationPermissionStatus = checkNotificationPermissionStatus;
+
+// Request OS Push Notification Permission
+export async function requestNotificationPermission() {
+  triggerHaptic(20);
+  if (typeof window === 'undefined' || !('Notification' in window)) return;
+  try {
+    const permission = await Notification.requestPermission();
+    checkNotificationPermissionStatus();
+    if (permission === 'granted') {
+      showLocalOSNotification('පිං පොත දැනුම්දීම් සක්‍රීය විය! 🙏', {
+        body: 'ඔබගේ පින්කම් සඳහා ලැබෙන සාදුකාර සහ පුණ්‍යානුමෝදනා ක්ෂණිකව ඔබට ලැබෙනු ඇත.',
+        tag: 'pin-potha-welcome'
+      });
+    }
+  } catch (err) {
+    console.warn('[PWA] Notification permission request error:', err);
+  }
+}
+window.requestNotificationPermission = requestNotificationPermission;
+
+// Display local OS alert via Service Worker or Notification constructor
+export function showLocalOSNotification(title, options = {}) {
+  if (typeof window === 'undefined' || !('Notification' in window)) return;
+  if (Notification.permission !== 'granted') return;
+
+  const defaultOptions = {
+    icon: 'assets/icon-192.png',
+    badge: 'assets/icon-192.png',
+    vibrate: [100, 50, 100],
+    data: { url: './' }
+  };
+  const finalOptions = { ...defaultOptions, ...options };
+
+  try {
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.ready.then((reg) => {
+        reg.showNotification(title, finalOptions).catch(() => {
+          new Notification(title, finalOptions);
+        });
+      }).catch(() => {
+        new Notification(title, finalOptions);
+      });
+    } else {
+      new Notification(title, finalOptions);
+    }
+  } catch (e) {
+    console.warn('[PWA] showLocalOSNotification error:', e);
+  }
+}
+window.showLocalOSNotification = showLocalOSNotification;
+
 window.toggleNotificationDropdown = function(e) {
   if (e) e.stopPropagation();
   const dropdown = document.getElementById('notificationsDropdown');
@@ -7692,9 +8352,11 @@ window.toggleNotificationDropdown = function(e) {
     dropdown.classList.remove('hidden');
     if (btn) btn.classList.add('active');
     if (mobBtn) mobBtn.classList.add('active');
+    checkNotificationPermissionStatus();
     renderNotificationsList();
     // Mark notifications as read so badge clears and notifications do not reappear as unread
     StorageService.markAllNotificationsAsRead();
+    updateAppNotificationBadge(0);
   } else {
     dropdown.style.display = 'none';
     dropdown.classList.add('hidden');
@@ -7738,6 +8400,9 @@ export function renderNotificationsList() {
 
   const notifs = currentNotifications || [];
   const unreadCount = notifs.filter(n => !n.read).length;
+
+  // Sync PWA app icon badge
+  updateAppNotificationBadge(unreadCount);
 
   // Update Badge in Navbar & Mobile Bottom Bar
   const mobBadgeEl = document.getElementById('mobNotifBadge');
@@ -8251,7 +8916,7 @@ window.renderCommunityDirectory = async function(filtered = null) {
       <div class="mithra-card directory-member-card" onclick="openPublicProfile('${m.uid}')" style="cursor: pointer;">
         <div class="mithra-card-avatar ${isMemberSangha ? 'sangha-framed-avatar' : ''}" style="cursor: pointer;">
           ${m.photo ? `<img src="${Security.sanitizeUrl(m.photo)}" alt="${Security.escapeHTML(m.name)}" onerror="this.parentElement.innerText = '${initial}';">` : `<span>${initial}</span>`}
-          ${isMemberSangha ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
+          ${isMemberSangha ? '<img src="assets/sangha-frame.webp" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
         </div>
         <div class="mithra-card-details">
           <div class="mithra-card-name" style="cursor: pointer;">
@@ -8301,6 +8966,12 @@ window.filterDirectoryBy = function(type) {
   renderCommunityDirectory(list);
 };
 
+let isPcSidebarExpanded = false;
+window.togglePcSidebarExpanded = function() {
+  isPcSidebarExpanded = !isPcSidebarExpanded;
+  renderPcSidebarMembers(document.getElementById('pcSidebarMemberSearchInput')?.value || '', false);
+};
+
 export async function renderPcSidebarMembers(filterQuery = '', forceRefresh = false) {
   try {
     const container = document.getElementById('pcSidebarMemberList');
@@ -8334,8 +9005,9 @@ export async function renderPcSidebarMembers(filterQuery = '', forceRefresh = fa
     }
 
     if (list.length > 0) {
-      const displayList = list.slice(0, 6);
-      container.innerHTML = displayList.map(m => {
+      const isFiltered = Boolean(filterQuery && filterQuery.trim());
+      const displayList = isFiltered ? list.slice(0, 30) : (isPcSidebarExpanded ? list.slice(0, 48) : list.slice(0, 12));
+      const itemsHtml = displayList.map(m => {
         const isMe = m.uid === currentUser.uid;
         const isFriend = currentMithrayan.includes(m.uid);
         const isSent = currentSent.includes(m.uid);
@@ -8369,8 +9041,8 @@ export async function renderPcSidebarMembers(filterQuery = '', forceRefresh = fa
         return `
           <div class="sidebar-member-item ${isMemberAnon ? 'sidebar-member-anon' : ''}" onclick="openPublicProfile('${m.uid}')" style="cursor: pointer;" title="${Security.escapeHTML(displayName)} ගේ පැතිකඩ බලන්න">
             <div class="sidebar-member-avatar ${isMemberSangha && !isMemberAnon ? 'sangha-framed-avatar' : ''}">
-              ${displayPhoto ? `<img src="${Security.sanitizeUrl(displayPhoto)}" alt="${Security.escapeHTML(displayName)}" onerror="this.parentElement.innerText = '${initial}';">` : `<span>${initial}</span>`}
-              ${isMemberSangha && !isMemberAnon ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
+              ${displayPhoto ? `<img src="${Security.sanitizeUrl(displayPhoto)}" alt="${Security.escapeHTML(displayName)}" loading="lazy" decoding="async" onerror="this.parentElement.innerText = '${initial}';">` : `<span>${initial}</span>`}
+              ${isMemberSangha && !isMemberAnon ? '<img src="assets/sangha-frame.webp" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
             </div>
             <div class="sidebar-member-info">
               <div class="sidebar-member-name">
@@ -8388,6 +9060,20 @@ export async function renderPcSidebarMembers(filterQuery = '', forceRefresh = fa
           </div>
         `;
       }).join('');
+
+      let toggleBtnHtml = '';
+      if (!isFiltered && list.length > 12) {
+        toggleBtnHtml = `
+          <div style="padding: 6px 4px 2px; text-align: center;">
+            <button type="button" class="btn-sidebar-expand-members" onclick="event.stopPropagation(); window.togglePcSidebarExpanded()" style="background: none; border: 1px dashed #cbd5e1; border-radius: 8px; width: 100%; padding: 6px 8px; font-size: 0.72rem; color: #64748b; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s;">
+              <span>${isPcSidebarExpanded ? 'අඩු කරන්න' : 'තවත් සාමාජිකයින් බලන්න (' + (list.length - 12) + ')'}</span>
+              <i class="fa-solid ${isPcSidebarExpanded ? 'fa-chevron-up' : 'fa-chevron-down'}" style="font-size: 0.65rem;"></i>
+            </button>
+          </div>
+        `;
+      }
+
+      container.innerHTML = itemsHtml + toggleBtnHtml;
     } else {
       container.innerHTML = `
         <div style="text-align: center; padding: 16px 8px; color: #94a3b8; font-size: 0.74rem;">
@@ -8851,7 +9537,7 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
           <div class="kmp-avatar-wrap ${isMemberSangha && !isMemberAnon ? 'kmp-sangha-avatar' : ''}" onclick="event.stopPropagation(); openPublicProfile('${m.uid}')" style="cursor: pointer;" title="පැතිකඩ බලන්න">
             ${displayPhoto ? `<img src="${Security.sanitizeUrl(displayPhoto)}" alt="${Security.escapeHTML(displayName)}" class="kmp-avatar-img" onerror="this.parentElement.innerHTML = '<div class=\\\'kmp-avatar-initial\\\'>${initial}</div>';">` : `<div class="kmp-avatar-initial">${initial}</div>`}
             ${m.isOnline ? `<span class="kmp-online-dot" title="දැන් සජීවීව Online"></span>` : ''}
-            ${isMemberSangha && !isMemberAnon ? '<img src="assets/sangha-frame.png" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
+            ${isMemberSangha && !isMemberAnon ? '<img src="assets/sangha-frame.webp" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
           </div>
           <div class="kmp-card-meta">
             <div class="kmp-name-row" onclick="event.stopPropagation(); openPublicProfile('${m.uid}')" style="cursor: pointer;" title="පැතිකඩ බලන්න">
@@ -9460,17 +10146,21 @@ window.submitRepost = async function() {
       const orig = postToPass.originalPost || postToPass;
       const rawImg = orig.image || (orig.images && orig.images[0]);
       if (rawImg && typeof rawImg === 'string' && rawImg.startsWith('data:image')) {
-        const thumb = await createFastThumbnail(rawImg, 420, 0.55);
-        postToPass = {
-          ...postToPass,
-          image: thumb,
-          images: [thumb],
-          originalPost: postToPass.originalPost ? {
-            ...postToPass.originalPost,
-            image: thumb,
-            images: [thumb]
-          } : undefined
-        };
+        try {
+          const cloudThumb = await uploadToCloudinary(rawImg, `repost_${Date.now()}`);
+          postToPass = {
+            ...postToPass,
+            image: cloudThumb,
+            images: [cloudThumb],
+            originalPost: postToPass.originalPost ? {
+              ...postToPass.originalPost,
+              image: cloudThumb,
+              images: [cloudThumb]
+            } : undefined
+          };
+        } catch (e) {
+          console.warn('[Repost] Cloudinary upload for legacy thumbnail failed:', e);
+        }
       }
     }
 
@@ -10171,17 +10861,55 @@ window.checkInSpiritualChallenge = async function(challengeId) {
    ========================================================================== */
 let deferredPwaPrompt = null;
 let newWorkerWaiting = null;
+let updateBannerShown = false;
+let updateBannerDismissed = false;
+let userRequestedSwReload = false;
+let isRefreshing = false;
+let swRegistrationRef = null;
+
+function safePerformSwReload() {
+  const LAST_RELOAD_KEY = 'pinpotha_sw_reloaded_at';
+  try {
+    const lastReloadStr = sessionStorage.getItem(LAST_RELOAD_KEY);
+    if (lastReloadStr) {
+      const lastReload = parseInt(lastReloadStr, 10);
+      if (Date.now() - lastReload < 15000) {
+        console.warn('[PWA] Aborting reload: already reloaded within last 15s to prevent loop.');
+        window.dismissPwaUpdateToast();
+        return;
+      }
+    }
+    sessionStorage.setItem(LAST_RELOAD_KEY, String(Date.now()));
+  } catch (e) {}
+
+  if (isRefreshing) return;
+  isRefreshing = true;
+  window.location.reload();
+}
 
 function initPWAEngine() {
   // Check standalone mode safely
   const isStandalone = (typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)')?.matches) || 
-                       (window.navigator && window.navigator.standalone === true);
+                       (window.navigator && window.navigator.standalone === true) ||
+                       (typeof document !== 'undefined' && document.referrer && document.referrer.includes('android-app://'));
 
-  // iOS Safari detection safely
-  const isIos = (typeof window !== 'undefined' && window.navigator && /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase())) && !window.MSStream;
+  // 24-hour dismiss cooldown check
+  const PWA_DISMISS_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+  const lastDismissed = localStorage.getItem('pinPotha_pwa_dismiss_timestamp');
+  const isDismissCooldownActive = lastDismissed && (Date.now() - parseInt(lastDismissed, 10) < PWA_DISMISS_COOLDOWN_MS);
+
+  // iOS Safari and in-app browser detection safely
+  const isIos = (typeof window !== 'undefined' && window.navigator && (
+    /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()) ||
+    (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1)
+  ));
+  const isNonSafariIos = isIos && (
+    /crios|fxios|optios|edgios|fban|fbav|instagram|line|micromessenger/i.test(window.navigator.userAgent) ||
+    (!/safari/i.test(window.navigator.userAgent))
+  );
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v139';
+  const ACTIVE_BUILD = 'v175';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
@@ -10197,37 +10925,41 @@ function initPWAEngine() {
 
   // Register Service Worker safely
   if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-    const registerSW = () => {
-      navigator.serviceWorker.register('./sw.js?v=139', { updateViaCache: 'none' });
-    };
-    if (document.readyState === 'complete') {
-      registerSW();
-    } else {
-      window.addEventListener('load', registerSW);
-    }
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=139', { updateViaCache: 'none' })
+    const swUrl = './sw.js?v=175';
+    const registerWorker = () => {
+      navigator.serviceWorker.register(swUrl, { updateViaCache: 'none' })
         .then((registration) => {
-          // Immediately check for service worker updates
+          swRegistrationRef = registration;
+
           try { registration.update(); } catch (e) {}
 
-          // Also check for updates when window becomes visible
           document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
               try { registration.update(); } catch (e) {}
             }
           });
 
-          // Track updates
+          // Check if a worker is already waiting
+          if (registration.waiting && navigator.serviceWorker.controller) {
+            newWorkerWaiting = registration.waiting;
+            if (!updateBannerShown && !updateBannerDismissed) {
+              updateBannerShown = true;
+              showPwaUpdateToast();
+            }
+          }
+
           registration.addEventListener('updatefound', () => {
             const installingWorker = registration.installing;
             if (!installingWorker) return;
 
             installingWorker.addEventListener('statechange', () => {
-              if ((installingWorker.state === 'installed' || installingWorker.state === 'activated') && navigator.serviceWorker.controller) {
-                // New update is available!
+              // Trigger ONLY when state transitions to installed (waiting to activate)
+              if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
                 newWorkerWaiting = installingWorker;
-                showPwaUpdateToast();
+                if (!updateBannerShown && !updateBannerDismissed) {
+                  updateBannerShown = true;
+                  showPwaUpdateToast();
+                }
               }
             });
           });
@@ -10235,47 +10967,67 @@ function initPWAEngine() {
         .catch((error) => {
           console.warn('[PWA] Service Worker registration failed:', error);
         });
-    });
+    };
 
-    // Log when new service worker takes over (no auto-reload loop)
+    if (document.readyState === 'complete') {
+      registerWorker();
+    } else {
+      window.addEventListener('load', registerWorker);
+    }
+
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      console.log('[PWA] Service Worker controller updated');
+      // Strictly ignore controllerchange unless user explicitly clicked Reload on the update toast
+      if (!userRequestedSwReload || isRefreshing) return;
+      safePerformSwReload();
     });
+  }
+
+  // Sync deferred prompt from early capture in head
+  if (window.__deferredInstallPrompt) {
+    deferredPwaPrompt = window.__deferredInstallPrompt;
   }
 
   // Handle Chrome / Android PWA Install Event
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPwaPrompt = e;
+    window.__deferredInstallPrompt = e;
 
-    // Show header install button
     const headerBtn = document.getElementById('headerInstallBtn');
-    if (headerBtn) {
+    if (headerBtn && !isStandalone) {
       headerBtn.classList.remove('hidden');
-    }
-
-    // Auto-display floating install prompt after 3.5 seconds if not dismissed
-    const isDismissed = sessionStorage.getItem('pinPotha_pwa_dismissed') === 'true';
-    if (!isStandalone && !isDismissed) {
-      setTimeout(() => {
-        showPWAInstallBanner();
-      }, 3500);
     }
   });
 
-  // iOS Safari setup: Show install button in header if not already installed
-  if (isIos && !isStandalone) {
+  // Header button display for non-standalone devices
+  if (!isStandalone) {
     const headerBtn = document.getElementById('headerInstallBtn');
     if (headerBtn) {
       headerBtn.classList.remove('hidden');
     }
+  }
 
-    const isDismissed = sessionStorage.getItem('pinPotha_pwa_dismissed') === 'true';
-    if (!isDismissed) {
-      setTimeout(() => {
+  // Auto-display floating install prompt after 1.6s if not standalone and not in cooldown
+  if (!isStandalone && !isDismissCooldownActive) {
+    setTimeout(() => {
+      const currentlyStandalone = (typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)')?.matches) || 
+                                  (window.navigator && window.navigator.standalone === true);
+      const currentCooldown = localStorage.getItem('pinPotha_pwa_dismiss_timestamp');
+      if (currentlyStandalone || (currentCooldown && (Date.now() - parseInt(currentCooldown, 10) < PWA_DISMISS_COOLDOWN_MS))) {
+        return;
+      }
+
+      if (isIos) {
+        const modal = document.getElementById('pwaIosModal');
+        if (modal) {
+          const noteEl = document.getElementById('pwaIosBrowserNote');
+          if (noteEl) noteEl.style.display = isNonSafariIos ? 'block' : 'none';
+          modal.classList.remove('hidden');
+        }
+      } else {
         showPWAInstallBanner();
-      }, 4000);
-    }
+      }
+    }, 1600);
   }
 
   // App installed listener
@@ -10284,6 +11036,7 @@ function initPWAEngine() {
     const headerBtn = document.getElementById('headerInstallBtn');
     if (headerBtn) headerBtn.classList.add('hidden');
     deferredPwaPrompt = null;
+    window.__deferredInstallPrompt = null;
     triggerHaptic([40, 80, 40]);
     console.log('[PWA] Pin Potha installed successfully!');
   });
@@ -10294,31 +11047,63 @@ window.triggerPWAInstall = async function () {
   triggerHaptic(20);
   SoundService?.playClick?.();
 
-  if (deferredPwaPrompt) {
-    deferredPwaPrompt.prompt();
-    const { outcome } = await deferredPwaPrompt.userChoice;
-    if (outcome === 'accepted') {
-      hidePWAInstallBanner();
+  const isStandalone = (typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)')?.matches) || 
+                       (window.navigator && window.navigator.standalone === true);
+  if (isStandalone) {
+    if (typeof showCustomToast === 'function') {
+      showCustomToast('ඔබ දැනටමත් "පිං පොත" App එක ඔබගේ දුරකථනයේ හෝ පරිගණකයේ ස්ථාපනය කරගෙන ඇත. සාදු! 🙏', 'success');
+    } else {
+      alert('ඔබ දැනටමත් "පිං පොත" App එක ඔබගේ දුරකථනයේ හෝ පරිගණකයේ ස්ථාපනය කරගෙන ඇත. සාදු! 🙏');
     }
-    deferredPwaPrompt = null;
+    hidePWAInstallBanner();
     return;
   }
 
-  // If iOS Safari
-  const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()) && !window.MSStream;
+  // 1. Native deferred prompt
+  const promptEvent = window.__deferredInstallPrompt || deferredPwaPrompt;
+  if (promptEvent && typeof promptEvent.prompt === 'function') {
+    try {
+      promptEvent.prompt();
+      const choice = await promptEvent.userChoice;
+      if (choice && choice.outcome === 'accepted') {
+        hidePWAInstallBanner();
+        window.__deferredInstallPrompt = null;
+        deferredPwaPrompt = null;
+      }
+    } catch (err) {
+      console.warn('[PWA] Native prompt error:', err);
+    }
+    return;
+  }
+
+  // 2. iOS Safari / WebKit
+  const isIos = (typeof window !== 'undefined' && window.navigator && (
+    /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()) ||
+    (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1)
+  ));
   if (isIos) {
     hidePWAInstallBanner();
     const modal = document.getElementById('pwaIosModal');
-    if (modal) modal.classList.remove('hidden');
+    if (modal) {
+      const isNonSafariIos = /crios|fxios|optios|edgios|fban|fbav|instagram|line|micromessenger/i.test(window.navigator.userAgent) || (!/safari/i.test(window.navigator.userAgent));
+      const noteEl = document.getElementById('pwaIosBrowserNote');
+      if (noteEl) noteEl.style.display = isNonSafariIos ? 'block' : 'none';
+      modal.classList.remove('hidden');
+    }
     return;
   }
 
-  // If standalone / already installed
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-  if (isStandalone) {
-    alert('ඔබ දැනටමත් "පිං පොත" App එක ඔබගේ දුරකථනයේ හෝ පරිගණකයේ ස්ථාපනය කරගෙන ඇත. සාදු! 🙏');
-  } else {
-    alert('ඔබගේ බ්‍රවුසරයේ ඉහළ ලිපින තීරුවේ (Address Bar) ඇති "Install" ලාංඡනයෙන් හෝ බ්‍රවුසර් මෙනුවේ "Install / Add to Home screen" තෝරා App එක පහසුවෙන්ම දමාගත හැක. 🙏');
+  // 3. Fallback for older Android / in-app browsers
+  const manualSteps = document.getElementById('pwaManualSteps');
+  const btnAction = document.getElementById('btnPwaAction');
+  if (manualSteps) {
+    manualSteps.style.display = 'block';
+    if (btnAction) {
+      btnAction.innerHTML = '<i class="fa-solid fa-check"></i><span>තේරුම් ගත්තා</span>';
+      btnAction.onclick = function() {
+        dismissPWAInstallBanner();
+      };
+    }
   }
 };
 
@@ -10348,8 +11133,18 @@ window.hidePWAInstallBanner = hidePWAInstallBanner;
 
 window.dismissPWAInstallBanner = function () {
   triggerHaptic(15);
-  sessionStorage.setItem('pinPotha_pwa_dismissed', 'true');
+  try {
+    localStorage.setItem('pinPotha_pwa_dismiss_timestamp', Date.now().toString());
+  } catch (e) {}
   hidePWAInstallBanner();
+};
+
+window.dismissPwaIosModal24h = function () {
+  triggerHaptic(15);
+  try {
+    localStorage.setItem('pinPotha_pwa_dismiss_timestamp', Date.now().toString());
+  } catch (e) {}
+  window.closePwaIosModal();
 };
 
 window.closePwaIosModal = function () {
@@ -10360,11 +11155,12 @@ window.closePwaIosModal = function () {
 
 window.closePwaIosModalOnBackdrop = function (e) {
   if (e && e.target && e.target.id === 'pwaIosModal') {
-    closePwaIosModal();
+    window.closePwaIosModal();
   }
 };
 
 window.showPwaUpdateToast = function () {
+  if (updateBannerDismissed) return;
   const toast = document.getElementById('pwaUpdateToast');
   if (toast) {
     toast.classList.remove('hidden');
@@ -10376,6 +11172,7 @@ window.showPwaUpdateToast = function () {
 
 window.dismissPwaUpdateToast = function () {
   triggerHaptic(15);
+  updateBannerDismissed = true;
   const toast = document.getElementById('pwaUpdateToast');
   if (toast) {
     toast.classList.remove('visible');
@@ -10388,19 +11185,35 @@ window.dismissPwaUpdateToast = function () {
 window.applyPwaUpdate = function () {
   triggerHaptic(30);
   SoundService?.playClick?.();
+
+  // Mark that user explicitly requested a reload
+  userRequestedSwReload = true;
+
+  // 1. Immediately hide/remove the toast and disable the button
   const toast = document.getElementById('pwaUpdateToast');
   if (toast) {
+    const btn = toast.querySelector('button');
+    if (btn) btn.disabled = true;
     toast.classList.remove('visible');
     toast.classList.add('hidden');
   }
-  if (newWorkerWaiting) {
+
+  // 2. If waiting worker exists, send SKIP_WAITING
+  const targetWorker = newWorkerWaiting || swRegistrationRef?.waiting;
+  if (targetWorker) {
     try {
-      newWorkerWaiting.postMessage({ type: 'SKIP_WAITING' });
-    } catch (e) {}
+      targetWorker.postMessage({ type: 'SKIP_WAITING' });
+    } catch (e) {
+      console.warn('[PWA] PostMessage to waiting worker failed:', e);
+    }
   }
+
+  // 3. Fallback reload after 1200ms in case controllerchange does not fire or is delayed
   setTimeout(() => {
-    window.location.reload();
-  }, 150);
+    if (userRequestedSwReload && !isRefreshing) {
+      safePerformSwReload();
+    }
+  }, 1200);
 };
 
 // ============================================================================
@@ -10560,6 +11373,70 @@ export function toggleMobileMenuDrawer() {
   }
 }
 window.toggleMobileMenuDrawer = toggleMobileMenuDrawer;
+
+// ============================================================================
+// Mobile Menu 24-Hour "NEW" Badge Feature Discovery
+// ============================================================================
+export function initFeatureDiscoveryBadge() {
+  try {
+    const key = 'pinpotha_new_badge_v21_first_seen';
+    const dismissedKey = 'pinpotha_new_badge_v21_dismissed';
+    if (localStorage.getItem(dismissedKey) === 'true') {
+      hideFeatureDiscoveryBadges();
+      return;
+    }
+    const rawFirstSeen = localStorage.getItem(key);
+    const now = Date.now();
+    if (!rawFirstSeen) {
+      localStorage.setItem(key, String(now));
+      showFeatureDiscoveryBadges();
+    } else {
+      const elapsed = now - parseInt(rawFirstSeen, 10);
+      const DURATION_24H = 24 * 60 * 60 * 1000;
+      if (elapsed < DURATION_24H) {
+        showFeatureDiscoveryBadges();
+      } else {
+        hideFeatureDiscoveryBadges();
+      }
+    }
+  } catch (e) {
+    console.warn('[DiscoveryBadge] Error checking badge status:', e);
+  }
+}
+
+export function showFeatureDiscoveryBadges() {
+  const menuBadge = document.getElementById('menuNewBadge');
+  const drawerBadge = document.getElementById('drawerArtisanNewBadge');
+  if (menuBadge) {
+    menuBadge.classList.remove('hidden');
+    menuBadge.style.display = 'inline-flex';
+  }
+  if (drawerBadge) {
+    drawerBadge.classList.remove('hidden');
+    drawerBadge.style.display = 'inline-flex';
+  }
+}
+
+export function hideFeatureDiscoveryBadges() {
+  const menuBadge = document.getElementById('menuNewBadge');
+  const drawerBadge = document.getElementById('drawerArtisanNewBadge');
+  if (menuBadge) {
+    menuBadge.classList.add('hidden');
+    menuBadge.style.display = 'none';
+  }
+  if (drawerBadge) {
+    drawerBadge.classList.add('hidden');
+    drawerBadge.style.display = 'none';
+  }
+}
+
+export function dismissMobileMenuNewBadge() {
+  try {
+    localStorage.setItem('pinpotha_new_badge_v21_dismissed', 'true');
+  } catch (e) {}
+  hideFeatureDiscoveryBadges();
+}
+window.dismissMobileMenuNewBadge = dismissMobileMenuNewBadge;
 
 // Keyboard Escape listener to dismiss drawer & modals
 document.addEventListener('keydown', (e) => {
@@ -11143,4 +12020,1807 @@ window.togglePoliciesSound = function(e) {
   }
   const otherChk = document.getElementById('chkSoundEffects');
   if (otherChk) otherChk.checked = enabled;
+};
+
+/* ============================================================================
+ * TEMPLE ARTISANS & PERAHERA CULTURAL SERVICES DIRECTORY LOGIC
+ * ============================================================================ */
+
+const ARTISAN_SECTIONS = {
+  temple_art: {
+    key: 'temple_art',
+    label: 'විහාර නිර්මාණ ශිල්පීන්',
+    icon: '🏛️',
+    categories: [
+      'සියල්ල',
+      'විහාර චිත්‍ර හා ප්‍රතිසංස්කරණ',
+      'වෙහෙර දාගැබ් හා චෛත්‍ය නිර්මාණ',
+      'බුදු පිළිම හා මූර්ති නිර්මාණ',
+      'ලී කැටයම් හා මකර තොරණ',
+      'විහාර ගෘහ නිර්මාණ හා වාස්තු',
+      'ගල් කැටයම්, කොත් වහන්සේ හා ලෝහ කර්මාන්ත'
+    ]
+  },
+  perahera_culture: {
+    key: 'perahera_culture',
+    label: 'පෙරහැර හා සංස්කෘතික සේවා',
+    icon: '🥁',
+    categories: [
+      'සියල්ල',
+      'හේවිසි හා තූර්ය වාදක (බෙර වාදක)',
+      'නර්තන කණ්ඩායම් (උඩරට / පහතරට / සබරගමු)',
+      'කස කරුවන් හා ගිනි බෝල',
+      'අලි ඇතුන් සපයන්නන්',
+      'සේසත්, පාවඩ හා මණ්ඩප සැරසිලි'
+    ]
+  }
+};
+
+// allArtisansList is declared at top level
+let currentArtisansSection = 'temple_art';
+let currentArtisansCategory = 'සියල්ල';
+let currentArtisansDistrict = 'සියල්ල';
+let currentArtisansSearch = '';
+let artisanRegPhotoSelected = null;
+let artisanRegPortfolioSelected = [];
+let artisanRegWildlifeLicenseSelected = null;
+
+// Expose upload services to window if needed
+window.uploadToImgBB = uploadToImgBB;
+window.uploadToCloudinary = uploadToCloudinary;
+
+window.renderArtisansDirectoryView = async function() {
+  const grid = document.getElementById('artisansGrid');
+
+  // Purge any legacy demo artisan cache if present
+  try {
+    const rawCache = localStorage.getItem('pinPotha_artisans_cache');
+    if (rawCache && (rawCache.includes('artisan_seed_') || rawCache.includes('සෝමපාල') || rawCache.includes('0773456789'))) {
+      localStorage.removeItem('pinPotha_artisans_cache');
+    }
+  } catch (e) {
+    // Ignore cache cleanup error
+  }
+
+  if (grid) {
+    grid.innerHTML = `
+      <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #d97706;">
+        <i class="fa-solid fa-spinner fa-spin" style="font-size: 1.8rem; margin-bottom: 10px;"></i>
+        <p style="font-weight: 600; font-size: 0.9rem;">ශිල්පීන් හා සංස්කෘතික සේවා නාමාවලිය පූරණය වෙමින්...</p>
+      </div>
+    `;
+  }
+
+  try {
+    allArtisansList = await StorageService.getTempleArtisansList();
+  } catch (err) {
+    console.error('[Artisans] Failed to load list:', err);
+    allArtisansList = [];
+  }
+
+  // Populate district dropdown
+  populateArtisansDistrictDropdown();
+
+  // Update tab counters
+  updateArtisansSectionTabCounts();
+
+  // Render categories bar for active section
+  renderArtisansCategoriesBar();
+
+  // Filter & Render Cards
+  filterAndRenderArtisanCards();
+};
+
+function updateArtisansSectionTabCounts() {
+  const badgeTemple = document.getElementById('tabBadgeTempleArt');
+  const badgePerahera = document.getElementById('tabBadgePeraheraCulture');
+  const templeCount = allArtisansList.filter(a => (a.section || 'temple_art') === 'temple_art').length;
+  const peraheraCount = allArtisansList.filter(a => a.section === 'perahera_culture').length;
+  if (badgeTemple) badgeTemple.textContent = templeCount;
+  if (badgePerahera) badgePerahera.textContent = peraheraCount;
+}
+
+window.switchArtisansSection = function(sectionKey) {
+  triggerHaptic(12);
+  currentArtisansSection = (sectionKey === 'perahera_culture') ? 'perahera_culture' : 'temple_art';
+  currentArtisansCategory = 'සියල්ල';
+
+  const tabTemple = document.getElementById('tabBtnTempleArt');
+  const tabPerahera = document.getElementById('tabBtnPeraheraCulture');
+
+  if (tabTemple && tabPerahera) {
+    if (currentArtisansSection === 'temple_art') {
+      tabTemple.classList.add('active');
+      tabTemple.setAttribute('aria-selected', 'true');
+      tabPerahera.classList.remove('active');
+      tabPerahera.setAttribute('aria-selected', 'false');
+    } else {
+      tabPerahera.classList.add('active');
+      tabPerahera.setAttribute('aria-selected', 'true');
+      tabTemple.classList.remove('active');
+      tabTemple.setAttribute('aria-selected', 'false');
+    }
+  }
+
+  renderArtisansCategoriesBar();
+  filterAndRenderArtisanCards();
+};
+
+function populateArtisansDistrictDropdown() {
+  const select = document.getElementById('artisansDistrictSelect');
+  if (!select || select.options.length > 1) return;
+
+  if (typeof SRI_LANKA_DISTRICTS_BY_PROVINCE === 'object') {
+    Object.entries(SRI_LANKA_DISTRICTS_BY_PROVINCE).forEach(([prov, dists]) => {
+      if (prov.includes('විදේශගත')) return;
+      const grp = document.createElement('optgroup');
+      grp.label = prov;
+      dists.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d;
+        opt.textContent = d;
+        grp.appendChild(opt);
+      });
+      select.appendChild(grp);
+    });
+  }
+}
+
+function renderArtisansCategoriesBar() {
+  const bar = document.getElementById('artisansCategoriesBar');
+  if (!bar) return;
+
+  const sectionDef = ARTISAN_SECTIONS[currentArtisansSection] || ARTISAN_SECTIONS.temple_art;
+  const categories = sectionDef.categories;
+
+  // Filter items in active section for category counting
+  const sectionItems = allArtisansList.filter(a => (a.section || 'temple_art') === currentArtisansSection);
+
+  bar.innerHTML = categories.map(cat => {
+    let count = 0;
+    if (cat === 'සියල්ල') {
+      count = sectionItems.length;
+    } else {
+      count = sectionItems.filter(a => Array.isArray(a.specialties) && a.specialties.includes(cat)).length;
+    }
+
+    const isActive = currentArtisansCategory === cat;
+    return `
+      <button type="button" 
+        class="artisan-category-chip ${isActive ? 'active' : ''}" 
+        onclick="setArtisansCategoryFilter('${cat}')">
+        <span>${cat}</span>
+        <span style="font-size: 0.68rem; opacity: 0.85; margin-left: 3px;">(${count})</span>
+      </button>
+    `;
+  }).join('');
+}
+
+window.setArtisansCategoryFilter = function(cat) {
+  triggerHaptic(10);
+  currentArtisansCategory = cat;
+  renderArtisansCategoriesBar();
+  filterAndRenderArtisanCards();
+};
+
+window.setArtisansDistrictFilter = function(dist) {
+  triggerHaptic(10);
+  currentArtisansDistrict = dist;
+  filterAndRenderArtisanCards();
+};
+
+window.filterArtisansDirectory = function() {
+  const input = document.getElementById('artisansSearchInput');
+  const clearBtn = document.getElementById('artisansSearchClearBtn');
+  currentArtisansSearch = (input?.value || '').trim().toLowerCase();
+
+  if (clearBtn) {
+    if (currentArtisansSearch) clearBtn.classList.remove('hidden');
+    else clearBtn.classList.add('hidden');
+  }
+
+  filterAndRenderArtisanCards();
+};
+
+window.clearArtisansSearch = function() {
+  const input = document.getElementById('artisansSearchInput');
+  const clearBtn = document.getElementById('artisansSearchClearBtn');
+  if (input) input.value = '';
+  if (clearBtn) clearBtn.classList.add('hidden');
+  currentArtisansSearch = '';
+  filterAndRenderArtisanCards();
+};
+
+window.resetArtisansFilters = function() {
+  currentArtisansCategory = 'සියල්ල';
+  currentArtisansDistrict = 'සියල්ල';
+  currentArtisansSearch = '';
+  const input = document.getElementById('artisansSearchInput');
+  const clearBtn = document.getElementById('artisansSearchClearBtn');
+  const distSelect = document.getElementById('artisansDistrictSelect');
+  if (input) input.value = '';
+  if (clearBtn) clearBtn.classList.add('hidden');
+  if (distSelect) distSelect.value = 'සියල්ල';
+  renderArtisansCategoriesBar();
+  filterAndRenderArtisanCards();
+};
+
+window.openArtisanPortfolioGallery = function(encodedImages, index = 0) {
+  try {
+    let images = [];
+    if (typeof encodedImages === 'string') {
+      images = JSON.parse(decodeURIComponent(encodedImages));
+    } else if (Array.isArray(encodedImages)) {
+      images = encodedImages;
+    }
+    if (images && images.length > 0 && typeof window.openLightbox === 'function') {
+      window.openLightbox(images, index);
+    }
+  } catch (err) {
+    console.error('[Artisans] Failed to open portfolio lightbox:', err);
+  }
+};
+
+function formatArtisanWhatsAppUrl(phone, whatsapp) {
+  let num = (whatsapp || phone || '').replace(/[^0-9]/g, '');
+  if (num.startsWith('0')) {
+    num = '94' + num.substring(1);
+  } else if (!num.startsWith('94') && num.length === 9) {
+    num = '94' + num;
+  }
+  const defaultMsg = encodeURIComponent("නමෝ බුද්ධාය! මා අපේ පිං පොත (Ape Pin Potha) නාමාවලිය හරහා සම්බන්ධ වන්නේ තොරතුරු විමසීමටයි.");
+  return `https://wa.me/${num}?text=${defaultMsg}`;
+}
+
+function filterAndRenderArtisanCards() {
+  const grid = document.getElementById('artisansGrid');
+  const emptyState = document.getElementById('artisansEmptyState');
+  const countEl = document.getElementById('artisansResultsCount');
+  if (!grid) return;
+
+  // Filter primarily by active section
+  let filtered = allArtisansList.filter(a => (a.section || 'temple_art') === currentArtisansSection);
+
+  // Category filter
+  if (currentArtisansCategory !== 'සියල්ල') {
+    filtered = filtered.filter(a => Array.isArray(a.specialties) && a.specialties.includes(currentArtisansCategory));
+  }
+
+  // District filter
+  if (currentArtisansDistrict !== 'සියල්ල') {
+    filtered = filtered.filter(a => (a.district || '').includes(currentArtisansDistrict));
+  }
+
+  // Search query filter
+  if (currentArtisansSearch) {
+    const q = currentArtisansSearch;
+    filtered = filtered.filter(a => {
+      const name = (a.name || '').toLowerCase();
+      const dist = (a.district || '').toLowerCase();
+      const bio = (a.bio || '').toLowerCase();
+      const temples = (a.notableTemples || '').toLowerCase();
+      const specs = (a.specialties || []).join(' ').toLowerCase();
+      return name.includes(q) || dist.includes(q) || bio.includes(q) || temples.includes(q) || specs.includes(q);
+    });
+  }
+
+  // Update counter
+  if (countEl) {
+    const unitLabel = currentArtisansSection === 'perahera_culture' ? 'සංස්කෘතික සේවාවන්' : 'ශිල්පීන්';
+    countEl.innerText = `${unitLabel} ${filtered.length} ක් හමුවිය`;
+  }
+
+  const sectionTotalCount = allArtisansList.filter(a => (a.section || 'temple_art') === currentArtisansSection).length;
+
+  if (filtered.length === 0) {
+    grid.innerHTML = '';
+    if (emptyState) {
+      emptyState.style.display = 'block';
+      if (sectionTotalCount === 0) {
+        // Welcoming empty state for empty section
+        const isPerahera = currentArtisansSection === 'perahera_culture';
+        const emptyIcon = isPerahera ? 'fa-drum' : 'fa-palette';
+        const emptyTitle = isPerahera 
+          ? 'තවමත් සත්‍යාපිත පෙරහැර හා සංස්කෘතික සේවා ඇතුළත් කර නොමැත' 
+          : 'තවමත් සත්‍යාපිත විහාර ශිල්පීන් ඇතුළත් කර නොමැත';
+        const emptyDesc = isPerahera
+          ? 'හේවිසි, තූර්ය වාදක, නර්තන කණ්ඩායම්, කස කරුවන් හෝ බලපත්‍රලාභී අලි ඇතුන් සපයන කණ්ඩායමක් ඔබ දන්නේ නම්, දැන්ම නොමිලේ ලියාපදිංචි කර සම්බුද්ධ ශාසනයට දායක වන්න.'
+          : 'විහාර චිත්‍ර, වෙහෙර දාගැබ් හෝ කැටයම් නිර්මාණ ක්ෂේත්‍රයේ දක්ෂ ශිල්පියෙකු ඔබ දන්නේ නම්, දැන්ම නොමිලේ ලියාපදිංචි කර ශාසනික මෙහෙවරට දායක වන්න.';
+        const emptyBtnText = isPerahera ? '+ පළමු සේවාව ලියාපදිංචි කරන්න' : '+ පළමු ශිල්පියා ලියාපදිංචි කරන්න';
+
+        emptyState.innerHTML = `
+          <div style="padding: 10px 8px;">
+            <i class="fa-solid ${emptyIcon}" style="font-size: 2.6rem; color: #d97706; margin-bottom: 14px; display: block;"></i>
+            <h3 style="font-size: 1.15rem; font-weight: 800; color: #451a03; margin-bottom: 8px;">${emptyTitle}</h3>
+            <p style="font-size: 0.85rem; color: #64748b; max-width: 520px; margin: 0 auto 18px; line-height: 1.6;">
+              ${emptyDesc}
+            </p>
+            <button type="button" class="btn-register-artisan" onclick="openArtisanRegisterModal()" style="margin: 0 auto; display: inline-flex; align-items: center; gap: 8px; padding: 10px 22px; font-weight: 700; font-size: 0.9rem; border-radius: 9999px; box-shadow: 0 4px 14px rgba(217, 119, 6, 0.3);">
+              <i class="fa-solid fa-circle-plus"></i>
+              <span>${emptyBtnText}</span>
+            </button>
+          </div>
+        `;
+      } else {
+        // Search or filter empty state
+        emptyState.innerHTML = `
+          <div style="padding: 10px 8px;">
+            <i class="fa-solid fa-magnifying-glass" style="font-size: 2.2rem; color: #d97706; margin-bottom: 12px; display: block;"></i>
+            <h3 style="font-size: 1.1rem; color: #451a03; margin-bottom: 6px;">කිසිදු තොරතුරක් හමු නොවීය</h3>
+            <p style="font-size: 0.82rem; color: #64748b; margin-bottom: 16px;">ඔබ සොයන නිර්මාණ ක්ෂේත්‍රය හෝ දිස්ත්‍රික්කය වෙනස් කර නැවත සොයන්න.</p>
+            <button type="button" class="btn-profile-primary" onclick="resetArtisansFilters()" style="margin: 0 auto;">
+              <i class="fa-solid fa-rotate-left"></i> සියල්ල නැවත පෙන්වන්න
+            </button>
+          </div>
+        `;
+      }
+    }
+    return;
+  }
+
+  if (emptyState) emptyState.style.display = 'none';
+
+  grid.innerHTML = filtered.map(item => {
+    const rawPhone = item.phone || '';
+    const cleanTel = rawPhone.replace(/[^0-9]/g, '');
+    const waUrl = formatArtisanWhatsAppUrl(item.phone, item.whatsapp);
+
+    const isElephantProvider = Array.isArray(item.specialties) && item.specialties.includes('අලි ඇතුන් සපයන්නන්');
+    const isPerahera = item.section === 'perahera_culture';
+    const fallbackAvatar = isPerahera ? '🥁' : '🎨';
+
+    const specialtiesHtml = (item.specialties || []).map(s => `
+      <span class="artisan-specialty-tag">${Security.escapeHTML(s)}</span>
+    `).join('');
+
+    const portfolioImages = Array.isArray(item.portfolioImages) ? item.portfolioImages.slice(0, 4) : [];
+    const cleanPortfolioUrls = portfolioImages.map(img => typeof img === 'object' && img.url ? img.url : img);
+    const encodedPortfolio = encodeURIComponent(JSON.stringify(cleanPortfolioUrls));
+
+    const portfolioHtml = portfolioImages.length > 0 ? `
+      <div class="artisan-portfolio-wrap" style="margin-top: 12px;">
+        <span style="font-size: 0.72rem; font-weight: 700; color: #78350f; display: block; margin-bottom: 6px;">
+          <i class="fa-solid fa-camera" style="margin-right: 4px;"></i> නිර්මාණ එකතුව (Portfolio - ඡායාරූප ${portfolioImages.length}ක්)
+        </span>
+        <div class="artisan-portfolio-grid">
+          ${portfolioImages.map((imgItem, idx) => {
+            const imgUrl = typeof imgItem === 'object' && imgItem.url ? imgItem.url : imgItem;
+            return `
+            <div class="artisan-portfolio-thumb" onclick="openArtisanPortfolioGallery('${encodedPortfolio}', ${idx})" title="විශාල කර බලන්න">
+              <img src="${imgUrl}" alt="නිර්මාණ සාම්පලය ${idx + 1}" loading="lazy">
+              <span class="portfolio-zoom-indicator"><i class="fa-solid fa-magnifying-glass-plus"></i></span>
+            </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    ` : '';
+
+    return `
+      <div class="artisan-card" id="artisan_${item.id || item.docId}">
+        <div class="artisan-card-header" onclick="openArtisanProfileModal('${item.id || item.docId}')" style="cursor: pointer;" title="ශිල්පියාගේ සම්පූර්ණ පැතිකඩ බලන්න">
+          <div class="artisan-avatar-wrap">
+            ${item.photo ? `
+              <img src="${item.photo}" alt="${Security.escapeHTML(item.name)}" class="artisan-avatar-img" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'artisan-avatar-placeholder\\'>${fallbackAvatar}</div>';">
+            ` : `
+              <div class="artisan-avatar-placeholder">${fallbackAvatar}</div>
+            `}
+          </div>
+          <div class="artisan-meta-header">
+            <div class="artisan-badges-row">
+              <span class="artisan-badge-verified">
+                <i class="fa-solid fa-circle-check"></i>
+                <span>සත්‍යාපිතයි</span>
+              </span>
+              ${isElephantProvider ? `
+                <span class="artisan-elephant-license-badge">
+                  <i class="fa-solid fa-shield-halved"></i>
+                  <span>වනජීවී බලපත්‍රය සත්‍යාපිතයි</span>
+                </span>
+              ` : ''}
+              <span class="artisan-section-pill">
+                ${isPerahera ? '🥁 පෙරහැර' : '🏛️ විහාර'}
+              </span>
+              ${item.islandWide ? `
+                <span class="artisan-islandwide-pill">
+                  <i class="fa-solid fa-earth-asia"></i>
+                  <span>දිවයින පුරා</span>
+                </span>
+              ` : ''}
+            </div>
+            <h3 class="artisan-name" onclick="openArtisanProfileModal('${item.id || item.docId}')" style="cursor: pointer;">${Security.escapeHTML(item.name)}</h3>
+            <div class="artisan-sub-row">
+              <span class="artisan-district-pill">
+                <i class="fa-solid fa-location-dot"></i>
+                <span>${Security.escapeHTML(item.district || 'ශ්‍රී ලංකා')}</span>
+              </span>
+              ${item.experience ? `
+                <span class="artisan-experience-badge">
+                  <i class="fa-solid fa-clock-rotate-left"></i>
+                  <span>වසර ${Number(item.experience)}+ පළපුරුද්ද</span>
+                </span>
+              ` : ''}
+            </div>
+          </div>
+        </div>
+
+        ${specialtiesHtml ? `<div class="artisan-specialties-container">${specialtiesHtml}</div>` : ''}
+
+        ${item.notableTemples ? `
+          <div class="artisan-notable-temples">
+            <i class="fa-solid fa-place-of-worship"></i>
+            <span><strong>දායක වූ ප්‍රකට විහාර / පෙරහැර:</strong> ${Security.escapeHTML(item.notableTemples)}</span>
+          </div>
+        ` : ''}
+
+        ${item.bio ? `<p class="artisan-bio-text">${Security.escapeHTML(item.bio)}</p>` : ''}
+
+        ${portfolioHtml}
+
+        <div class="artisan-actions">
+          <button type="button" class="btn-artisan-profile" onclick="openArtisanProfileModal('${item.id || item.docId}')" title="ශිල්පියාගේ සම්පූර්ණ පැතිකඩ සහ නිර්මාණ එකතුව බලන්න">
+            <i class="fa-solid fa-address-card"></i>
+            <span>පැතිකඩ</span>
+          </button>
+          ${cleanTel ? `
+            <a href="tel:${cleanTel}" class="btn-artisan-call" title="සෘජු ඇමතුමක් ලබාගන්න">
+              <i class="fa-solid fa-phone"></i>
+              <span>ඇමතුම්</span>
+            </a>
+          ` : ''}
+          <a href="${waUrl}" target="_blank" rel="noopener" class="btn-artisan-whatsapp" title="WhatsApp පණිවිඩයක් යොමු කරන්න">
+            <i class="fa-brands fa-whatsapp"></i>
+            <span>WhatsApp</span>
+          </a>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ============================================================================
+// Artisan Dedicated Profile Modal & Owner Portfolio Management
+// ============================================================================
+
+function checkIsArtisanOwner(artisan) {
+  if (!artisan) return false;
+  const currentUser = StorageService.currentUser;
+  if (!currentUser) return false;
+  if (typeof StorageService.isMasterAdmin === 'function' && StorageService.isMasterAdmin()) return true;
+
+  const artisanEmail = (artisan.ownerEmail || artisan.submittedByEmail || '').trim().toLowerCase();
+  const userEmail = (currentUser.email || '').trim().toLowerCase();
+  const userUid = currentUser.uid ? String(currentUser.uid).trim() : '';
+
+  // Prioritize explicit owner email - match strictly by email
+  if (artisanEmail) {
+    return Boolean(userEmail && artisanEmail === userEmail);
+  }
+
+  // Fall back to UIDs strictly when artisan owner email is empty/missing
+  if (userUid) {
+    if (artisan.ownerUid && String(artisan.ownerUid).trim() === userUid) return true;
+    if (artisan.userId && String(artisan.userId).trim() === userUid) return true;
+    if (artisan.submittedByUid && String(artisan.submittedByUid).trim() === userUid) return true;
+  }
+
+  return false;
+}
+
+let currentArtisanProfileId = null;
+
+window.openArtisanProfileModal = async function(artisanId) {
+  triggerHaptic(12);
+  currentArtisanProfileId = artisanId;
+  let artisan = (allArtisansList || []).find(a => (a.id || a.docId) === artisanId);
+  if (!artisan && typeof StorageService.getTempleArtisansList === 'function') {
+    try {
+      allArtisansList = await StorageService.getTempleArtisansList();
+      artisan = (allArtisansList || []).find(a => (a.id || a.docId) === artisanId);
+    } catch (e) {}
+  }
+
+  // 1. Immediately render cached data if available (zero UI delay)
+  if (artisan) {
+    renderArtisanProfileModal(artisan);
+    const modal = document.getElementById('artisanProfileModal');
+    if (modal) {
+      modal.classList.remove('hidden');
+      modal.style.display = 'flex';
+    }
+  }
+
+  // 2. Concurrently fetch fresh artisan data directly from Firestore
+  if (typeof StorageService.getArtisanById === 'function') {
+    (async () => {
+      try {
+        const freshArtisan = await StorageService.getArtisanById(artisanId, true);
+        if (freshArtisan) {
+          if (Array.isArray(allArtisansList)) {
+            const idx = allArtisansList.findIndex(a => (a.id || a.docId) === artisanId);
+            if (idx >= 0) {
+              allArtisansList[idx] = freshArtisan;
+            } else {
+              allArtisansList.push(freshArtisan);
+            }
+            try {
+              localStorage.setItem('pinPotha_artisans_cache', JSON.stringify({
+                timestamp: Date.now(),
+                data: allArtisansList
+              }));
+            } catch (e) {}
+          }
+          // If modal is currently displaying this artisan, update it live
+          if (currentArtisanProfileId === artisanId) {
+            renderArtisanProfileModal(freshArtisan);
+            const modal = document.getElementById('artisanProfileModal');
+            if (modal && modal.classList.contains('hidden')) {
+              modal.classList.remove('hidden');
+              modal.style.display = 'flex';
+            }
+          }
+        } else if (!artisan) {
+          if (typeof showCustomToast === 'function') {
+            showCustomToast("ශිල්පියාගේ තොරතුරු සොයාගත නොහැක.", "warning");
+          }
+        }
+      } catch (err) {
+        console.warn('[ArtisanProfile] Live fetch error:', err);
+        if (!artisan && typeof showCustomToast === 'function') {
+          showCustomToast("ශිල්පියාගේ තොරතුරු ලබාගැනීමේදී දෝෂයක් සිදුවිය.", "warning");
+        }
+      }
+    })();
+  } else if (!artisan) {
+    if (typeof showCustomToast === 'function') {
+      showCustomToast("ශිල්පියාගේ තොරතුරු සොයාගත නොහැක.", "warning");
+    }
+  }
+};
+
+window.closeArtisanProfileModal = function() {
+  triggerHaptic(10);
+  currentArtisanProfileId = null;
+  const modal = document.getElementById('artisanProfileModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
+  try {
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('a') || url.searchParams.has('artisan') || url.hash.startsWith('#artisan_')) {
+      url.searchParams.delete('a');
+      url.searchParams.delete('artisan');
+      if (url.hash.startsWith('#artisan_')) {
+        url.hash = '';
+      }
+      window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+    }
+  } catch (e) {}
+};
+
+function renderArtisanProfileModal(artisan) {
+  const container = document.getElementById('artisanProfileModalContent');
+  if (!container || !artisan) return;
+
+  const artisanId = artisan.id || artisan.docId || '';
+  currentArtisanProfileId = artisanId;
+  const isOwner = checkIsArtisanOwner(artisan);
+  const isPerahera = artisan.section === 'perahera_culture';
+  const fallbackAvatar = isPerahera ? '🥁' : '🎨';
+  const isElephantProvider = Array.isArray(artisan.specialties) && artisan.specialties.includes('අලි ඇතුන් සපයන්නන්');
+
+  // Update Cover Banner image and Edit button
+  const coverImg = document.getElementById('artisanProfileCoverImg');
+  const coverEditWrap = document.getElementById('artisanCoverEditBtnWrap');
+  const bannerUrl = (artisan.bannerUrl || artisan.coverImage || '').trim();
+  if (coverImg) {
+    if (bannerUrl) {
+      coverImg.src = bannerUrl;
+      coverImg.classList.remove('hidden');
+      coverImg.style.display = 'block';
+      coverImg.style.setProperty('display', 'block', 'important');
+    } else {
+      coverImg.src = '';
+      coverImg.classList.add('hidden');
+      coverImg.style.display = 'none';
+      coverImg.style.setProperty('display', 'none', 'important');
+    }
+  }
+  if (coverEditWrap) {
+    if (isOwner) {
+      coverEditWrap.classList.remove('hidden');
+      coverEditWrap.style.display = 'block';
+    } else {
+      coverEditWrap.classList.add('hidden');
+      coverEditWrap.style.display = 'none';
+    }
+  }
+
+  const rawPhone = artisan.phone || '';
+  const cleanTel = rawPhone.replace(/[^0-9]/g, '');
+  const waUrl = formatArtisanWhatsAppUrl(artisan.phone, artisan.whatsapp);
+
+  // Portfolio list normalization (safe against strings or objects)
+  const allPortfolio = Array.isArray(artisan.portfolioImages) ? artisan.portfolioImages : (Array.isArray(artisan.portfolio) ? artisan.portfolio : []);
+  const cleanPortfolioUrls = allPortfolio.map(img => typeof img === 'object' && img.url ? img.url : img);
+  const encodedPortfolio = encodeURIComponent(JSON.stringify(cleanPortfolioUrls));
+
+  const specialtiesHtml = (artisan.specialties || []).map(s => `
+    <span class="artisan-specialty-tag">${Security.escapeHTML(s)}</span>
+  `).join('');
+
+  const quotaRemaining = Math.max(0, 15 - allPortfolio.length);
+
+  container.innerHTML = `
+    <div class="artisan-profile-header-card">
+      <div class="artisan-profile-avatar-large">
+        ${artisan.photo ? `
+          <img src="${artisan.photo}" alt="${Security.escapeHTML(artisan.name)}" onerror="this.onerror=null; this.parentElement.innerHTML='${fallbackAvatar}';">
+        ` : `
+          <span>${fallbackAvatar}</span>
+        `}
+        ${isOwner ? `
+          <button type="button" class="btn-artisan-avatar-edit" onclick="triggerArtisanAvatarUpload()" title="පැතිකඩ ඡායාරූපය වෙනස් කරන්න">
+            <i class="fa-solid fa-camera"></i>
+          </button>
+          <input type="file" id="artisanAvatarFileInput" accept="image/*" class="hidden" style="display: none;" onchange="handleArtisanAvatarFileChange(this)">
+        ` : ''}
+      </div>
+      <div class="artisan-profile-details">
+        <div class="artisan-profile-badges-row">
+          <span class="artisan-badge-verified">
+            <i class="fa-solid fa-circle-check"></i>
+            <span>සත්‍යාපිතයි</span>
+          </span>
+          ${isElephantProvider ? `
+            <span class="artisan-elephant-license-badge">
+              <i class="fa-solid fa-shield-halved"></i>
+              <span>වනජීවී බලපත්‍රය සත්‍යාපිතයි</span>
+            </span>
+          ` : ''}
+          <span class="artisan-section-pill">
+            ${isPerahera ? '🥁 පෙරහැර සේවා' : '🏛️ විහාර නිර්මාණ'}
+          </span>
+          ${artisan.islandWide ? `
+            <span class="artisan-islandwide-pill">
+              <i class="fa-solid fa-earth-asia"></i>
+              <span>දිවයින පුරා සේවා</span>
+            </span>
+          ` : ''}
+        </div>
+        <h2 class="artisan-profile-name">${Security.escapeHTML(artisan.name)}</h2>
+        <div class="artisan-profile-meta-row">
+          <span class="artisan-district-pill">
+            <i class="fa-solid fa-location-dot"></i>
+            <span>${Security.escapeHTML(artisan.district || 'ශ්‍රී ලංකා')}</span>
+          </span>
+          ${artisan.experience ? `
+            <span class="artisan-experience-badge">
+              <i class="fa-solid fa-clock-rotate-left"></i>
+              <span>වසර ${Number(artisan.experience)}+ පළපුරුද්ද</span>
+            </span>
+          ` : ''}
+        </div>
+      </div>
+    </div>
+
+    <!-- Direct Contact & Share Actions -->
+    <div class="artisan-profile-actions-bar">
+      ${cleanTel ? `
+        <a href="tel:${cleanTel}" class="btn-artisan-profile-call" title="සෘජු ඇමතුමක් ලබාගන්න">
+          <i class="fa-solid fa-phone"></i>
+          <span>ඇමතුම් ගන්න</span>
+        </a>
+      ` : ''}
+      <a href="${waUrl}" target="_blank" rel="noopener" class="btn-artisan-profile-wa" title="WhatsApp පණිවිඩයක් යොමු කරන්න">
+        <i class="fa-brands fa-whatsapp"></i>
+        <span>WhatsApp</span>
+      </a>
+      <button type="button" class="btn-artisan-profile-share" onclick="copyArtisanProfileLink('${artisanId}', '${Security.escapeHTML(artisan.name).replace(/'/g, "\\'")}')" title="පැතිකඩ බෙදාගන්න">
+        <i class="fa-solid fa-share-nodes"></i>
+        <span>බෙදාගන්න</span>
+      </button>
+    </div>
+
+    <!-- Specialties Box -->
+    ${specialtiesHtml ? `
+      <div class="artisan-info-card">
+        <div class="artisan-info-title">
+          <i class="fa-solid fa-shapes"></i>
+          <span>නිර්මාණ හා සේවා ක්ෂේත්‍ර</span>
+        </div>
+        <div class="artisan-profile-specialties-wrap">${specialtiesHtml}</div>
+      </div>
+    ` : ''}
+
+    <!-- Notable Temples / Perahera -->
+    ${artisan.notableTemples ? `
+      <div class="artisan-info-card">
+        <div class="artisan-info-title">
+          <i class="fa-solid fa-place-of-worship"></i>
+          <span>දායක වූ ප්‍රකට විහාර / පෙරහැර</span>
+        </div>
+        <p style="margin: 0; font-size: 0.84rem; color: #475569; line-height: 1.5;">${Security.escapeHTML(artisan.notableTemples)}</p>
+      </div>
+    ` : ''}
+
+    <!-- Bio Description -->
+    ${artisan.bio ? `
+      <div class="artisan-info-card">
+        <div class="artisan-info-title">
+          <i class="fa-solid fa-scroll"></i>
+          <span>කෙටි හැඳින්වීම (Bio)</span>
+        </div>
+        <p style="margin: 0; font-size: 0.84rem; color: #475569; line-height: 1.6;">${Security.escapeHTML(artisan.bio)}</p>
+      </div>
+    ` : ''}
+
+    <!-- Complete Portfolio Gallery Section -->
+    <div style="margin-top: 24px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <h3 style="font-size: 1.05rem; font-weight: 800; color: #451a03; margin: 0;">
+            <i class="fa-solid fa-camera-retro" style="color: #d97706;"></i> නිර්මාණ එකතුව (Portfolio)
+          </h3>
+          <span style="font-size: 0.74rem; font-weight: 700; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; padding: 2px 8px; border-radius: 9999px;">
+            ${allPortfolio.length} / 15
+          </span>
+        </div>
+      </div>
+
+      <!-- Owner Self-Service Upload Toolbar -->
+      ${isOwner ? `
+        <div class="artisan-owner-toolbar">
+          <div class="artisan-owner-header">
+            <div class="artisan-owner-title">
+              <i class="fa-solid fa-star" style="color: #f59e0b;"></i>
+              <span>ඔබ මෙම ශිල්පී පැතිකඩෙහි හිමිකරු වේ</span>
+            </div>
+            <span class="artisan-photo-quota-pill">
+              ${quotaRemaining > 0 ? `තවත් පින්තූර ${quotaRemaining}ක් එක් කළ හැක` : 'උපරිම සීමාව සම්පූර්ණයි (15/15)'}
+            </span>
+          </div>
+
+          ${quotaRemaining > 0 ? `
+            <div class="artisan-owner-upload-form">
+              <input type="text" id="artisanOwnerPortCaption" class="artisan-caption-input" placeholder="විහාරය හෝ නිර්මාණය ගැන කෙටි විස්තරයක් (අවශ්‍ය නම් පමණක්)..." maxlength="120">
+              <div class="artisan-upload-actions">
+                <input type="file" id="artisanOwnerPortFiles" accept="image/*" multiple style="display: none;" onchange="handleArtisanOwnerFileSelect(this)">
+                <button type="button" class="btn-owner-upload" onclick="document.getElementById('artisanOwnerPortFiles').click()">
+                  <i class="fa-solid fa-images"></i> <span>ඡායාරූප තෝරන්න</span>
+                </button>
+                <span id="artisanOwnerSelectedCount" style="font-size: 0.78rem; color: #92400e; font-weight: 700; display: none;"></span>
+                <button type="button" id="btnUploadArtisanOwnerPhotos" class="btn-owner-upload" style="display: none; background: linear-gradient(135deg, #10b981, #059669);" onclick="submitArtisanOwnerPhotos('${artisanId}')">
+                  <i class="fa-solid fa-cloud-arrow-up"></i> <span>උඩුගත කරන්න</span>
+                </button>
+              </div>
+              <div id="artisanOwnerUploadStatus" style="display: none; font-size: 0.78rem; color: #d97706; font-weight: 600; padding: 4px 0;"></div>
+            </div>
+          ` : `
+            <div style="font-size: 0.78rem; color: #92400e; background: #fff; padding: 8px 12px; border-radius: 8px; border: 1px solid #fed7aa;">
+              <i class="fa-solid fa-circle-info"></i> ඔබ උපරිම ඡායාරූප 15ක සීමාව සම්පූර්ණ කර ඇත. නව ඡායාරූප එක් කිරීමට අවශ්‍ය නම් පහතින් ඇති අනවශ්‍ය ඡායාරූපයක් ඉවත් කරන්න (🗑️).
+            </div>
+          `}
+        </div>
+      ` : ''}
+
+      <!-- Portfolio Photos Grid -->
+      ${allPortfolio.length > 0 ? `
+        <div class="artisan-full-portfolio-grid">
+          ${allPortfolio.map((item, idx) => {
+            const imgUrl = typeof item === 'object' && item.url ? item.url : item;
+            const caption = typeof item === 'object' && item.caption ? item.caption : '';
+            return `
+              <div class="artisan-portfolio-item-card" onclick="openArtisanPortfolioGallery('${encodedPortfolio}', ${idx})" title="${Security.escapeHTML(caption || 'විශාල කර බලන්න')}">
+                <img src="${imgUrl}" alt="නිර්මාණ සාම්පලය ${idx + 1}" loading="lazy">
+                ${caption ? `<div class="artisan-portfolio-item-caption">${Security.escapeHTML(caption)}</div>` : ''}
+                ${isOwner ? `
+                  <button type="button" class="btn-artisan-photo-del" onclick="event.stopPropagation(); deleteArtisanPortfolioPhoto('${artisanId}', ${idx})" title="මෙම ඡායාරූපය ඉවත් කරන්න">
+                    <i class="fa-solid fa-trash-can"></i>
+                  </button>
+                ` : ''}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      ` : `
+        <div style="text-align: center; padding: 30px 16px; background: #fffdf8; border: 1.5px dashed #fed7aa; border-radius: 16px; color: #94a3b8;">
+          <i class="fa-regular fa-images" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 8px; display: block;"></i>
+          <span style="font-size: 0.82rem; color: #64748b;">තවමත් නිර්මාණ ඡායාරූප ඇතුළත් කර නොමැත.</span>
+          ${isOwner ? `
+            <div style="font-size: 0.78rem; color: #d97706; margin-top: 6px; font-weight: 700;">ඉහතින් ඇති බොත්තම මඟින් ඔබගේ නිර්මාණ ඡායාරූප එක් කරන්න.</div>
+          ` : ''}
+        </div>
+      `}
+    </div>
+  `;
+}
+
+window.handleArtisanOwnerFileSelect = function(input) {
+  if (!input || !input.files || input.files.length === 0) return;
+  const countEl = document.getElementById('artisanOwnerSelectedCount');
+  const submitBtn = document.getElementById('btnUploadArtisanOwnerPhotos');
+  if (countEl) {
+    countEl.textContent = `තෝරාගත් ඡායාරූප ${input.files.length}ක්`;
+    countEl.style.display = 'inline-block';
+  }
+  if (submitBtn) {
+    submitBtn.style.display = 'inline-flex';
+  }
+};
+
+window.submitArtisanOwnerPhotos = async function(artisanId) {
+  triggerHaptic(15);
+  const artisan = (allArtisansList || []).find(a => (a.id || a.docId) === artisanId);
+  if (!artisan) return;
+  if (!checkIsArtisanOwner(artisan)) {
+    alert("මෙම පැතිකඩට ඡායාරූප එක් කිරීමට ඔබට අවසර නොමැත.");
+    return;
+  }
+
+  const fileInput = document.getElementById('artisanOwnerPortFiles');
+  if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+    alert("කරුණාකර අවම වශයෙන් එක් ඡායාරූපයක් හෝ තෝරන්න.");
+    return;
+  }
+
+  const existing = Array.isArray(artisan.portfolioImages) ? artisan.portfolioImages : (Array.isArray(artisan.portfolio) ? artisan.portfolio : []);
+  if (existing.length >= 15) {
+    alert("උපරිම ඡායාරූප සීමාව (15) සම්පූර්ණ වී ඇත.");
+    return;
+  }
+
+  const allowedSlots = 15 - existing.length;
+  const filesToUpload = Array.from(fileInput.files).slice(0, allowedSlots);
+  const caption = (document.getElementById('artisanOwnerPortCaption')?.value || '').trim();
+
+  const submitBtn = document.getElementById('btnUploadArtisanOwnerPhotos');
+  const statusBox = document.getElementById('artisanOwnerUploadStatus');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>උඩුගත වෙමින් පවතී...</span>`;
+  }
+  if (statusBox) {
+    statusBox.style.display = 'block';
+    statusBox.textContent = "ඡායාරූප සම්පීඩනය කරමින් සහ Cloudinary වෙත උඩුගත කරමින් පවතී...";
+  }
+
+  try {
+    const uploadedItems = [];
+    for (let i = 0; i < filesToUpload.length; i++) {
+      if (statusBox) {
+        statusBox.textContent = `ඡායාරූප උඩුගත කෙරේ (${i + 1}/${filesToUpload.length})...`;
+      }
+      const file = filesToUpload[i];
+      let uploadPayload = file;
+      try {
+        const compressed = await compressSingleImageFile(file);
+        if (compressed) uploadPayload = compressed;
+      } catch (cErr) {
+        console.warn('[Artisan] Compression fallback to raw file:', cErr);
+      }
+
+      const cloudUrl = await uploadToCloudinary(uploadPayload, `artisan_portfolio_${artisanId}_${Date.now()}_${i}`);
+      if (!cloudUrl || !cloudUrl.startsWith('http')) {
+        throw new Error("ඡායාරූපය උඩුගත කිරීම අසාර්ථක විය.");
+      }
+
+      if (caption) {
+        uploadedItems.push({ url: cloudUrl, caption, addedAt: Date.now() });
+      } else {
+        uploadedItems.push(cloudUrl);
+      }
+    }
+
+    const updatedPortfolio = [...existing, ...uploadedItems];
+    await StorageService.updateArtisan(artisanId, { portfolioImages: updatedPortfolio });
+
+    // Update in-memory artisan and directory state
+    artisan.portfolioImages = updatedPortfolio;
+    const cacheIdx = (allArtisansList || []).findIndex(a => (a.id || a.docId) === artisanId);
+    if (cacheIdx !== -1) {
+      allArtisansList[cacheIdx].portfolioImages = updatedPortfolio;
+    }
+    try {
+      localStorage.removeItem('pinPotha_artisans_cache');
+    } catch (e) {}
+
+    // Re-render modal and directory cards
+    renderArtisanProfileModal(artisan);
+    renderArtisansDirectoryView();
+
+    triggerHaptic([30, 60, 30]);
+    if (typeof showCustomToast === 'function') {
+      showCustomToast(`සාදු! නව ඡායාරූප ${uploadedItems.length}ක් සාර්ථකව ඇතුළත් විය. 🙏`, 'success');
+    } else {
+      alert(`සාදු! නව ඡායාරූප ${uploadedItems.length}ක් සාර්ථකව ඇතුළත් විය. 🙏`);
+    }
+  } catch (err) {
+    console.error('[Artisan] Portfolio upload error:', err);
+    alert("ඡායාරූප උඩුගත කිරීමේදී දෝෂයක් සිදුවිය: " + (err.message || 'නැවත උත්සාහ කරන්න.'));
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> <span>උඩුගත කරන්න</span>`;
+    }
+    if (statusBox) {
+      statusBox.style.display = 'none';
+    }
+  }
+};
+
+window.deleteArtisanPortfolioPhoto = async function(artisanId, photoIndex) {
+  triggerHaptic(15);
+  const artisan = (allArtisansList || []).find(a => (a.id || a.docId) === artisanId);
+  if (!artisan) return;
+  if (!checkIsArtisanOwner(artisan)) {
+    alert("මෙම ඡායාරූපය ඉවත් කිරීමට ඔබට අවසර නොමැත.");
+    return;
+  }
+
+  if (!confirm("මෙම නිර්මාණ ඡායාරූපය ඔබගේ පැතිකඩෙන් ඉවත් කිරීමට ඔබට විශ්වාසද?")) {
+    return;
+  }
+
+  const existing = Array.isArray(artisan.portfolioImages) ? [...artisan.portfolioImages] : (Array.isArray(artisan.portfolio) ? [...artisan.portfolio] : []);
+  if (photoIndex < 0 || photoIndex >= existing.length) return;
+
+  existing.splice(photoIndex, 1);
+
+  try {
+    await StorageService.updateArtisan(artisanId, { portfolioImages: existing });
+    artisan.portfolioImages = existing;
+    const cacheIdx = (allArtisansList || []).findIndex(a => (a.id || a.docId) === artisanId);
+    if (cacheIdx !== -1) {
+      allArtisansList[cacheIdx].portfolioImages = existing;
+    }
+    try {
+      localStorage.removeItem('pinPotha_artisans_cache');
+    } catch (e) {}
+
+    renderArtisanProfileModal(artisan);
+    renderArtisansDirectoryView();
+
+    triggerHaptic(20);
+    if (typeof showCustomToast === 'function') {
+      showCustomToast("ඡායාරූපය සාර්ථකව ඉවත් කරන ලදී.", "info");
+    }
+  } catch (err) {
+    console.error('[Artisan] Delete photo error:', err);
+    alert("ඡායාරූපය ඉවත් කිරීමේදී දෝෂයක් සිදුවිය: " + (err.message || 'නැවත උත්සාහ කරන්න.'));
+  }
+};
+
+window.copyArtisanProfileLink = function(artisanId, artisanName) {
+  triggerHaptic(15);
+  const artisan = (allArtisansList || []).find(a => (a.id || a.docId) === artisanId) || {};
+  const name = artisanName || artisan.name || 'ශිල්පී';
+  const isPerahera = artisan.section === 'perahera_culture';
+  const role = isPerahera ? 'සත්‍යාපිත පෙරහැර කලා ශිල්පී' : 'සත්‍යාපිත විහාර කලා ශිල්පී';
+  const district = artisan.district ? `(${artisan.district})` : '(ශ්‍රී ලංකා)';
+  const specialties = Array.isArray(artisan.specialties) && artisan.specialties.length > 0
+    ? `\n🎨 ක්ෂේත්‍ර: ${artisan.specialties.slice(0, 3).join(', ')}`
+    : '';
+  const shareUrl = buildCleanShareUrl('a', artisanId);
+
+  const shareTitle = `🏛️ ${name} — ${role} ${district}`;
+  const shareBody = `🏛️ ${name} — ${role} ${district}${specialties}\n\n🙏 අපේ පිං පොත විහාර කලා හා පෙරහැර ශිල්පී නාමාවලිය ඔස්සේ සම්පූර්ණ පැතිකඩ සහ නිර්මාණ එකතුව (Portfolio) දැකබලා ගැනීමට:`;
+
+  if (navigator.share) {
+    navigator.share({
+      title: shareTitle,
+      text: shareBody,
+      url: shareUrl
+    }).catch(() => {});
+  } else if (navigator.clipboard && navigator.clipboard.writeText) {
+    const fullShareText = `${shareBody}\n👉 ${shareUrl}`;
+    navigator.clipboard.writeText(fullShareText).then(() => {
+      if (typeof showCustomToast === 'function') {
+        showCustomToast("පැතිකඩ සබැඳිය සාර්ථකව පිටපත් විය! 📋", "success");
+      } else {
+        alert("පැතිකඩ සබැඳිය සාර්ථකව පිටපත් විය! 📋");
+      }
+    }).catch(() => {
+      prompt('මෙම සබැඳිය Copy කරගන්න:', shareUrl);
+    });
+  } else {
+    prompt('මෙම සබැඳිය Copy කරගන්න:', shareUrl);
+  }
+};
+
+// ============================================================================
+// Artisan Cover Banner & Avatar Self-Service Upload
+// ============================================================================
+
+function compressBannerImage(file, maxWidth = 1200, quality = 0.85) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const img = new Image();
+      img.onload = function() {
+        let w = img.width;
+        let h = img.height;
+        if (w > maxWidth) {
+          h = Math.round((h * maxWidth) / w);
+          w = maxWidth;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, w, h);
+        try {
+          resolve(canvas.toDataURL('image/webp', quality));
+        } catch (err) {
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        }
+      };
+      img.onerror = () => resolve(null);
+      img.src = e.target.result;
+    };
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
+  });
+}
+
+function compressSquareAvatar(file, size = 400, quality = 0.88) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const img = new Image();
+      img.onload = function() {
+        const minDim = Math.min(img.width, img.height);
+        const sx = Math.floor((img.width - minDim) / 2);
+        const sy = Math.floor((img.height - minDim) / 2);
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, size, size);
+        try {
+          resolve(canvas.toDataURL('image/webp', quality));
+        } catch (err) {
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        }
+      };
+      img.onerror = () => resolve(null);
+      img.src = e.target.result;
+    };
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
+  });
+}
+
+// ============================================================================
+// Interactive Universal Crop & Zoom Modal (Cropper.js)
+// ============================================================================
+
+let universalCropperInstance = null;
+let universalCropConfirmCallback = null;
+let universalCropActiveOptions = null;
+
+window.openUniversalCropModal = function(options) {
+  if (!options || !options.file) return;
+  const file = options.file;
+  if (file.type && !file.type.startsWith('image/')) {
+    alert("කරුණාකර වලංගු ඡායාරූපයක් (Image file) තෝරන්න.");
+    return;
+  }
+
+  universalCropActiveOptions = options;
+  universalCropConfirmCallback = options.onConfirm || null;
+
+  const titleText = document.getElementById('universalCropTitleText');
+  const subtitleEl = document.getElementById('universalCropSubtitle');
+  const cropImg = document.getElementById('universalImageToCrop');
+  const modal = document.getElementById('universalCropModal');
+  const zoomSlider = document.getElementById('universalCropperZoomRange');
+
+  if (titleText) titleText.textContent = options.title || 'පින්තූරය සකසන්න (Crop & Zoom)';
+  if (subtitleEl) subtitleEl.textContent = options.subtitle || 'රාමුව තුළට අවශ්‍ය කොටස පැමිණෙන පරිදි ඡායාරූපය Zoom කර සකසන්න:';
+  if (zoomSlider) zoomSlider.value = 1;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    if (!cropImg || !modal) return;
+
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+
+    if (universalCropperInstance) {
+      universalCropperInstance.destroy();
+      universalCropperInstance = null;
+    }
+
+    cropImg.onload = function() {
+      if (universalCropperInstance) {
+        universalCropperInstance.destroy();
+        universalCropperInstance = null;
+      }
+
+      const aspectRatio = typeof options.aspectRatio === 'number' ? options.aspectRatio : (1 / 1);
+
+      universalCropperInstance = new Cropper(cropImg, {
+        aspectRatio: aspectRatio,
+        viewMode: 1,
+        dragMode: 'move',
+        autoCropArea: 0.92,
+        restore: false,
+        guides: true,
+        center: true,
+        highlight: false,
+        cropBoxMovable: true,
+        cropBoxResizable: true,
+        toggleDragModeOnDblclick: false,
+        responsive: true,
+        ready() {
+          if (zoomSlider) zoomSlider.value = 1;
+        },
+        zoom(ev) {
+          if (zoomSlider && ev && ev.detail) {
+            zoomSlider.value = Math.min(Math.max(ev.detail.ratio, 0.1), 3);
+          }
+        }
+      });
+    };
+    cropImg.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+};
+
+window.closeUniversalCropModal = function() {
+  const modal = document.getElementById('universalCropModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
+  if (universalCropperInstance) {
+    universalCropperInstance.destroy();
+    universalCropperInstance = null;
+  }
+  universalCropConfirmCallback = null;
+  universalCropActiveOptions = null;
+};
+
+window.zoomUniversalCropper = function(delta) {
+  if (universalCropperInstance) {
+    universalCropperInstance.zoom(delta);
+  }
+};
+
+window.setUniversalCropperZoom = function(val) {
+  if (universalCropperInstance) {
+    universalCropperInstance.zoomTo(parseFloat(val));
+  }
+};
+
+window.resetUniversalCropper = function() {
+  if (universalCropperInstance) {
+    universalCropperInstance.reset();
+    const zoomSlider = document.getElementById('universalCropperZoomRange');
+    if (zoomSlider) zoomSlider.value = 1;
+  }
+};
+
+window.confirmUniversalCrop = async function() {
+  if (!universalCropperInstance || typeof universalCropConfirmCallback !== 'function') return;
+
+  const btn = document.getElementById('btnUniversalCropSave');
+  const btnText = document.getElementById('btnUniversalCropSaveText');
+  const originalHtml = btnText ? btnText.innerHTML : '✂️ සකසා උඩුගත කරන්න';
+
+  const outputWidth = universalCropActiveOptions?.outputWidth || 500;
+  const aspectRatio = typeof universalCropActiveOptions?.aspectRatio === 'number' ? universalCropActiveOptions.aspectRatio : 1;
+  const outputHeight = Math.round(outputWidth / aspectRatio);
+
+  try {
+    if (btn) btn.disabled = true;
+    if (btnText) btnText.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>සකසමින් පවතී...</span>`;
+
+    let canvas = null;
+    try {
+      canvas = universalCropperInstance.getCroppedCanvas({
+        width: outputWidth,
+        height: outputHeight,
+        imageSmoothingEnabled: true,
+        imageSmoothingQuality: 'high'
+      });
+    } catch (cErr) {
+      console.warn('[Cropper] getCroppedCanvas failed:', cErr);
+    }
+
+    if (!canvas) {
+      const cropImg = document.getElementById('universalImageToCrop');
+      canvas = document.createElement('canvas');
+      canvas.width = outputWidth;
+      canvas.height = outputHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(cropImg, 0, 0, outputWidth, outputHeight);
+    }
+
+    const blob = await new Promise((resolve) => {
+      canvas.toBlob((b) => {
+        if (b) resolve(b);
+        else canvas.toBlob((jb) => resolve(jb), 'image/jpeg', 0.85);
+      }, 'image/webp', 0.85);
+    });
+
+    if (!blob) {
+      throw new Error("ඡායාරූපය සකස් කිරීම අසාර්ථක විය.");
+    }
+
+    if (btnText) btnText.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>උඩුගත වෙමින් පවතී...</span>`;
+
+    await universalCropConfirmCallback(blob);
+
+    closeUniversalCropModal();
+  } catch (err) {
+    console.error('[Cropper] Save error:', err);
+    alert("ඡායාරූපය සුරැකීමේදී දෝෂයක් සිදුවිය: " + (err.message || 'නැවත උත්සාහ කරන්න.'));
+  } finally {
+    if (btn) btn.disabled = false;
+    if (btnText) btnText.innerHTML = originalHtml;
+  }
+};
+
+window.triggerArtisanCoverUpload = function() {
+  const input = document.getElementById('artisanCoverFileInput');
+  if (input) input.click();
+};
+
+window.handleArtisanCoverFileChange = function(input) {
+  if (!input || !input.files || input.files.length === 0) return;
+  const file = input.files[0];
+  const artisanId = currentArtisanProfileId;
+  const artisan = (allArtisansList || []).find(a => (a.id || a.docId) === artisanId);
+  if (!artisan || !checkIsArtisanOwner(artisan)) {
+    alert("මෙම පැතිකඩෙහි කවරය වෙනස් කිරීමට ඔබට අවසර නොමැත.");
+    input.value = '';
+    return;
+  }
+
+  triggerHaptic(12);
+  openUniversalCropModal({
+    file,
+    title: 'පින්තූරය සකසන්න (Crop & Zoom) - ශිල්පී කවරයේ ඡායාරූපය',
+    subtitle: 'කවරයේ රාමුවට ගැලපෙන ලෙස ඡායාරූපය Zoom කර අවශ්‍ය කොටස සකසන්න:',
+    aspectRatio: 3 / 1,
+    outputWidth: 1200,
+    onConfirm: async (blob) => {
+      const cloudUrl = await uploadToCloudinary(blob, `artisan_banner_${artisanId}_${Date.now()}`);
+      if (!cloudUrl || !cloudUrl.startsWith('http')) {
+        throw new Error("කවරයේ ඡායාරූපය උඩුගත කිරීම අසාර්ථක විය.");
+      }
+
+      await StorageService.updateArtisan(artisanId, { bannerUrl: cloudUrl });
+
+      artisan.bannerUrl = cloudUrl;
+      const cacheIdx = (allArtisansList || []).findIndex(a => (a.id || a.docId) === artisanId);
+      if (cacheIdx !== -1) {
+        allArtisansList[cacheIdx].bannerUrl = cloudUrl;
+      }
+      try {
+        localStorage.removeItem('pinPotha_artisans_cache');
+      } catch (e) {}
+
+      renderArtisanProfileModal(artisan);
+      if (typeof showCustomToast === 'function') {
+        showCustomToast("කවරයේ ඡායාරූපය සාර්ථකව යාවත්කාලීන විය! 🙏", "success");
+      }
+    }
+  });
+
+  input.value = '';
+};
+
+window.triggerArtisanAvatarUpload = function() {
+  const input = document.getElementById('artisanAvatarFileInput');
+  if (input) input.click();
+};
+
+window.handleArtisanAvatarFileChange = function(input) {
+  if (!input || !input.files || input.files.length === 0) return;
+  const file = input.files[0];
+  const artisanId = currentArtisanProfileId;
+  const artisan = (allArtisansList || []).find(a => (a.id || a.docId) === artisanId);
+  if (!artisan || !checkIsArtisanOwner(artisan)) {
+    alert("මෙම පැතිකඩෙහි ඡායාරූපය වෙනස් කිරීමට ඔබට අවසර නොමැත.");
+    input.value = '';
+    return;
+  }
+
+  triggerHaptic(12);
+  openUniversalCropModal({
+    file,
+    title: 'පින්තූරය සකසන්න (Crop & Zoom) - ශිල්පී පැතිකඩ ඡායාරූපය',
+    subtitle: 'රවුම් රාමුවට ගැලපෙන ලෙස ඡායාරූපය Zoom කර සකසන්න:',
+    aspectRatio: 1 / 1,
+    outputWidth: 500,
+    onConfirm: async (blob) => {
+      const cloudUrl = await uploadToCloudinary(blob, `artisan_avatar_${artisanId}_${Date.now()}`);
+      if (!cloudUrl || !cloudUrl.startsWith('http')) {
+        throw new Error("පැතිකඩ ඡායාරූපය උඩුගත කිරීම අසාර්ථක විය.");
+      }
+
+      await StorageService.updateArtisan(artisanId, { photo: cloudUrl });
+
+      artisan.photo = cloudUrl;
+      const cacheIdx = (allArtisansList || []).findIndex(a => (a.id || a.docId) === artisanId);
+      if (cacheIdx !== -1) {
+        allArtisansList[cacheIdx].photo = cloudUrl;
+      }
+      try {
+        localStorage.removeItem('pinPotha_artisans_cache');
+      } catch (e) {}
+
+      renderArtisanProfileModal(artisan);
+      renderArtisansDirectoryView();
+      if (typeof showCustomToast === 'function') {
+        showCustomToast("පැතිකඩ ඡායාරූපය සාර්ථකව යාවත්කාලීන විය! 🙏", "success");
+      }
+    }
+  });
+
+  input.value = '';
+};
+
+// Modal handling
+window.openArtisanRegisterModal = function() {
+  triggerHaptic(12);
+  const user = StorageService.currentUser;
+  if (!user || !user.email) {
+    if (typeof showCustomToast === 'function') {
+      showCustomToast("කරුණාකර ශිල්පියෙකු ලියාපදිංචි කිරීමට පළමුව Google ගිණුමෙන් පිවිසෙන්න.", "warning");
+    }
+    if (typeof openProfileModal === 'function') {
+      openProfileModal();
+    }
+    return;
+  }
+
+  // Populate district dropdown in modal
+  const distSelect = document.getElementById('artisanRegDistrict');
+  if (distSelect && distSelect.options.length <= 1) {
+    distSelect.innerHTML = '<option value="" disabled selected>දිස්ත්‍රික්කය තෝරන්න (Select District)</option>';
+    if (typeof SRI_LANKA_DISTRICTS_BY_PROVINCE === 'object') {
+      Object.entries(SRI_LANKA_DISTRICTS_BY_PROVINCE).forEach(([prov, dists]) => {
+        if (prov.includes('විදේශගත')) return;
+        const grp = document.createElement('optgroup');
+        grp.label = prov;
+        dists.forEach(d => {
+          const opt = document.createElement('option');
+          opt.value = d;
+          opt.textContent = d;
+          grp.appendChild(opt);
+        });
+        distSelect.appendChild(grp);
+      });
+    }
+  }
+
+  // Sync default modal section with current directory section
+  const sectionRadios = document.querySelectorAll('input[name="artisanRegSection"]');
+  sectionRadios.forEach(r => {
+    if (r.value === currentArtisansSection) {
+      r.checked = true;
+    }
+  });
+  handleArtisanRegSectionChange(currentArtisansSection);
+
+  // Uncheck islandwide service by default
+  const islandWideChk = document.getElementById('artisanRegIslandWide');
+  if (islandWideChk) {
+    islandWideChk.checked = false;
+  }
+
+  // Reset elephant license fields
+  const licenseNumInp = document.getElementById('artisanRegWildlifeLicenseNum');
+  if (licenseNumInp) licenseNumInp.value = '';
+  removeArtisanWildlifeLicenseFile();
+  const confirmChk = document.getElementById('artisanRegWildlifeConfirm');
+  if (confirmChk) confirmChk.checked = false;
+
+  // Re-evaluate license box visibility
+  checkArtisanSpecialtyToggles();
+
+  // Attach listeners
+  initArtisanModalPhotoListeners();
+
+  const modal = document.getElementById('artisanRegisterModal');
+  if (modal) modal.classList.remove('hidden');
+};
+
+window.handleArtisanRegSectionChange = function(sectionKey) {
+  const grid = document.getElementById('artisanRegSpecialtiesGrid');
+  if (!grid) return;
+
+  const sectionDef = ARTISAN_SECTIONS[sectionKey] || ARTISAN_SECTIONS.temple_art;
+  const specialties = sectionDef.categories.filter(c => c !== 'සියල්ල');
+
+  grid.innerHTML = specialties.map(s => `
+    <label class="artisan-checkbox-item">
+      <input type="checkbox" name="artisanSpecialty" value="${s}" onchange="checkArtisanSpecialtyToggles()">
+      <span>${s}</span>
+    </label>
+  `).join('');
+
+  checkArtisanSpecialtyToggles();
+};
+
+window.checkArtisanSpecialtyToggles = function() {
+  const licenseWrap = document.getElementById('elephantLicenseFieldsWrap');
+  const checked = Array.from(document.querySelectorAll('input[name="artisanSpecialty"]:checked')).map(cb => cb.value);
+  const isElephant = checked.includes('අලි ඇතුන් සපයන්නන්');
+
+  if (licenseWrap) {
+    if (isElephant) {
+      licenseWrap.style.display = 'block';
+      licenseWrap.classList.remove('hidden');
+    } else {
+      licenseWrap.style.display = 'none';
+      licenseWrap.classList.add('hidden');
+      // Clear inputs when unchecked or hidden
+      const licenseNumInp = document.getElementById('artisanRegWildlifeLicenseNum');
+      if (licenseNumInp) licenseNumInp.value = '';
+      removeArtisanWildlifeLicenseFile();
+      const confirmChk = document.getElementById('artisanRegWildlifeConfirm');
+      if (confirmChk) confirmChk.checked = false;
+    }
+  }
+};
+
+window.closeArtisanRegisterModal = function() {
+  const modal = document.getElementById('artisanRegisterModal');
+  if (modal) modal.classList.add('hidden');
+  artisanRegPhotoSelected = null;
+  artisanRegPortfolioSelected = [];
+  artisanRegWildlifeLicenseSelected = null;
+
+  const form = document.getElementById('artisanRegisterForm');
+  if (form) form.reset();
+
+  const islandWideChk = document.getElementById('artisanRegIslandWide');
+  if (islandWideChk) islandWideChk.checked = false;
+
+  const confirmChk = document.getElementById('artisanRegWildlifeConfirm');
+  if (confirmChk) confirmChk.checked = false;
+
+  const licenseNumInp = document.getElementById('artisanRegWildlifeLicenseNum');
+  if (licenseNumInp) licenseNumInp.value = '';
+
+  const photoPrev = document.getElementById('artisanRegPhotoPreview');
+  if (photoPrev) {
+    photoPrev.innerHTML = '';
+    photoPrev.style.display = 'none';
+  }
+
+  const portPrev = document.getElementById('artisanRegPortfolioPreviewGrid');
+  if (portPrev) {
+    portPrev.innerHTML = '';
+  }
+
+  const licenseWrap = document.getElementById('elephantLicenseFieldsWrap');
+  if (licenseWrap) {
+    licenseWrap.style.display = 'none';
+    licenseWrap.classList.add('hidden');
+  }
+
+  const licensePrev = document.getElementById('artisanRegWildlifeLicensePreview');
+  if (licensePrev) {
+    licensePrev.innerHTML = '';
+    licensePrev.style.display = 'none';
+  }
+
+  const uploadStatus = document.getElementById('artisanRegUploadStatus');
+  if (uploadStatus) uploadStatus.style.display = 'none';
+};
+
+function initArtisanModalPhotoListeners() {
+  // Event delegation on specialties checkboxes container
+  const specGrid = document.getElementById('artisanRegSpecialtiesGrid');
+  if (specGrid && !specGrid.dataset.delegationAttached) {
+    specGrid.dataset.delegationAttached = 'true';
+    specGrid.addEventListener('change', (e) => {
+      if (e.target && e.target.name === 'artisanSpecialty') {
+        checkArtisanSpecialtyToggles();
+      }
+    });
+  }
+
+  const photoInp = document.getElementById('artisanRegPhotoInput');
+  const photoPrev = document.getElementById('artisanRegPhotoPreview');
+  if (photoInp && !photoInp.dataset.listenerAttached) {
+    photoInp.dataset.listenerAttached = 'true';
+    photoInp.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) {
+        artisanRegPhotoSelected = file;
+        const reader = new FileReader();
+        reader.onload = (re) => {
+          if (photoPrev) {
+            photoPrev.style.display = 'block';
+            photoPrev.innerHTML = `
+              <div style="position: relative; width: 70px; height: 70px; border-radius: 12px; overflow: hidden; border: 2px solid #d97706;">
+                <img src="${re.target.result}" style="width: 100%; height: 100%; object-fit: cover;">
+                <button type="button" onclick="removeArtisanRegPhoto()" style="position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.6); color: #fff; border: none; border-radius: 9999px; width: 20px; height: 20px; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center;">&times;</button>
+              </div>
+            `;
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  }
+
+  const portInp = document.getElementById('artisanRegPortfolioInput');
+  const portGrid = document.getElementById('artisanRegPortfolioPreviewGrid');
+  if (portInp && !portInp.dataset.listenerAttached) {
+    portInp.dataset.listenerAttached = 'true';
+    portInp.addEventListener('change', (e) => {
+      const files = Array.from(e.target.files || []);
+      if (files.length === 0) return;
+      
+      const remainingSlots = 4 - artisanRegPortfolioSelected.length;
+      if (remainingSlots <= 0) {
+        alert("ඔබට උපරිම වශයෙන් එකතු කළ හැක්කේ ඡායාරූප 4ක් පමණි.");
+        portInp.value = '';
+        return;
+      }
+
+      const filesToAdd = files.slice(0, remainingSlots);
+      filesToAdd.forEach(file => {
+        artisanRegPortfolioSelected.push(file);
+      });
+      renderArtisanPortfolioPreviews();
+      portInp.value = '';
+    });
+  }
+
+  const licenseInp = document.getElementById('artisanRegWildlifeLicenseFile');
+  const licensePrev = document.getElementById('artisanRegWildlifeLicensePreview');
+  if (licenseInp && !licenseInp.dataset.listenerAttached) {
+    licenseInp.dataset.listenerAttached = 'true';
+    licenseInp.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) {
+        artisanRegWildlifeLicenseSelected = file;
+        const reader = new FileReader();
+        reader.onload = (re) => {
+          if (licensePrev) {
+            licensePrev.style.display = 'block';
+            licensePrev.innerHTML = `
+              <div style="position: relative; width: 70px; height: 70px; border-radius: 8px; overflow: hidden; border: 2px solid #059669; margin-top: 6px;">
+                <img src="${re.target.result}" style="width: 100%; height: 100%; object-fit: cover;">
+                <button type="button" onclick="removeArtisanWildlifeLicenseFile()" style="position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.6); color: #fff; border: none; border-radius: 9999px; width: 20px; height: 20px; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center;">&times;</button>
+              </div>
+            `;
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  }
+}
+
+window.removeArtisanRegPhoto = function() {
+  artisanRegPhotoSelected = null;
+  const photoInp = document.getElementById('artisanRegPhotoInput');
+  if (photoInp) photoInp.value = '';
+  const photoPrev = document.getElementById('artisanRegPhotoPreview');
+  if (photoPrev) {
+    photoPrev.innerHTML = '';
+    photoPrev.style.display = 'none';
+  }
+};
+
+window.removeArtisanWildlifeLicenseFile = function() {
+  artisanRegWildlifeLicenseSelected = null;
+  const licenseInp = document.getElementById('artisanRegWildlifeLicenseFile');
+  if (licenseInp) licenseInp.value = '';
+  const licensePrev = document.getElementById('artisanRegWildlifeLicensePreview');
+  if (licensePrev) {
+    licensePrev.innerHTML = '';
+    licensePrev.style.display = 'none';
+  }
+};
+
+window.removeArtisanPortfolioThumb = function(index) {
+  if (index >= 0 && index < artisanRegPortfolioSelected.length) {
+    artisanRegPortfolioSelected.splice(index, 1);
+    renderArtisanPortfolioPreviews();
+  }
+};
+
+function renderArtisanPortfolioPreviews() {
+  const portGrid = document.getElementById('artisanRegPortfolioPreviewGrid');
+  if (!portGrid) return;
+  portGrid.innerHTML = '';
+
+  artisanRegPortfolioSelected.forEach((file, idx) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const thumb = document.createElement('div');
+      thumb.style.cssText = "position: relative; width: 68px; height: 68px; border-radius: 8px; overflow: hidden; border: 1.5px solid #cbd5e1;";
+      thumb.innerHTML = `
+        <img src="${e.target.result}" style="width: 100%; height: 100%; object-fit: cover;">
+        <button type="button" onclick="removeArtisanPortfolioThumb(${idx})" style="position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.65); color: #fff; border: none; border-radius: 9999px; width: 18px; height: 18px; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="ඉවත් කරන්න">&times;</button>
+      `;
+      portGrid.appendChild(thumb);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+window.handleArtisanRegisterSubmit = async function(e) {
+  if (e) e.preventDefault();
+  const user = StorageService.currentUser;
+  if (!user || !user.email) {
+    alert("කරුණාකර පළමුව Google ගිණුමෙන් පිවිසෙන්න.");
+    if (typeof openProfileModal === 'function') openProfileModal();
+    return;
+  }
+
+  const selectedSection = document.querySelector('input[name="artisanRegSection"]:checked')?.value || 'temple_art';
+  const name = (document.getElementById('artisanRegName')?.value || '').trim();
+  const expVal = document.getElementById('artisanRegExperience')?.value;
+  const experience = expVal ? parseInt(expVal, 10) : 0;
+  const district = (document.getElementById('artisanRegDistrict')?.value || '').trim();
+  const islandWide = Boolean(document.getElementById('artisanRegIslandWide')?.checked);
+  const phone = (document.getElementById('artisanRegPhone')?.value || '').trim();
+  const whatsapp = (document.getElementById('artisanRegWhatsapp')?.value || '').trim();
+  const notableTemples = (document.getElementById('artisanRegTemples')?.value || '').trim();
+  const bio = (document.getElementById('artisanRegBio')?.value || '').trim();
+
+  // Gather checked specialties
+  const checkedSpecialties = [];
+  const specCheckboxes = document.querySelectorAll('input[name="artisanSpecialty"]:checked');
+  specCheckboxes.forEach(cb => {
+    if (cb.value) checkedSpecialties.push(cb.value.trim());
+  });
+
+  if (!name) {
+    alert("කරුණාකර ශිල්පියාගේ හෝ කලායතනයේ නම ඇතුළත් කරන්න.");
+    return;
+  }
+  if (checkedSpecialties.length === 0) {
+    alert("කරුණාකර අවම වශයෙන් එක් නිර්මාණ හෝ සේවා ක්ෂේත්‍රයක් තෝරන්න.");
+    return;
+  }
+  if (!district) {
+    alert("කරුණාකර ප්‍රධාන දිස්ත්‍රික්කය තෝරන්න.");
+    return;
+  }
+  if (!phone) {
+    alert("කරුණාකර වලංගු දුරකථන අංකයක් ඇතුළත් කරන්න.");
+    return;
+  }
+
+  // Mandatory Elephant License Verification
+  const isElephant = checkedSpecialties.includes('අලි ඇතුන් සපයන්නන්');
+  const wildlifeLicenseNum = (document.getElementById('artisanRegWildlifeLicenseNum')?.value || '').trim();
+  const wildlifeConfirmed = Boolean(document.getElementById('artisanRegWildlifeConfirm')?.checked);
+
+  if (isElephant) {
+    if (!wildlifeLicenseNum) {
+      alert("අලි ඇතුන් සපයන්නන් සඳහා වනජීවී දෙපාර්තමේන්තු බලපත්‍ර අංකය ඇතුළත් කිරීම අනිවාර්ය වේ.");
+      const numInp = document.getElementById('artisanRegWildlifeLicenseNum');
+      if (numInp) numInp.focus();
+      return;
+    }
+    if (!artisanRegWildlifeLicenseSelected) {
+      alert("අලි ඇතුන් සපයන්නන් සඳහා වනජීවී දෙපාර්තමේන්තු බලපත්‍රයේ පැහැදිලි ඡායාරූපය උඩුගත කිරීම අනිවාර්ය වේ.");
+      const fileInp = document.getElementById('artisanRegWildlifeLicenseFile');
+      if (fileInp) fileInp.focus();
+      return;
+    }
+    if (!wildlifeConfirmed) {
+      alert("අලි ඇතුන් සඳහා වලංගු වනජීවී දෙපාර්තමේන්තු බලපත්‍රයක් ඇති බවට සහතික කිරීමේ කොටුව සලකුණු කිරීම අනිවාර්ය වේ.");
+      const confInp = document.getElementById('artisanRegWildlifeConfirm');
+      if (confInp) confInp.focus();
+      return;
+    }
+  }
+
+  const submitBtn = document.getElementById('btnSubmitArtisanReg');
+  const uploadStatus = document.getElementById('artisanRegUploadStatus');
+  const uploadStatusText = document.getElementById('artisanRegUploadStatusText');
+
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>යොමු වෙමින් පවතී...</span>`;
+  }
+  if (uploadStatus) {
+    uploadStatus.style.display = 'block';
+    if (uploadStatusText) uploadStatusText.textContent = "ඡායාරූප සකසමින් හා උඩුගත කරමින් පවතී...";
+  }
+
+  try {
+    let photoUrl = '';
+    // Upload profile photo if present
+    if (artisanRegPhotoSelected) {
+      if (uploadStatusText) uploadStatusText.textContent = "ප්‍රොෆයිල් ඡායාරූපය උඩුගත කෙරේ...";
+      photoUrl = await uploadToCloudinary(artisanRegPhotoSelected, `artisan_profile_${Date.now()}`);
+      if (!photoUrl || !photoUrl.startsWith('http')) {
+        throw new Error("පින්තූරය උඩුගත කිරීම අසාර්ථක විය. කරුණාකර නැවත උත්සාහ කරන්න.");
+      }
+    }
+
+    // Upload portfolio images (up to 4)
+    const portfolioUrls = [];
+    if (artisanRegPortfolioSelected.length > 0) {
+      for (let i = 0; i < artisanRegPortfolioSelected.length; i++) {
+        if (uploadStatusText) {
+          uploadStatusText.textContent = `නිර්මාණ ඡායාරූප උඩුගත කෙරේ (${i + 1}/${artisanRegPortfolioSelected.length})...`;
+        }
+        const imgFile = artisanRegPortfolioSelected[i];
+        const url = await uploadToCloudinary(imgFile, `artisan_portfolio_${Date.now()}_${i}`);
+        if (!url || !url.startsWith('http')) {
+          throw new Error("පින්තූරය උඩුගත කිරීම අසාර්ථක විය. කරුණාකර නැවත උත්සාහ කරන්න.");
+        }
+        portfolioUrls.push(url);
+      }
+    }
+
+    // Upload Wildlife License image if elephant provider
+    let wildlifeLicenseImageUrl = '';
+    if (isElephant && artisanRegWildlifeLicenseSelected) {
+      if (uploadStatusText) uploadStatusText.textContent = "වනජීවී බලපත්‍ර ඡායාරූපය උඩුගත කෙරේ...";
+      wildlifeLicenseImageUrl = await uploadToCloudinary(artisanRegWildlifeLicenseSelected, `artisan_license_${Date.now()}`);
+      if (!wildlifeLicenseImageUrl || !wildlifeLicenseImageUrl.startsWith('http')) {
+        throw new Error("පින්තූරය උඩුගත කිරීම අසාර්ථක විය. කරුණාකර නැවත උත්සාහ කරන්න.");
+      }
+    }
+
+    if (uploadStatusText) uploadStatusText.textContent = "අයදුම්පත සුරකිමින් පවතී...";
+
+    const applicationData = {
+      name,
+      section: selectedSection,
+      specialties: checkedSpecialties,
+      experience: experience || 0,
+      district,
+      islandWide,
+      phone,
+      whatsapp: whatsapp || phone,
+      notableTemples,
+      bio,
+      photo: photoUrl || '',
+      portfolioImages: portfolioUrls,
+      wildlifeLicenseNumber: isElephant ? wildlifeLicenseNum : '',
+      wildlifeLicenseImage: isElephant ? (wildlifeLicenseImageUrl || '') : '',
+      wildlifeLicenseConfirmed: isElephant ? true : false,
+      status: 'pending',
+      ownerUid: user.uid || 'unknown',
+      ownerEmail: user.email || '',
+      submittedByUid: user.uid || 'unknown',
+      submittedByName: user.name || 'පින්වත් සාමාජිකයෙක්',
+      submittedByEmail: user.email || ''
+    };
+
+    await StorageService.submitArtisanApplication(applicationData);
+
+    closeArtisanRegisterModal();
+    triggerHaptic([30, 60, 30]);
+    if (typeof SoundService !== 'undefined' && SoundService.playSadhu) {
+      SoundService.playSadhu();
+    }
+
+    alert("සාදු! සාදු! 🙏 ඔබගේ අයදුම්පත සාර්ථකව පරිපාලක මණ්ඩලය වෙත යොමු විය.\n\nතොරතුරු සත්‍යාපනය කිරීමෙන් පසු ප්‍රධාන නාමාවලියෙහි ප්‍රදර්ශනය කරනු ඇත.");
+  } catch (err) {
+    console.error('[Artisans] Application submission error:', err);
+    alert("අයදුම්පත යොමු කිරීමේදී දෝෂයක් සිදුවිය: " + (err.message || 'නැවත උත්සාහ කරන්න.'));
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> <span>අයදුම්පත යොමු කරන්න</span>`;
+    }
+    if (uploadStatus) {
+      uploadStatus.style.display = 'none';
+    }
+  }
 };

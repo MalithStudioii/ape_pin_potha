@@ -1,16 +1,16 @@
-// Ape Pin Potha Service Worker (v155)
+// Ape Pin Potha Service Worker (v175)
 // Strategy: Network-First for HTML, JS, CSS to guarantee instant updates; Stale-While-Revalidate for media assets
-const CACHE_NAME = 'pin-potha-cache-v155';
+const CACHE_NAME = 'pin-potha-cache-v175';
 const STATIC_ASSETS = [
   './',
   './index.html',
-  './css/styles.css?v=155',
-  './js/app.js?v=155',
-  './js/storage.js?v=155',
-  './js/initial-seed.js?v=147',
+  './css/styles.css?v=167',
+  './js/app.js?v=175',
+  './js/storage.js?v=165',
+  './js/imgbb-service.js?v=68',
   './js/aranya-data.js',
   './js/spiritual-avatars.js?v=147',
-  './js/security.js?v=147',
+  './js/security.js?v=160',
   './js/algorithm.js?v=147',
   './js/sound.js?v=66',
   './manifest.json',
@@ -18,12 +18,14 @@ const STATIC_ASSETS = [
   './assets/icon-512.png',
   './assets/og-banner.jpg',
   './assets/official-welcome-banner.webp',
-  './assets/sangha-frame.png'
+  './assets/sangha-frame.webp',
+  './assets/artisan-banner-buddha.webp',
+  './assets/banner.webp',
+  './assets/nexiapro-logo.webp'
 ];
 
-// Install: Cache critical shell assets and immediately activate (Instant <50ms install)
+// Install: Cache critical shell assets
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(STATIC_ASSETS).catch((err) => {
@@ -33,29 +35,39 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Message listener to trigger immediate update activation
+// Message listener for skip waiting and badge synchronization
 self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
+  if (!event.data) return;
+
+  if (event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
+  } else if (event.data.type === 'SET_BADGE') {
+    const count = parseInt(event.data.count || 0, 10);
+    try {
+      if ('setAppBadge' in self.navigator) {
+        if (count > 0) {
+          self.navigator.setAppBadge(count).catch(() => {});
+        } else {
+          self.navigator.clearAppBadge().catch(() => {});
+        }
+      }
+    } catch (e) {}
   }
 });
 
-// Activate: Clean up old caches immediately and take control of all clients
+// Activate: Clean up old caches immediately
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    Promise.all([
-      self.clients.claim(),
-      caches.keys().then((keys) => {
-        return Promise.all(
-          keys.map((key) => {
-            if (key !== CACHE_NAME) {
-              console.log('[SW] Deleting old cache:', key);
-              return caches.delete(key);
-            }
-          })
-        );
-      })
-    ])
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys.map((key) => {
+          if (key !== CACHE_NAME) {
+            console.log('[SW] Deleting old cache:', key);
+            return caches.delete(key);
+          }
+        })
+      );
+    })
   );
 });
 
@@ -131,3 +143,23 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+
+// Notification click listener: Focus open window or open new window
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) ? event.notification.data.url : './';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+    })
+  );
+});
+

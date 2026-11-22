@@ -35,5 +35,7 @@ export const COLLECTIONS = {
   NEEDS: "charity_needs",
   NOTIFICATIONS: "notifications",
   SETTINGS: "admin_settings",
-  ARANYA: "aranya_senasana"
+  ARANYA: "aranya_senasana",
+  ARTISANS: "temple_artisans",
+  ARTISAN_APPLICATIONS: "artisan_applications"
 };

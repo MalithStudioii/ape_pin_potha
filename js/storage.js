@@ -5,9 +5,20 @@
  */
 
 import { firebaseConfig, isFirebaseConfigured, COLLECTIONS } from './firebase-config.js?v=139';
-import { Security } from './security.js?v=139';
+import { Security } from './security.js?v=160';
 import { INITIAL_ARANYA_LIST, SRI_LANKA_DISTRICTS } from './aranya-data.js';
-import { SEED_POSTS } from './initial-seed.js?v=144';
+
+let _seedPostsCache = null;
+async function getSeedPosts() {
+  if (_seedPostsCache) return _seedPostsCache;
+  try {
+    const mod = await import('./initial-seed.js?v=160');
+    _seedPostsCache = mod.SEED_POSTS || [];
+  } catch (e) {
+    _seedPostsCache = [];
+  }
+  return _seedPostsCache;
+}
 
 let db = null;
 let auth = null;
@@ -42,7 +53,9 @@ const SEED_NOTIFICATIONS = [];
 
 export const StorageService = {
   _cachedPosts: null,
-  FEED_PAGE_SIZE: 20,
+  FEED_PAGE_SIZE: 15,
+  _feedUnsubscribe: null,
+  _officialUnsubscribe: null,
   _lastVisibleDoc: null,
   _hasMorePosts: true,
   _isLoadingMore: false,
@@ -283,7 +296,7 @@ export const StorageService = {
   },
 
   /**
-   * Checks whether a user/email/post is Master Admin (silvadilan9@gmail.com, creativeparadise25@gmail.com, user_malith, o2pWiAX7SXTHiMfSiphI8Ln5HAM2)
+   * Checks whether a user/email/post is Master Admin (strictly silvadilan9@gmail.com)
    */
     isMasterAdmin(userOrEmailOrUid) {
     const isMasterEmail = (email) => {
@@ -505,7 +518,7 @@ export const StorageService = {
             uid: docSnap.id,
             name: data.name || data.firstName || 'කල්‍යාණ මිත්‍ර',
             photo: data.photo || '',
-            coverImage: data.coverImage || 'assets/banner.jpg',
+            coverImage: data.coverImage || 'assets/banner.webp',
             bio: data.bio || '',
             location: data.location || data.district || '',
             joinedDate: data.joinedDate || '',
@@ -586,6 +599,7 @@ export const StorageService = {
     const userStatsMap = new Map();
     allLocalPosts.forEach(p => {
       if (!p || !p.uid) return;
+      if (this.isOfficialPost(p) || p.isOfficial === true || p.authorRole === 'official') return;
       let stat = userStatsMap.get(p.uid);
       if (!stat) {
         stat = { count: 0, sadhu: 0 };
@@ -695,9 +709,6 @@ export const StorageService = {
       }
     } catch(e) {}
 
-    // Immediate zero-latency background fast REST sync for official announcements & community directory
-    // Immediate zero-latency fast REST bootstrap for BOTH community feed & official announcements
-    this.fallbackFastFetch().catch(err => console.warn('[Storage] Fast feed REST bootstrap note:', err));
 
     this.fetchUsersViaREST().then(users => {
       if (Array.isArray(users) && users.length > 0) {
@@ -837,8 +848,13 @@ export const StorageService = {
           }
         });
 
-        // Real-time Firestore Feed Subscription - Paginated Stream (Top 20 Posts for ultra-fast startup)
+        // Real-time Firestore Feed Subscription - Paginated Stream (Top 15 Posts for ultra-fast startup)
         try {
+          if (typeof this._feedUnsubscribe === 'function') {
+            try { this._feedUnsubscribe(); } catch (e) {}
+            this._feedUnsubscribe = null;
+          }
+
           const q = query(
             collection(db, COLLECTIONS.POSTS),
             orderBy("timestamp", "desc"),
@@ -846,16 +862,16 @@ export const StorageService = {
           );
 
           let initialSnapshotReceived = false;
-          // Safety timeout (2.5s): unblocks UI if Firestore query hangs or permissions delayed
+          // Safety timeout (7.5s): unblocks UI if Firestore query hangs or permissions delayed
           const feedTimeoutId = setTimeout(() => {
             if (!initialSnapshotReceived) {
-              console.warn('[Firestore] Feed query timed out (2.5s), unblocking with cached/fallback posts...');
+              console.warn('[Firestore] Feed query timed out, unblocking with cached/fallback posts...');
               const fallback = this.getLocalPosts() || [];
               this.notifyListeners(fallback);
             }
-          }, 2500);
+          }, 7500);
 
-          onSnapshot(q, (snapshot) => {
+          this._feedUnsubscribe = onSnapshot(q, (snapshot) => {
             initialSnapshotReceived = true;
             clearTimeout(feedTimeoutId);
 
@@ -960,12 +976,17 @@ export const StorageService = {
 
         // Real-time Firestore Subscription for Official Platform Announcements
         try {
+          if (typeof this._officialUnsubscribe === 'function') {
+            try { this._officialUnsubscribe(); } catch (e) {}
+            this._officialUnsubscribe = null;
+          }
+
           const officialQ = query(
             collection(db, COLLECTIONS.POSTS),
             where("isOfficial", "==", true),
             limit(50)
           );
-          onSnapshot(officialQ, (officialSnap) => {
+          this._officialUnsubscribe = onSnapshot(officialQ, (officialSnap) => {
             const offPosts = [];
             officialSnap.forEach(doc => {
               const data = doc.data();
@@ -992,15 +1013,6 @@ export const StorageService = {
         } catch (offErr) {
           console.warn('[Firestore] Official posts listener init note:', offErr);
         }
-
-        // Feed Watchdog: Guarantee that feed renders within 1200ms even if WebSocket / SDK is blocked
-        setTimeout(() => {
-          const nonOfficialCount = (this._loadedPosts || []).filter(p => !this.isOfficialPost(p)).length;
-          if (nonOfficialCount === 0) {
-            console.log('[Storage] Watchdog: Community posts missing, bootstrapping fast REST feed...');
-            this.fallbackFastFetch();
-          }
-        }, 1200);
 
         // Real-time Firestore Notifications Subscription for authenticated user
         if (this.currentUser && this.currentUser.uid && this.currentUser.email) {
@@ -1063,7 +1075,11 @@ export const StorageService = {
 
     // Default: Local Sandbox Engine
     if (!localStorage.getItem('pinPotha_sandbox_posts')) {
-      this.cacheLocal(SEED_POSTS);
+      getSeedPosts().then(seed => {
+        if (Array.isArray(seed) && seed.length > 0) {
+          this.cacheLocal(seed);
+        }
+      }).catch(() => {});
     }
     if (!localStorage.getItem('pinKetha_notifications')) {
       this.cacheLocalNotifications(SEED_NOTIFICATIONS);
@@ -1230,9 +1246,9 @@ export const StorageService = {
         } catch (e) {}
       }
 
-      // 2. Base community seeds (all 71 genuine Firestore community posts)
-      if (typeof SEED_POSTS !== 'undefined' && Array.isArray(SEED_POSTS) && SEED_POSTS.length > 0) {
-        combined.push(...SEED_POSTS);
+      // 2. Base community seeds (if already cached in memory)
+      if (_seedPostsCache && Array.isArray(_seedPostsCache) && _seedPostsCache.length > 0) {
+        combined.push(..._seedPostsCache);
       }
 
       // 3. Merged local storage cache (updated posts & fresh additions)
@@ -1486,7 +1502,7 @@ export const StorageService = {
     return postObj;
   },
 
-  async fetchPostsViaREST(limitCount = 100, startAfterTimestamp = null) {
+  async fetchPostsViaREST(limitCount = 15, startAfterTimestamp = null) {
     try {
       const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents:runQuery?key=${firebaseConfig.apiKey}`;
       const queryPayload = {
@@ -1597,7 +1613,7 @@ export const StorageService = {
           lastName: lName,
           email,
           photo: f.photo?.stringValue || '',
-          coverImage: f.coverImage?.stringValue || 'assets/banner.jpg',
+          coverImage: f.coverImage?.stringValue || 'assets/banner.webp',
           bio: f.bio?.stringValue || '',
           location: f.location?.stringValue || f.district?.stringValue || '',
           district: f.district?.stringValue || '',
@@ -2522,6 +2538,31 @@ export const StorageService = {
       repostCount: 0
     };
 
+    // Safety guard: ensure no raw Base64 data URI is stored in Firestore
+    if ((postPayload.image && typeof postPayload.image === 'string' && postPayload.image.startsWith('data:image/')) ||
+        (Array.isArray(postPayload.images) && postPayload.images.some(img => typeof img === 'string' && img.startsWith('data:image/')))) {
+      const { uploadToCloudinary } = await import('./imgbb-service.js?v=68');
+      if (postPayload.image && typeof postPayload.image === 'string' && postPayload.image.startsWith('data:image/')) {
+        postPayload.image = await uploadToCloudinary(postPayload.image, `post_guard_${Date.now()}`);
+      }
+      if (Array.isArray(postPayload.images)) {
+        const resolvedList = [];
+        for (let i = 0; i < postPayload.images.length; i++) {
+          const itm = postPayload.images[i];
+          if (typeof itm === 'string' && itm.startsWith('data:image/')) {
+            const upl = await uploadToCloudinary(itm, `post_guard_${Date.now()}_${i}`);
+            resolvedList.push(upl);
+          } else {
+            resolvedList.push(itm);
+          }
+        }
+        postPayload.images = resolvedList;
+        if (!postPayload.image && resolvedList.length > 0) {
+          postPayload.image = resolvedList[0];
+        }
+      }
+    }
+
     // Resilient Optimistic Insertion: ensure immediate feedback in UI and persistent storage
     const localPostId = "post_" + Date.now() + "_" + Math.random().toString(36).substr(2, 6);
     const newPost = {
@@ -2753,9 +2794,9 @@ export const StorageService = {
       if (targetPost) allPosts.push(targetPost);
     }
 
-    // Fallback 3: Check SEED_POSTS
-    if (!targetPost && typeof SEED_POSTS !== 'undefined' && Array.isArray(SEED_POSTS)) {
-      targetPost = SEED_POSTS.find(p => String(p.id) === sPostId);
+    // Fallback 3: Check _seedPostsCache
+    if (!targetPost && _seedPostsCache && Array.isArray(_seedPostsCache)) {
+      targetPost = _seedPostsCache.find(p => String(p.id) === sPostId);
       if (targetPost) allPosts.push(targetPost);
     }
 
@@ -3445,7 +3486,7 @@ export const StorageService = {
 
     let userCover = savedProfile.coverImage;
     if (!userCover || userCover.includes('photo-1548013146-72479768bada') || userCover.includes('photo-1582510003544-4d00b7f74220')) {
-      userCover = "assets/banner.jpg";
+      userCover = "assets/banner.webp";
     }
 
     // Resolve user's confirmed name
@@ -3623,7 +3664,7 @@ export const StorageService = {
           uid: found.uid || uid,
           name: found.name || cleanAuthor || 'කල්‍යාණ මිත්‍ර',
           photo: found.photo || null,
-          coverImage: found.coverImage || 'assets/banner.jpg',
+          coverImage: found.coverImage || 'assets/banner.webp',
           bio: found.bio || "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏",
           location: found.location || '',
           occupation: found.occupation || '',
@@ -3653,7 +3694,7 @@ export const StorageService = {
           data.isSangha = data.isSangha === true || data.role === 'sangha' || this.isSangha({ uid, name: data.name });
           data.isAdmin = isMaster;
           data.isSubAdmin = isSub;
-          data.coverImage = data.coverImage || 'assets/banner.jpg';
+          data.coverImage = data.coverImage || 'assets/banner.webp';
           try {
             localStorage.setItem('pinPotha_profile_' + uid, JSON.stringify(data));
           } catch (e) {}
@@ -3671,7 +3712,7 @@ export const StorageService = {
         if (raw) {
           const parsed = JSON.parse(raw);
           if (parsed && (parsed.uid || parsed.name)) {
-            parsed.coverImage = parsed.coverImage || 'assets/banner.jpg';
+            parsed.coverImage = parsed.coverImage || 'assets/banner.webp';
             return parsed;
           }
         }
@@ -3681,8 +3722,10 @@ export const StorageService = {
     // 5. Fallback: derive from existing posts in memory
     const allPosts = this.getLocalPosts();
     const userPost = allPosts.find(p => 
-      (uid && p.uid === uid) || 
-      (cleanAuthor && p.author && p.author.trim().toLowerCase() === cleanAuthor.toLowerCase())
+      !this.isOfficialPost(p) && (
+        (uid && p.uid === uid) || 
+        (cleanAuthor && p.author && p.author.trim().toLowerCase() === cleanAuthor.toLowerCase())
+      )
     );
     if (userPost) {
       const resolvedPhoto = this.resolveAuthorPhoto(userPost);
@@ -3691,7 +3734,7 @@ export const StorageService = {
         uid: userPost.uid || uid,
         name: userPost.author || cleanAuthor || 'කල්‍යාණ මිත්‍ර',
         photo: resolvedPhoto || userPost.authorPhoto || null,
-        coverImage: userPost.authorCover || 'assets/banner.jpg',
+        coverImage: userPost.authorCover || 'assets/banner.webp',
         bio: "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏",
         location: userPost.location || '',
         occupation: '',
@@ -3709,7 +3752,7 @@ export const StorageService = {
         uid: uid || null,
         name: cleanAuthor,
         photo: null,
-        coverImage: 'assets/banner.jpg',
+        coverImage: 'assets/banner.webp',
         bio: "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏",
         location: '',
         occupation: '',
@@ -4525,7 +4568,7 @@ export const StorageService = {
           lastName: this.currentUser.lastName || '',
           email: this.currentUser.email || null,
           photo: this.currentUser.photo || null,
-          coverImage: this.currentUser.coverImage || 'assets/banner.jpg',
+          coverImage: this.currentUser.coverImage || 'assets/banner.webp',
           bio: this.currentUser.bio || '',
           location: this.currentUser.location || '',
           district: this.currentUser.district || '',
@@ -4805,6 +4848,373 @@ export const StorageService = {
         console.warn('[Storage] Cloud suggest aranya warning:', e);
       }
     }
+    return true;
+  },
+
+  /**
+   * Fetches the Temple Artisans directory with 15-minute localStorage caching
+   * @param {boolean} [forceRefresh=false]
+   * @returns {Promise<Array>}
+   */
+  async getTempleArtisansList(forceRefresh = false) {
+    const CACHE_KEY = 'pinPotha_artisans_cache';
+    const TTL_MS = 15 * 60 * 1000; // 15 minutes TTL to minimize Spark plan reads
+
+    if (!forceRefresh) {
+      try {
+        const raw = localStorage.getItem(CACHE_KEY);
+        if (raw) {
+          // If cached data contains dummy seed items, immediately invalidate and remove
+          if (raw.includes('artisan_seed_')) {
+            localStorage.removeItem(CACHE_KEY);
+          } else {
+            const cached = JSON.parse(raw);
+            if (cached && cached.timestamp && (Date.now() - cached.timestamp < TTL_MS) && Array.isArray(cached.data) && cached.data.length > 0) {
+              return cached.data;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[Storage] Read artisans cache warning:', e);
+      }
+    }
+
+    let list = [];
+
+    // Wait briefly if Firebase cloud connection is initializing
+    if (!isCloudReady && !db) {
+      const waitStart = Date.now();
+      while (!isCloudReady && (Date.now() - waitStart < 3500)) {
+        await new Promise(r => setTimeout(r, 100));
+      }
+    }
+
+    if (isCloudReady && db) {
+      try {
+        const { collection, getDocs, query, orderBy } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const q = query(collection(db, COLLECTIONS.ARTISANS), orderBy("createdAt", "desc"));
+        const snap = await getDocs(q);
+        snap.forEach(docSnap => {
+          list.push({ id: docSnap.id, ...docSnap.data() });
+        });
+      } catch (err) {
+        console.warn('[Storage] Cloud artisans read warning:', err);
+      }
+    }
+
+    // Only cache if valid items were retrieved
+    if (list.length > 0) {
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify({
+          timestamp: Date.now(),
+          data: list
+        }));
+      } catch (e) {}
+    }
+
+    return list;
+  },
+
+  /**
+   * Submits an application for artisan registration
+   * @param {Object} data
+   * @returns {Promise<boolean>}
+   */
+  async submitArtisanApplication(data) {
+    if (!data || !data.name || !data.phone) {
+      throw new Error("අත්‍යවශ්‍ය තොරතුරු (නම සහ දුරකථන අංකය) ඇතුළත් කරන්න.");
+    }
+
+    const payload = {
+      ...data,
+      status: 'pending',
+      submittedByUid: this.currentUser?.uid || '',
+      submittedByName: this.currentUser?.name || 'කල්‍යාණ මිත්‍ර සාමාජික',
+      submittedByEmail: this.currentUser?.email || '',
+      ownerUid: data.ownerUid || this.currentUser?.uid || '',
+      ownerEmail: data.ownerEmail || this.currentUser?.email || '',
+      timestamp: Date.now(),
+      createdAt: Date.now()
+    };
+
+    // Save pending application locally
+    try {
+      const localApps = JSON.parse(localStorage.getItem('pinPotha_artisan_apps_local') || '[]');
+      localApps.unshift(payload);
+      localStorage.setItem('pinPotha_artisan_apps_local', JSON.stringify(localApps));
+    } catch (e) {}
+
+    // Save to Firestore
+    if (isCloudReady && db) {
+      try {
+        const { collection, addDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const docRef = await addDoc(collection(db, COLLECTIONS.ARTISAN_APPLICATIONS), payload);
+        payload.id = docRef.id;
+      } catch (err) {
+        console.error('[Storage] Cloud submit artisan application failed:', err);
+        throw err;
+      }
+    }
+
+    // Trigger notification to Master Admin
+    try {
+      const adminUid = (this._cachedCommunityMembers && this._cachedCommunityMembers.find(m => (m.email || '').toLowerCase() === 'silvadilan9@gmail.com')?.uid) || 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2';
+      await this.createNotification({
+        recipientUid: adminUid,
+        type: 'artisan_application',
+        senderUid: this.currentUser?.uid || '',
+        senderName: this.currentUser?.name || 'කල්‍යාණ මිත්‍ර සාමාජික',
+        senderPhoto: this.currentUser?.photo || '',
+        message: `නව විහාර කලා ශිල්පී ලියාපදිංචි අයදුම්පතක් යොමු විය: "${data.name}"`
+      });
+    } catch (notifErr) {
+      console.warn('[Storage] Admin notification trigger notice:', notifErr);
+    }
+
+    return true;
+  },
+
+  /**
+   * Gets pending artisan applications for Master Admin
+   * @returns {Promise<Array>}
+   */
+  async getPendingArtisanApplications() {
+    if (!this.isMasterAdmin()) return [];
+
+    let list = [];
+    if (isCloudReady && db) {
+      try {
+        const { collection, getDocs, query, orderBy } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const q = query(collection(db, COLLECTIONS.ARTISAN_APPLICATIONS), orderBy("timestamp", "desc"));
+        const snap = await getDocs(q);
+        snap.forEach(docSnap => {
+          const item = { id: docSnap.id, ...docSnap.data() };
+          if (item.status === 'pending') {
+            list.push(item);
+          }
+        });
+      } catch (err) {
+        console.warn('[Storage] Cloud read pending artisan apps warning:', err);
+      }
+    }
+
+    if (list.length === 0) {
+      try {
+        const localApps = JSON.parse(localStorage.getItem('pinPotha_artisan_apps_local') || '[]');
+        list = localApps.filter(a => a.status === 'pending');
+      } catch (e) {}
+    }
+
+    return list;
+  },
+
+  /**
+   * Approves an artisan application, copying it to temple_artisans
+   * @param {string} appId
+   * @param {Object} artisanData
+   * @returns {Promise<boolean>}
+   */
+  async approveArtisanApplication(appId, artisanData) {
+    if (!this.isMasterAdmin()) throw new Error("අවශ්‍ය පරිපාලක බලතල නොමැත.");
+
+    const verifiedArtisan = {
+      ...artisanData,
+      isVerified: true,
+      status: 'approved',
+      ownerUid: artisanData.ownerUid || artisanData.submittedByUid || '',
+      ownerEmail: artisanData.ownerEmail || artisanData.submittedByEmail || '',
+      approvedAt: Date.now(),
+      updatedAt: Date.now(),
+      createdAt: artisanData.createdAt || Date.now()
+    };
+    delete verifiedArtisan.id;
+
+    if (isCloudReady && db) {
+      try {
+        const { collection, addDoc, doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        await addDoc(collection(db, COLLECTIONS.ARTISANS), verifiedArtisan);
+
+        if (appId) {
+          try {
+            await updateDoc(doc(db, COLLECTIONS.ARTISAN_APPLICATIONS, appId), {
+              status: 'approved',
+              approvedAt: Date.now()
+            });
+          } catch (appErr) {
+            console.warn('[Storage] Update application status warning:', appErr);
+          }
+        }
+      } catch (err) {
+        console.error('[Storage] Approve artisan cloud error:', err);
+        throw err;
+      }
+    }
+
+    // Invalidate cached directory
+    localStorage.removeItem('pinPotha_artisans_cache');
+
+    // Notify the submitting user if UID exists
+    if (artisanData.submittedByUid) {
+      try {
+        await this.createNotification({
+          recipientUid: artisanData.submittedByUid,
+          type: 'artisan_approved',
+          senderUid: this.currentUser?.uid || '',
+          senderName: 'අපේ පිං පොත පරිපාලනය',
+          senderPhoto: '',
+          message: `සාදු! ඔබ ඉදිරිපත් කළ විහාර කලා ශිල්පී තොරතුරු ("${artisanData.name}") සත්‍යාපනය කර නාමාවලියට ඇතුළත් කරන ලදී.`
+        });
+      } catch (e) {}
+    }
+
+    return true;
+  },
+
+  /**
+   * Rejects an artisan application
+   * @param {string} appId
+   * @returns {Promise<boolean>}
+   */
+  async rejectArtisanApplication(appId) {
+    if (!this.isMasterAdmin()) throw new Error("අවශ්‍ය පරිපාලක බලතල නොමැත.");
+
+    if (isCloudReady && db && appId) {
+      try {
+        const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        await updateDoc(doc(db, COLLECTIONS.ARTISAN_APPLICATIONS, appId), {
+          status: 'rejected',
+          rejectedAt: Date.now()
+        });
+      } catch (err) {
+        console.error('[Storage] Reject artisan application error:', err);
+        throw err;
+      }
+    }
+
+    return true;
+  },
+
+  /**
+   * Directly saves or updates a verified artisan (Master Admin only)
+   * @param {Object} artisanData
+   * @param {string|null} [docId=null]
+   * @returns {Promise<boolean>}
+   */
+  async saveArtisanDirect(artisanData, docId = null) {
+    if (!this.isMasterAdmin()) throw new Error("අවශ්‍ය පරිපාලක බලතල නොමැත.");
+
+    const payload = {
+      ...artisanData,
+      isVerified: true,
+      updatedAt: Date.now()
+    };
+
+    if (isCloudReady && db) {
+      try {
+        const { collection, addDoc, doc, setDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        if (docId) {
+          await setDoc(doc(db, COLLECTIONS.ARTISANS, docId), payload, { merge: true });
+        } else {
+          payload.createdAt = Date.now();
+          await addDoc(collection(db, COLLECTIONS.ARTISANS), payload);
+        }
+      } catch (err) {
+        console.error('[Storage] Save artisan direct error:', err);
+        throw err;
+      }
+    }
+
+    localStorage.removeItem('pinPotha_artisans_cache');
+    return true;
+  },
+
+  /**
+   * Fetches an artisan document by ID from memory, cache, or Firestore
+   * @param {string} artisanId
+   * @param {boolean} [forceCloud=false]
+   * @returns {Promise<Object|null>}
+   */
+  async getArtisanById(artisanId, forceCloud = false) {
+    if (!artisanId) return null;
+
+    if (!forceCloud) {
+      try {
+        const raw = localStorage.getItem('pinPotha_artisans_cache');
+        if (raw) {
+          const cached = JSON.parse(raw);
+          const list = Array.isArray(cached) ? cached : (Array.isArray(cached.data) ? cached.data : []);
+          const found = list.find(a => (a.id || a.docId) === artisanId);
+          if (found) return found;
+        }
+      } catch (e) {}
+    }
+
+    try {
+      if (!isCloudReady && !db) {
+        const waitStart = Date.now();
+        while (!isCloudReady && (Date.now() - waitStart < 2500)) {
+          await new Promise(r => setTimeout(r, 100));
+        }
+      }
+      if (db && COLLECTIONS && COLLECTIONS.ARTISANS) {
+        const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const snap = await getDoc(doc(db, COLLECTIONS.ARTISANS, artisanId));
+        if (snap && snap.exists()) {
+          const data = { id: snap.id, docId: snap.id, ...snap.data() };
+          return data;
+        }
+      }
+    } catch (e) {
+      console.warn('[Storage] getArtisanById error:', e);
+    }
+    return null;
+  },
+
+  /**
+   * Updates an artisan document in Firestore
+   * @param {string} docId
+   * @param {Object} updateData
+   * @returns {Promise<boolean>}
+   */
+  async updateArtisan(docId, updateData) {
+    if (!docId || !updateData) return false;
+    const payload = {
+      ...updateData,
+      updatedAt: Date.now()
+    };
+    if (isCloudReady && db) {
+      try {
+        const { doc, setDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        await setDoc(doc(db, COLLECTIONS.ARTISANS, docId), payload, { merge: true });
+      } catch (err) {
+        console.error('[Storage] Update artisan error:', err);
+        throw err;
+      }
+    }
+    localStorage.removeItem('pinPotha_artisans_cache');
+    return true;
+  },
+
+  /**
+   * Deletes an artisan from the directory (Master Admin only)
+   * @param {string} docId
+   * @returns {Promise<boolean>}
+   */
+  async deleteArtisan(docId) {
+    if (!this.isMasterAdmin()) throw new Error("අවශ්‍ය පරිපාලක බලතල නොමැත.");
+    if (!docId) return false;
+
+    if (isCloudReady && db) {
+      try {
+        const { doc, deleteDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        await deleteDoc(doc(db, COLLECTIONS.ARTISANS, docId));
+      } catch (err) {
+        console.error('[Storage] Delete artisan error:', err);
+        throw err;
+      }
+    }
+
+    localStorage.removeItem('pinPotha_artisans_cache');
     return true;
   }
 };

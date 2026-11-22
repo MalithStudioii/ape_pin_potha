@@ -9,25 +9,20 @@
 
 import { firebaseConfig, isFirebaseConfigured, COLLECTIONS } from './firebase-config.js?v=22';
 import { Security } from './security.js?v=48';
+import { uploadToImgBB, uploadToCloudinary, getImgBBApiKey } from './imgbb-service.js?v=68';
 
-const MASTER_ADMIN_EMAIL = "supportnexiapro@gmail.com";
+const MASTER_ADMIN_EMAIL = "silvadilan9@gmail.com";
 const MASTER_ADMIN_EMAILS = [
-    "supportnexiapro@gmail.com",
-    "silvadilan9@gmail.com",
-    "creativeparadise25@gmail.com"
+    "silvadilan9@gmail.com"
 ];
 
 function checkIsMasterAdmin(emailOrUser) {
     if (!emailOrUser) return false;
     if (typeof emailOrUser === 'string') {
-        const clean = emailOrUser.trim().toLowerCase();
-        return MASTER_ADMIN_EMAILS.some(adm => adm.toLowerCase() === clean);
+        return emailOrUser.trim().toLowerCase() === 'silvadilan9@gmail.com';
     }
     const email = (emailOrUser.email || '').trim().toLowerCase();
-    const uid = emailOrUser.uid || '';
-    return MASTER_ADMIN_EMAILS.some(adm => adm.toLowerCase() === email) ||
-           uid === 'user_malith' ||
-           uid === 'o2pWiAX7SXTHiMfSiphI8Ln5HAM2';
+    return email === 'silvadilan9@gmail.com';
 }
 
 let app = null;
@@ -39,6 +34,8 @@ let isSubAdmin = false;
 
 let allUsersList = [];
 let allPostsList = [];
+let allPendingArtisanApps = [];
+let allVerifiedArtisans = [];
 let growthChartInstance = null;
 let currentChartDays = 14;
 
@@ -183,6 +180,10 @@ function unlockDashboard(user) {
     subscribeToUsers();
     subscribeToPosts();
     subscribeToSettings();
+    if (isMasterAdmin) {
+        subscribeToArtisanApplications();
+        subscribeToVerifiedArtisans();
+    }
     loadAuditLogs();
 }
 
@@ -306,7 +307,8 @@ function updateUserMetrics(users) {
 
     users.forEach(u => {
         const isMaster = checkIsMasterAdmin(u.email);
-        if (isMaster || u.role === 'admin' || u.role === 'master_admin') adminsCount++;
+        const hasAdmin = isMaster || u.role === 'admin' || u.role === 'sub_admin' || u.isAdmin === true || u.isSubAdmin === true;
+        if (hasAdmin) adminsCount++;
         if (u.isBanned) bannedCount++;
     });
 
@@ -346,9 +348,16 @@ function renderUsersTable(usersToRender) {
     }
 
     tbody.innerHTML = usersToRender.map(u => {
-        const email = u.email || 'නැත';
-        const isMaster = checkIsMasterAdmin(email);
-        const isCurrentAdmin = (u.role === 'admin' || isMaster);
+        const userEmail = u.email || 'නැත';
+        const cleanEmail = (u.email || '').trim().toLowerCase();
+        const isMaster = cleanEmail === 'silvadilan9@gmail.com';
+        const hasAdminPrivilege = !isMaster && (
+            u.role === 'admin' ||
+            u.role === 'sub_admin' ||
+            u.role === 'master_admin' ||
+            u.isAdmin === true ||
+            u.isSubAdmin === true
+        );
         const isBanned = !!u.isBanned;
 
         const isSangha = u.isSangha === true || u.role === 'sangha' || (u.authorRole === 'sangha') || (u.name && (u.name.includes('ස්වාමීන් වහන්සේ') || u.name.includes('හිමි') || u.name.includes('තෙරුන්') || u.name.startsWith('පූජ්‍ය ') || u.name.startsWith('පූජ්‍යපාද ')));
@@ -359,7 +368,7 @@ function renderUsersTable(usersToRender) {
             roleBadge = `<span class="role-badge role-master"><i class="fa-solid fa-crown"></i> Master Admin</span>`;
         } else if (isSangha) {
             roleBadge = `<span class="role-badge" style="background: linear-gradient(135deg, #d97706, #92400e); color: #ffffff; border: 1px solid #fde68a; font-weight: 800; padding: 2px 8px; border-radius: 9999px; font-size: 0.7rem; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-dharmachakra" style="color:#fde68a;"></i> පූජනීය සංඝ</span>`;
-        } else if (u.role === 'admin') {
+        } else if (hasAdminPrivilege) {
             roleBadge = `<span class="role-badge role-admin"><i class="fa-solid fa-shield"></i> Sub-Admin</span>`;
         }
 
@@ -389,9 +398,9 @@ function renderUsersTable(usersToRender) {
                     `;
                 }
 
-                if (u.role === 'admin') {
+                if (hasAdminPrivilege) {
                     actionsHTML += `
-                        <button class="btn-table-action btn-table-demote" onclick="toggleUserRole('${u.uid}', 'member')" title="Admin බලතල ඉවත් කරන්න">
+                        <button class="btn-table-action btn-table-demote" onclick="toggleUserRole('${u.uid}', 'member')" title="Admin බලතල ඉවත් කර සාමාන්‍ය සාමාජිකයෙකු කරන්න">
                             <i class="fa-solid fa-user-minus"></i> Remove Admin
                         </button>
                     `;
@@ -404,8 +413,8 @@ function renderUsersTable(usersToRender) {
                 }
             }
 
-            // Both Master & Admins can Ban/Unban non-admin users
-            if (isMasterAdmin || (!isMaster && u.role !== 'admin')) {
+            // Both Master & Admins can Ban/Unban non-master users
+            if (isMasterAdmin || !hasAdminPrivilege) {
                 if (isBanned) {
                     actionsHTML += `
                         <button class="btn-table-action btn-table-unban" onclick="toggleUserBan('${u.uid}', false)" title="නැවත සක්‍රීය කරන්න">
@@ -441,7 +450,7 @@ function renderUsersTable(usersToRender) {
                                 <span>${Security.escapeHTML(u.name || 'කල්‍යාණ මිත්‍ර')}</span>
                                 ${isMaster ? '<span title="Master Admin" style="color:#fbbf24;">✓</span>' : ''}
                             </div>
-                            <div class="table-user-email">${Security.escapeHTML(email)}</div>
+                            <div class="table-user-email">${Security.escapeHTML(userEmail)}</div>
                         </div>
                     </div>
                 </td>
@@ -469,17 +478,25 @@ window.filterUsersTable = function() {
         const matchesSearch = !searchVal || nameMatch || emailMatch;
 
         let matchesRole = true;
-        const isMaster = checkIsMasterAdmin(u.email);
+        const cleanEmail = (u.email || '').trim().toLowerCase();
+        const isMaster = cleanEmail === 'silvadilan9@gmail.com';
+        const hasAdminPrivilege = !isMaster && (
+            u.role === 'admin' ||
+            u.role === 'sub_admin' ||
+            u.role === 'master_admin' ||
+            u.isAdmin === true ||
+            u.isSubAdmin === true
+        );
         const isSangha = u.isSangha === true || u.role === 'sangha' || (u.authorRole === 'sangha') || (u.name && (u.name.includes('ස්වාමීන් වහන්සේ') || u.name.includes('හිමි') || u.name.includes('තෙරුන්') || u.name.startsWith('පූජ්‍ය ') || u.name.startsWith('පූජ්‍යපාද ')));
 
         if (roleVal === 'master') {
             matchesRole = isMaster;
         } else if (roleVal === 'admin') {
-            matchesRole = (u.role === 'admin' || isMaster);
+            matchesRole = hasAdminPrivilege || isMaster;
         } else if (roleVal === 'sangha') {
             matchesRole = isSangha;
         } else if (roleVal === 'member') {
-            matchesRole = (!isMaster && u.role !== 'admin' && !isSangha);
+            matchesRole = (!isMaster && !hasAdminPrivilege && !isSangha);
         } else if (roleVal === 'banned') {
             matchesRole = !!u.isBanned;
         }
@@ -567,11 +584,30 @@ window.toggleUserRole = async function(uid, newRole) {
 
     try {
         const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
-        await updateDoc(doc(db, COLLECTIONS.USERS, uid), {
+        const updates = {
             role: newRole,
             roleUpdatedBy: currentAdminUser.email,
             roleUpdatedAt: Date.now()
-        });
+        };
+        if (newRole === 'member') {
+            updates.isAdmin = false;
+            updates.isSubAdmin = false;
+        } else if (newRole === 'admin') {
+            updates.isAdmin = true;
+            updates.isSubAdmin = true;
+        }
+
+        await updateDoc(doc(db, COLLECTIONS.USERS, uid), updates);
+
+        // Update local user object immediately so table reflects change
+        user.role = newRole;
+        if (newRole === 'member') {
+            user.isAdmin = false;
+            user.isSubAdmin = false;
+        } else if (newRole === 'admin') {
+            user.isAdmin = true;
+            user.isSubAdmin = true;
+        }
 
         // Dispatch celebratory notification to the user
         if (newRole === 'admin') {
@@ -600,6 +636,7 @@ window.toggleUserRole = async function(uid, newRole) {
         );
 
         alert(`සාර්ථකයි! "${user.name}" ගේ තනතුර ${newRole === 'admin' ? 'Sub-Admin' : 'සාමාන්‍ය සාමාජික'} ලෙස යාවත්කාලීන විය.`);
+        filterUsersTable();
     } catch (err) {
         console.error('[Admin] toggleUserRole error:', err);
         alert('තනතුර වෙනස් කිරීමේදී දෝෂයක් ඇතිවිය: ' + err.message);
@@ -1133,6 +1170,7 @@ window.switchAdminTab = function(tabId) {
         'users': document.getElementById('sectionUsers'),
         'moderation': document.getElementById('sectionModeration'),
         'settings': document.getElementById('sectionSettings'),
+        'artisans': document.getElementById('sectionArtisans'),
         'audit': document.getElementById('sectionAudit')
     };
 
@@ -1157,5 +1195,1981 @@ window.switchAdminTab = function(tabId) {
 
     if (tabId === 'overview') {
         setTimeout(() => renderGrowthChart(allUsersList), 100);
+    }
+    if (tabId === 'artisans') {
+        loadAdminArtisanApplications();
+        loadAdminVerifiedArtisans();
+    }
+};
+
+// ============================================================================
+// 9. TEMPLE ARTISANS DIRECTORY & APPLICATION APPROVAL (MASTER ADMIN ONLY)
+// ============================================================================
+
+function subscribeToArtisanApplications() {
+    if (!db) return;
+    import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js').then(({ collection, onSnapshot, query, orderBy }) => {
+        try {
+            const q = query(collection(db, COLLECTIONS.ARTISAN_APPLICATIONS || 'artisan_applications'), orderBy('createdAt', 'desc'));
+            onSnapshot(q, (snapshot) => {
+                allPendingArtisanApps = [];
+                snapshot.forEach(docSnap => {
+                    allPendingArtisanApps.push({ docId: docSnap.id, id: docSnap.id, ...docSnap.data() });
+                });
+                renderAdminArtisanApplications();
+            }, (err) => {
+                console.warn('[Admin] Artisan applications onSnapshot error:', err);
+                loadAdminArtisanApplications();
+            });
+        } catch (err) {
+            console.warn('[Admin] Artisan applications setup error:', err);
+            loadAdminArtisanApplications();
+        }
+    }).catch(err => {
+        console.warn('[Admin] Firestore import error for applications:', err);
+    });
+}
+
+function subscribeToVerifiedArtisans() {
+    if (!db) return;
+    import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js').then(({ collection, onSnapshot, query, orderBy }) => {
+        try {
+            const q = query(collection(db, COLLECTIONS.ARTISANS || 'temple_artisans'), orderBy('createdAt', 'desc'));
+            onSnapshot(q, (snapshot) => {
+                allVerifiedArtisans = [];
+                snapshot.forEach(docSnap => {
+                    allVerifiedArtisans.push({ docId: docSnap.id, id: docSnap.id, ...docSnap.data() });
+                });
+                renderAdminVerifiedArtisans();
+            }, (err) => {
+                console.warn('[Admin] Verified artisans onSnapshot error:', err);
+                loadAdminVerifiedArtisans();
+            });
+        } catch (err) {
+            console.warn('[Admin] Verified artisans setup error:', err);
+            loadAdminVerifiedArtisans();
+        }
+    }).catch(err => {
+        console.warn('[Admin] Firestore import error for artisans:', err);
+    });
+}
+
+window.loadAdminArtisanApplications = async function() {
+    if (!db) return;
+    const container = document.getElementById('adminPendingArtisansList');
+    try {
+        const { collection, getDocs, query, orderBy } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const q = query(collection(db, COLLECTIONS.ARTISAN_APPLICATIONS || 'artisan_applications'), orderBy('createdAt', 'desc'));
+        const snap = await getDocs(q);
+        allPendingArtisanApps = [];
+        snap.forEach(docSnap => {
+            allPendingArtisanApps.push({ docId: docSnap.id, id: docSnap.id, ...docSnap.data() });
+        });
+        renderAdminArtisanApplications();
+    } catch (err) {
+        console.error('[Admin] loadAdminArtisanApplications error:', err);
+        if (container) {
+            container.innerHTML = `<div style="text-align: center; color: #ef4444; padding: 20px;">අයදුම්පත් පූරණය කිරීමේදී දෝෂයක් ඇතිවිය: ${Security.escapeHTML(err.message)}</div>`;
+        }
+    }
+};
+
+window.loadAdminVerifiedArtisans = async function() {
+    if (!db) return;
+    const tbody = document.getElementById('adminVerifiedArtisansTableBody');
+    try {
+        const { collection, getDocs, query, orderBy } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const q = query(collection(db, COLLECTIONS.ARTISANS || 'temple_artisans'), orderBy('createdAt', 'desc'));
+        const snap = await getDocs(q);
+        allVerifiedArtisans = [];
+        snap.forEach(docSnap => {
+            allVerifiedArtisans.push({ docId: docSnap.id, id: docSnap.id, ...docSnap.data() });
+        });
+        renderAdminVerifiedArtisans();
+    } catch (err) {
+        console.error('[Admin] loadAdminVerifiedArtisans error:', err);
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #ef4444; padding: 20px;">ශිල්පීන් දත්ත පූරණය කිරීමේදී දෝෂයක් ඇතිවිය: ${Security.escapeHTML(err.message)}</td></tr>`;
+        }
+    }
+};
+
+function renderAdminArtisanApplications() {
+    const container = document.getElementById('adminPendingArtisansList');
+    const badge = document.getElementById('tabBadgeArtisans');
+    if (!container) return;
+
+    const pendingApps = allPendingArtisanApps.filter(a => a.status === 'pending');
+
+    if (badge) {
+        if (pendingApps.length > 0) {
+            badge.textContent = pendingApps.length;
+            badge.style.display = 'inline-block';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+
+    if (pendingApps.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; color: var(--text-muted); padding: 30px;">
+                <i class="fa-solid fa-circle-check" style="color: #10b981; font-size: 1.8rem; margin-bottom: 8px;"></i>
+                <p style="font-size: 0.9rem;">අනුමැතිය සඳහා නව ශිල්පී අයදුම්පත් නොමැත. සියලුම අයදුම්පත් සලකා බලා අවසන් කර ඇත.</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = pendingApps.map(app => {
+        const isPerahera = app.section === 'perahera_culture';
+        const sectionBadge = isPerahera
+            ? '<span style="display: inline-block; padding: 2px 8px; background: rgba(217, 119, 6, 0.2); border: 1px solid rgba(217, 119, 6, 0.4); border-radius: 9999px; font-size: 0.7rem; color: #f59e0b; margin-right: 4px;">🥁 පෙරහැර සේවා</span>'
+            : '<span style="display: inline-block; padding: 2px 8px; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 9999px; font-size: 0.7rem; color: #60a5fa; margin-right: 4px;">🏛️ විහාර නිර්මාණ</span>';
+
+        const specs = (app.specialties || []).map(s => `
+            <span style="display: inline-block; padding: 2px 7px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 9999px; font-size: 0.72rem; color: #fbbf24; margin: 2px;">
+                ${Security.escapeHTML(s)}
+            </span>
+        `).join('');
+
+        const portImages = Array.isArray(app.portfolioImages) ? app.portfolioImages.slice(0, 4) : [];
+        const portHtml = portImages.length > 0 ? `
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
+                ${portImages.map(img => `
+                    <a href="${img}" target="_blank" rel="noopener" style="display: block; width: 60px; height: 60px; border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.2);">
+                        <img src="${img}" style="width: 100%; height: 100%; object-fit: cover;" alt="Portfolio">
+                    </a>
+                `).join('')}
+            </div>
+        ` : '<span style="font-size: 0.75rem; color: var(--text-muted);">ඡායාරූප නොමැත</span>';
+
+        const rawPhone = app.phone || '';
+        const cleanTel = rawPhone.replace(/[^0-9]/g, '');
+        let numWa = (app.whatsapp || app.phone || '').replace(/[^0-9]/g, '');
+        if (numWa.startsWith('0')) numWa = '94' + numWa.substring(1);
+        else if (!numWa.startsWith('94') && numWa.length === 9) numWa = '94' + numWa;
+
+        const hasElephant = (app.specialties || []).includes('අලි ඇතුන් සපයන්නන්') || Boolean(app.wildlifeLicenseNumber);
+        const licenseHtml = hasElephant ? `
+            <div style="background: rgba(16, 185, 129, 0.12); border: 1.5px solid rgba(16, 185, 129, 0.4); border-radius: 8px; padding: 10px 12px; margin-top: 10px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                    <div>
+                        <div style="font-size: 0.8rem; font-weight: 700; color: #34d399;">
+                            <i class="fa-solid fa-shield-halved"></i> වනජීවී දෙපාර්තමේන්තු බලපත්‍ර සත්‍යාපනය (Elephant License)
+                        </div>
+                        <div style="font-size: 0.76rem; color: #cbd5e1; margin-top: 2px;">
+                            <strong>බලපත්‍ර අංකය:</strong> ${Security.escapeHTML(app.wildlifeLicenseNumber || 'ඇතුළත් කර නැත')}
+                        </div>
+                    </div>
+                    ${app.wildlifeLicenseImage ? `
+                        <a href="${app.wildlifeLicenseImage}" target="_blank" rel="noopener" class="btn-header" style="background: rgba(16, 185, 129, 0.25); border-color: rgba(16, 185, 129, 0.5); color: #34d399; font-size: 0.74rem; padding: 5px 12px; display: inline-flex; align-items: center; gap: 6px;">
+                            <i class="fa-solid fa-file-image"></i> 📄 බලපත්‍රය බලන්න
+                        </a>
+                    ` : '<span style="font-size: 0.72rem; color: #f87171;">(බලපත්‍ර ඡායාරූපයක් නොමැත)</span>'}
+                </div>
+            </div>
+        ` : '';
+
+        let createdDateStr = 'මෑතකදී';
+        if (app.createdAt) {
+            try {
+                const dateObj = app.createdAt.toDate ? app.createdAt.toDate() : new Date(app.createdAt);
+                createdDateStr = dateObj.toLocaleDateString('si-LK', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            } catch (e) {
+                // Ignore date parsing error
+            }
+        }
+
+        return `
+            <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 14px;">
+                <div style="display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap;">
+                    <div style="width: 60px; height: 60px; border-radius: 12px; overflow: hidden; background: rgba(255,255,255,0.05); border: 1px solid rgba(245,158,11,0.4); flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+                        ${app.photo ? `
+                            <img src="${app.photo}" style="width: 100%; height: 100%; object-fit: cover;">
+                        ` : `
+                            <i class="fa-solid ${isPerahera ? 'fa-drum' : 'fa-palette'}" style="font-size: 1.5rem; color: #fbbf24;"></i>
+                        `}
+                    </div>
+                    <div style="flex: 1; min-width: 250px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                ${sectionBadge}
+                                <h4 style="font-size: 1rem; font-weight: 700; color: #fff; margin: 0;">${Security.escapeHTML(app.name)}</h4>
+                            </div>
+                            <span style="font-size: 0.72rem; color: var(--text-muted);">🕒 ${createdDateStr}</span>
+                        </div>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; font-size: 0.78rem; color: var(--text-secondary);">
+                            <span><i class="fa-solid fa-location-dot" style="color: #f59e0b;"></i> ${Security.escapeHTML(app.district || 'ශ්‍රී ලංකා')}</span>
+                            ${app.experience ? `<span><i class="fa-solid fa-clock-rotate-left"></i> වසර ${app.experience}+ පළපුරුද්ද</span>` : ''}
+                            ${app.islandWide ? `<span style="color: #34d399;"><i class="fa-solid fa-earth-asia"></i> දිවයින පුරා සේවය</span>` : ''}
+                        </div>
+                        
+                        <div style="margin-top: 8px;">
+                            ${specs}
+                        </div>
+
+                        ${app.notableTemples ? `
+                            <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 6px;">
+                                <strong>දායක වූ ප්‍රකට විහාර / පෙරහැර:</strong> ${Security.escapeHTML(app.notableTemples)}
+                            </div>
+                        ` : ''}
+
+                        ${app.bio ? `
+                            <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; line-height: 1.4;">
+                                ${Security.escapeHTML(app.bio)}
+                            </div>
+                        ` : ''}
+
+                        ${licenseHtml}
+
+                        <div style="margin-top: 8px;">
+                            <span style="font-size: 0.72rem; color: #fbbf24; font-weight: 600;">Portfolio නිර්මාණ:</span>
+                            ${portHtml}
+                        </div>
+
+                        <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                            <div style="font-size: 0.75rem; color: var(--text-secondary); display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                                <span><strong>දුරකථන:</strong> <a href="tel:${cleanTel}" style="color: #38bdf8;">${Security.escapeHTML(rawPhone)}</a></span>
+                                <span><strong>WhatsApp:</strong> <a href="https://wa.me/${numWa}" target="_blank" rel="noopener" style="color: #34d399;">${Security.escapeHTML(app.whatsapp || rawPhone)}</a></span>
+                                <span><strong>යොමුකළේ:</strong> ${Security.escapeHTML(app.submittedByName || 'සාමාජික')} (${Security.escapeHTML(app.submittedByEmail || '')})</span>
+                            </div>
+
+                            <div style="display: flex; gap: 8px;">
+                                <button type="button" class="btn-header" style="background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.4); color: #fca5a5;" onclick="adminRejectArtisan('${app.docId}')">
+                                    <i class="fa-solid fa-xmark"></i> ප්‍රතික්ෂේප කරන්න
+                                </button>
+                                <button type="button" class="btn-header" style="background: linear-gradient(135deg, #10b981, #059669); border-color: transparent; color: #fff;" onclick="adminApproveArtisan('${app.docId}')">
+                                    <i class="fa-solid fa-check"></i> අනුමත කර එක්කරන්න
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderAdminVerifiedArtisans() {
+    const tbody = document.getElementById('adminVerifiedArtisansTableBody');
+    if (!tbody) return;
+
+    if (allVerifiedArtisans.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                    දැනට සත්‍යාපිත ශිල්පීන් නාමාවලියෙහි නොමැත. ඉහත පෝරමයෙන් සෘජුව එක්කරන්න හෝ අයදුම්පත් අනුමත කරන්න.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = allVerifiedArtisans.map(item => {
+        const isPerahera = item.section === 'perahera_culture';
+        const sectionBadge = isPerahera
+            ? '<span style="display: block; width: fit-content; padding: 1px 7px; background: rgba(217, 119, 6, 0.2); border: 1px solid rgba(217, 119, 6, 0.4); border-radius: 9999px; font-size: 0.68rem; color: #fbbf24; margin-bottom: 3px;">🥁 පෙරහැර</span>'
+            : '<span style="display: block; width: fit-content; padding: 1px 7px; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 9999px; font-size: 0.68rem; color: #60a5fa; margin-bottom: 3px;">🏛️ විහාර</span>';
+
+        const specs = (item.specialties || []).map(s => `
+            <span style="display: inline-block; padding: 2px 6px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 9999px; font-size: 0.7rem; color: #fbbf24; margin: 1px;">
+                ${Security.escapeHTML(s)}
+            </span>
+        `).join('');
+
+        const rawPhone = item.phone || '';
+        const cleanTel = rawPhone.replace(/[^0-9]/g, '');
+        let numWa = (item.whatsapp || item.phone || '').replace(/[^0-9]/g, '');
+        if (numWa.startsWith('0')) numWa = '94' + numWa.substring(1);
+        else if (!numWa.startsWith('94') && numWa.length === 9) numWa = '94' + numWa;
+
+        const portCount = Array.isArray(item.portfolioImages) ? item.portfolioImages.length : 0;
+
+        const hasElephant = (item.specialties || []).includes('අලි ඇතුන් සපයන්නන්') || Boolean(item.wildlifeLicenseNumber);
+        const elephantBadge = hasElephant ? `
+            <div style="margin-top: 4px;">
+                <span style="display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 9999px; font-size: 0.68rem; color: #34d399;">
+                    <i class="fa-solid fa-shield-halved"></i> බලපත්‍රලාභී
+                </span>
+                ${item.wildlifeLicenseImage ? `
+                    <a href="${item.wildlifeLicenseImage}" target="_blank" rel="noopener" style="font-size: 0.68rem; color: #38bdf8; margin-left: 4px; text-decoration: underline;" title="බලපත්‍රය පරීක්ෂා කරන්න">[📄 බලපත්‍රය]</a>
+                ` : ''}
+            </div>
+        ` : '';
+
+        return `
+            <tr>
+                <td>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div style="width: 38px; height: 38px; border-radius: 8px; overflow: hidden; background: rgba(255,255,255,0.05); border: 1px solid rgba(245,158,11,0.3); flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+                            ${item.photo ? `
+                                <img src="${item.photo}" style="width: 100%; height: 100%; object-fit: cover;">
+                            ` : `
+                                <i class="fa-solid ${isPerahera ? 'fa-drum' : 'fa-palette'}" style="font-size: 1rem; color: #fbbf24;"></i>
+                            `}
+                        </div>
+                        <div>
+                            <div style="font-weight: 700; color: #fff;">${Security.escapeHTML(item.name)}</div>
+                            ${item.experience ? `<div style="font-size: 0.72rem; color: var(--text-muted);">වසර ${item.experience}+ පළපුරුද්ද</div>` : ''}
+                            ${item.ownerEmail ? `<div style="font-size: 0.7rem; color: #38bdf8; margin-top: 2px;"><i class="fa-solid fa-user-check"></i> ${Security.escapeHTML(item.ownerEmail)}</div>` : ''}
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    ${sectionBadge}
+                    <div style="font-size: 0.8rem; color: var(--text-secondary);">${Security.escapeHTML(item.district || 'ශ්‍රී ලංකා')}</div>
+                    ${item.islandWide ? `<div style="font-size: 0.7rem; color: #34d399;">දිවයින පුරා</div>` : ''}
+                </td>
+                <td>
+                    <div style="max-width: 280px;">${specs}</div>
+                    ${elephantBadge}
+                </td>
+                <td>
+                    <div style="font-size: 0.78rem;">
+                        <div><a href="tel:${cleanTel}" style="color: #38bdf8;"><i class="fa-solid fa-phone" style="font-size: 0.7rem;"></i> ${Security.escapeHTML(rawPhone)}</a></div>
+                        <div><a href="https://wa.me/${numWa}" target="_blank" rel="noopener" style="color: #34d399;"><i class="fa-brands fa-whatsapp" style="font-size: 0.7rem;"></i> ${Security.escapeHTML(item.whatsapp || rawPhone)}</a></div>
+                    </div>
+                </td>
+                <td>
+                    <span style="font-size: 0.78rem; color: var(--text-secondary);">${portCount} ඡායාරූප</span>
+                </td>
+                <td>
+                    <div style="display: flex; gap: 6px;">
+                        <button type="button" class="btn-header" style="padding: 4px 8px; font-size: 0.72rem;" onclick="adminEditArtisan('${item.docId}')" title="සංස්කරණය">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                        <button type="button" class="btn-header" style="padding: 4px 8px; font-size: 0.72rem; color: #fca5a5; border-color: rgba(239, 68, 68, 0.4);" onclick="adminDeleteArtisan('${item.docId}', '${Security.escapeHTML(item.name).replace(/'/g, "\\'")}')" title="ඉවත් කරන්න">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+window.adminApproveArtisan = async function(appId) {
+    if (!isMasterAdmin) {
+        alert("මෙම පහසුකම සඳහා අවසර ඇත්තේ Master Admin ට පමණි.");
+        return;
+    }
+    const app = allPendingArtisanApps.find(a => a.docId === appId);
+    if (!app) {
+        alert("අයදුම්පත සොයාගත නොහැක.");
+        return;
+    }
+
+    if (!confirm(`"${app.name}" ශිල්පියා ප්‍රධාන නාමාවලිය සඳහා අනුමත කිරීමට ඔබට විශ්වාසද?`)) {
+        return;
+    }
+
+    try {
+        const { collection, addDoc, doc, updateDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        
+        // 1. Add to verified artisans collection
+        const artisanPayload = {
+            name: app.name || '',
+            section: app.section || 'temple_art',
+            specialties: app.specialties || [],
+            experience: Number(app.experience) || 0,
+            district: app.district || '',
+            islandWide: Boolean(app.islandWide),
+            phone: app.phone || '',
+            whatsapp: app.whatsapp || app.phone || '',
+            notableTemples: app.notableTemples || '',
+            bio: app.bio || '',
+            photo: app.photo || '',
+            bannerUrl: app.bannerUrl || app.coverImage || '',
+            portfolioImages: app.portfolioImages || [],
+            wildlifeLicenseNumber: app.wildlifeLicenseNumber || '',
+            wildlifeLicenseImage: app.wildlifeLicenseImage || '',
+            ownerUid: app.ownerUid || app.submittedByUid || '',
+            ownerEmail: app.ownerEmail || app.submittedByEmail || '',
+            isVerified: true,
+            approvedBy: currentAdminUser ? currentAdminUser.email : 'Master Admin',
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+        };
+
+        await addDoc(collection(db, COLLECTIONS.ARTISANS || 'temple_artisans'), artisanPayload);
+
+        // 2. Mark application as approved
+        await updateDoc(doc(db, COLLECTIONS.ARTISAN_APPLICATIONS || 'artisan_applications', appId), {
+            status: 'approved',
+            reviewedAt: serverTimestamp(),
+            reviewedBy: currentAdminUser ? currentAdminUser.email : 'Master Admin'
+        });
+
+        // 3. Clear localStorage cache so directory refreshes
+        try {
+            localStorage.removeItem('pinPotha_artisans_cache');
+        } catch (e) {
+            // Ignore cache error
+        }
+
+        // 4. Record audit log
+        await recordAuditLog('Artisan Application Approved', `Approved artisan "${app.name}" into directory.`);
+
+        alert(`සාර්ථකයි! "${app.name}" ශිල්පියා ප්‍රධාන නාමාවලියට සාර්ථකව එක්කරන ලදී. 🙏`);
+    } catch (err) {
+        console.error('[Admin] adminApproveArtisan error:', err);
+        alert("අනුමත කිරීමේදී දෝෂයක් සිදුවිය: " + err.message);
+    }
+};
+
+window.adminRejectArtisan = async function(appId) {
+    if (!isMasterAdmin) {
+        alert("මෙම පහසුකම සඳහා අවසර ඇත්තේ Master Admin ට පමණි.");
+        return;
+    }
+    const app = allPendingArtisanApps.find(a => a.docId === appId);
+    if (!app) return;
+
+    if (!confirm(`"${app.name}" ගේ අයදුම්පත ප්‍රතික්ෂේප කිරීමට ඔබට විශ්වාසද?`)) {
+        return;
+    }
+
+    try {
+        const { doc, updateDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        await updateDoc(doc(db, COLLECTIONS.ARTISAN_APPLICATIONS || 'artisan_applications', appId), {
+            status: 'rejected',
+            reviewedAt: serverTimestamp(),
+            reviewedBy: currentAdminUser ? currentAdminUser.email : 'Master Admin'
+        });
+
+        await recordAuditLog('Artisan Application Rejected', `Rejected artisan application "${app.name}".`);
+        alert("අයදුම්පත ප්‍රතික්ෂේප කරන ලදී.");
+    } catch (err) {
+        console.error('[Admin] adminRejectArtisan error:', err);
+        alert("දෝෂයක් සිදුවිය: " + err.message);
+    }
+};
+
+window.toggleAdminArtisanDirectForm = function() {
+    const wrap = document.getElementById('adminArtisanDirectFormWrap');
+    if (!wrap) return;
+    if (wrap.style.display === 'none' || !wrap.style.display) {
+        wrap.style.display = 'block';
+    } else {
+        wrap.style.display = 'none';
+    }
+};
+
+window.handleAdminArtisanSectionChange = function(sec) {
+    const container = document.getElementById('adminArtisanShortcutsContainer');
+    if (!container) return;
+
+    if (sec === 'perahera_culture') {
+        container.innerHTML = `
+            <span class="admin-tag-shortcut" onclick="appendAdminArtisanSpecialty('හේවිසි හා තූර්ය වාදක (බෙර වාදක)')">+ හේවිසි / බෙර වාදක</span>
+            <span class="admin-tag-shortcut" onclick="appendAdminArtisanSpecialty('නර්තන කණ්ඩායම් (උඩරට / පහතරට / සබරගමු)')">+ නර්තන කණ්ඩායම්</span>
+            <span class="admin-tag-shortcut" onclick="appendAdminArtisanSpecialty('කස කරුවන් හා ගිනි බෝල')">+ කස කරුවන් / ගිනි බෝල</span>
+            <span class="admin-tag-shortcut" onclick="appendAdminArtisanSpecialty('අලි ඇතුන් සපයන්නන්')">+ අලි ඇතුන් සපයන්නන්</span>
+            <span class="admin-tag-shortcut" onclick="appendAdminArtisanSpecialty('සේසත්, පාවඩ හා මණ්ඩප සැරසිලි')">+ සේසත් / පාවඩ / සැරසිලි</span>
+        `;
+    } else {
+        container.innerHTML = `
+            <span class="admin-tag-shortcut" onclick="appendAdminArtisanSpecialty('විහාර චිත්‍ර හා ප්‍රතිසංස්කරණ')">+ විහාර චිත්‍ර</span>
+            <span class="admin-tag-shortcut" onclick="appendAdminArtisanSpecialty('වෙහෙර දාගැබ් හා චෛත්‍ය නිර්මාණ')">+ වෙහෙර දාගැබ්</span>
+            <span class="admin-tag-shortcut" onclick="appendAdminArtisanSpecialty('බුදු පිළිම හා මූර්ති නිර්මාණ')">+ බුදු පිළිම</span>
+            <span class="admin-tag-shortcut" onclick="appendAdminArtisanSpecialty('ලී කැටයම් හා මකර තොරණ')">+ ලී කැටයම්</span>
+            <span class="admin-tag-shortcut" onclick="appendAdminArtisanSpecialty('විහාර ගෘහ නිර්මාණ හා වාස්තු')">+ ගෘහ නිර්මාණ</span>
+            <span class="admin-tag-shortcut" onclick="appendAdminArtisanSpecialty('ගල් කැටයම්, කොත් වහන්සේ හා ලෝහ කර්මාන්ත')">+ ගල් කැටයම්</span>
+        `;
+    }
+    checkAdminElephantLicenseToggle();
+};
+
+window.checkAdminElephantLicenseToggle = function() {
+    const specInp = document.getElementById('adminArtisanSpecialtiesText');
+    const licenseWrap = document.getElementById('adminElephantLicenseWrap');
+    if (!licenseWrap) return;
+
+    const val = (specInp?.value || '').trim();
+    if (val.includes('අලි ඇතුන් සපයන්නන්')) {
+        licenseWrap.style.display = 'block';
+    } else {
+        const licenseNum = document.getElementById('adminArtisanWildlifeLicenseNum')?.value || '';
+        if (!licenseNum) {
+            licenseWrap.style.display = 'none';
+        }
+    }
+};
+
+window.cancelAdminArtisanEdit = function() {
+    const wrap = document.getElementById('adminArtisanDirectFormWrap');
+    const form = document.getElementById('adminArtisanDirectForm');
+    const title = document.getElementById('adminArtisanFormTitle');
+    const editDoc = document.getElementById('adminArtisanEditDocId');
+    const btnText = document.getElementById('btnAdminSaveArtisanText');
+    const licenseWrap = document.getElementById('adminElephantLicenseWrap');
+    const secSelect = document.getElementById('adminArtisanSection');
+
+    if (form) form.reset();
+    if (editDoc) editDoc.value = '';
+    if (secSelect) {
+        secSelect.value = 'temple_art';
+        handleAdminArtisanSectionChange('temple_art');
+    }
+    if (licenseWrap) licenseWrap.style.display = 'none';
+    if (title) title.textContent = '+ නව විහාර ශිල්පියෙකු සෘජුව ඇතුළත් කිරීම';
+    if (btnText) btnText.textContent = 'ශිල්පියා සුරකින්න';
+    if (wrap) wrap.style.display = 'none';
+};
+
+window.appendAdminArtisanSpecialty = function(spec) {
+    const input = document.getElementById('adminArtisanSpecialtiesText');
+    if (!input) return;
+    const current = input.value.trim();
+    if (!current) {
+        input.value = spec;
+    } else {
+        const parts = current.split(',').map(p => p.trim());
+        if (!parts.includes(spec)) {
+            parts.push(spec);
+            input.value = parts.join(', ');
+        }
+    }
+    checkAdminElephantLicenseToggle();
+};
+
+window.adminEditArtisan = function(docId) {
+    const item = allVerifiedArtisans.find(a => a.docId === docId);
+    if (!item) {
+        alert("ශිල්පියාගේ දත්ත සොයාගත නොහැක.");
+        return;
+    }
+
+    const wrap = document.getElementById('adminArtisanDirectFormWrap');
+    const title = document.getElementById('adminArtisanFormTitle');
+    const btnText = document.getElementById('btnAdminSaveArtisanText');
+
+    const editDoc = document.getElementById('adminArtisanEditDocId');
+    const secInp = document.getElementById('adminArtisanSection');
+    const nameInp = document.getElementById('adminArtisanName');
+    const distInp = document.getElementById('adminArtisanDistrict');
+    const specInp = document.getElementById('adminArtisanSpecialtiesText');
+    const expInp = document.getElementById('adminArtisanExperience');
+    const phoneInp = document.getElementById('adminArtisanPhone');
+    const waInp = document.getElementById('adminArtisanWhatsapp');
+    const tempInp = document.getElementById('adminArtisanTemples');
+    const bioInp = document.getElementById('adminArtisanBio');
+    const photoInp = document.getElementById('adminArtisanPhotoUrl');
+    const bannerInp = document.getElementById('adminArtisanBannerUrl');
+    const portInp = document.getElementById('adminArtisanPortfolioUrls');
+    const islandInp = document.getElementById('adminArtisanIslandWide');
+    const licenseNumInp = document.getElementById('adminArtisanWildlifeLicenseNum');
+    const licenseUrlInp = document.getElementById('adminArtisanWildlifeLicenseUrl');
+    const licenseWrap = document.getElementById('adminElephantLicenseWrap');
+    const ownerEmailInp = document.getElementById('adminArtisanOwnerEmail');
+
+    if (editDoc) editDoc.value = item.docId;
+    if (secInp) {
+        secInp.value = item.section || 'temple_art';
+        handleAdminArtisanSectionChange(item.section || 'temple_art');
+    }
+    if (nameInp) nameInp.value = item.name || '';
+    if (distInp) distInp.value = item.district || '';
+    if (specInp) specInp.value = (item.specialties || []).join(', ');
+    if (expInp) expInp.value = item.experience || '';
+    if (phoneInp) phoneInp.value = item.phone || '';
+    if (waInp) waInp.value = item.whatsapp || '';
+    if (tempInp) tempInp.value = item.notableTemples || '';
+    if (bioInp) bioInp.value = item.bio || '';
+    if (photoInp) photoInp.value = item.photo || '';
+    if (bannerInp) bannerInp.value = item.bannerUrl || item.coverImage || '';
+    if (portInp) portInp.value = (item.portfolioImages || []).join(', ');
+    if (islandInp) islandInp.checked = Boolean(item.islandWide);
+    if (licenseNumInp) licenseNumInp.value = item.wildlifeLicenseNumber || '';
+    if (licenseUrlInp) licenseUrlInp.value = item.wildlifeLicenseImage || '';
+    if (ownerEmailInp) ownerEmailInp.value = item.ownerEmail || item.submittedByEmail || '';
+
+    if (licenseWrap) {
+        const hasElephant = (item.specialties || []).includes('අලි ඇතුන් සපයන්නන්') || Boolean(item.wildlifeLicenseNumber);
+        licenseWrap.style.display = hasElephant ? 'block' : 'none';
+    }
+
+    if (title) title.textContent = '✏️ ශිල්පියාගේ / සේවාවේ තොරතුරු සංස්කරණය';
+    if (btnText) btnText.textContent = 'යාවත්කාලීන කරන්න';
+    if (wrap) {
+        wrap.style.display = 'block';
+        wrap.scrollIntoView({ behavior: 'smooth' });
+    }
+};
+
+window.adminDeleteArtisan = async function(docId, name) {
+    if (!isMasterAdmin) {
+        alert("මෙම පහසුකම සඳහා අවසර ඇත්තේ Master Admin ට පමණි.");
+        return;
+    }
+    if (!confirm(`ඔබට "${name}" ශිල්පියා නාමාවලියෙන් ඉවත් කිරීමට අවශ්‍යද? මෙම ක්‍රියාව ආපසු හැරවිය නොහැක.`)) {
+        return;
+    }
+
+    try {
+        const { doc, deleteDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        await deleteDoc(doc(db, COLLECTIONS.ARTISANS || 'temple_artisans', docId));
+
+        try {
+            localStorage.removeItem('pinPotha_artisans_cache');
+        } catch (e) {
+            // Ignore cache error
+        }
+
+        await recordAuditLog('Artisan Deleted', `Deleted artisan "${name}" (ID: ${docId}).`);
+        alert(`"${name}" ශිල්පියා සාර්ථකව ඉවත් කරන ලදී.`);
+    } catch (err) {
+        console.error('[Admin] adminDeleteArtisan error:', err);
+        alert("ඉවත් කිරීමේදී දෝෂයක් සිදුවිය: " + err.message);
+    }
+};
+
+window.handleAdminArtisanDirectSubmit = async function(e) {
+    if (e) e.preventDefault();
+    if (!isMasterAdmin) {
+        alert("මෙම පහසුකම සඳහා අවසර ඇත්තේ Master Admin ට පමණි.");
+        return;
+    }
+
+    const editDocId = (document.getElementById('adminArtisanEditDocId')?.value || '').trim();
+    const section = (document.getElementById('adminArtisanSection')?.value || 'temple_art').trim();
+    const name = (document.getElementById('adminArtisanName')?.value || '').trim();
+    const district = (document.getElementById('adminArtisanDistrict')?.value || '').trim();
+    const specialtiesRaw = (document.getElementById('adminArtisanSpecialtiesText')?.value || '').trim();
+    const expVal = document.getElementById('adminArtisanExperience')?.value;
+    const experience = expVal ? parseInt(expVal, 10) : 0;
+    const phone = (document.getElementById('adminArtisanPhone')?.value || '').trim();
+    const whatsapp = (document.getElementById('adminArtisanWhatsapp')?.value || '').trim();
+    const notableTemples = (document.getElementById('adminArtisanTemples')?.value || '').trim();
+    const bio = (document.getElementById('adminArtisanBio')?.value || '').trim();
+    let photoUrl = (document.getElementById('adminArtisanPhotoUrl')?.value || '').trim();
+    let bannerUrl = (document.getElementById('adminArtisanBannerUrl')?.value || '').trim();
+    const portUrlsRaw = (document.getElementById('adminArtisanPortfolioUrls')?.value || '').trim();
+    const ownerEmail = (document.getElementById('adminArtisanOwnerEmail')?.value || '').trim();
+    const islandWide = Boolean(document.getElementById('adminArtisanIslandWide')?.checked);
+    let wildlifeLicenseNumber = (document.getElementById('adminArtisanWildlifeLicenseNum')?.value || '').trim();
+    let wildlifeLicenseUrl = (document.getElementById('adminArtisanWildlifeLicenseUrl')?.value || '').trim();
+
+    const photoFileInput = document.getElementById('adminArtisanPhotoFile');
+    const bannerFileInput = document.getElementById('adminArtisanBannerFile');
+    const portFilesInput = document.getElementById('adminArtisanPortfolioFiles');
+    const licenseFileInput = document.getElementById('adminArtisanWildlifeLicenseFile');
+    const submitBtn = document.getElementById('btnAdminSaveArtisan');
+    const btnText = document.getElementById('btnAdminSaveArtisanText');
+
+    if (!name || !district || !phone || !specialtiesRaw) {
+        alert("කරුණාකර නම, දිස්ත්‍රික්කය, දුරකථන අංකය සහ අවම වශයෙන් එක් නිර්මාණ ක්ෂේත්‍රයක් ඇතුළත් කරන්න.");
+        return;
+    }
+
+    const specialties = specialtiesRaw.split(',').map(s => s.trim()).filter(Boolean);
+    let portfolioImages = portUrlsRaw.split(',').map(s => s.trim()).filter(Boolean);
+
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        if (btnText) btnText.textContent = "සුරකිමින් පවතී...";
+    }
+
+    try {
+        // Upload photo file if provided
+        if (photoFileInput && photoFileInput.files && photoFileInput.files[0]) {
+            if (btnText) btnText.textContent = "ප්‍රොෆයිල් ඡායාරූපය උඩුගත කෙරේ...";
+            const uploadedPhoto = await uploadToCloudinary(photoFileInput.files[0], `admin_artisan_${Date.now()}`);
+            if (uploadedPhoto) photoUrl = uploadedPhoto;
+        }
+
+        // Upload banner file if provided
+        if (bannerFileInput && bannerFileInput.files && bannerFileInput.files[0]) {
+            if (btnText) btnText.textContent = "කවර ඡායාරූපය උඩුගත කෙරේ...";
+            const uploadedBanner = await uploadToCloudinary(bannerFileInput.files[0], `admin_banner_${Date.now()}`);
+            if (uploadedBanner) bannerUrl = uploadedBanner;
+        }
+
+        // Upload portfolio files if provided
+        if (portFilesInput && portFilesInput.files && portFilesInput.files.length > 0) {
+            const files = Array.from(portFilesInput.files).slice(0, 4);
+            for (let i = 0; i < files.length; i++) {
+                if (btnText) btnText.textContent = `Portfolio උඩුගත කෙරේ (${i + 1}/${files.length})...`;
+                const uploadedPort = await uploadToImgBB(files[i], `admin_port_${Date.now()}_${i}`);
+                if (uploadedPort) portfolioImages.push(uploadedPort);
+            }
+        }
+
+        // Upload elephant license file if provided
+        if (licenseFileInput && licenseFileInput.files && licenseFileInput.files[0]) {
+            if (btnText) btnText.textContent = "බලපත්‍ර ඡායාරූපය උඩුගත කෙරේ...";
+            const uploadedLicense = await uploadToImgBB(licenseFileInput.files[0], `admin_license_${Date.now()}`);
+            if (uploadedLicense) wildlifeLicenseUrl = uploadedLicense;
+        }
+
+        const { collection, addDoc, doc, setDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+
+        const artisanData = {
+            name,
+            section,
+            specialties,
+            experience: experience || 0,
+            district,
+            islandWide,
+            phone,
+            whatsapp: whatsapp || phone,
+            notableTemples,
+            bio,
+            photo: photoUrl || '',
+            bannerUrl: bannerUrl || '',
+            portfolioImages: portfolioImages.slice(0, 15),
+            wildlifeLicenseNumber: wildlifeLicenseNumber || '',
+            wildlifeLicenseImage: wildlifeLicenseUrl || '',
+            ownerEmail: ownerEmail || '',
+            isVerified: true,
+            updatedAt: serverTimestamp()
+        };
+
+        if (editDocId) {
+            const existingArtisan = (typeof allVerifiedArtisans !== 'undefined' && Array.isArray(allVerifiedArtisans))
+                ? allVerifiedArtisans.find(a => (a.docId || a.id) === editDocId)
+                : null;
+            const existingEmail = (existingArtisan?.ownerEmail || existingArtisan?.submittedByEmail || '').trim().toLowerCase();
+            const newEmail = ownerEmail.trim().toLowerCase();
+
+            // When ownerEmail has changed, is empty, or previously held admin UID, explicitly reset ownerUid and userId
+            if (!newEmail || newEmail !== existingEmail || (currentAdminUser && existingArtisan?.ownerUid === currentAdminUser.uid)) {
+                artisanData.ownerUid = '';
+                artisanData.userId = '';
+                artisanData.submittedByUid = '';
+                artisanData.submittedByEmail = ownerEmail;
+            }
+            await setDoc(doc(db, COLLECTIONS.ARTISANS || 'temple_artisans', editDocId), artisanData, { merge: true });
+            if (existingArtisan) {
+                Object.assign(existingArtisan, artisanData);
+            }
+            await recordAuditLog('Artisan Updated', `Updated artisan "${name}" (ID: ${editDocId}).`);
+            alert(`"${name}" තොරතුරු සාර්ථකව යාවත්කාලීන විය!`);
+        } else {
+            artisanData.createdAt = serverTimestamp();
+            artisanData.addedBy = currentAdminUser ? currentAdminUser.email : 'Master Admin';
+            // Never auto-populate ownerUid or ownerEmail with logged-in Admin credentials
+            artisanData.ownerUid = '';
+            artisanData.userId = '';
+            artisanData.submittedByUid = '';
+            artisanData.submittedByEmail = '';
+            const newDoc = await addDoc(collection(db, COLLECTIONS.ARTISANS || 'temple_artisans'), artisanData);
+            await recordAuditLog('Artisan Added Direct', `Added new verified artisan "${name}" (ID: ${newDoc.id}).`);
+            alert(`"${name}" සාර්ථකව නාමාවලියට ඇතුළත් කරන ලදී!`);
+        }
+
+        try {
+            localStorage.removeItem('pinPotha_artisans_cache');
+        } catch (e) {
+            // Ignore cache error
+        }
+
+        cancelAdminArtisanEdit();
+    } catch (err) {
+        console.error('[Admin] handleAdminArtisanDirectSubmit error:', err);
+        alert("සුරැකීමේදී දෝෂයක් සිදුවිය: " + err.message);
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            if (btnText) btnText.textContent = editDocId ? "යාවත්කාලීන කරන්න" : "ශිල්පියා සුරකින්න";
+        }
+    }
+};
+
+// ============================================================================
+// BASE64 TO IMGBB STORAGE OPTIMIZER & MIGRATOR (MASTER ADMIN ONLY)
+// ============================================================================
+
+let scannedBase64Items = [];
+let isBase64Scanning = false;
+let isBase64Migrating = false;
+
+// Append message line to the monospace terminal log box
+function appendBase64Log(message, type = 'info') {
+    const box = document.getElementById('base64LogBox');
+    if (!box) return;
+    const time = new Date().toLocaleTimeString();
+    let color = '#cbd5e1';
+    if (type === 'success') color = '#34d399';
+    if (type === 'warn') color = '#f59e0b';
+    if (type === 'error') color = '#f87171';
+    if (type === 'info') color = '#38bdf8';
+
+    const line = document.createElement('div');
+    line.style.color = color;
+    line.style.wordBreak = 'break-all';
+    line.innerText = `[${time}] ${message}`;
+    box.appendChild(line);
+    box.scrollTop = box.scrollHeight;
+}
+
+// Clear terminal log box
+window.clearBase64Logs = function() {
+    const box = document.getElementById('base64LogBox');
+    if (box) {
+        box.innerHTML = '<div style="color: #64748b;">[Ready] Logs cleared.</div>';
+    }
+};
+
+// Convert Base64 Data URI to binary Blob
+function dataURItoBlob(dataURI) {
+    const parts = dataURI.split(',');
+    const mimeMatch = parts[0].match(/:(.*?);/);
+    const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+    const b64Data = parts[1];
+    const byteCharacters = atob(b64Data);
+    const byteArrays = [];
+
+    const sliceSize = 512;
+    for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+        const slice = byteCharacters.slice(offset, offset + sliceSize);
+        const byteNumbers = new Array(slice.length);
+        for (let i = 0; i < slice.length; i++) {
+            byteNumbers[i] = slice.charCodeAt(i);
+        }
+        byteArrays.push(new Uint8Array(byteNumbers));
+    }
+    return new Blob(byteArrays, { type: mime });
+}
+
+// Delay helper to prevent rate-limiting
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Scan collections for raw Base64 data URIs
+window.scanBase64Images = async function() {
+    if (!isMasterAdmin || !checkIsMasterAdmin(currentAdminUser)) {
+        alert('මෙම පහසුකම සඳහා අවසර ඇත්තේ Master Admin ට පමණි.');
+        return;
+    }
+    if (isBase64Scanning || isBase64Migrating) return;
+
+    isBase64Scanning = true;
+    const btnScan = document.getElementById('btnScanBase64');
+    const btnMigrate = document.getElementById('btnMigrateBase64');
+    if (btnScan) {
+        btnScan.disabled = true;
+        btnScan.style.opacity = '0.6';
+    }
+    if (btnMigrate) {
+        btnMigrate.disabled = true;
+        btnMigrate.style.opacity = '0.5';
+        btnMigrate.style.cursor = 'not-allowed';
+    }
+
+    appendBase64Log('Scanning merit_posts and users collections for Base64 Data URIs...', 'info');
+
+    scannedBase64Items = [];
+    let scannedDocsCount = 0;
+    let foundItemsCount = 0;
+    let totalBytesFound = 0;
+
+    try {
+        const { collection, getDocs } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+
+        // 1. Scan merit_posts collection
+        appendBase64Log('Reading merit_posts collection...', 'info');
+        const postsSnap = await getDocs(collection(db, COLLECTIONS.POSTS));
+        postsSnap.forEach(docSnap => {
+            scannedDocsCount++;
+            const data = docSnap.data();
+            const docId = docSnap.id;
+
+            // Check single image string fields
+            const singleFields = ['image', 'imageUrl', 'photo', 'mediaUrl', 'thumbnail', 'authorPhoto'];
+            singleFields.forEach(field => {
+                const val = data[field];
+                if (typeof val === 'string' && val.startsWith('data:image/')) {
+                    foundItemsCount++;
+                    totalBytesFound += val.length;
+                    scannedBase64Items.push({
+                        collection: COLLECTIONS.POSTS,
+                        docId: docId,
+                        field: field,
+                        isArray: false,
+                        index: -1,
+                        base64: val,
+                        docTitle: data.title || data.author || docId
+                    });
+                }
+            });
+
+            // Check array fields
+            const arrayFields = ['images', 'media', 'photos'];
+            arrayFields.forEach(field => {
+                const arr = data[field];
+                if (Array.isArray(arr)) {
+                    arr.forEach((item, idx) => {
+                        if (typeof item === 'string' && item.startsWith('data:image/')) {
+                            foundItemsCount++;
+                            totalBytesFound += item.length;
+                            scannedBase64Items.push({
+                                collection: COLLECTIONS.POSTS,
+                                docId: docId,
+                                field: field,
+                                isArray: true,
+                                index: idx,
+                                base64: item,
+                                docTitle: data.title || data.author || docId
+                            });
+                        }
+                    });
+                }
+            });
+        });
+
+        // 2. Scan users collection
+        appendBase64Log('Reading users collection...', 'info');
+        const usersSnap = await getDocs(collection(db, COLLECTIONS.USERS));
+        usersSnap.forEach(docSnap => {
+            scannedDocsCount++;
+            const data = docSnap.data();
+            const docId = docSnap.id;
+            const userFields = ['photo', 'photoURL', 'coverImage'];
+            userFields.forEach(field => {
+                const val = data[field];
+                if (typeof val === 'string' && val.startsWith('data:image/')) {
+                    foundItemsCount++;
+                    totalBytesFound += val.length;
+                    scannedBase64Items.push({
+                        collection: COLLECTIONS.USERS,
+                        docId: docId,
+                        field: field,
+                        isArray: false,
+                        index: -1,
+                        base64: val,
+                        docTitle: data.name || data.email || docId
+                    });
+                }
+            });
+        });
+
+        // Update UI counters
+        const scannedEl = document.getElementById('statBase64Scanned');
+        const foundEl = document.getElementById('statBase64Found');
+        const savedEl = document.getElementById('statBase64Saved');
+        if (scannedEl) scannedEl.innerText = scannedDocsCount;
+        if (foundEl) foundEl.innerText = foundItemsCount;
+
+        const estKb = Math.round(totalBytesFound / 1024);
+        if (savedEl) savedEl.innerText = estKb > 1024 ? `${(estKb / 1024).toFixed(2)} MB` : `${estKb} KB`;
+
+        if (foundItemsCount > 0) {
+            appendBase64Log(`Scan completed: Found ${foundItemsCount} Base64 image(s) across ${scannedDocsCount} documents (~${estKb} KB payload bloat). Ready to migrate.`, 'warn');
+            if (btnMigrate) {
+                btnMigrate.disabled = false;
+                btnMigrate.style.opacity = '1';
+                btnMigrate.style.cursor = 'pointer';
+            }
+        } else {
+            appendBase64Log(`Scan completed: Scanned ${scannedDocsCount} documents. Zero Base64 images found. Database is clean!`, 'success');
+        }
+    } catch (err) {
+        console.error('[Base64 Scan] Error:', err);
+        appendBase64Log(`Scan error: ${err.message}`, 'error');
+    } finally {
+        isBase64Scanning = false;
+        if (btnScan) {
+            btnScan.disabled = false;
+            btnScan.style.opacity = '1';
+        }
+    }
+};
+
+// Migrate scanned Base64 items to ImgBB and update Firestore docs
+window.startBase64Migration = async function() {
+    if (!isMasterAdmin || !checkIsMasterAdmin(currentAdminUser)) {
+        alert('මෙම පහසුකම සඳහා අවසර ඇත්තේ Master Admin ට පමණි.');
+        return;
+    }
+    if (isBase64Migrating || scannedBase64Items.length === 0) return;
+
+    const confirmMigrate = confirm(`හමු වූ Base64 අයිතම ${scannedBase64Items.length} ක් ImgBB වෙත මාරු කිරීම (Migration) ආරම්භ කිරීමට අවශ්‍යද?\n\nමෙම ක්‍රියාවලිය අතරතුර පිටුව Reload නොකරන්න.`);
+    if (!confirmMigrate) return;
+
+    isBase64Migrating = true;
+    const btnScan = document.getElementById('btnScanBase64');
+    const btnMigrate = document.getElementById('btnMigrateBase64');
+    if (btnScan) {
+        btnScan.disabled = true;
+        btnScan.style.opacity = '0.5';
+    }
+    if (btnMigrate) {
+        btnMigrate.disabled = true;
+        btnMigrate.style.opacity = '0.5';
+        btnMigrate.style.cursor = 'not-allowed';
+    }
+
+    const progressContainer = document.getElementById('base64ProgressContainer');
+    const progressBar = document.getElementById('base64ProgressBar');
+    const progressPercent = document.getElementById('base64ProgressPercent');
+    const progressLabel = document.getElementById('base64ProgressLabel');
+    if (progressContainer) progressContainer.style.display = 'block';
+
+    appendBase64Log(`Starting sequential ImgBB migration for ${scannedBase64Items.length} item(s)...`, 'info');
+    await recordAuditLog('Base64 Migration Started', `Starting migration for ${scannedBase64Items.length} base64 items.`);
+
+    let migratedCount = 0;
+    let failedCount = 0;
+    let bytesSavedSoFar = 0;
+
+    const { doc, getDoc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+
+    for (let i = 0; i < scannedBase64Items.length; i++) {
+        const item = scannedBase64Items[i];
+        const itemNum = i + 1;
+        const total = scannedBase64Items.length;
+        const pct = Math.round((itemNum / total) * 100);
+
+        if (progressBar) progressBar.style.width = `${pct}%`;
+        if (progressPercent) progressPercent.innerText = `${pct}% (${itemNum}/${total})`;
+        if (progressLabel) progressLabel.innerText = `Migrating [${item.collection}] ${item.docId} (${item.field})...`;
+
+        try {
+            // 1. Convert Base64 data URI to Blob
+            const blob = dataURItoBlob(item.base64);
+            const uploadName = `migrated_${item.collection}_${item.docId}_${item.field}`;
+
+            // 2. Upload to ImgBB
+            appendBase64Log(`[${itemNum}/${total}] Uploading to ImgBB (${item.docId} -> ${item.field})...`, 'info');
+            const uploadedUrl = await uploadToImgBB(blob, uploadName);
+
+            // 3. Verify returned URL is valid https URL
+            if (!uploadedUrl || !uploadedUrl.startsWith('https://')) {
+                throw new Error('ImgBB did not return a valid https URL (upload failed or returned fallback URI).');
+            }
+
+            // 4. Update the Firestore document strictly replacing the image field
+            const docRef = doc(db, item.collection, item.docId);
+            const docSnap = await getDoc(docRef);
+
+            if (!docSnap.exists()) {
+                throw new Error(`Document ${item.docId} not found in ${item.collection}`);
+            }
+
+            const currentData = docSnap.data();
+
+            if (item.isArray) {
+                const currentArr = Array.isArray(currentData[item.field]) ? [...currentData[item.field]] : [];
+                if (item.index >= 0 && item.index < currentArr.length && currentArr[item.index] === item.base64) {
+                    currentArr[item.index] = uploadedUrl;
+                } else {
+                    const matchIdx = currentArr.indexOf(item.base64);
+                    if (matchIdx !== -1) {
+                        currentArr[matchIdx] = uploadedUrl;
+                    } else if (item.index >= 0 && item.index < currentArr.length) {
+                        currentArr[item.index] = uploadedUrl;
+                    }
+                }
+                await updateDoc(docRef, { [item.field]: currentArr });
+            } else {
+                await updateDoc(docRef, { [item.field]: uploadedUrl });
+            }
+
+            migratedCount++;
+            bytesSavedSoFar += (item.base64.length - uploadedUrl.length);
+            appendBase64Log(`✓ [${itemNum}/${total}] Success: ${item.docId} (${item.field}) -> ${uploadedUrl}`, 'success');
+
+        } catch (err) {
+            failedCount++;
+            console.error(`[Base64 Migration Error] ${item.docId}:`, err);
+            appendBase64Log(`✗ [${itemNum}/${total}] Failed (${item.docId} / ${item.field}): ${err.message}`, 'error');
+        }
+
+        // Update live counters
+        const migEl = document.getElementById('statBase64Migrated');
+        const failEl = document.getElementById('statBase64Failed');
+        const savedEl = document.getElementById('statBase64Saved');
+        if (migEl) migEl.innerText = migratedCount;
+        if (failEl) failEl.innerText = failedCount;
+        const savedKb = Math.round(bytesSavedSoFar / 1024);
+        if (savedEl) savedEl.innerText = savedKb > 1024 ? `${(savedKb / 1024).toFixed(2)} MB` : `${savedKb} KB`;
+
+        // Wait 1200ms before next upload to prevent ImgBB API rate limits
+        if (i < scannedBase64Items.length - 1) {
+            await sleep(1200);
+        }
+    }
+
+    // Invalidate and clear local caches
+    try {
+        localStorage.removeItem('pinPotha_posts');
+        localStorage.removeItem('pinPotha_sandbox_posts');
+        localStorage.removeItem('pinPotha_cached_posts');
+        appendBase64Log('Cleared local post caches (pinPotha_posts, pinPotha_sandbox_posts).', 'info');
+    } catch (e) {
+        console.warn('[Base64 Migration] Cache clear warning:', e);
+    }
+
+    const totalSavedKb = Math.round(bytesSavedSoFar / 1024);
+    const summaryMsg = `Migration completed: Successfully migrated ${migratedCount} item(s) to ImgBB (~${totalSavedKb} KB saved). Failed/Skipped: ${failedCount}.`;
+    appendBase64Log(summaryMsg, migratedCount > 0 ? 'success' : 'warn');
+    await recordAuditLog('Base64 Migration Finished', summaryMsg);
+    alert(summaryMsg);
+
+    isBase64Migrating = false;
+    scannedBase64Items = [];
+    if (btnScan) {
+        btnScan.disabled = false;
+        btnScan.style.opacity = '1';
+    }
+};
+
+// Helper to detect whether an ImgBB image URL is the cyan-blue 'image not found' placeholder
+export async function isImgBBNotFoundPlaceholder(url) {
+    if (!url || typeof url !== 'string') return true;
+    const cleanUrl = url.trim();
+    if (!cleanUrl.includes('ibb.co')) return false;
+
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        let settled = false;
+
+        const timer = setTimeout(() => {
+            if (!settled) {
+                settled = true;
+                img.onload = null;
+                img.onerror = null;
+                resolve(true); // Timed out image treated as unreachable/dead
+            }
+        }, 8500);
+
+        img.onload = () => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+
+            if (img.naturalWidth === 0 || img.naturalHeight === 0) {
+                return resolve(true);
+            }
+
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = 20;
+                canvas.height = 20;
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                if (!ctx) return resolve(false);
+
+                ctx.drawImage(img, 0, 0, 20, 20);
+
+                const isCyanBlue = (r, g, b) => (r >= 25 && r <= 65 && g >= 155 && g <= 195 && b >= 210 && b <= 250);
+                const p1 = ctx.getImageData(2, 2, 1, 1).data;
+                const p2 = ctx.getImageData(17, 2, 1, 1).data;
+                const p3 = ctx.getImageData(2, 17, 1, 1).data;
+                const p4 = ctx.getImageData(17, 17, 1, 1).data;
+
+                if (isCyanBlue(p1[0], p1[1], p1[2]) &&
+                    isCyanBlue(p2[0], p2[1], p2[2]) &&
+                    isCyanBlue(p3[0], p3[1], p3[2]) &&
+                    isCyanBlue(p4[0], p4[1], p4[2])) {
+                    return resolve(true); // Matches dead ImgBB placeholder graphic
+                }
+                resolve(false);
+            } catch (canvasErr) {
+                // If canvas reading is blocked by CORS, treat as surviving to prevent false deletion
+                resolve(false);
+            }
+        };
+
+        img.onerror = () => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            resolve(true); // Failed to load
+        };
+
+        img.src = cleanUrl;
+    });
+}
+
+// Helper to extract image URLs from a merit_posts document
+function extractImageUrlsFromPost(data, docId) {
+    const urls = [];
+    const snippet = (data.title || data.text || data.author || docId || '').toString().substring(0, 40);
+    const author = (data.author || data.authorName || data.userName || 'Unknown').toString();
+    const title = (data.title || data.text || 'Untitled').toString().substring(0, 50);
+
+    // Single string fields
+    const singleFields = ['image', 'imageUrl', 'mediaUrl', 'photo', 'thumbnail'];
+    singleFields.forEach(field => {
+        const val = data[field];
+        if (typeof val === 'string' && val.trim().length > 0 && !val.startsWith('data:image/')) {
+            urls.push({ docId, author, title, field, url: val.trim(), snippet });
+        }
+    });
+
+    // Array fields (strings or objects with url)
+    const arrayFields = ['images', 'media', 'photos'];
+    arrayFields.forEach(field => {
+        const arr = data[field];
+        if (Array.isArray(arr)) {
+            arr.forEach((item, idx) => {
+                if (typeof item === 'string' && item.trim().length > 0 && !item.startsWith('data:image/')) {
+                    urls.push({ docId, author, title, field: `${field}[${idx}]`, url: item.trim(), snippet });
+                } else if (item && typeof item === 'object') {
+                    const u = item.url || item.src || item.link;
+                    if (typeof u === 'string' && u.trim().length > 0 && !u.startsWith('data:image/')) {
+                        urls.push({ docId, author, title, field: `${field}[${idx}].url`, url: u.trim(), snippet });
+                    }
+                }
+            });
+        }
+    });
+
+    return urls;
+}
+
+// Probes an image URL off-screen to check for load errors, zero dimensions, or ImgBB placeholder
+async function probeImageUrl(url, timeoutMs = 8500) {
+    if (!url || typeof url !== 'string' || !url.trim()) {
+        return { ok: false, reason: 'empty_url' };
+    }
+    const trimmed = url.trim();
+
+    // Check ImgBB placeholder detection first if it is an ImgBB URL
+    if (trimmed.includes('ibb.co')) {
+        const isDeadPlaceholder = await isImgBBNotFoundPlaceholder(trimmed);
+        if (isDeadPlaceholder) {
+            return { ok: false, reason: 'imgbb_placeholder_not_found' };
+        }
+    }
+
+    return new Promise((resolve) => {
+        const img = new Image();
+        let timer = null;
+        let settled = false;
+
+        const cleanup = () => {
+            if (timer) clearTimeout(timer);
+            img.onload = null;
+            img.onerror = null;
+        };
+
+        timer = setTimeout(() => {
+            if (!settled) {
+                settled = true;
+                cleanup();
+                resolve({ ok: false, reason: 'timeout' });
+            }
+        }, timeoutMs);
+
+        img.onload = () => {
+            if (!settled) {
+                settled = true;
+                cleanup();
+                if (img.naturalWidth === 0 || img.naturalHeight === 0) {
+                    resolve({ ok: false, reason: 'zero_dimensions' });
+                } else {
+                    resolve({ ok: true, width: img.naturalWidth, height: img.naturalHeight });
+                }
+            }
+        };
+
+        img.onerror = () => {
+            if (!settled) {
+                settled = true;
+                cleanup();
+                resolve({ ok: false, reason: 'load_error' });
+            }
+        };
+
+        img.src = trimmed;
+    });
+}
+
+// Scans merit_posts image URLs in small parallel batches to detect broken/missing images
+let isBrokenImageScanning = false;
+
+window.scanBrokenImages = async function() {
+    if (!isMasterAdmin || !checkIsMasterAdmin(currentAdminUser)) {
+        alert('මෙම පහසුකම සඳහා අවසර ඇත්තේ Master Admin ට පමණි.');
+        return;
+    }
+    if (isBrokenImageScanning || isBase64Scanning || isBase64Migrating || isImgBBScanning || isImgBBMigrating) return;
+
+    isBrokenImageScanning = true;
+    const btn = document.getElementById('btnScanBrokenImages');
+    if (btn) {
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+    }
+
+    appendBase64Log('Starting scan for broken images in merit_posts...', 'info');
+
+    try {
+        const { collection, getDocs } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const postsSnap = await getDocs(collection(db, COLLECTIONS.POSTS));
+
+        const imageTargets = [];
+        let totalDocs = 0;
+
+        postsSnap.forEach(docSnap => {
+            totalDocs++;
+            const data = docSnap.data();
+            const docId = docSnap.id;
+            const items = extractImageUrlsFromPost(data, docId);
+            imageTargets.push(...items);
+        });
+
+        appendBase64Log(`Found ${imageTargets.length} image URL(s) across ${totalDocs} post(s). Testing in parallel batches of 6...`, 'info');
+
+        let checkedCount = 0;
+        let brokenCount = 0;
+        const batchSize = 6;
+
+        for (let i = 0; i < imageTargets.length; i += batchSize) {
+            const batch = imageTargets.slice(i, i + batchSize);
+            const results = await Promise.all(batch.map(async (target) => {
+                const res = await probeImageUrl(target.url, 8500);
+                return { target, res };
+            }));
+
+            results.forEach(({ target, res }) => {
+                checkedCount++;
+                if (!res.ok) {
+                    brokenCount++;
+                    appendBase64Log(`✗ [Broken Image] Doc: ${target.docId} | Author: "${target.author}" | Title: "${target.title}" | Field: ${target.field} | Reason: ${res.reason} | URL: ${target.url}`, 'error');
+                }
+            });
+
+            if (i + batchSize < imageTargets.length) {
+                await sleep(150);
+            }
+        }
+
+        const summaryMsg = `Checked ${checkedCount} images across ${totalDocs} posts: ${brokenCount} broken found.`;
+        if (brokenCount > 0) {
+            appendBase64Log(`Scan completed: ${summaryMsg} Details listed above in red.`, 'warn');
+            alert(`පරීක්ෂාව අවසන්: පින්තූර ${checkedCount} න් ${brokenCount} ක් කැඩී ඇත. විස්තර Execution Log හි බලන්න.`);
+        } else {
+            appendBase64Log(`Scan completed: ${summaryMsg} All scanned images loaded successfully!`, 'success');
+            alert(`පරීක්ෂාව අවසන්: සියලුම පින්තූර (${checkedCount}) සාර්ථකව Load විය. කිසිදු කැඩුණු පින්තූරයක් හමු නොවීය!`);
+        }
+
+    } catch (err) {
+        console.error('[Broken Image Scan] Error:', err);
+        appendBase64Log(`Error scanning images: ${err.message}`, 'error');
+        alert('පින්තූර පරීක්ෂා කිරීමේදී දෝෂයක් සිදුවිය: ' + err.message);
+    } finally {
+        isBrokenImageScanning = false;
+        if (btn) {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+        }
+    }
+};
+
+// ============================================================================
+// Rescue Migrator: Surviving ImgBB -> Cloudinary (Zero-Transformation Mode)
+// ============================================================================
+let scannedImgBBItems = [];
+let isImgBBScanning = false;
+let isImgBBMigrating = false;
+
+window.scanImgBBImages = async function() {
+    if (!isMasterAdmin || !checkIsMasterAdmin(currentAdminUser)) {
+        alert('මෙම පහසුකම සඳහා අවසර ඇත්තේ Master Admin ට පමණි.');
+        return;
+    }
+    if (isImgBBScanning || isImgBBMigrating || isBase64Scanning || isBase64Migrating || isBrokenImageScanning) return;
+
+    isImgBBScanning = true;
+    scannedImgBBItems = [];
+
+    const btnScan = document.getElementById('btnScanImgBB');
+    const btnMigrate = document.getElementById('btnMigrateImgBB');
+    if (btnScan) {
+        btnScan.disabled = true;
+        btnScan.style.opacity = '0.5';
+    }
+    if (btnMigrate) {
+        btnMigrate.disabled = true;
+        btnMigrate.style.opacity = '0.5';
+        btnMigrate.style.cursor = 'not-allowed';
+    }
+
+    appendBase64Log('Scanning Firestore collections (merit_posts, users, temple_artisans) for ImgBB hosted images...', 'info');
+
+    try {
+        const { collection, getDocs } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+
+        let totalDocsScanned = 0;
+
+        // 1. Scan merit_posts
+        const postsSnap = await getDocs(collection(db, COLLECTIONS.POSTS));
+        postsSnap.forEach(docSnap => {
+            totalDocsScanned++;
+            const data = docSnap.data();
+            const docId = docSnap.id;
+            const snippet = (data.title || data.text || docId || '').toString().substring(0, 40);
+
+            // Single fields
+            ['image', 'imageUrl', 'mediaUrl', 'photo', 'thumbnail'].forEach(f => {
+                const val = data[f];
+                if (typeof val === 'string' && (val.includes('ibb.co') || val.includes('i.ibb.co'))) {
+                    scannedImgBBItems.push({
+                        collection: COLLECTIONS.POSTS,
+                        docId,
+                        field: f,
+                        isArray: false,
+                        url: val.trim(),
+                        snippet
+                    });
+                }
+            });
+
+            // Array fields
+            ['images', 'media', 'photos'].forEach(f => {
+                const arr = data[f];
+                if (Array.isArray(arr)) {
+                    arr.forEach((item, idx) => {
+                        if (typeof item === 'string' && (item.includes('ibb.co') || item.includes('i.ibb.co'))) {
+                            scannedImgBBItems.push({
+                                collection: COLLECTIONS.POSTS,
+                                docId,
+                                field: f,
+                                isArray: true,
+                                index: idx,
+                                isObjectInArray: false,
+                                url: item.trim(),
+                                snippet
+                            });
+                        } else if (item && typeof item === 'object') {
+                            const u = item.url || item.src || item.link;
+                            const key = item.url ? 'url' : (item.src ? 'src' : 'link');
+                            if (typeof u === 'string' && (u.includes('ibb.co') || u.includes('i.ibb.co'))) {
+                                scannedImgBBItems.push({
+                                    collection: COLLECTIONS.POSTS,
+                                    docId,
+                                    field: f,
+                                    isArray: true,
+                                    index: idx,
+                                    isObjectInArray: true,
+                                    objectKey: key,
+                                    url: u.trim(),
+                                    snippet
+                                });
+                            }
+                        }
+                    });
+                }
+            });
+        });
+
+        // 2. Scan users
+        const usersSnap = await getDocs(collection(db, COLLECTIONS.USERS));
+        usersSnap.forEach(docSnap => {
+            totalDocsScanned++;
+            const data = docSnap.data();
+            const docId = docSnap.id;
+            const snippet = (data.displayName || data.name || docId || '').toString().substring(0, 40);
+
+            ['photoURL', 'avatar', 'coverImage', 'profileImage'].forEach(f => {
+                const val = data[f];
+                if (typeof val === 'string' && (val.includes('ibb.co') || val.includes('i.ibb.co'))) {
+                    scannedImgBBItems.push({
+                        collection: COLLECTIONS.USERS,
+                        docId,
+                        field: f,
+                        isArray: false,
+                        url: val.trim(),
+                        snippet
+                    });
+                }
+            });
+        });
+
+        // 3. Scan temple_artisans
+        const artisansCollectionName = COLLECTIONS.ARTISANS || 'temple_artisans';
+        try {
+            const artisansSnap = await getDocs(collection(db, artisansCollectionName));
+            artisansSnap.forEach(docSnap => {
+                totalDocsScanned++;
+                const data = docSnap.data();
+                const docId = docSnap.id;
+                const snippet = (data.fullName || data.serviceTitle || docId || '').toString().substring(0, 40);
+
+                // Single fields
+                ['photo', 'photoUrl', 'wildlifeLicenseImageUrl', 'licenseUrl'].forEach(f => {
+                    const val = data[f];
+                    if (typeof val === 'string' && (val.includes('ibb.co') || val.includes('i.ibb.co'))) {
+                        scannedImgBBItems.push({
+                            collection: artisansCollectionName,
+                            docId,
+                            field: f,
+                            isArray: false,
+                            url: val.trim(),
+                            snippet
+                        });
+                    }
+                });
+
+                // Array fields
+                ['portfolio', 'portfolioUrls', 'images'].forEach(f => {
+                    const arr = data[f];
+                    if (Array.isArray(arr)) {
+                        arr.forEach((item, idx) => {
+                            if (typeof item === 'string' && (item.includes('ibb.co') || item.includes('i.ibb.co'))) {
+                                scannedImgBBItems.push({
+                                    collection: artisansCollectionName,
+                                    docId,
+                                    field: f,
+                                    isArray: true,
+                                    index: idx,
+                                    isObjectInArray: false,
+                                    url: item.trim(),
+                                    snippet
+                                });
+                            } else if (item && typeof item === 'object') {
+                                const u = item.url || item.src || item.link;
+                                const key = item.url ? 'url' : (item.src ? 'src' : 'link');
+                                if (typeof u === 'string' && (u.includes('ibb.co') || u.includes('i.ibb.co'))) {
+                                    scannedImgBBItems.push({
+                                        collection: artisansCollectionName,
+                                        docId,
+                                        field: f,
+                                        isArray: true,
+                                        index: idx,
+                                        isObjectInArray: true,
+                                        objectKey: key,
+                                        url: u.trim(),
+                                        snippet
+                                    });
+                                }
+                            }
+                        });
+                    }
+                });
+            });
+        } catch (artisanErr) {
+            console.warn('[ImgBB Scan] Could not scan artisans collection:', artisanErr);
+        }
+
+        if (scannedImgBBItems.length > 0) {
+            appendBase64Log(`Found ${scannedImgBBItems.length} ImgBB image(s) across ${totalDocsScanned} documents. Ready for Cloudinary migration!`, 'warn');
+            if (btnMigrate) {
+                btnMigrate.disabled = false;
+                btnMigrate.style.opacity = '1';
+                btnMigrate.style.cursor = 'pointer';
+            }
+        } else {
+            appendBase64Log(`Scan completed: Scanned ${totalDocsScanned} documents. No ImgBB hosted images found!`, 'success');
+        }
+
+    } catch (err) {
+        console.error('[ImgBB Scan] Error:', err);
+        appendBase64Log(`Error scanning ImgBB images: ${err.message}`, 'error');
+        alert('ImgBB පින්තූර පරීක්ෂාවේදී දෝෂයක් සිදුවිය: ' + err.message);
+    } finally {
+        isImgBBScanning = false;
+        if (btnScan) {
+            btnScan.disabled = false;
+            btnScan.style.opacity = '1';
+        }
+    }
+};
+
+window.startImgBBMigration = async function() {
+    if (!isMasterAdmin || !checkIsMasterAdmin(currentAdminUser)) {
+        alert('මෙම පහසුකම සඳහා අවසර ඇත්තේ Master Admin ට පමණි.');
+        return;
+    }
+    if (isImgBBMigrating || scannedImgBBItems.length === 0) return;
+
+    const confirmMigrate = confirm(`හමු වූ ImgBB පින්තූර ${scannedImgBBItems.length} Cloudinary වෙත මාරු කිරීම (Rescue Migration) ආරම්භ කිරීමට අවශ්‍යද?\n\nමියගිය (Dead) ImgBB පින්තූර ස්වයංක්‍රීයව හඳුනාගෙන Skip කරනු ලැබේ.\nමෙම ක්‍රියාවලිය අතරතුර පිටුව Reload නොකරන්න.`);
+    if (!confirmMigrate) return;
+
+    isImgBBMigrating = true;
+    const btnScan = document.getElementById('btnScanImgBB');
+    const btnMigrate = document.getElementById('btnMigrateImgBB');
+    if (btnScan) {
+        btnScan.disabled = true;
+        btnScan.style.opacity = '0.5';
+    }
+    if (btnMigrate) {
+        btnMigrate.disabled = true;
+        btnMigrate.style.opacity = '0.5';
+        btnMigrate.style.cursor = 'not-allowed';
+    }
+
+    const progressContainer = document.getElementById('base64ProgressContainer');
+    const progressBar = document.getElementById('base64ProgressBar');
+    const progressPercent = document.getElementById('base64ProgressPercent');
+    const progressLabel = document.getElementById('base64ProgressLabel');
+    if (progressContainer) progressContainer.style.display = 'block';
+
+    appendBase64Log(`Starting ImgBB -> Cloudinary migration for ${scannedImgBBItems.length} item(s)...`, 'info');
+    await recordAuditLog('ImgBB to Cloudinary Migration Started', `Starting rescue migration for ${scannedImgBBItems.length} ImgBB items.`);
+
+    let migratedCount = 0;
+    let deadSkippedCount = 0;
+    let failedCount = 0;
+
+    const { doc, getDoc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+
+    for (let i = 0; i < scannedImgBBItems.length; i++) {
+        const item = scannedImgBBItems[i];
+        const itemNum = i + 1;
+        const total = scannedImgBBItems.length;
+        const pct = Math.round((itemNum / total) * 100);
+
+        if (progressBar) progressBar.style.width = `${pct}%`;
+        if (progressPercent) progressPercent.innerText = `${pct}% (${itemNum}/${total})`;
+        if (progressLabel) progressLabel.innerText = `Testing [${item.collection}] ${item.docId}...`;
+
+        try {
+            // 1. Test if this is a dead ImgBB placeholder
+            const isDead = await isImgBBNotFoundPlaceholder(item.url);
+            if (isDead) {
+                deadSkippedCount++;
+                appendBase64Log(`⚠ [${itemNum}/${total}] Skipped (Dead ImgBB Placeholder): Doc: ${item.docId} | Snippet: "${item.snippet}" | URL: ${item.url}`, 'warn');
+                continue;
+            }
+
+            // 2. Surviving image: upload directly to Cloudinary via remote URL
+            appendBase64Log(`[${itemNum}/${total}] Migrating to Cloudinary (${item.docId} -> ${item.field})...`, 'info');
+            const formData = new FormData();
+            formData.append('file', item.url);
+            formData.append('upload_preset', 'apepinpotha_uploads');
+            formData.append('folder', 'apepinpotha');
+
+            const response = await fetch('https://api.cloudinary.com/v1_1/xvygfeh6/image/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            const resData = await response.json();
+            if (!response.ok || !resData || !resData.secure_url) {
+                throw new Error(resData?.error?.message || 'Cloudinary upload failed');
+            }
+
+            // Zero-transformation mode: use exact secure_url without f_auto,q_auto
+            const newCloudinaryUrl = resData.secure_url;
+
+            // 3. Update Firestore document
+            const docRef = doc(db, item.collection, item.docId);
+            const docSnap = await getDoc(docRef);
+
+            if (!docSnap.exists()) {
+                throw new Error(`Document ${item.docId} not found in ${item.collection}`);
+            }
+
+            const currentData = docSnap.data();
+
+            if (item.isArray) {
+                const currentArr = Array.isArray(currentData[item.field]) ? [...currentData[item.field]] : [];
+                if (item.isObjectInArray) {
+                    if (currentArr[item.index] && typeof currentArr[item.index] === 'object') {
+                        currentArr[item.index] = { ...currentArr[item.index], [item.objectKey]: newCloudinaryUrl };
+                    }
+                } else {
+                    if (item.index >= 0 && item.index < currentArr.length && currentArr[item.index] === item.url) {
+                        currentArr[item.index] = newCloudinaryUrl;
+                    } else {
+                        const matchIdx = currentArr.indexOf(item.url);
+                        if (matchIdx !== -1) {
+                            currentArr[matchIdx] = newCloudinaryUrl;
+                        } else if (item.index >= 0 && item.index < currentArr.length) {
+                            currentArr[item.index] = newCloudinaryUrl;
+                        }
+                    }
+                }
+                await updateDoc(docRef, { [item.field]: currentArr });
+            } else {
+                await updateDoc(docRef, { [item.field]: newCloudinaryUrl });
+            }
+
+            migratedCount++;
+            appendBase64Log(`✓ [${itemNum}/${total}] Migrated: Doc: ${item.docId} (${item.field}) -> ${newCloudinaryUrl}`, 'success');
+
+        } catch (err) {
+            failedCount++;
+            console.error(`[ImgBB Migration Error] ${item.docId}:`, err);
+            appendBase64Log(`✗ [${itemNum}/${total}] Failed (${item.docId} / ${item.field}): ${err.message}`, 'error');
+        }
+
+        // Wait 600ms between uploads as instructed
+        if (i < scannedImgBBItems.length - 1) {
+            await sleep(600);
+        }
+    }
+
+    // Invalidate and clear local caches
+    try {
+        localStorage.removeItem('pinPotha_posts');
+        localStorage.removeItem('pinPotha_sandbox_posts');
+        localStorage.removeItem('pinPotha_cached_posts');
+        localStorage.removeItem('pinPotha_artisans_cache');
+        appendBase64Log('Cleared local post and artisan caches (pinPotha_posts, pinPotha_sandbox_posts, pinPotha_cached_posts, pinPotha_artisans_cache).', 'info');
+    } catch (e) {
+        console.warn('[ImgBB Migration] Cache clear warning:', e);
+    }
+
+    const summaryMsg = `Migration completed: Successfully migrated ${migratedCount} item(s) to Cloudinary. Skipped dead placeholders: ${deadSkippedCount}. Failed: ${failedCount}.`;
+    appendBase64Log(summaryMsg, migratedCount > 0 ? 'success' : 'warn');
+    await recordAuditLog('ImgBB to Cloudinary Migration Finished', summaryMsg);
+    alert(summaryMsg);
+
+    isImgBBMigrating = false;
+    scannedImgBBItems = [];
+    if (btnScan) {
+        btnScan.disabled = false;
+        btnScan.style.opacity = '1';
+    }
+};
+
+// ============================================================================
+// Safe Dead Link Cleaner: Strip dead ImgBB placeholder links without deleting posts
+// ============================================================================
+let isDeadLinkCleaning = false;
+
+window.cleanDeadImgBBLinks = async function() {
+    if (!isMasterAdmin || !checkIsMasterAdmin(currentAdminUser)) {
+        alert('මෙම පහසුකම සඳහා අවසර ඇත්තේ Master Admin ට පමණි.');
+        return;
+    }
+    if (isDeadLinkCleaning || isImgBBScanning || isImgBBMigrating || isBase64Scanning || isBase64Migrating || isBrokenImageScanning) return;
+
+    const confirmClean = confirm(
+        "මැකුණු (Dead) ImgBB ඡායාරූප ලින්ක් පමණක් Firestore වෙතින් ආරක්ෂිතව ඉවත් කිරීමට අවශ්‍යද?\n\n" +
+        "සැලකිය යුතුයි: කිසිදු සටහනක් (Post), සාධුකාර ගණනක්, අදහසක් (Comment) හෝ ක්‍රියාකාරී Cloudinary ඡායාරූපයක් මැකී නොයන අතර, මැකුණු ImgBB ලින්ක් පමණක් ඉවත් කෙරේ."
+    );
+    if (!confirmClean) return;
+
+    isDeadLinkCleaning = true;
+    const btnClean = document.getElementById('btnCleanDeadImgBB');
+    if (btnClean) {
+        btnClean.disabled = true;
+        btnClean.style.opacity = '0.5';
+    }
+
+    const progressContainer = document.getElementById('base64ProgressContainer');
+    const progressBar = document.getElementById('base64ProgressBar');
+    const progressPercent = document.getElementById('base64ProgressPercent');
+    const progressLabel = document.getElementById('base64ProgressLabel');
+    if (progressContainer) progressContainer.style.display = 'block';
+
+    appendBase64Log('Starting safe cleanup of dead ImgBB placeholder links...', 'info');
+    await recordAuditLog('Dead ImgBB Cleanup Started', 'Scanning and stripping dead ImgBB placeholder links from Firestore.');
+
+    let totalDocsScanned = 0;
+    let cleanedDocsCount = 0;
+    let cleanedLinksCount = 0;
+
+    // Cache image probe results in memory to avoid redundant network/canvas checks
+    const deadUrlTestCache = new Map();
+
+    async function checkIsDead(url) {
+        if (!url || typeof url !== 'string') return false;
+        const trimmed = url.trim();
+        if (!trimmed.includes('ibb.co')) return false;
+        if (deadUrlTestCache.has(trimmed)) {
+            return deadUrlTestCache.get(trimmed);
+        }
+        const isDead = await isImgBBNotFoundPlaceholder(trimmed);
+        deadUrlTestCache.set(trimmed, isDead);
+        return isDead;
+    }
+
+    try {
+        const { collection, getDocs, doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+
+        const targetsToProcess = [];
+
+        // 1. Collect candidate documents across merit_posts, users, and temple_artisans
+        const postsSnap = await getDocs(collection(db, COLLECTIONS.POSTS));
+        postsSnap.forEach(d => {
+            targetsToProcess.push({
+                collection: COLLECTIONS.POSTS,
+                docId: d.id,
+                data: d.data(),
+                snippet: (d.data().title || d.data().text || d.id || '').toString().substring(0, 40)
+            });
+        });
+
+        const usersSnap = await getDocs(collection(db, COLLECTIONS.USERS));
+        usersSnap.forEach(d => {
+            targetsToProcess.push({
+                collection: COLLECTIONS.USERS,
+                docId: d.id,
+                data: d.data(),
+                snippet: (d.data().displayName || d.data().name || d.id || '').toString().substring(0, 40)
+            });
+        });
+
+        const artisansCollectionName = COLLECTIONS.ARTISANS || 'temple_artisans';
+        try {
+            const artisansSnap = await getDocs(collection(db, artisansCollectionName));
+            artisansSnap.forEach(d => {
+                targetsToProcess.push({
+                    collection: artisansCollectionName,
+                    docId: d.id,
+                    data: d.data(),
+                    snippet: (d.data().fullName || d.data().serviceTitle || d.id || '').toString().substring(0, 40)
+                });
+            });
+        } catch (err) {
+            console.warn('[Dead Link Cleanup] Could not fetch artisans collection:', err);
+        }
+
+        totalDocsScanned = targetsToProcess.length;
+        appendBase64Log(`Scanned ${totalDocsScanned} total documents. Checking for dead ImgBB links...`, 'info');
+
+        const singleFields = ['image', 'imageUrl', 'photo', 'photoURL', 'mediaUrl', 'thumbnail', 'authorPhoto', 'coverImage', 'avatar', 'profileImage', 'wildlifeLicenseImageUrl', 'licenseUrl'];
+        const arrayFields = ['images', 'media', 'photos', 'portfolio', 'portfolioUrls'];
+
+        for (let i = 0; i < targetsToProcess.length; i++) {
+            const item = targetsToProcess[i];
+            const itemNum = i + 1;
+            const pct = Math.round((itemNum / totalDocsScanned) * 100);
+
+            if (progressBar) progressBar.style.width = `${pct}%`;
+            if (progressPercent) progressPercent.innerText = `${pct}% (${itemNum}/${totalDocsScanned})`;
+            if (progressLabel) progressLabel.innerText = `Checking [${item.collection}] ${item.docId}...`;
+
+            const data = item.data;
+            const docId = item.docId;
+
+            // Collect all ibb.co URLs present in this document
+            const ibbUrlsInDoc = new Set();
+
+            singleFields.forEach(f => {
+                const val = data[f];
+                if (typeof val === 'string' && val.includes('ibb.co')) {
+                    ibbUrlsInDoc.add(val.trim());
+                }
+            });
+
+            arrayFields.forEach(f => {
+                const arr = data[f];
+                if (Array.isArray(arr)) {
+                    arr.forEach(entry => {
+                        if (typeof entry === 'string' && entry.includes('ibb.co')) {
+                            ibbUrlsInDoc.add(entry.trim());
+                        } else if (entry && typeof entry === 'object') {
+                            const u = entry.url || entry.src || entry.link;
+                            if (typeof u === 'string' && u.includes('ibb.co')) {
+                                ibbUrlsInDoc.add(u.trim());
+                            }
+                        }
+                    });
+                }
+            });
+
+            if (ibbUrlsInDoc.size === 0) continue;
+
+            // Verify each URL against isImgBBNotFoundPlaceholder
+            const deadUrlsInThisDoc = new Set();
+            for (const url of ibbUrlsInDoc) {
+                const isDead = await checkIsDead(url);
+                if (isDead) {
+                    deadUrlsInThisDoc.add(url);
+                }
+            }
+
+            if (deadUrlsInThisDoc.size === 0) continue;
+
+            // Prepare safe updates for affected fields only
+            const updates = {};
+            const cleanedArrays = {};
+
+            // 1. Clean array fields: filter out only dead URLs
+            arrayFields.forEach(f => {
+                const arr = data[f];
+                if (Array.isArray(arr)) {
+                    let arrayChanged = false;
+                    const filtered = arr.filter(entry => {
+                        if (typeof entry === 'string') {
+                            if (deadUrlsInThisDoc.has(entry.trim())) {
+                                arrayChanged = true;
+                                return false;
+                            }
+                            return true;
+                        } else if (entry && typeof entry === 'object') {
+                            const u = (entry.url || entry.src || entry.link || '').trim();
+                            if (deadUrlsInThisDoc.has(u)) {
+                                arrayChanged = true;
+                                return false;
+                            }
+                            return true;
+                        }
+                        return true;
+                    });
+
+                    if (arrayChanged) {
+                        updates[f] = filtered;
+                        cleanedArrays[f] = filtered;
+                    } else {
+                        cleanedArrays[f] = arr;
+                    }
+                }
+            });
+
+            // 2. Clean single string fields
+            // Determine surviving fallback image from images array if available
+            const survivingImagesArr = cleanedArrays['images'] || (Array.isArray(data['images']) ? data['images'] : []);
+            let fallbackImage = '';
+            if (survivingImagesArr.length > 0) {
+                const first = survivingImagesArr[0];
+                if (typeof first === 'string' && first.trim()) {
+                    fallbackImage = first.trim();
+                } else if (first && typeof first === 'object') {
+                    fallbackImage = (first.url || first.src || first.link || '').trim();
+                }
+            }
+
+            singleFields.forEach(f => {
+                const val = data[f];
+                if (typeof val === 'string' && deadUrlsInThisDoc.has(val.trim())) {
+                    if (f === 'image' || f === 'imageUrl') {
+                        updates[f] = fallbackImage || '';
+                    } else {
+                        updates[f] = '';
+                    }
+                }
+            });
+
+            // 3. Atomically update Firestore document
+            if (Object.keys(updates).length > 0) {
+                const docRef = doc(db, item.collection, docId);
+                await updateDoc(docRef, updates);
+
+                cleanedDocsCount++;
+                cleanedLinksCount += deadUrlsInThisDoc.size;
+
+                const changedFieldsStr = Object.keys(updates).join(', ');
+                appendBase64Log(`✓ Cleaned [${item.collection}] ${docId} | Snippet: "${item.snippet}" | Removed ${deadUrlsInThisDoc.size} dead link(s) | Fields: ${changedFieldsStr}`, 'success');
+
+                // Small delay to maintain UI responsiveness
+                await sleep(50);
+            }
+        }
+
+        // 4. Invalidate and clear local caches
+        try {
+            localStorage.removeItem('pinPotha_posts');
+            localStorage.removeItem('pinPotha_sandbox_posts');
+            localStorage.removeItem('pinPotha_cached_posts');
+            localStorage.removeItem('pinPotha_artisans_cache');
+            appendBase64Log('Cleared local post and artisan caches (pinPotha_posts, pinPotha_sandbox_posts, pinPotha_cached_posts, pinPotha_artisans_cache).', 'info');
+        } catch (e) {
+            console.warn('[Dead Link Cleanup] Cache clear warning:', e);
+        }
+
+        const summaryMsg = `Cleanup completed: Removed ${cleanedLinksCount} dead ImgBB link(s) across ${cleanedDocsCount} document(s). Post text and valid Cloudinary images preserved!`;
+        appendBase64Log(summaryMsg, cleanedDocsCount > 0 ? 'success' : 'info');
+        await recordAuditLog('Dead ImgBB Cleanup Finished', summaryMsg);
+        alert(summaryMsg);
+
+    } catch (err) {
+        console.error('[Dead Link Cleanup] Error:', err);
+        appendBase64Log(`Error cleaning dead ImgBB links: ${err.message}`, 'error');
+        alert('මැකුණු ලින්ක් ඉවත් කිරීමේදී දෝෂයක් සිදුවිය: ' + err.message);
+    } finally {
+        isDeadLinkCleaning = false;
+        if (btnClean) {
+            btnClean.disabled = false;
+            btnClean.style.opacity = '1';
+        }
     }
 };

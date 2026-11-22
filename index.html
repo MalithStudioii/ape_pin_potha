@@ -51,7 +51,7 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=149">
+    <link rel="stylesheet" href="css/styles.css?v=167">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
@@ -85,6 +85,15 @@
           }
         }
       })();
+    </script>
+
+    <!-- Early PWA Install Prompt Capture -->
+    <script>
+      window.__deferredInstallPrompt = null;
+      window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        window.__deferredInstallPrompt = e;
+      });
     </script>
 </head>
 <body>
@@ -175,6 +184,17 @@
                             </div>
                         </div>
 
+                        <!-- OS Push Notifications Permission Bar -->
+                        <div id="notifPermissionBanner" style="display: none; padding: 7px 12px; background: rgba(245, 158, 11, 0.12); border-bottom: 1px solid rgba(245, 158, 11, 0.2); font-size: 0.74rem; align-items: center; justify-content: space-between; gap: 8px;">
+                            <span style="color: #cbd5e1; display: flex; align-items: center; gap: 6px;">
+                                <i class="fa-solid fa-bell-ring" style="color: #f59e0b;"></i>
+                                <span>දුරකථන දැනුම්දීම්</span>
+                            </span>
+                            <button type="button" id="btnEnablePushNotifs" onclick="requestNotificationPermission()" class="notif-filter-chip" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #ffffff; border: none; font-size: 0.7rem; padding: 3px 10px; font-weight: 700; cursor: pointer;">
+                                🔔 සක්‍රීය කරන්න
+                            </button>
+                        </div>
+
                         <!-- Filter Chips -->
                         <div class="notif-filter-bar">
                             <button class="notif-filter-chip active" id="notif-chip-all" onclick="filterNotifications('all', event)">සියල්ල</button>
@@ -207,6 +227,7 @@
                 <!-- Mobile 3-Lines Hamburger Menu Button (To the right of profile) -->
                 <button type="button" id="headerMenuBtn" class="header-icon-btn header-menu-btn" onclick="toggleMobileMenuDrawer()" title="මෙනුව (Menu)" aria-label="මෙනුව">
                     <i class="fa-solid fa-bars"></i>
+                    <span id="menuNewBadge" class="menu-new-badge hidden">NEW</span>
                 </button>
             </div>
         </div>
@@ -268,6 +289,12 @@
                 <button onclick="switchTab('aranya')" id="side-btn-aranya" class="category-item" style="background: linear-gradient(135deg, #f0fdf4, #dcfce7); border: 1px solid #86efac; color: #166534; font-weight: 700; margin-bottom: 8px;" title="ශ්‍රී ලංකා ආරණ්‍ය සේනාසන සහ භාවනා මධ්‍යස්ථාන නාමාවලිය">
                     <span><i class="fa-solid fa-mountain-sun cat-icon" style="color: #15803d;"></i> ආරණ්‍ය සේනාසන</span>
                     <span class="badge-live" style="background: linear-gradient(135deg, #15803d, #059669); font-size: 0.65rem; padding: 2px 7px;">නාමාවලිය</span>
+                </button>
+
+                <!-- Temple Artisans Directory Sidebar Shortcut -->
+                <button onclick="switchTab('artisans')" id="side-btn-artisans" class="category-item" style="background: linear-gradient(135deg, #fffbeb, #fef3c7); border: 1px solid #fde68a; color: #92400e; font-weight: 700; margin-bottom: 8px;" title="ශ්‍රී ලංකා විහාර නිර්මාණ හා කලා ශිල්පීන් නාමාවලිය">
+                    <span><i class="fa-solid fa-palette cat-icon" style="color: #d97706;"></i> විහාර කලා ශිල්පීන්</span>
+                    <span class="badge-live" style="background: linear-gradient(135deg, #d97706, #b45309); font-size: 0.65rem; padding: 2px 7px;">නාමාවලිය</span>
                 </button>
 
                 <h3 class="category-title">පින්කම් වර්ගීකරණය</h3>
@@ -379,7 +406,7 @@
 
             <!-- Newsfeed Posts Stream -->
             <div id="postsContainer">
-                <div class="feed-loading-shimmer" style="padding: 40px 20px; text-align: center; border-radius: 20px; background: rgba(255, 255, 255, 0.7); border: 1.5px dashed rgba(217, 119, 6, 0.25); margin-bottom: 20px;">
+                <div class="feed-loading-shimmer" style="padding: 40px 20px; text-align: center; border-radius: 20px; background: rgba(255, 255, 255, 0.7); border: 1.5px dashed rgba(217, 119, 6, 0.25); margin-bottom: 12px;">
                     <div style="width: 54px; height: 54px; border-radius: 50%; background: #fffbeb; border: 2px solid #fef3c7; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px; box-shadow: 0 4px 14px rgba(245, 158, 11, 0.15);">
                         <i class="fa-solid fa-dharmachakra animate-spin-slow" style="font-size: 1.8rem; color: #d97706;"></i>
                     </div>
@@ -420,7 +447,7 @@
                         <i class="fa-solid fa-users" style="color: #d97706;"></i>
                         <span>සියලු සාමාජිකයින්</span>
                     </h3>
-                    <span class="widget-sub-pill" id="pcCommunityCountPill">47 දෙනෙක්</span>
+                    <span class="widget-sub-pill" id="pcCommunityCountPill">සාමාජිකයින්</span>
                 </div>
 
                 <!-- Quick Member Search Box -->
@@ -431,61 +458,9 @@
 
                 <!-- Mini Member List (Compact Preview) -->
                 <div id="pcSidebarMemberList" class="sidebar-member-list">
-                    <div class="sidebar-member-item" onclick="openMemberProfileModal('1z3CVffo7lb9FoZan9vABNr8fgi1', 'Sunil Wijaya Kumara', 'https://lh3.googleusercontent.com/a/ACg8ocIz_0oGZKwXeIoc1gWHXw2p7ntY6TKreen3A5aqGkieiIzCD48z=s96-c')" style="cursor: pointer;">
-                        <div class="sidebar-member-avatar">
-                            <img src="https://lh3.googleusercontent.com/a/ACg8ocIz_0oGZKwXeIoc1gWHXw2p7ntY6TKreen3A5aqGkieiIzCD48z=s96-c" alt="Sunil Wijaya Kumara" onerror="this.parentElement.innerText='S';">
-                        </div>
-                        <div class="sidebar-member-info">
-                            <div class="sidebar-member-name"><span>Sunil Wijaya Kumara</span></div>
-                            <div class="sidebar-member-meta"><i class="fa-solid fa-calendar-check"></i> 2026 ඔක්තෝබර්</div>
-                        </div>
-                        <div>
-                            <button type="button" class="sidebar-member-action-btn" onclick="event.stopPropagation(); handleSidebarMemberAction('1z3CVffo7lb9FoZan9vABNr8fgi1', 'Sunil Wijaya Kumara')" title="කල්‍යාණ මිත්‍ර ඇරයුමක් යවන්න">
-                                <i class="fa-solid fa-user-plus"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="sidebar-member-item" onclick="openMemberProfileModal('69xlT9NgTUUoGuessE40S7SAabk1', 'Creative World', 'https://lh3.googleusercontent.com/a/ACg8ocKWBk6TI1TYph86IffKhtbJqG9H3Lgv8mkgr0BDozYQabip7H0=s96-c')" style="cursor: pointer;">
-                        <div class="sidebar-member-avatar">
-                            <img src="https://lh3.googleusercontent.com/a/ACg8ocKWBk6TI1TYph86IffKhtbJqG9H3Lgv8mkgr0BDozYQabip7H0=s96-c" alt="Creative World" onerror="this.parentElement.innerText='C';">
-                        </div>
-                        <div class="sidebar-member-info">
-                            <div class="sidebar-member-name"><span>Creative World</span></div>
-                            <div class="sidebar-member-meta"><i class="fa-solid fa-location-dot"></i> ගාල්ල, ගාල්ල</div>
-                        </div>
-                        <div>
-                            <button type="button" class="sidebar-member-action-btn" onclick="event.stopPropagation(); handleSidebarMemberAction('69xlT9NgTUUoGuessE40S7SAabk1', 'Creative World')" title="කල්‍යාණ මිත්‍ර ඇරයුමක් යවන්න">
-                                <i class="fa-solid fa-user-plus"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="sidebar-member-item" onclick="openMemberProfileModal('4MyCCKbszFdct42oN8LcIYvXYEe2', 'Sanjewa Gamage', 'https://i.ibb.co/RpYcqq9R/avatar-1792464305480.jpg')" style="cursor: pointer;">
-                        <div class="sidebar-member-avatar">
-                            <img src="https://i.ibb.co/RpYcqq9R/avatar-1792464305480.jpg" alt="Sanjewa Gamage" onerror="this.parentElement.innerText='S';">
-                        </div>
-                        <div class="sidebar-member-info">
-                            <div class="sidebar-member-name"><span>Sanjewa Gamage</span></div>
-                            <div class="sidebar-member-meta"><i class="fa-solid fa-calendar-check"></i> 2026 ඔක්තෝබර්</div>
-                        </div>
-                        <div>
-                            <button type="button" class="sidebar-member-action-btn" onclick="event.stopPropagation(); handleSidebarMemberAction('4MyCCKbszFdct42oN8LcIYvXYEe2', 'Sanjewa Gamage')" title="කල්‍යාණ මිත්‍ර ඇරයුමක් යවන්න">
-                                <i class="fa-solid fa-user-plus"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="sidebar-member-item" onclick="openMemberProfileModal('1zKUNrsU10dTuJ381WtXtmVjurB2', 'Janaka Bandara', 'https://i.ibb.co/cGNDLLF/avatar-1792991063289.jpg')" style="cursor: pointer;">
-                        <div class="sidebar-member-avatar">
-                            <img src="https://i.ibb.co/cGNDLLF/avatar-1792991063289.jpg" alt="Janaka Bandara" onerror="this.parentElement.innerText='J';">
-                        </div>
-                        <div class="sidebar-member-info">
-                            <div class="sidebar-member-name"><span>Janaka Bandara</span></div>
-                            <div class="sidebar-member-meta"><i class="fa-solid fa-location-dot"></i> ත්‍රිකුණාමලය</div>
-                        </div>
-                        <div>
-                            <button type="button" class="sidebar-member-action-btn" onclick="event.stopPropagation(); handleSidebarMemberAction('1zKUNrsU10dTuJ381WtXtmVjurB2', 'Janaka Bandara')" title="කල්‍යාණ මිත්‍ර ඇරයුමක් යවන්න">
-                                <i class="fa-solid fa-user-plus"></i>
-                            </button>
-                        </div>
+                    <div style="text-align: center; color: var(--text-muted); padding: 24px 10px; font-size: 0.82rem;">
+                        <i class="fa-solid fa-spinner fa-spin" style="color: var(--gold-light); margin-bottom: 6px; font-size: 1.1rem; display: block;"></i>
+                        <span>සාමාජිකයින් පූරණය වෙමින් පවතී...</span>
                     </div>
                 </div>
 
@@ -547,7 +522,7 @@
         <div class="profile-header-wrapper">
             <!-- Cover Photo Area -->
             <div class="profile-cover-banner" id="profileCoverBanner" onclick="viewCoverPhoto(event)" title="කවරයේ ඡායාරූපය බලන්න (Click to view full cover)">
-                <img id="profileCoverImg" src="assets/banner.jpg" alt="Cover Photo">
+                <img id="profileCoverImg" src="assets/banner.webp" alt="Cover Photo">
                 <button onclick="event.stopPropagation(); openCoverModal()" class="btn-edit-cover cover-camera-btn" title="කවරයේ ඡායාරූපය වෙනස් කරන්න">
                     <i class="fa-solid fa-camera"></i>
                 </button>
@@ -577,6 +552,7 @@
                             <i class="fa-solid fa-circle-check"></i>
                             <span>Google සත්‍යාපිත කල්‍යාණ මිත්‍ර</span>
                         </span>
+                        <div id="profArtisanBadgeWrap" class="member-artisan-badge-wrap hidden" style="display: none;"></div>
                     </div>
                     <p class="profile-dhamma-bio" id="profDhammaBio">
                         "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏"
@@ -1044,6 +1020,117 @@
         </div>
     </div>
 
+    <!-- ========================================================================= -->
+    <!-- Temple Artisans & Creators Directory Page Container                       -->
+    <!-- ========================================================================= -->
+    <div id="artisansPageContainer" class="artisans-page-container hidden" style="display: none;">
+        <div class="artisans-page-content">
+
+            <!-- Hero Banner Card -->
+            <div class="artisans-hero-card">
+                <div class="artisans-hero-content">
+                    <div class="artisans-hero-badge">
+                        <i class="fa-solid fa-palette"></i>
+                        <span>සම්ප්‍රදායික විහාර කලා හා සංස්කෘතික සේවා</span>
+                    </div>
+                    <h1 class="artisans-hero-title">ශ්‍රී ලංකා විහාර නිර්මාණ හා පෙරහැර කලා ශිල්පීන් නාමාවලිය</h1>
+                    <p class="artisans-hero-desc">
+                        විහාර බිතුසිතුවම්, දාගැබ්, බුදු පිළිම, කැටයම් මෙන්ම පෙරහැර තූර්ය වාදක, නර්තන කණ්ඩායම්, කස කරුවන් හා බලපත්‍රලාභී අලි ඇතුන් සපයන්නන් පිළිබඳ සත්‍යාපිත තොරතුරු.
+                    </p>
+                    <div class="artisans-hero-actions">
+                        <button type="button" class="btn-register-artisan" onclick="openArtisanRegisterModal()">
+                            <i class="fa-solid fa-circle-plus"></i>
+                            <span>+ ශිල්පියෙකු ලියාපදිංචි කරන්න</span>
+                        </button>
+                        <button type="button" class="btn-artisans-back" onclick="switchTab('feed')">
+                            <i class="fa-solid fa-arrow-left"></i>
+                            <span>පුණ්‍ය පවුර වෙත</span>
+                        </button>
+                    </div>
+                </div>
+                <img src="assets/artisan-banner-buddha.webp" alt="Lord Buddha Statue Artwork" class="artisans-hero-buddha-bg" aria-hidden="true" loading="lazy">
+            </div>
+
+            <!-- Section Switcher Tabs: Temple Art vs Perahera Cultural Services -->
+            <div class="artisans-section-tabs-bar" role="tablist">
+                <button type="button" id="tabBtnTempleArt" class="artisans-section-tab active" onclick="switchArtisansSection('temple_art')" role="tab" aria-selected="true">
+                    <span class="section-tab-icon">🏛️</span>
+                    <span class="section-tab-title">විහාර නිර්මාණ ශිල්පීන්</span>
+                    <span class="section-tab-badge" id="tabBadgeTempleArt">0</span>
+                </button>
+                <button type="button" id="tabBtnPeraheraCulture" class="artisans-section-tab" onclick="switchArtisansSection('perahera_culture')" role="tab" aria-selected="false">
+                    <span class="section-tab-icon">🥁</span>
+                    <span class="section-tab-title">පෙරහැර හා සංස්කෘතික සේවා</span>
+                    <span class="section-tab-badge" id="tabBadgePeraheraCulture">0</span>
+                </button>
+            </div>
+
+            <!-- Search & Filter Controls -->
+            <div class="artisans-search-filter-card">
+                <div class="artisans-search-row">
+                    <div class="artisans-search-input-wrap">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" id="artisansSearchInput" placeholder="ශිල්පියාගේ හෝ ආයතනයේ නම, විහාරය හෝ සේවාවන් සොයන්න..." oninput="filterArtisansDirectory()">
+                        <button type="button" id="artisansSearchClearBtn" class="artisans-clear-search-btn hidden" onclick="clearArtisansSearch()" title="මකන්න">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                    <div class="artisans-district-select-wrap">
+                        <i class="fa-solid fa-location-dot"></i>
+                        <select id="artisansDistrictSelect" class="artisans-district-select" onchange="setArtisansDistrictFilter(this.value)">
+                            <option value="සියල්ල">සියලුම දිස්ත්‍රික්ක (All Districts)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Specialty Category Chips -->
+                <div class="artisans-categories-bar" id="artisansCategoriesBar">
+                    <!-- Populated dynamically via JS -->
+                </div>
+            </div>
+
+            <!-- Results Counter & Verified Legend -->
+            <div class="artisans-results-header">
+                <span id="artisansResultsCount" class="artisans-results-count">ශිල්පීන් පූරණය වෙමින්...</span>
+                <div class="artisans-sort-legend">
+                    <i class="fa-solid fa-shield-halved" style="color: #059669;"></i>
+                    <span>සත්‍යාපිත ශිල්පීන් (Verified Directory)</span>
+                </div>
+            </div>
+
+            <!-- Artisans Cards Grid -->
+            <div class="artisans-grid" id="artisansGrid">
+                <!-- Populated dynamically via JS -->
+            </div>
+
+            <!-- Empty State -->
+            <div id="artisansEmptyState" class="artisans-empty-state hidden" style="display: none; text-align: center; padding: 40px 20px; background: #fff; border-radius: 16px; border: 1px dashed #cbd5e1; margin-bottom: 20px;">
+                <div style="padding: 10px 8px;">
+                    <i class="fa-solid fa-palette" style="font-size: 2.6rem; color: #d97706; margin-bottom: 14px; display: block;"></i>
+                    <h3 style="font-size: 1.15rem; font-weight: 800; color: #451a03; margin-bottom: 8px;">තවමත් සත්‍යාපිත ශිල්පීන් ඇතුළත් කර නොමැත</h3>
+                    <p style="font-size: 0.85rem; color: #64748b; max-width: 520px; margin: 0 auto 18px; line-height: 1.6;">
+                        විහාර චිත්‍ර, වෙහෙර දාගැබ් හෝ කැටයම් නිර්මාණ ක්ෂේත්‍රයේ දක්ෂ ශිල්පියෙකු ඔබ දන්නේ නම්, දැන්ම නොමිලේ ලියාපදිංචි කර ශාසනික මෙහෙවරට දායක වන්න.
+                    </p>
+                    <button type="button" class="btn-register-artisan" onclick="openArtisanRegisterModal()" style="margin: 0 auto; display: inline-flex; align-items: center; gap: 8px; padding: 10px 22px; font-weight: 700; font-size: 0.9rem; border-radius: 9999px; box-shadow: 0 4px 14px rgba(217, 119, 6, 0.3);">
+                        <i class="fa-solid fa-circle-plus"></i>
+                        <span>+ පළමු ශිල්පියා ලියාපදිංචි කරන්න</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Bottom Disclaimer Card -->
+            <div class="artisans-disclaimer-card">
+                <div class="disclaimer-icon">
+                    <i class="fa-solid fa-circle-info"></i>
+                </div>
+                <div class="disclaimer-text">
+                    <strong>වැදගත් සටහන:</strong> අපේ පිං පොත විසින් සිදුකරන්නේ ශිල්පීන් සහ විහාරස්ථාන සම්බන්ධ කිරීම පමණි. මූල්‍ය ගනුදෙනු හා ගිවිසුම් දෙපාර්ශ්වයේ සෘජු එකඟතාවයෙන් සිදුකරගත යුතුය.
+                </div>
+            </div>
+
+        </div>
+    </div>
+
     <!-- ================= KALYANA MITHURU PAWURA DIRECTORY VIEW ================= -->
     <div id="friendsPageContainer" class="kmp-page-container hidden" style="display: none;">
         <div class="kmp-page-content">
@@ -1323,14 +1410,14 @@
 
                 <!-- NexiaProLanka Creator Card -->
                 <div style="background: linear-gradient(135deg, rgba(240, 249, 255, 0.95), rgba(240, 253, 250, 0.95)); border: 1.5px solid rgba(14, 165, 233, 0.25); border-radius: 14px; padding: 14px 18px; margin-top: 16px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
-                    <img src="assets/nexiapro-logo.png" alt="NexiaProLanka Logo" style="width: 54px; height: 54px; object-fit: contain; border-radius: 10px; background: #ffffff; padding: 4px; border: 1px solid rgba(14, 165, 233, 0.2); box-shadow: 0 2px 8px rgba(0,0,0,0.06); flex-shrink: 0;">
+                    <img src="assets/nexiapro-logo.webp" alt="NexiaProLanka Logo" style="width: 54px; height: 54px; object-fit: contain; border-radius: 10px; background: #ffffff; padding: 4px; border: 1px solid rgba(14, 165, 233, 0.2); box-shadow: 0 2px 8px rgba(0,0,0,0.06); flex-shrink: 0;">
                     <div style="flex: 1; min-width: 220px;">
                         <div style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: #0284c7; background: rgba(2, 132, 199, 0.1); padding: 2px 8px; border-radius: 12px; margin-bottom: 3px;">
                             <i class="fa-solid fa-code"></i> Technology & Innovation
                         </div>
                         <h4 style="margin: 0 0 2px; font-size: 1rem; font-weight: 800; background: linear-gradient(135deg, #0284c7, #059669); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">NexiaProLanka</h4>
                         <p style="margin: 0; font-size: 0.74rem; color: #64748b; line-height: 1.4;">
-                            සංකල්පය, සැලසුම්කරණය සහ තාක්ෂණික දායකත්වය • Digital Initiative • Version 2.0.5 (Beta)
+                            සංකල්පය, සැලසුම්කරණය සහ තාක්ෂණික දායකත්වය • Digital Initiative • Version 2.0.5
                         </p>
                     </div>
                 </div>
@@ -1584,6 +1671,214 @@
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- Artisan Registration Modal Dialog                                         -->
+    <!-- ========================================================================= -->
+    <div id="artisanRegisterModal" class="modal-overlay hidden" onclick="if(event.target === this) closeArtisanRegisterModal()">
+        <div class="modal-box" style="max-width: 600px; width: 95%; max-height: 90vh; overflow-y: auto; padding: 0; border-radius: 20px;">
+            <div class="modal-header" style="position: sticky; top: 0; background: #fff; z-index: 10; padding: 14px 18px; border-bottom: 1.5px solid #fde68a;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-palette" style="color: #d97706; font-size: 1.15rem;"></i>
+                    <h3 class="modal-title" style="font-size: 1rem; color: #451a03; font-weight: 800;">ශිල්පියෙකු හෝ සංස්කෘතික සේවාවක් ලියාපදිංචි කරන්න</h3>
+                </div>
+                <button type="button" onclick="closeArtisanRegisterModal()" class="modal-close-btn" title="වසන්න">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            
+            <form id="artisanRegisterForm" onsubmit="handleArtisanRegisterSubmit(event)" style="padding: 18px 20px;">
+                <p style="font-size: 0.8rem; color: #64748b; margin-top: 0; margin-bottom: 14px; line-height: 1.5;">
+                    ඔබගේ හෝ ආයතනයේ නිවැරදි විස්තර මෙහි ඇතුළත් කරන්න. අපගේ කණ්ඩායම විසින් සත්‍යාපනය කිරීමෙන් පසු ප්‍රධාන නාමාවලියෙහි ප්‍රදර්ශනය කරනු ඇත.
+                </p>
+
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label class="form-label" style="font-size: 0.82rem; font-weight: 700; color: #334155;">ශිල්පියාගේ හෝ කලායතනයේ නම *</label>
+                    <input type="text" id="artisanRegName" class="form-input" required maxlength="100" placeholder="උදා: සෝමපාල කලායතනය / ඩබ්ලිව්. එම්. සුනිල් ශාන්ත">
+                </div>
+
+                <!-- Section Selector -->
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label class="form-label" style="font-size: 0.82rem; font-weight: 700; color: #334155; margin-bottom: 6px; display: block;">ප්‍රධාන අංශය (Category Section) *</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <label class="artisan-section-radio-label">
+                            <input type="radio" name="artisanRegSection" value="temple_art" checked onchange="handleArtisanRegSectionChange(this.value)">
+                            <span>🏛️ විහාර නිර්මාණ</span>
+                        </label>
+                        <label class="artisan-section-radio-label">
+                            <input type="radio" name="artisanRegSection" value="perahera_culture" onchange="handleArtisanRegSectionChange(this.value)">
+                            <span>🥁 පෙරහැර සේවා</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label class="form-label" style="font-size: 0.82rem; font-weight: 700; color: #334155; margin-bottom: 6px; display: block;">නිර්මාණ / සේවා ක්ෂේත්‍ර * (අවම වශයෙන් 1ක් තෝරන්න)</label>
+                    <div id="artisanRegSpecialtiesGrid" class="artisan-specialties-checkboxes-grid">
+                        <label class="artisan-checkbox-item">
+                            <input type="checkbox" name="artisanSpecialty" value="විහාර චිත්‍ර හා ප්‍රතිසංස්කරණ">
+                            <span>විහාර චිත්‍ර හා ප්‍රතිසංස්කරණ</span>
+                        </label>
+                        <label class="artisan-checkbox-item">
+                            <input type="checkbox" name="artisanSpecialty" value="වෙහෙර දාගැබ් හා චෛත්‍ය නිර්මාණ">
+                            <span>වෙහෙර දාගැබ් හා චෛත්‍ය නිර්මාණ</span>
+                        </label>
+                        <label class="artisan-checkbox-item">
+                            <input type="checkbox" name="artisanSpecialty" value="බුදු පිළිම හා මූර්ති නිර්මාණ">
+                            <span>බුදු පිළිම හා මූර්ති නිර්මාණ</span>
+                        </label>
+                        <label class="artisan-checkbox-item">
+                            <input type="checkbox" name="artisanSpecialty" value="ලී කැටයම් හා මකර තොරණ">
+                            <span>ලී කැටයම් හා මකර තොරණ</span>
+                        </label>
+                        <label class="artisan-checkbox-item">
+                            <input type="checkbox" name="artisanSpecialty" value="විහාර ගෘහ නිර්මාණ හා වාස්තු">
+                            <span>විහාර ගෘහ නිර්මාණ හා වාස්තු</span>
+                        </label>
+                        <label class="artisan-checkbox-item">
+                            <input type="checkbox" name="artisanSpecialty" value="ගල් කැටයම්, කොත් වහන්සේ හා ලෝහ කර්මාන්ත">
+                            <span>ගල් කැටයම්, කොත් වහන්සේ හා ලෝහ කර්මාන්ත</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Conditional Elephant License Verification Box (Strictly for අලි ඇතුන් සපයන්නන්) -->
+                <div id="elephantLicenseFieldsWrap" class="hidden" style="display: none; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 12px; padding: 14px; margin-bottom: 14px;">
+                    <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 10px;">
+                        <i class="fa-solid fa-shield-halved" style="color: #059669; font-size: 1.1rem; margin-top: 2px;"></i>
+                        <div>
+                            <div style="font-size: 0.84rem; font-weight: 800; color: #065f46;">වනජීවී දෙපාර්තමේන්තු බලපත්‍ර සත්‍යාපනය (Mandatory Elephant License)</div>
+                            <div style="font-size: 0.72rem; color: #047857; margin-top: 2px; line-height: 1.4;">
+                                🔒 මෙම බලපත්‍ර තොරතුරු ප්‍රසිද්ධියේ පළ නොකෙරේ — පරිපාලක සත්‍යාපනය (Admin Verification) සඳහා පමණි.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label class="form-label" style="font-size: 0.8rem; font-weight: 700; color: #065f46;">වනජීවී දෙපාර්තමේන්තු බලපත්‍ර අංකය (License No.) *</label>
+                        <input type="text" id="artisanRegWildlifeLicenseNum" class="form-input" placeholder="උදා: DWC/ELE/2024/..." style="border-color: #86efac; background: #ffffff;">
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label class="form-label" style="font-size: 0.8rem; font-weight: 700; color: #065f46;">බලපත්‍රයේ පැහැදිලි ඡායාරූපය (License Document / Photo) *</label>
+                        <input type="file" id="artisanRegWildlifeLicenseFile" accept="image/*" class="form-control" style="font-size: 0.76rem; border-color: #86efac; background: #ffffff;">
+                        <div id="artisanRegWildlifeLicensePreview" style="margin-top: 6px; display: none;"></div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="display: flex; align-items: flex-start; gap: 8px; font-size: 0.78rem; color: #065f46; font-weight: 700; cursor: pointer; line-height: 1.4;">
+                            <input type="checkbox" id="artisanRegWildlifeConfirm" style="accent-color: #059669; width: 17px; height: 17px; margin-top: 2px; flex-shrink: 0;">
+                            <span>මෙම අලි/ඇතුන් සඳහා වලංගු වනජීවී දෙපාර්තමේන්තු බලපත්‍රයක් ඇති බවට සහතික වෙමි. *</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" style="font-size: 0.82rem; font-weight: 700; color: #334155;">පළපුරුද්ද (වසර ගණන)</label>
+                        <input type="number" id="artisanRegExperience" class="form-input" min="1" max="75" placeholder="උදා: 15">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" style="font-size: 0.82rem; font-weight: 700; color: #334155;">ප්‍රධාන දිස්ත්‍රික්කය *</label>
+                        <select id="artisanRegDistrict" class="form-select" required>
+                            <!-- Populated with districts -->
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: #78350f; font-weight: 600; cursor: pointer;">
+                        <input type="checkbox" id="artisanRegIslandWide" style="accent-color: #d97706; width: 17px; height: 17px;">
+                        <span>දිවයින පුරා සේවය ලබා දේ (Island-wide Service Available)</span>
+                    </label>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" style="font-size: 0.82rem; font-weight: 700; color: #334155;">දුරකථන අංකය (Phone) *</label>
+                        <input type="tel" id="artisanRegPhone" class="form-input" required placeholder="0771234567">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" style="font-size: 0.82rem; font-weight: 700; color: #334155;">WhatsApp අංකය</label>
+                        <input type="tel" id="artisanRegWhatsapp" class="form-input" placeholder="0771234567 (හිස්නම් Phone යොදයි)">
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label class="form-label" style="font-size: 0.82rem; font-weight: 700; color: #334155;">සේවය ලබාදුන් ප්‍රකට විහාරස්ථාන (Notable Temples)</label>
+                    <input type="text" id="artisanRegTemples" class="form-input" maxlength="200" placeholder="උදා: රන්ගිරි දඹුලු රජමහා විහාරය, අස්ගිරි මහා විහාරය...">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label class="form-label" style="font-size: 0.82rem; font-weight: 700; color: #334155;">කෙටි හැඳින්වීමක් / Bio</label>
+                    <textarea id="artisanRegBio" class="form-textarea" rows="2" maxlength="300" placeholder="ඔබගේ කලා නිර්මාණ හා සේවාවන් පිළිබඳ කෙටි විස්තරයක්..."></textarea>
+                </div>
+
+                <!-- Profile Photo Upload -->
+                <div class="form-group" style="margin-bottom: 12px; background: #fffdf8; border: 1px dashed #fde68a; border-radius: 10px; padding: 10px 12px;">
+                    <label class="form-label" style="margin-bottom: 4px; display: flex; justify-content: space-between; font-size: 0.82rem; font-weight: 700; color: #78350f;">
+                        <span>ප්‍රොෆයිල් ඡායාරූපය (Profile Photo)</span>
+                        <span style="font-size: 0.7rem; color: #64748b;">(Optional - 1 Image)</span>
+                    </label>
+                    <input type="file" id="artisanRegPhotoInput" accept="image/*" class="form-control" style="font-size: 0.78rem;">
+                    <div id="artisanRegPhotoPreview" style="margin-top: 6px; display: none;"></div>
+                </div>
+
+                <!-- Portfolio Photos Upload (Up to 4 images) -->
+                <div class="form-group" style="margin-bottom: 14px; background: #fffdf8; border: 1px dashed #fde68a; border-radius: 10px; padding: 10px 12px;">
+                    <label class="form-label" style="margin-bottom: 4px; display: flex; justify-content: space-between; font-size: 0.82rem; font-weight: 700; color: #78350f;">
+                        <span>නිර්මාණ එකතුව / Portfolio (උපරිම 4ක්)</span>
+                        <span style="font-size: 0.7rem; color: #64748b;">(Max 4 Images)</span>
+                    </label>
+                    <input type="file" id="artisanRegPortfolioInput" accept="image/*" multiple class="form-control" style="font-size: 0.78rem;">
+                    <div id="artisanRegPortfolioPreviewGrid" style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;"></div>
+                </div>
+
+                <!-- Upload Status Notice -->
+                <div id="artisanRegUploadStatus" style="display: none; padding: 8px 12px; border-radius: 8px; font-size: 0.78rem; font-weight: 600; margin-bottom: 12px; background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe;">
+                    <i class="fa-solid fa-spinner fa-spin" style="margin-right: 6px;"></i>
+                    <span id="artisanRegUploadStatusText">ඡායාරූප සකසමින් පවතී...</span>
+                </div>
+
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button type="button" onclick="closeArtisanRegisterModal()" class="btn-crop-cancel" style="padding: 8px 16px;">
+                        අවලංගු කරන්න
+                    </button>
+                    <button type="submit" id="btnSubmitArtisanReg" class="btn-submit-merit" style="margin: 0; padding: 8px 20px; min-width: 150px; background: linear-gradient(135deg, #d97706, #b45309);">
+                        <i class="fa-solid fa-paper-plane"></i>
+                        <span>අයදුම්පත යොමු කරන්න</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- Artisan Dedicated Profile & Portfolio Modal Dialog                        -->
+    <!-- ========================================================================= -->
+    <div id="artisanProfileModal" class="modal-overlay hidden" onclick="if(event.target === this) closeArtisanProfileModal()">
+        <div class="modal-box artisan-profile-modal-box">
+            <!-- Modal Cover with Close Button -->
+            <div id="artisanProfileModalCover" class="artisan-profile-modal-cover">
+                <img id="artisanProfileCoverImg" class="artisan-profile-cover-img hidden" src="" alt="Cover Banner">
+                <div class="artisan-profile-cover-overlay"></div>
+                <div id="artisanCoverEditBtnWrap" class="artisan-cover-edit-wrap hidden" style="display: none;">
+                    <button type="button" class="btn-artisan-cover-edit" onclick="triggerArtisanCoverUpload()" title="කවරයේ ඡායාරූපය වෙනස් කරන්න">
+                        <i class="fa-solid fa-camera"></i> <span>කවරය වෙනස් කරන්න</span>
+                    </button>
+                    <input type="file" id="artisanCoverFileInput" accept="image/*" class="hidden" style="display: none;" onchange="handleArtisanCoverFileChange(this)">
+                </div>
+                <button type="button" onclick="closeArtisanProfileModal()" class="modal-close-btn artisan-profile-close-btn" title="වසන්න">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Profile Modal Dynamic Content -->
+            <div id="artisanProfileModalContent" class="artisan-profile-modal-body">
+                <!-- Dynamically populated via renderArtisanProfileModal() -->
+            </div>
         </div>
     </div>
 
@@ -2310,6 +2605,59 @@
     </div>
 
     <!-- ========================================================================= -->
+    <!-- Reusable Crop & Zoom Modal for Avatar & Cover Banner                      -->
+    <!-- ========================================================================= -->
+    <div id="universalCropModal" class="modal-overlay hidden" style="z-index: 1060;" onclick="if(event.target === this) closeUniversalCropModal()">
+        <div class="modal-box crop-modal-container" id="universalCropBox" style="max-width: 620px !important;">
+            <div class="modal-header">
+                <h3 class="modal-title" id="universalCropTitle">
+                    <i class="fa-solid fa-crop-simple" style="color: #d97706;"></i>
+                    <span id="universalCropTitleText">පින්තූරය සකසන්න (Crop & Zoom)</span>
+                </h3>
+                <button type="button" onclick="closeUniversalCropModal()" class="modal-close-btn" title="වසන්න">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <p id="universalCropSubtitle" style="font-size: 0.78rem; color: #64748b; margin: 4px 0 12px; line-height: 1.4;">
+                රාමුව තුළට අවශ්‍ය කොටස පැමිණෙන පරිදි ඡායාරූපය Zoom කර සකසන්න:
+            </p>
+
+            <!-- Image Cropping Area -->
+            <div class="crop-area-container" id="universalCropArea" style="height: 290px; max-height: 52vh; background: #0f172a; border-radius: 12px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                <img id="universalImageToCrop" src="" alt="Crop preview" style="max-width: 100%; max-height: 100%; display: block;">
+            </div>
+
+            <!-- Zoom & Pan Controls -->
+            <div class="crop-controls-wrapper" style="margin-top: 12px;">
+                <div style="display: flex; align-items: center; gap: 10px; width: 100%;">
+                    <button type="button" class="btn-crop-ctrl" onclick="zoomUniversalCropper(-0.1)" title="Zoom Out">
+                        <i class="fa-solid fa-magnifying-glass-minus"></i>
+                    </button>
+                    <input type="range" id="universalCropperZoomRange" min="0.1" max="3" step="0.05" value="1" class="crop-zoom-slider" oninput="setUniversalCropperZoom(this.value)" style="flex: 1;">
+                    <button type="button" class="btn-crop-ctrl" onclick="zoomUniversalCropper(0.1)" title="Zoom In">
+                        <i class="fa-solid fa-magnifying-glass-plus"></i>
+                    </button>
+                    <button type="button" class="btn-crop-ctrl" onclick="resetUniversalCropper()" title="මුල් තත්වයට (Reset)">
+                        <i class="fa-solid fa-arrows-rotate"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modal Action Buttons -->
+            <div style="display: flex; gap: 10px; margin-top: 16px;">
+                <button type="button" onclick="closeUniversalCropModal()" class="btn-crop-cancel" style="flex: 1;">
+                    අවලංගු කරන්න
+                </button>
+                <button type="button" id="btnUniversalCropSave" onclick="confirmUniversalCrop()" class="btn-submit-merit" style="flex: 2; margin: 0; background: linear-gradient(135deg, #f59e0b, #d97706);">
+                    <i class="fa-solid fa-scissors"></i>
+                    <span id="btnUniversalCropSaveText">✂️ සකසා උඩුගත කරන්න</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
     <!-- Settings & Policies Modal Dialog                                         -->
     <!-- ========================================================================= -->
     <div id="settingsModal" class="modal-overlay hidden" onclick="if(event.target === this) closeSettingsModal()">
@@ -2590,7 +2938,7 @@
 
                         <!-- NexiaProLanka Creator Brand Card -->
                         <div style="background: linear-gradient(135deg, rgba(240, 249, 255, 0.95), rgba(240, 253, 250, 0.95)); border: 1px solid rgba(14, 165, 233, 0.25); border-radius: 12px; padding: 10px 14px; max-width: 440px; margin: 0 auto; display: flex; align-items: center; gap: 12px; text-align: left; box-shadow: 0 3px 12px rgba(2, 132, 199, 0.06);">
-                            <img src="assets/nexiapro-logo.png" alt="NexiaProLanka Logo" style="width: 52px; height: 52px; object-fit: contain; border-radius: 10px; background: #ffffff; padding: 3px; border: 1px solid rgba(14, 165, 233, 0.2); box-shadow: 0 2px 6px rgba(0,0,0,0.05); flex-shrink: 0;">
+                            <img src="assets/nexiapro-logo.webp" alt="NexiaProLanka Logo" style="width: 52px; height: 52px; object-fit: contain; border-radius: 10px; background: #ffffff; padding: 3px; border: 1px solid rgba(14, 165, 233, 0.2); box-shadow: 0 2px 6px rgba(0,0,0,0.05); flex-shrink: 0;">
                             <div>
                                 <div style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: #0284c7; background: rgba(2, 132, 199, 0.1); padding: 2px 7px; border-radius: 12px; margin-bottom: 2px;">
                                     <i class="fa-solid fa-code"></i> Technology & Innovation
@@ -2864,7 +3212,7 @@
             <div class="member-profile-header">
                 <!-- Cover Banner -->
                 <div class="member-profile-cover" id="memCoverWrap" onclick="viewMemberCoverPhoto(event)" title="කවරයේ ඡායාරූපය බලන්න">
-                    <img id="memCoverImg" src="assets/banner.jpg" alt="Cover Photo">
+                    <img id="memCoverImg" src="assets/banner.webp" alt="Cover Photo">
                     <button type="button" onclick="event.stopPropagation(); closeMemberProfileModal()" class="member-modal-back-btn" title="ආපසු">
                         <i class="fa-solid fa-arrow-left"></i> <span>ආපසු</span>
                     </button>
@@ -2887,6 +3235,7 @@
                                 <i class="fa-solid fa-circle-check"></i>
                                 <span>Google සත්‍යාපිත කල්‍යාණ මිත්‍ර</span>
                             </span>
+                            <div id="memArtisanBadgeWrap" class="member-artisan-badge-wrap hidden" style="display: none;"></div>
                         </div>
                         <p class="member-bio-text" id="memBio">"සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏"</p>
                         <div class="member-meta-row" id="memMetaRow">
@@ -3463,12 +3812,16 @@
                     <strong>පිං පොත App එක ස්ථාපනය කරන්න</strong>
                     <span class="pwa-badge">නොමිලේ</span>
                 </div>
-                <p class="pwa-banner-desc">දුරකථනයට පහසුවෙන් Install කර ඉක්මනින් පින්කම් සටහන් කරගන්න.</p>
+                <p class="pwa-banner-desc" id="pwaBannerDesc">දුරකථනයට පහසුවෙන් Install කර ඉක්මනින් පින්කම් සටහන් කරගන්න.</p>
+                <div id="pwaManualSteps" style="display: none; margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(245, 158, 11, 0.4); font-size: 0.74rem; color: #fde68a; line-height: 1.45;">
+                    <div>1. බ්‍රවුසරයේ ඉහළ දකුණු කෙළවරේ ඇති <strong>⋮</strong> මෙනුව ඔබන්න.</div>
+                    <div>2. <strong>"Install App"</strong> හෝ <strong>"Add to Home screen"</strong> තෝරන්න.</div>
+                </div>
             </div>
             <div class="pwa-banner-actions">
-                <button type="button" class="btn-pwa-install" onclick="triggerPWAInstall()">
+                <button type="button" class="btn-pwa-install" id="btnPwaAction" onclick="triggerPWAInstall()">
                     <i class="fa-solid fa-cloud-arrow-down"></i>
-                    <span>Install</span>
+                    <span>📲 ස්ථාපනය කරන්න</span>
                 </button>
                 <button type="button" class="btn-pwa-dismiss" onclick="dismissPWAInstallBanner()" title="පසුව">
                     <i class="fa-solid fa-xmark"></i>
@@ -3484,35 +3837,38 @@
                 <img src="assets/icon-192.png" alt="පිං පොත" class="pwa-ios-icon">
                 <div>
                     <h3 style="margin: 0; font-size: 1.05rem; font-family: var(--font-serif); color: #1e293b;">Apple iPhone / iPad වෙත ස්ථාපනය</h3>
-                    <span style="font-size: 0.72rem; color: #d97706; font-weight: 700;">පියවර 3කින් Home Screen එකට Add කරගන්න</span>
+                    <span style="font-size: 0.72rem; color: #d97706; font-weight: 700;">පියවර 2කින් Home Screen එකට Add කරගන්න</span>
                 </div>
                 <button type="button" class="modal-close-btn" onclick="closePwaIosModal()" style="margin-left: auto;">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
+            <div id="pwaIosBrowserNote" style="display: none; background: #fffbeb; border: 1px solid #fde68a; padding: 8px 12px; border-radius: 10px; margin-bottom: 14px; font-size: 0.75rem; color: #92400e; line-height: 1.4;">
+                <i class="fa-solid fa-circle-info" style="color: #d97706; margin-right: 4px;"></i>
+                <span>හොඳම ප්‍රතිඵල සඳහා Safari බ්‍රවුසරයෙන් විවෘත කරන්න.</span>
+            </div>
             <div class="pwa-ios-steps">
                 <div class="pwa-ios-step">
                     <div class="pwa-step-num">1</div>
                     <div class="pwa-step-text">
-                        Safari බ්‍රවුසරයේ පහළ ඇති <strong>Share බොත්තම (<i class="fa-solid fa-arrow-up-from-bracket" style="color: #0284c7;"></i>)</strong> ඔබන්න.
+                        පහළ ඇති <strong>Share (<i class="fa-solid fa-arrow-up-from-bracket" style="color: #0284c7;"></i> ⬆️)</strong> අයිකනය ඔබන්න.
                     </div>
                 </div>
                 <div class="pwa-ios-step">
                     <div class="pwa-step-num">2</div>
                     <div class="pwa-step-text">
-                        මෙනුවෙන් පහළට ගොස් <strong>"Add to Home Screen" (මුල් තිරයට එක් කරන්න <i class="fa-regular fa-square-plus" style="color: #d97706;"></i>)</strong> තෝරන්න.
-                    </div>
-                </div>
-                <div class="pwa-ios-step">
-                    <div class="pwa-step-num">3</div>
-                    <div class="pwa-step-text">
-                        ඉහළ දකුණු කෙළවරේ ඇති <strong>"Add"</strong> ඔබන්න. එවිට ඔබගේ iPhone එකේ App එකක් ලෙස ස්ථාපනය වේ!
+                        මෙනුවෙන් <strong>"Add to Home Screen" (<i class="fa-regular fa-square-plus" style="color: #d97706;"></i> ➕)</strong> තෝරා <strong>"Add"</strong> ඔබන්න.
                     </div>
                 </div>
             </div>
-            <button type="button" class="btn-profile-primary" onclick="closePwaIosModal()" style="width: 100%; justify-content: center; margin-top: 16px;">
-                <i class="fa-solid fa-circle-check"></i> තේරුම් ගත්තා
-            </button>
+            <div style="display: flex; gap: 8px; margin-top: 16px;">
+                <button type="button" class="btn-profile-primary" onclick="closePwaIosModal()" style="flex: 1; justify-content: center;">
+                    <i class="fa-solid fa-circle-check"></i> තේරුම් ගත්තා
+                </button>
+                <button type="button" onclick="dismissPwaIosModal24h()" class="btn-profile-secondary" style="padding: 0 16px; font-size: 0.78rem;">
+                    පසුව
+                </button>
+            </div>
         </div>
     </div>
 
@@ -3586,13 +3942,29 @@
                     </div>
                     <i class="fa-solid fa-chevron-right drawer-chevron"></i>
                 </button>
+
+                <!-- 2. Temple Artisans Directory Featured Card -->
+                <button type="button" class="drawer-item-card drawer-item-featured" onclick="closeMobileMenuDrawer(); dismissMobileMenuNewBadge(); switchTab('artisans');" style="margin-top: 8px; border-color: rgba(217, 119, 6, 0.35); background: linear-gradient(135deg, rgba(254, 243, 199, 0.45), rgba(255, 251, 235, 0.75));">
+                    <div class="drawer-item-icon-wrap" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; flex-shrink: 0; box-shadow: 0 4px 10px rgba(217, 119, 6, 0.25);">
+                        <i class="fa-solid fa-palette"></i>
+                    </div>
+                    <div class="drawer-item-content">
+                        <div class="drawer-item-title-row">
+                            <span class="drawer-item-title">විහාර නිර්මාණ හා කලා ශිල්පීන්</span>
+                            <span class="drawer-badge-emerald" style="background: linear-gradient(135deg, #d97706, #b45309);">නාමාවලිය</span>
+                            <span id="drawerArtisanNewBadge" class="drawer-new-pill-badge hidden">NEW</span>
+                        </div>
+                        <p class="drawer-item-desc">විහාර චිත්‍ර, වෙහෙර දාගැබ්, බුදු පිළිම සහ සාම්ප්‍රදායික කැටයම් ශිල්පීන් සම්බන්ධ කරගන්න</p>
+                    </div>
+                    <i class="fa-solid fa-chevron-right drawer-chevron"></i>
+                </button>
             </div>
 
             <!-- Section 2: Shortcuts & Future Features -->
             <div class="drawer-section">
                 <div class="drawer-section-title">
                     <i class="fa-solid fa-compass" style="color: #b45309;"></i>
-                    <span>පහසුකම් & සේවා</span>
+                    <span>පහසුකම් සහ සේවා</span>
                 </div>
 
                 <div class="drawer-items-list">
@@ -3657,18 +4029,18 @@
             <!-- Drawer Footer Info -->
             <div class="drawer-footer-meta">
                 <p>පිං පොත • කල්‍යාණ මිත්‍ර පුණ්‍ය ජාලය</p>
-                <span>Version 2.0.5 (Beta)</span>
+                <span>Version 2.0.5</span>
             </div>
         </div>
     </aside>
 
     <!-- Cropper.js Library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 
     <!-- html2canvas Library for WhatsApp Status & Post Card Image Generation -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=155"></script>
+    <script type="module" src="js/app.js?v=175"></script>
 </body>
 </html>
