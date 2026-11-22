@@ -567,16 +567,36 @@ function bootApp() {
   }
 }
 
-// Build clean production-ready share URLs (e.g. https://apepinpotha.lk/?a=ID or /?p=ID)
+// Build outgoing share URLs using the dedicated dynamic OG share domain (https://share.apepinpotha.lk)
 function buildCleanShareUrl(paramKey, paramValue, extraParams = {}) {
-  const origin = window.location.origin || '';
+  const SHARE_BASE_URL = 'https://share.apepinpotha.lk';
+  const cleanVal = paramValue ? String(paramValue).trim() : '';
+
+  // Outgoing post share URL: https://share.apepinpotha.lk/p/:id
+  if (paramKey === 'p' && cleanVal) {
+    const qs = extraParams && typeof extraParams === 'object' && Object.keys(extraParams).length > 0
+      ? '?' + new URLSearchParams(extraParams).toString()
+      : '';
+    return `${SHARE_BASE_URL}/p/${encodeURIComponent(cleanVal)}${qs}`;
+  }
+
+  // Outgoing artisan profile share URL: https://share.apepinpotha.lk/a/:id
+  if (paramKey === 'a' && cleanVal) {
+    const qs = extraParams && typeof extraParams === 'object' && Object.keys(extraParams).length > 0
+      ? '?' + new URLSearchParams(extraParams).toString()
+      : '';
+    return `${SHARE_BASE_URL}/a/${encodeURIComponent(cleanVal)}${qs}`;
+  }
+
+  // Fallback to origin root if type is unknown
+  const origin = window.location.origin || 'https://apepinpotha.lk';
   let path = (window.location.pathname || '/').replace(/\/index\.html?$/i, '');
   if (!path.endsWith('/')) {
     path += '/';
   }
   const params = new URLSearchParams();
-  if (paramKey && paramValue) {
-    params.set(paramKey, String(paramValue).trim());
+  if (paramKey && cleanVal) {
+    params.set(paramKey, cleanVal);
   }
   if (extraParams && typeof extraParams === 'object') {
     Object.keys(extraParams).forEach(k => {
