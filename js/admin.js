@@ -1926,15 +1926,23 @@ window.handleAdminArtisanDirectSubmit = async function(e) {
         };
 
         if (editDocId) {
-            // Strictly clear ownerUid and linking fields if ownerEmail is blank or cleared
-            if (!ownerEmail) {
-                artisanData.ownerEmail = '';
+            const existingArtisan = (typeof allVerifiedArtisans !== 'undefined' && Array.isArray(allVerifiedArtisans))
+                ? allVerifiedArtisans.find(a => (a.docId || a.id) === editDocId)
+                : null;
+            const existingEmail = (existingArtisan?.ownerEmail || existingArtisan?.submittedByEmail || '').trim().toLowerCase();
+            const newEmail = ownerEmail.trim().toLowerCase();
+
+            // When ownerEmail has changed, is empty, or previously held admin UID, explicitly reset ownerUid and userId
+            if (!newEmail || newEmail !== existingEmail || (currentAdminUser && existingArtisan?.ownerUid === currentAdminUser.uid)) {
                 artisanData.ownerUid = '';
                 artisanData.userId = '';
                 artisanData.submittedByUid = '';
-                artisanData.submittedByEmail = '';
+                artisanData.submittedByEmail = ownerEmail;
             }
             await setDoc(doc(db, COLLECTIONS.ARTISANS || 'temple_artisans', editDocId), artisanData, { merge: true });
+            if (existingArtisan) {
+                Object.assign(existingArtisan, artisanData);
+            }
             await recordAuditLog('Artisan Updated', `Updated artisan "${name}" (ID: ${editDocId}).`);
             alert(`"${name}" තොරතුරු සාර්ථකව යාවත්කාලීන විය!`);
         } else {

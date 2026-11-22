@@ -2928,15 +2928,20 @@ function findUserArtisanListing(userOrMember) {
   const targetEmail = userOrMember.email ? String(userOrMember.email).trim().toLowerCase() : '';
   return verifiedList.find(a => {
     if (!a) return false;
+    const artisanEmail = (a.ownerEmail || a.submittedByEmail || '').trim().toLowerCase();
+
+    // Prioritize explicit owner email - do NOT match stale UIDs when owner email is set
+    if (artisanEmail) {
+      return Boolean(targetEmail && artisanEmail === targetEmail);
+    }
+
+    // Fall back to UIDs strictly when artisan owner email is empty/missing
     if (targetUid) {
       if (a.ownerUid && String(a.ownerUid).trim() === targetUid) return true;
       if (a.userId && String(a.userId).trim() === targetUid) return true;
       if (a.submittedByUid && String(a.submittedByUid).trim() === targetUid) return true;
     }
-    if (targetEmail) {
-      if (a.ownerEmail && String(a.ownerEmail).trim().toLowerCase() === targetEmail) return true;
-      if (a.submittedByEmail && String(a.submittedByEmail).trim().toLowerCase() === targetEmail) return true;
-    }
+
     return false;
   }) || null;
 }
@@ -10842,7 +10847,7 @@ function initPWAEngine() {
   );
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v173';
+  const ACTIVE_BUILD = 'v174';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
@@ -10858,7 +10863,7 @@ function initPWAEngine() {
 
   // Register Service Worker safely
   if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-    const swUrl = './sw.js?v=173';
+    const swUrl = './sw.js?v=174';
     const registerWorker = () => {
       navigator.serviceWorker.register(swUrl, { updateViaCache: 'none' })
         .then((registration) => {
@@ -12420,14 +12425,23 @@ function checkIsArtisanOwner(artisan) {
   const currentUser = StorageService.currentUser;
   if (!currentUser) return false;
   if (typeof StorageService.isMasterAdmin === 'function' && StorageService.isMasterAdmin()) return true;
-  if (artisan.ownerUid && artisan.ownerUid === currentUser.uid) return true;
-  if (artisan.submittedByUid && artisan.submittedByUid === currentUser.uid) return true;
-  if (artisan.userId && artisan.userId === currentUser.uid) return true;
+
+  const artisanEmail = (artisan.ownerEmail || artisan.submittedByEmail || '').trim().toLowerCase();
   const userEmail = (currentUser.email || '').trim().toLowerCase();
-  if (userEmail) {
-    if (artisan.ownerEmail && artisan.ownerEmail.trim().toLowerCase() === userEmail) return true;
-    if (artisan.submittedByEmail && artisan.submittedByEmail.trim().toLowerCase() === userEmail) return true;
+  const userUid = currentUser.uid ? String(currentUser.uid).trim() : '';
+
+  // Prioritize explicit owner email - match strictly by email
+  if (artisanEmail) {
+    return Boolean(userEmail && artisanEmail === userEmail);
   }
+
+  // Fall back to UIDs strictly when artisan owner email is empty/missing
+  if (userUid) {
+    if (artisan.ownerUid && String(artisan.ownerUid).trim() === userUid) return true;
+    if (artisan.userId && String(artisan.userId).trim() === userUid) return true;
+    if (artisan.submittedByUid && String(artisan.submittedByUid).trim() === userUid) return true;
+  }
+
   return false;
 }
 
