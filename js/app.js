@@ -10909,13 +10909,14 @@ function initPWAEngine() {
   );
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v175';
+  const ACTIVE_BUILD = 'v176';
+  const CURRENT_CACHE_NAME = 'pin-potha-cache-v176-live';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
       caches.keys().then((names) => {
         names.forEach((name) => {
-          if (name !== 'pin-potha-cache-' + ACTIVE_BUILD) {
+          if (name !== CURRENT_CACHE_NAME) {
             caches.delete(name);
           }
         });
@@ -10925,7 +10926,7 @@ function initPWAEngine() {
 
   // Register Service Worker safely
   if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-    const swUrl = './sw.js?v=175';
+    const swUrl = './sw.js?v=176';
     const registerWorker = () => {
       navigator.serviceWorker.register(swUrl, { updateViaCache: 'none' })
         .then((registration) => {
