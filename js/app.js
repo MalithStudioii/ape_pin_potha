@@ -13005,16 +13005,17 @@ window.copyArtisanProfileLink = function(artisanId, artisanName) {
   const shareUrl = buildCleanShareUrl('a', artisanId);
 
   const shareTitle = `🏛️ ${name} — ${role} ${district}`;
-  const shareText = `🏛️ ${name} — ${role} ${district}${specialties}\n\n🙏 අපේ පිං පොත විහාර කලා හා පෙරහැර ශිල්පී නාමාවලිය ඔස්සේ සම්පූර්ණ පැතිකඩ සහ නිර්මාණ එකතුව (Portfolio) දැකබලා ගැනීමට:\n👉 ${shareUrl}`;
+  const shareBody = `🏛️ ${name} — ${role} ${district}${specialties}\n\n🙏 අපේ පිං පොත විහාර කලා හා පෙරහැර ශිල්පී නාමාවලිය ඔස්සේ සම්පූර්ණ පැතිකඩ සහ නිර්මාණ එකතුව (Portfolio) දැකබලා ගැනීමට:`;
 
   if (navigator.share) {
     navigator.share({
       title: shareTitle,
-      text: shareText,
+      text: shareBody,
       url: shareUrl
     }).catch(() => {});
   } else if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(shareText).then(() => {
+    const fullShareText = `${shareBody}\n👉 ${shareUrl}`;
+    navigator.clipboard.writeText(fullShareText).then(() => {
       if (typeof showCustomToast === 'function') {
         showCustomToast("පැතිකඩ සබැඳිය සාර්ථකව පිටපත් විය! 📋", "success");
       } else {
