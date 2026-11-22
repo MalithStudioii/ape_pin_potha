@@ -51,7 +51,7 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=165">
+    <link rel="stylesheet" href="css/styles.css?v=166">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
@@ -227,6 +227,7 @@
                 <!-- Mobile 3-Lines Hamburger Menu Button (To the right of profile) -->
                 <button type="button" id="headerMenuBtn" class="header-icon-btn header-menu-btn" onclick="toggleMobileMenuDrawer()" title="මෙනුව (Menu)" aria-label="මෙනුව">
                     <i class="fa-solid fa-bars"></i>
+                    <span id="menuNewBadge" class="menu-new-badge hidden">NEW</span>
                 </button>
             </div>
         </div>
@@ -551,6 +552,7 @@
                             <i class="fa-solid fa-circle-check"></i>
                             <span>Google සත්‍යාපිත කල්‍යාණ මිත්‍ර</span>
                         </span>
+                        <div id="profArtisanBadgeWrap" class="member-artisan-badge-wrap hidden" style="display: none;"></div>
                     </div>
                     <p class="profile-dhamma-bio" id="profDhammaBio">
                         "සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏"
@@ -1415,7 +1417,7 @@
                         </div>
                         <h4 style="margin: 0 0 2px; font-size: 1rem; font-weight: 800; background: linear-gradient(135deg, #0284c7, #059669); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">NexiaProLanka</h4>
                         <p style="margin: 0; font-size: 0.74rem; color: #64748b; line-height: 1.4;">
-                            සංකල්පය, සැලසුම්කරණය සහ තාක්ෂණික දායකත්වය • Digital Initiative • Version 2.0.5 (Beta)
+                            සංකල්පය, සැලසුම්කරණය සහ තාක්ෂණික දායකත්වය • Digital Initiative • Version 2.0.5
                         </p>
                     </div>
                 </div>
@@ -1859,7 +1861,15 @@
     <div id="artisanProfileModal" class="modal-overlay hidden" onclick="if(event.target === this) closeArtisanProfileModal()">
         <div class="modal-box artisan-profile-modal-box">
             <!-- Modal Cover with Close Button -->
-            <div class="artisan-profile-modal-cover">
+            <div id="artisanProfileModalCover" class="artisan-profile-modal-cover">
+                <img id="artisanProfileCoverImg" class="artisan-profile-cover-img hidden" src="" alt="Cover Banner">
+                <div class="artisan-profile-cover-overlay"></div>
+                <div id="artisanCoverEditBtnWrap" class="artisan-cover-edit-wrap hidden" style="display: none;">
+                    <button type="button" class="btn-artisan-cover-edit" onclick="triggerArtisanCoverUpload()" title="කවරයේ ඡායාරූපය වෙනස් කරන්න">
+                        <i class="fa-solid fa-camera"></i> <span>කවරය වෙනස් කරන්න</span>
+                    </button>
+                    <input type="file" id="artisanCoverFileInput" accept="image/*" class="hidden" style="display: none;" onchange="handleArtisanCoverFileChange(this)">
+                </div>
                 <button type="button" onclick="closeArtisanProfileModal()" class="modal-close-btn artisan-profile-close-btn" title="වසන්න">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
@@ -3172,6 +3182,7 @@
                                 <i class="fa-solid fa-circle-check"></i>
                                 <span>Google සත්‍යාපිත කල්‍යාණ මිත්‍ර</span>
                             </span>
+                            <div id="memArtisanBadgeWrap" class="member-artisan-badge-wrap hidden" style="display: none;"></div>
                         </div>
                         <p class="member-bio-text" id="memBio">"සබ්බපාපස්ස අකරණං - කුසලස්ස උපසම්පදා 🙏"</p>
                         <div class="member-meta-row" id="memMetaRow">
@@ -3880,7 +3891,7 @@
                 </button>
 
                 <!-- 2. Temple Artisans Directory Featured Card -->
-                <button type="button" class="drawer-item-card drawer-item-featured" onclick="closeMobileMenuDrawer(); switchTab('artisans');" style="margin-top: 8px; border-color: rgba(217, 119, 6, 0.35); background: linear-gradient(135deg, rgba(254, 243, 199, 0.45), rgba(255, 251, 235, 0.75));">
+                <button type="button" class="drawer-item-card drawer-item-featured" onclick="closeMobileMenuDrawer(); dismissMobileMenuNewBadge(); switchTab('artisans');" style="margin-top: 8px; border-color: rgba(217, 119, 6, 0.35); background: linear-gradient(135deg, rgba(254, 243, 199, 0.45), rgba(255, 251, 235, 0.75));">
                     <div class="drawer-item-icon-wrap" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; flex-shrink: 0; box-shadow: 0 4px 10px rgba(217, 119, 6, 0.25);">
                         <i class="fa-solid fa-palette"></i>
                     </div>
@@ -3888,6 +3899,7 @@
                         <div class="drawer-item-title-row">
                             <span class="drawer-item-title">විහාර නිර්මාණ හා කලා ශිල්පීන්</span>
                             <span class="drawer-badge-emerald" style="background: linear-gradient(135deg, #d97706, #b45309);">නාමාවලිය</span>
+                            <span id="drawerArtisanNewBadge" class="drawer-new-pill-badge hidden">NEW</span>
                         </div>
                         <p class="drawer-item-desc">විහාර චිත්‍ර, වෙහෙර දාගැබ්, බුදු පිළිම සහ සාම්ප්‍රදායික කැටයම් ශිල්පීන් සම්බන්ධ කරගන්න</p>
                     </div>
@@ -3964,7 +3976,7 @@
             <!-- Drawer Footer Info -->
             <div class="drawer-footer-meta">
                 <p>පිං පොත • කල්‍යාණ මිත්‍ර පුණ්‍ය ජාලය</p>
-                <span>Version 2.0.5 (Beta)</span>
+                <span>Version 2.0.5</span>
             </div>
         </div>
     </aside>
@@ -3976,6 +3988,6 @@
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=171"></script>
+    <script type="module" src="js/app.js?v=172"></script>
 </body>
 </html>

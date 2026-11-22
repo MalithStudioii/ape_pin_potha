@@ -1579,6 +1579,7 @@ window.adminApproveArtisan = async function(appId) {
             notableTemples: app.notableTemples || '',
             bio: app.bio || '',
             photo: app.photo || '',
+            bannerUrl: app.bannerUrl || app.coverImage || '',
             portfolioImages: app.portfolioImages || [],
             wildlifeLicenseNumber: app.wildlifeLicenseNumber || '',
             wildlifeLicenseImage: app.wildlifeLicenseImage || '',
@@ -1754,6 +1755,7 @@ window.adminEditArtisan = function(docId) {
     const tempInp = document.getElementById('adminArtisanTemples');
     const bioInp = document.getElementById('adminArtisanBio');
     const photoInp = document.getElementById('adminArtisanPhotoUrl');
+    const bannerInp = document.getElementById('adminArtisanBannerUrl');
     const portInp = document.getElementById('adminArtisanPortfolioUrls');
     const islandInp = document.getElementById('adminArtisanIslandWide');
     const licenseNumInp = document.getElementById('adminArtisanWildlifeLicenseNum');
@@ -1775,6 +1777,7 @@ window.adminEditArtisan = function(docId) {
     if (tempInp) tempInp.value = item.notableTemples || '';
     if (bioInp) bioInp.value = item.bio || '';
     if (photoInp) photoInp.value = item.photo || '';
+    if (bannerInp) bannerInp.value = item.bannerUrl || item.coverImage || '';
     if (portInp) portInp.value = (item.portfolioImages || []).join(', ');
     if (islandInp) islandInp.checked = Boolean(item.islandWide);
     if (licenseNumInp) licenseNumInp.value = item.wildlifeLicenseNumber || '';
@@ -1840,6 +1843,7 @@ window.handleAdminArtisanDirectSubmit = async function(e) {
     const notableTemples = (document.getElementById('adminArtisanTemples')?.value || '').trim();
     const bio = (document.getElementById('adminArtisanBio')?.value || '').trim();
     let photoUrl = (document.getElementById('adminArtisanPhotoUrl')?.value || '').trim();
+    let bannerUrl = (document.getElementById('adminArtisanBannerUrl')?.value || '').trim();
     const portUrlsRaw = (document.getElementById('adminArtisanPortfolioUrls')?.value || '').trim();
     const ownerEmail = (document.getElementById('adminArtisanOwnerEmail')?.value || '').trim();
     const islandWide = Boolean(document.getElementById('adminArtisanIslandWide')?.checked);
@@ -1847,6 +1851,7 @@ window.handleAdminArtisanDirectSubmit = async function(e) {
     let wildlifeLicenseUrl = (document.getElementById('adminArtisanWildlifeLicenseUrl')?.value || '').trim();
 
     const photoFileInput = document.getElementById('adminArtisanPhotoFile');
+    const bannerFileInput = document.getElementById('adminArtisanBannerFile');
     const portFilesInput = document.getElementById('adminArtisanPortfolioFiles');
     const licenseFileInput = document.getElementById('adminArtisanWildlifeLicenseFile');
     const submitBtn = document.getElementById('btnAdminSaveArtisan');
@@ -1869,8 +1874,15 @@ window.handleAdminArtisanDirectSubmit = async function(e) {
         // Upload photo file if provided
         if (photoFileInput && photoFileInput.files && photoFileInput.files[0]) {
             if (btnText) btnText.textContent = "ප්‍රොෆයිල් ඡායාරූපය උඩුගත කෙරේ...";
-            const uploadedPhoto = await uploadToImgBB(photoFileInput.files[0], `admin_artisan_${Date.now()}`);
+            const uploadedPhoto = await uploadToCloudinary(photoFileInput.files[0], `admin_artisan_${Date.now()}`);
             if (uploadedPhoto) photoUrl = uploadedPhoto;
+        }
+
+        // Upload banner file if provided
+        if (bannerFileInput && bannerFileInput.files && bannerFileInput.files[0]) {
+            if (btnText) btnText.textContent = "කවර ඡායාරූපය උඩුගත කෙරේ...";
+            const uploadedBanner = await uploadToCloudinary(bannerFileInput.files[0], `admin_banner_${Date.now()}`);
+            if (uploadedBanner) bannerUrl = uploadedBanner;
         }
 
         // Upload portfolio files if provided
@@ -1904,6 +1916,7 @@ window.handleAdminArtisanDirectSubmit = async function(e) {
             notableTemples,
             bio,
             photo: photoUrl || '',
+            bannerUrl: bannerUrl || '',
             portfolioImages: portfolioImages.slice(0, 15),
             wildlifeLicenseNumber: wildlifeLicenseNumber || '',
             wildlifeLicenseImage: wildlifeLicenseUrl || '',

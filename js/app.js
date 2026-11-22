@@ -272,6 +272,7 @@ function bootApp() {
   try {
     try { initSmartHeaderScroll(); } catch (e) {}
     try { initMobileBottomBarLock(); } catch (e) {}
+    try { initFeatureDiscoveryBadge(); } catch (e) {}
 
     // 1. INSTANT ZERO-LATENCY PAINT:
     // Render immediately from localStorage/seed so users see the feed instantaneously in <50ms!
@@ -1207,6 +1208,38 @@ currentViewingMember = member;
     } else {
       badgeEl.className = 'verified-pill';
       badgeEl.innerHTML = `<i class="fa-solid fa-seedling"></i> <span>පිංවත් සාමාජික</span>`;
+    }
+  }
+
+  // Verified Artisan Badge on Member Profile Modal
+  const memArtisanWrap = document.getElementById('memArtisanBadgeWrap');
+  if (memArtisanWrap) {
+    const matchedArtisan = findUserArtisanListing(member);
+    if (matchedArtisan) {
+      const isPerahera = matchedArtisan.section === 'perahera_culture';
+      const badgeIcon = isPerahera ? '🥁' : '🎨';
+      const badgeText = isPerahera ? 'සත්‍යාපිත පෙරහැර කලා ශිල්පී' : 'සත්‍යාපිත විහාර කලා ශිල්පී';
+      const pillClass = isPerahera ? 'pill-perahera' : 'pill-temple';
+      const artId = matchedArtisan.id || matchedArtisan.docId || '';
+
+      memArtisanWrap.innerHTML = `
+        <div class="artisan-member-pill-group">
+          <span class="member-artisan-pill ${pillClass}">
+            <span>${badgeIcon}</span>
+            <span>${badgeText}</span>
+          </span>
+          <button type="button" class="btn-view-artisan-profile-link" onclick="openArtisanProfileModal('${artId}')" title="ශිල්පී පැතිකඩ බලන්න">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+            <span>ශිල්පී පැතිකඩ</span>
+          </button>
+        </div>
+      `;
+      memArtisanWrap.classList.remove('hidden');
+      memArtisanWrap.style.display = 'inline-flex';
+    } else {
+      memArtisanWrap.innerHTML = '';
+      memArtisanWrap.classList.add('hidden');
+      memArtisanWrap.style.display = 'none';
     }
   }
 
@@ -2884,6 +2917,28 @@ function getVerifiedArtisansList() {
     }
   } catch (e) {}
   return [];
+}
+
+// Matches user or member profile to an approved artisan listing
+function findUserArtisanListing(userOrMember) {
+  if (!userOrMember) return null;
+  const verifiedList = getVerifiedArtisansList();
+  if (!Array.isArray(verifiedList) || verifiedList.length === 0) return null;
+  const targetUid = userOrMember.uid ? String(userOrMember.uid).trim() : '';
+  const targetEmail = userOrMember.email ? String(userOrMember.email).trim().toLowerCase() : '';
+  return verifiedList.find(a => {
+    if (!a) return false;
+    if (targetUid) {
+      if (a.ownerUid && String(a.ownerUid).trim() === targetUid) return true;
+      if (a.userId && String(a.userId).trim() === targetUid) return true;
+      if (a.submittedByUid && String(a.submittedByUid).trim() === targetUid) return true;
+    }
+    if (targetEmail) {
+      if (a.ownerEmail && String(a.ownerEmail).trim().toLowerCase() === targetEmail) return true;
+      if (a.submittedByEmail && String(a.submittedByEmail).trim().toLowerCase() === targetEmail) return true;
+    }
+    return false;
+  }) || null;
 }
 
 function renderFeedArtisanSpotlightHTML(verifiedArtisans) {
@@ -7045,6 +7100,38 @@ function renderProfileView() {
     }
   }
 
+  // Verified Artisan Badge on Own Profile View
+  const profArtisanWrap = document.getElementById('profArtisanBadgeWrap');
+  if (profArtisanWrap) {
+    const matchedArtisan = findUserArtisanListing(user);
+    if (matchedArtisan) {
+      const isPerahera = matchedArtisan.section === 'perahera_culture';
+      const badgeIcon = isPerahera ? '🥁' : '🎨';
+      const badgeText = isPerahera ? 'සත්‍යාපිත පෙරහැර කලා ශිල්පී' : 'සත්‍යාපිත විහාර කලා ශිල්පී';
+      const pillClass = isPerahera ? 'pill-perahera' : 'pill-temple';
+      const artId = matchedArtisan.id || matchedArtisan.docId || '';
+
+      profArtisanWrap.innerHTML = `
+        <div class="artisan-member-pill-group">
+          <span class="member-artisan-pill ${pillClass}">
+            <span>${badgeIcon}</span>
+            <span>${badgeText}</span>
+          </span>
+          <button type="button" class="btn-view-artisan-profile-link" onclick="openArtisanProfileModal('${artId}')" title="ශිල්පී පැතිකඩ බලන්න">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+            <span>ශිල්පී පැතිකඩ</span>
+          </button>
+        </div>
+      `;
+      profArtisanWrap.classList.remove('hidden');
+      profArtisanWrap.style.display = 'inline-flex';
+    } else {
+      profArtisanWrap.innerHTML = '';
+      profArtisanWrap.classList.add('hidden');
+      profArtisanWrap.style.display = 'none';
+    }
+  }
+
   // Profile Admin Dashboard Quick Jump Button
   const profAdminBtn = document.getElementById('profAdminDashboardBtn');
   const profAdminIcon = document.getElementById('profAdminDashboardIcon');
@@ -10755,7 +10842,7 @@ function initPWAEngine() {
   );
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v171';
+  const ACTIVE_BUILD = 'v172';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
@@ -10771,7 +10858,7 @@ function initPWAEngine() {
 
   // Register Service Worker safely
   if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-    const swUrl = './sw.js?v=171';
+    const swUrl = './sw.js?v=172';
     const registerWorker = () => {
       navigator.serviceWorker.register(swUrl, { updateViaCache: 'none' })
         .then((registration) => {
@@ -11219,6 +11306,70 @@ export function toggleMobileMenuDrawer() {
   }
 }
 window.toggleMobileMenuDrawer = toggleMobileMenuDrawer;
+
+// ============================================================================
+// Mobile Menu 24-Hour "NEW" Badge Feature Discovery
+// ============================================================================
+export function initFeatureDiscoveryBadge() {
+  try {
+    const key = 'pinpotha_new_badge_v21_first_seen';
+    const dismissedKey = 'pinpotha_new_badge_v21_dismissed';
+    if (localStorage.getItem(dismissedKey) === 'true') {
+      hideFeatureDiscoveryBadges();
+      return;
+    }
+    const rawFirstSeen = localStorage.getItem(key);
+    const now = Date.now();
+    if (!rawFirstSeen) {
+      localStorage.setItem(key, String(now));
+      showFeatureDiscoveryBadges();
+    } else {
+      const elapsed = now - parseInt(rawFirstSeen, 10);
+      const DURATION_24H = 24 * 60 * 60 * 1000;
+      if (elapsed < DURATION_24H) {
+        showFeatureDiscoveryBadges();
+      } else {
+        hideFeatureDiscoveryBadges();
+      }
+    }
+  } catch (e) {
+    console.warn('[DiscoveryBadge] Error checking badge status:', e);
+  }
+}
+
+export function showFeatureDiscoveryBadges() {
+  const menuBadge = document.getElementById('menuNewBadge');
+  const drawerBadge = document.getElementById('drawerArtisanNewBadge');
+  if (menuBadge) {
+    menuBadge.classList.remove('hidden');
+    menuBadge.style.display = 'inline-flex';
+  }
+  if (drawerBadge) {
+    drawerBadge.classList.remove('hidden');
+    drawerBadge.style.display = 'inline-flex';
+  }
+}
+
+export function hideFeatureDiscoveryBadges() {
+  const menuBadge = document.getElementById('menuNewBadge');
+  const drawerBadge = document.getElementById('drawerArtisanNewBadge');
+  if (menuBadge) {
+    menuBadge.classList.add('hidden');
+    menuBadge.style.display = 'none';
+  }
+  if (drawerBadge) {
+    drawerBadge.classList.add('hidden');
+    drawerBadge.style.display = 'none';
+  }
+}
+
+export function dismissMobileMenuNewBadge() {
+  try {
+    localStorage.setItem('pinpotha_new_badge_v21_dismissed', 'true');
+  } catch (e) {}
+  hideFeatureDiscoveryBadges();
+}
+window.dismissMobileMenuNewBadge = dismissMobileMenuNewBadge;
 
 // Keyboard Escape listener to dismiss drawer & modals
 document.addEventListener('keydown', (e) => {
@@ -12280,8 +12431,11 @@ function checkIsArtisanOwner(artisan) {
   return false;
 }
 
+let currentArtisanProfileId = null;
+
 window.openArtisanProfileModal = async function(artisanId) {
   triggerHaptic(12);
+  currentArtisanProfileId = artisanId;
   let artisan = (allArtisansList || []).find(a => (a.id || a.docId) === artisanId);
   if (!artisan && typeof StorageService.getTempleArtisansList === 'function') {
     try {
@@ -12318,10 +12472,36 @@ function renderArtisanProfileModal(artisan) {
   if (!container || !artisan) return;
 
   const artisanId = artisan.id || artisan.docId || '';
+  currentArtisanProfileId = artisanId;
   const isOwner = checkIsArtisanOwner(artisan);
   const isPerahera = artisan.section === 'perahera_culture';
   const fallbackAvatar = isPerahera ? '🥁' : '🎨';
   const isElephantProvider = Array.isArray(artisan.specialties) && artisan.specialties.includes('අලි ඇතුන් සපයන්නන්');
+
+  // Update Cover Banner image and Edit button
+  const coverImg = document.getElementById('artisanProfileCoverImg');
+  const coverEditWrap = document.getElementById('artisanCoverEditBtnWrap');
+  const bannerUrl = artisan.bannerUrl || artisan.coverImage || '';
+  if (coverImg) {
+    if (bannerUrl) {
+      coverImg.src = bannerUrl;
+      coverImg.classList.remove('hidden');
+      coverImg.style.display = 'block';
+    } else {
+      coverImg.src = '';
+      coverImg.classList.add('hidden');
+      coverImg.style.display = 'none';
+    }
+  }
+  if (coverEditWrap) {
+    if (isOwner) {
+      coverEditWrap.classList.remove('hidden');
+      coverEditWrap.style.display = 'block';
+    } else {
+      coverEditWrap.classList.add('hidden');
+      coverEditWrap.style.display = 'none';
+    }
+  }
 
   const rawPhone = artisan.phone || '';
   const cleanTel = rawPhone.replace(/[^0-9]/g, '');
@@ -12346,6 +12526,12 @@ function renderArtisanProfileModal(artisan) {
         ` : `
           <span>${fallbackAvatar}</span>
         `}
+        ${isOwner ? `
+          <button type="button" class="btn-artisan-avatar-edit" onclick="triggerArtisanAvatarUpload()" title="පැතිකඩ ඡායාරූපය වෙනස් කරන්න">
+            <i class="fa-solid fa-camera"></i>
+          </button>
+          <input type="file" id="artisanAvatarFileInput" accept="image/*" class="hidden" style="display: none;" onchange="handleArtisanAvatarFileChange(this)">
+        ` : ''}
       </div>
       <div class="artisan-profile-details">
         <div class="artisan-profile-badges-row">
@@ -12690,6 +12876,202 @@ window.copyArtisanProfileLink = function(artisanId, artisanName) {
         alert("පැතිකඩ ලින්ක් එක කොපි විය! 📋");
       }
     }).catch(() => {});
+  }
+};
+
+// ============================================================================
+// Artisan Cover Banner & Avatar Self-Service Upload
+// ============================================================================
+
+function compressBannerImage(file, maxWidth = 1200, quality = 0.85) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const img = new Image();
+      img.onload = function() {
+        let w = img.width;
+        let h = img.height;
+        if (w > maxWidth) {
+          h = Math.round((h * maxWidth) / w);
+          w = maxWidth;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, w, h);
+        try {
+          resolve(canvas.toDataURL('image/webp', quality));
+        } catch (err) {
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        }
+      };
+      img.onerror = () => resolve(null);
+      img.src = e.target.result;
+    };
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
+  });
+}
+
+function compressSquareAvatar(file, size = 400, quality = 0.88) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const img = new Image();
+      img.onload = function() {
+        const minDim = Math.min(img.width, img.height);
+        const sx = Math.floor((img.width - minDim) / 2);
+        const sy = Math.floor((img.height - minDim) / 2);
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, size, size);
+        try {
+          resolve(canvas.toDataURL('image/webp', quality));
+        } catch (err) {
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        }
+      };
+      img.onerror = () => resolve(null);
+      img.src = e.target.result;
+    };
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
+  });
+}
+
+window.triggerArtisanCoverUpload = function() {
+  const input = document.getElementById('artisanCoverFileInput');
+  if (input) input.click();
+};
+
+window.handleArtisanCoverFileChange = async function(input) {
+  if (!input || !input.files || input.files.length === 0) return;
+  const file = input.files[0];
+  const artisanId = currentArtisanProfileId;
+  const artisan = (allArtisansList || []).find(a => (a.id || a.docId) === artisanId);
+  if (!artisan || !checkIsArtisanOwner(artisan)) {
+    alert("මෙම පැතිකඩෙහි කවරය වෙනස් කිරීමට ඔබට අවසර නොමැත.");
+    return;
+  }
+
+  const editBtn = document.querySelector('.btn-artisan-cover-edit');
+  const originalHtml = editBtn ? editBtn.innerHTML : '';
+  if (editBtn) {
+    editBtn.disabled = true;
+    editBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>උඩුගත වෙමින් පවතී...</span>`;
+  }
+
+  try {
+    triggerHaptic(12);
+    let payload = file;
+    try {
+      const compressed = await compressBannerImage(file);
+      if (compressed) payload = compressed;
+    } catch (e) {
+      console.warn('[Artisan] Cover compression fallback:', e);
+    }
+
+    const cloudUrl = await uploadToCloudinary(payload, `artisan_banner_${artisanId}_${Date.now()}`);
+    if (!cloudUrl || !cloudUrl.startsWith('http')) {
+      throw new Error("කවරයේ ඡායාරූපය උඩුගත කිරීම අසාර්ථක විය.");
+    }
+
+    await StorageService.updateArtisan(artisanId, { bannerUrl: cloudUrl });
+
+    artisan.bannerUrl = cloudUrl;
+    const cacheIdx = (allArtisansList || []).findIndex(a => (a.id || a.docId) === artisanId);
+    if (cacheIdx !== -1) {
+      allArtisansList[cacheIdx].bannerUrl = cloudUrl;
+    }
+    try {
+      localStorage.removeItem('pinPotha_artisans_cache');
+    } catch (e) {}
+
+    renderArtisanProfileModal(artisan);
+    if (typeof showCustomToast === 'function') {
+      showCustomToast("කවරයේ ඡායාරූපය සාර්ථකව යාවත්කාලීන විය! 🙏", "success");
+    }
+  } catch (err) {
+    console.error('[Artisan] Cover upload failed:', err);
+    alert("කවරයේ ඡායාරූපය උඩුගත කිරීම අසාර්ථක විය: " + (err.message || 'නැවත උත්සාහ කරන්න.'));
+  } finally {
+    if (editBtn) {
+      editBtn.disabled = false;
+      editBtn.innerHTML = originalHtml || `<i class="fa-solid fa-camera"></i> <span>කවරය වෙනස් කරන්න</span>`;
+    }
+    input.value = '';
+  }
+};
+
+window.triggerArtisanAvatarUpload = function() {
+  const input = document.getElementById('artisanAvatarFileInput');
+  if (input) input.click();
+};
+
+window.handleArtisanAvatarFileChange = async function(input) {
+  if (!input || !input.files || input.files.length === 0) return;
+  const file = input.files[0];
+  const artisanId = currentArtisanProfileId;
+  const artisan = (allArtisansList || []).find(a => (a.id || a.docId) === artisanId);
+  if (!artisan || !checkIsArtisanOwner(artisan)) {
+    alert("මෙම පැතිකඩෙහි ඡායාරූපය වෙනස් කිරීමට ඔබට අවසර නොමැත.");
+    return;
+  }
+
+  const avatarBtn = document.querySelector('.btn-artisan-avatar-edit');
+  const originalHtml = avatarBtn ? avatarBtn.innerHTML : '';
+  if (avatarBtn) {
+    avatarBtn.disabled = true;
+    avatarBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>`;
+  }
+
+  try {
+    triggerHaptic(12);
+    let payload = file;
+    try {
+      const compressed = await compressSquareAvatar(file);
+      if (compressed) payload = compressed;
+    } catch (e) {
+      console.warn('[Artisan] Avatar compression fallback:', e);
+    }
+
+    const cloudUrl = await uploadToCloudinary(payload, `artisan_avatar_${artisanId}_${Date.now()}`);
+    if (!cloudUrl || !cloudUrl.startsWith('http')) {
+      throw new Error("පැතිකඩ ඡායාරූපය උඩුගත කිරීම අසාර්ථක විය.");
+    }
+
+    await StorageService.updateArtisan(artisanId, { photo: cloudUrl });
+
+    artisan.photo = cloudUrl;
+    const cacheIdx = (allArtisansList || []).findIndex(a => (a.id || a.docId) === artisanId);
+    if (cacheIdx !== -1) {
+      allArtisansList[cacheIdx].photo = cloudUrl;
+    }
+    try {
+      localStorage.removeItem('pinPotha_artisans_cache');
+    } catch (e) {}
+
+    renderArtisanProfileModal(artisan);
+    renderArtisansDirectoryView();
+    if (typeof showCustomToast === 'function') {
+      showCustomToast("පැතිකඩ ඡායාරූපය සාර්ථකව යාවත්කාලීන විය! 🙏", "success");
+    }
+  } catch (err) {
+    console.error('[Artisan] Avatar upload failed:', err);
+    alert("පැතිකඩ ඡායාරූපය උඩුගත කිරීම අසාර්ථක විය: " + (err.message || 'නැවත උත්සාහ කරන්න.'));
+  } finally {
+    if (avatarBtn) {
+      avatarBtn.disabled = false;
+      avatarBtn.innerHTML = originalHtml || `<i class="fa-solid fa-camera"></i>`;
+    }
+    input.value = '';
   }
 };
 
