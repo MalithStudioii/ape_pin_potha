@@ -225,6 +225,7 @@ let activeProfileSubTab = 'timeline';
 let currentNotifications = [];
 let activeNotifFilter = 'all';
 let currentFeedSort = 'trending';
+let allArtisansList = [];
 
 window.setFeedSort = function(sortMode) {
   triggerHaptic(15);
@@ -277,6 +278,17 @@ function bootApp() {
       StorageService.purgeDummyPostsFromStorage();
     } catch (e) {}
 
+    // Initialize cached artisans synchronously for fast spotlight render
+    try {
+      const cachedArtisans = localStorage.getItem('pinPotha_artisans_cache');
+      if (cachedArtisans) {
+        const parsed = JSON.parse(cachedArtisans);
+        if (parsed && Array.isArray(parsed.data) && parsed.data.length > 0) {
+          allArtisansList = parsed.data;
+        }
+      }
+    } catch (e) {}
+
     currentPostsData = (StorageService.getLocalPosts() || []).filter(p => !StorageService.isDummyTestPost || !StorageService.isDummyTestPost(p));
     window.currentPostsData = currentPostsData;
 
@@ -311,6 +323,24 @@ function bootApp() {
     } catch (e) {
       console.warn('[App] renderPoyaUI error caught safely:', e);
     }
+
+    // Warm / refresh artisans cache in background (respects 15-min TTL)
+    try {
+      if (typeof StorageService.getTempleArtisansList === 'function') {
+        StorageService.getTempleArtisansList().then(list => {
+          if (Array.isArray(list) && list.length > 0) {
+            const prevCount = (allArtisansList || []).length;
+            allArtisansList = list;
+            if (prevCount === 0 && activeTab === 'feed' && !document.getElementById('searchInput')?.value?.trim() && activeCategory === 'සියල්ල') {
+              const spotlightEl = document.getElementById('feedArtisansSpotlight');
+              if (!spotlightEl) {
+                renderFeed();
+              }
+            }
+          }
+        }).catch(() => {});
+      }
+    } catch (e) {}
 
     // Subscribe to real-time database updates with 150ms debounce to prevent multiple consecutive DOM repaints on boot
     let postUpdateDebounceTimer = null;
@@ -2847,6 +2877,118 @@ function updateFeedInPlace(posts) {
   });
 }
 
+// ============================================================================
+// Verified Artisans Spotlight Strip for Merit Feed
+// ============================================================================
+
+function getVerifiedArtisansList() {
+  if (Array.isArray(allArtisansList) && allArtisansList.length > 0) {
+    return allArtisansList.filter(a => a && a.isVerified !== false && a.status !== 'rejected');
+  }
+  try {
+    const raw = localStorage.getItem('pinPotha_artisans_cache');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && Array.isArray(parsed.data) && parsed.data.length > 0) {
+        allArtisansList = parsed.data;
+        return allArtisansList.filter(a => a && a.isVerified !== false && a.status !== 'rejected');
+      }
+    }
+  } catch (e) {}
+  return [];
+}
+
+function renderFeedArtisanSpotlightHTML(verifiedArtisans) {
+  if (!Array.isArray(verifiedArtisans) || verifiedArtisans.length === 0) return '';
+
+  // Sort: prioritize artisans with portfolio images, then newest
+  const sorted = [...verifiedArtisans].sort((a, b) => {
+    const aHasImg = (Array.isArray(a.portfolioImages) && a.portfolioImages.length > 0) || Boolean(a.photo);
+    const bHasImg = (Array.isArray(b.portfolioImages) && b.portfolioImages.length > 0) || Boolean(b.photo);
+    if (aHasImg && !bHasImg) return -1;
+    if (!aHasImg && bHasImg) return 1;
+    return (b.createdAt || 0) - (a.createdAt || 0);
+  });
+
+  const spotlightItems = sorted.slice(0, 6);
+  if (spotlightItems.length === 0) return '';
+
+  const cardsHtml = spotlightItems.map(item => {
+    const itemId = item.id || item.docId || '';
+    const isPerahera = item.section === 'perahera_culture';
+
+    // Cover image extraction (portfolio image or profile photo) - NO license images
+    let coverUrl = '';
+    if (Array.isArray(item.portfolioImages) && item.portfolioImages.length > 0) {
+      const first = item.portfolioImages[0];
+      coverUrl = typeof first === 'object' && first.url ? first.url : first;
+    }
+    if (!coverUrl && item.photo) {
+      coverUrl = item.photo;
+    }
+
+    // Primary specialty text
+    let specialtyText = '';
+    if (Array.isArray(item.specialties) && item.specialties.length > 0) {
+      specialtyText = item.specialties.slice(0, 2).join(' • ');
+    } else if (item.specialties && typeof item.specialties === 'string') {
+      specialtyText = item.specialties;
+    } else {
+      specialtyText = isPerahera ? 'පෙරහැර සංස්කෘතික සේවා' : 'විහාර නිර්මාණ ශිල්පී';
+    }
+
+    const districtText = item.district ? `📍 ${item.district}` : '📍 ශ්‍රී ලංකා';
+
+    return `
+      <div class="spotlight-mini-card" onclick="openArtisanProfileModal('${itemId}')" title="${Security.escapeHTML(item.name)} - පැතිකඩ බලන්න">
+        <div class="spotlight-card-cover-wrap">
+          ${coverUrl ? `
+            <img src="${coverUrl}" alt="${Security.escapeHTML(item.name)}" class="spotlight-card-cover-img" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'spotlight-card-cover-placeholder\\'><span class=\\'spotlight-cover-icon\\'>${isPerahera ? '🥁' : '🏛️'}</span></div>';">
+          ` : `
+            <div class="spotlight-card-cover-placeholder">
+              <span class="spotlight-cover-icon">${isPerahera ? '🥁' : '🏛️'}</span>
+            </div>
+          `}
+          <div class="spotlight-cover-badges">
+            <span class="spotlight-badge-section">${isPerahera ? '🥁 පෙරහැර' : '🏛️ විහාර'}</span>
+            <span class="spotlight-badge-verified"><i class="fa-solid fa-circle-check"></i> සත්‍යාපිතයි</span>
+          </div>
+        </div>
+        <div class="spotlight-card-body">
+          <h4 class="spotlight-artisan-name">${Security.escapeHTML(item.name)}</h4>
+          <div class="spotlight-artisan-specialty" title="${Security.escapeHTML(specialtyText)}">${Security.escapeHTML(specialtyText)}</div>
+          <div class="spotlight-artisan-district">${Security.escapeHTML(districtText)}</div>
+          <button type="button" class="btn-spotlight-card-action" onclick="event.stopPropagation(); openArtisanProfileModal('${itemId}')" title="ශිල්පියාගේ සම්පූර්ණ පැතිකඩ බලන්න">
+            <i class="fa-solid fa-address-card"></i>
+            <span>පැතිකඩ බලන්න</span>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="feed-artisan-spotlight-card" id="feedArtisansSpotlight">
+      <div class="spotlight-strip-header">
+        <div class="spotlight-title-wrap">
+          <div class="spotlight-main-title">
+            <span class="spotlight-icon">🏛️</span>
+            <span class="spotlight-title-text">සත්‍යාපිත විහාර කලා හා පෙරහැර ශිල්පීන්</span>
+          </div>
+          <div class="spotlight-subtitle">විහාර නිර්මාණ හා සංස්කෘතික සේවා නාමාවලිය</div>
+        </div>
+        <button type="button" class="btn-spotlight-view-all" onclick="switchTab('artisans')" title="සියලුම ශිල්පීන් බලන්න">
+          <span>සියල්ල බලන්න</span>
+          <i class="fa-solid fa-arrow-right"></i>
+        </button>
+      </div>
+      <div class="spotlight-cards-track">
+        ${cardsHtml}
+      </div>
+    </div>
+  `;
+}
+
 // Render Newsfeed
 function renderFeed() {
   const container = document.getElementById('postsContainer');
@@ -2992,14 +3134,41 @@ function renderFeed() {
   }
 
   const cardsHtmlArr = [];
-  for (const post of ranked) {
+  const shouldInjectSpotlight = (
+    activeTab === 'feed' &&
+    !searchQ &&
+    activeCategory === 'සියල්ල' &&
+    ranked.length > 0
+  );
+
+  let spotlightInjected = false;
+  const verifiedArtisans = shouldInjectSpotlight ? getVerifiedArtisansList() : [];
+  const spotlightHtml = (shouldInjectSpotlight && verifiedArtisans.length > 0)
+    ? renderFeedArtisanSpotlightHTML(verifiedArtisans)
+    : '';
+
+  for (let i = 0; i < ranked.length; i++) {
+    const post = ranked[i];
     try {
       const cardHtml = renderPostCardHTML(post, user);
       if (cardHtml) cardsHtmlArr.push(cardHtml);
     } catch (cardErr) {
       console.warn('[Feed] Error rendering card for post', post?.id, cardErr);
     }
+
+    // Inject Spotlight Strip right after the 4th post (index 3)
+    if (spotlightHtml && i === 3) {
+      cardsHtmlArr.push(spotlightHtml);
+      spotlightInjected = true;
+    }
   }
+
+  // If fewer than 4 posts exist and spotlight was not injected yet, inject at the end
+  if (spotlightHtml && !spotlightInjected) {
+    cardsHtmlArr.push(spotlightHtml);
+    spotlightInjected = true;
+  }
+
   container.innerHTML = cardsHtmlArr.join('') + sentinelHtml;
   setupInfiniteScrollObserver();
 }
@@ -10502,7 +10671,7 @@ function initPWAEngine() {
   );
 
   // Purge any stale caches from previous builds
-  const ACTIVE_BUILD = 'v168';
+  const ACTIVE_BUILD = 'v169';
   if (localStorage.getItem('pinPotha_active_build') !== ACTIVE_BUILD) {
     localStorage.setItem('pinPotha_active_build', ACTIVE_BUILD);
     if ('caches' in window) {
@@ -10518,7 +10687,7 @@ function initPWAEngine() {
 
   // Register Service Worker safely
   if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-    const swUrl = './sw.js?v=168';
+    const swUrl = './sw.js?v=169';
     const registerWorker = () => {
       navigator.serviceWorker.register(swUrl, { updateViaCache: 'none' })
         .then((registration) => {
@@ -11550,7 +11719,7 @@ const ARTISAN_SECTIONS = {
   }
 };
 
-let allArtisansList = [];
+// allArtisansList is declared at top level
 let currentArtisansSection = 'temple_art';
 let currentArtisansCategory = 'සියල්ල';
 let currentArtisansDistrict = 'සියල්ල';
@@ -11992,9 +12161,15 @@ function checkIsArtisanOwner(artisan) {
   return false;
 }
 
-window.openArtisanProfileModal = function(artisanId) {
+window.openArtisanProfileModal = async function(artisanId) {
   triggerHaptic(12);
-  const artisan = (allArtisansList || []).find(a => (a.id || a.docId) === artisanId);
+  let artisan = (allArtisansList || []).find(a => (a.id || a.docId) === artisanId);
+  if (!artisan && typeof StorageService.getTempleArtisansList === 'function') {
+    try {
+      allArtisansList = await StorageService.getTempleArtisansList();
+      artisan = (allArtisansList || []).find(a => (a.id || a.docId) === artisanId);
+    } catch (e) {}
+  }
   if (!artisan) {
     if (typeof showCustomToast === 'function') {
       showCustomToast("ශිල්පියාගේ තොරතුරු සොයාගත නොහැක.", "warning");

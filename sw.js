@@ -1,11 +1,11 @@
-// Ape Pin Potha Service Worker (v168)
+// Ape Pin Potha Service Worker (v169)
 // Strategy: Network-First for HTML, JS, CSS to guarantee instant updates; Stale-While-Revalidate for media assets
-const CACHE_NAME = 'pin-potha-cache-v168';
+const CACHE_NAME = 'pin-potha-cache-v169';
 const STATIC_ASSETS = [
   './',
   './index.html',
-  './css/styles.css?v=164',
-  './js/app.js?v=168',
+  './css/styles.css?v=165',
+  './js/app.js?v=169',
   './js/storage.js?v=163',
   './js/imgbb-service.js?v=68',
   './js/aranya-data.js',

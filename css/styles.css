@@ -12261,3 +12261,347 @@ body.drawer-open {
     grid-template-columns: 1fr;
   }
 }
+
+/* ==========================================================================
+   In-Feed "Verified Artisans & Perahera Services" Spotlight Strip
+   ========================================================================== */
+.feed-artisan-spotlight-card {
+  background: linear-gradient(135deg, #fffdf8, #fff8ea);
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  border-radius: var(--radius-lg, 16px);
+  padding: 16px 18px 18px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 18px rgba(180, 83, 9, 0.06);
+  position: relative;
+  overflow: hidden;
+}
+
+.feed-artisan-spotlight-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #d97706, #f59e0b, #fbbf24, #d97706);
+}
+
+.spotlight-strip-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.spotlight-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.spotlight-main-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #78350f;
+  line-height: 1.3;
+}
+
+.spotlight-icon {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.spotlight-subtitle {
+  font-size: 0.78rem;
+  color: #92400e;
+  opacity: 0.88;
+}
+
+.btn-spotlight-view-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #b45309;
+  background: #ffffff;
+  border: 1px solid rgba(217, 119, 6, 0.28);
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.btn-spotlight-view-all:hover {
+  background: #fef3c7;
+  color: #78350f;
+  border-color: #d97706;
+  transform: translateX(2px);
+}
+
+/* Horizontal Scroll Track */
+.spotlight-cards-track {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 2px 10px 2px;
+  margin: 0 -4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(217, 119, 6, 0.3) transparent;
+}
+
+.spotlight-cards-track::-webkit-scrollbar {
+  height: 5px;
+}
+
+.spotlight-cards-track::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.spotlight-cards-track::-webkit-scrollbar-thumb {
+  background: rgba(217, 119, 6, 0.28);
+  border-radius: 9999px;
+}
+
+.spotlight-cards-track::-webkit-scrollbar-thumb:hover {
+  background: rgba(217, 119, 6, 0.5);
+}
+
+/* Mini Card */
+.spotlight-mini-card {
+  flex: 0 0 220px;
+  width: 220px;
+  max-width: 220px;
+  scroll-snap-align: start;
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.spotlight-mini-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(180, 83, 9, 0.12);
+  border-color: rgba(217, 119, 6, 0.4);
+}
+
+.spotlight-card-cover-wrap {
+  width: 100%;
+  height: 110px;
+  position: relative;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  overflow: hidden;
+}
+
+.spotlight-card-cover-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.35s ease;
+}
+
+.spotlight-mini-card:hover .spotlight-card-cover-img {
+  transform: scale(1.05);
+}
+
+.spotlight-card-cover-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #78350f, #b45309);
+}
+
+.spotlight-cover-icon {
+  font-size: 2.2rem;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
+}
+
+.spotlight-cover-badges {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.spotlight-badge-section {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(4px);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.spotlight-badge-verified {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  background: rgba(16, 185, 129, 0.9);
+  backdrop-filter: blur(4px);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+
+.spotlight-card-body {
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.spotlight-artisan-name {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 4px 0;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spotlight-artisan-specialty {
+  font-size: 0.73rem;
+  color: #b45309;
+  font-weight: 600;
+  margin-bottom: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spotlight-artisan-district {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  color: #64748b;
+  margin-bottom: 10px;
+}
+
+.btn-spotlight-card-action {
+  margin-top: auto;
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 10px;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(217, 119, 6, 0.25);
+}
+
+.btn-spotlight-card-action:hover {
+  background: linear-gradient(135deg, #d97706, #b45309);
+  box-shadow: 0 3px 8px rgba(180, 83, 9, 0.35);
+  transform: translateY(-1px);
+}
+
+/* Dark mode compatibility */
+body.dark-mode .feed-artisan-spotlight-card {
+  background: linear-gradient(135deg, #1e1b18, #2a221b);
+  border-color: rgba(245, 158, 11, 0.3);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+}
+
+body.dark-mode .spotlight-main-title {
+  color: #fbbf24;
+}
+
+body.dark-mode .spotlight-subtitle {
+  color: #fde68a;
+}
+
+body.dark-mode .btn-spotlight-view-all {
+  background: #2a221b;
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+body.dark-mode .btn-spotlight-view-all:hover {
+  background: #3a2e23;
+  color: #fef3c7;
+}
+
+body.dark-mode .spotlight-mini-card {
+  background: #231d17;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+body.dark-mode .spotlight-mini-card:hover {
+  border-color: rgba(245, 158, 11, 0.5);
+}
+
+body.dark-mode .spotlight-artisan-name {
+  color: #f8fafc;
+}
+
+body.dark-mode .spotlight-artisan-specialty {
+  color: #fbbf24;
+}
+
+body.dark-mode .spotlight-artisan-district {
+  color: #94a3b8;
+}
+
+@media (max-width: 480px) {
+  .feed-artisan-spotlight-card {
+    padding: 14px 12px 14px;
+    margin-bottom: 16px;
+    border-radius: 14px;
+  }
+  .spotlight-main-title {
+    font-size: 0.96rem;
+  }
+  .spotlight-subtitle {
+    font-size: 0.72rem;
+  }
+  .btn-spotlight-view-all {
+    padding: 4px 10px;
+    font-size: 0.74rem;
+  }
+  .spotlight-mini-card {
+    flex: 0 0 205px;
+    width: 205px;
+    max-width: 205px;
+  }
+  .spotlight-card-cover-wrap {
+    height: 100px;
+  }
+}
