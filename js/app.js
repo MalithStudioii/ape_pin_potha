@@ -11585,15 +11585,18 @@ export async function saveQuickNameEdit() {
     const firstName = parts[0] || newName;
     const lastName = parts.slice(1).join(' ') || '';
 
-    await StorageService.updateUserProfile({
+    await StorageService.updateProfile({
       name: newName,
       firstName: firstName,
       lastName: lastName
     });
 
-    // Update UI across header, drawer, and profile
-    updateUserInfoUI();
-    loadProfilePage();
+    // Update UI across header, drawer, and profile immediately
+    if (typeof updateUserInfoUI === 'function') updateUserInfoUI();
+    if (typeof renderProfileView === 'function') renderProfileView();
+    if (typeof loadProfilePage === 'function') {
+      try { loadProfilePage(); } catch (e) {}
+    }
     
     closeQuickNameEditModal();
     showToast("ඔබගේ නම සාර්ථකව යාවත්කාලීන විය! 🙏", "success");

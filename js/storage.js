@@ -4620,11 +4620,33 @@ export const StorageService = {
       }
     }
 
+    // 4. Update Firebase Auth displayName if user is authenticated
+    if (isCloudReady && auth && auth.currentUser) {
+      try {
+        const { updateProfile } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js');
+        const authDisplayName = this.currentUser.name || '';
+        const authPhotoURL = this.currentUser.photo || null;
+        await updateProfile(auth.currentUser, {
+          displayName: authDisplayName,
+          ...(authPhotoURL ? { photoURL: authPhotoURL } : {})
+        });
+      } catch (authProfileErr) {
+        console.warn('[Firebase Auth] updateProfile displayName error:', authProfileErr);
+      }
+    }
+
     const currentLivePosts = this.getLocalPosts();
     if (Array.isArray(currentLivePosts) && currentLivePosts.length > 0) {
       this.notifyListeners(currentLivePosts);
     }
     return this.currentUser;
+  },
+
+  /**
+   * Alias for updateProfile (supporting both naming conventions across components)
+   */
+  async updateUserProfile(params) {
+    return await this.updateProfile(params);
   },
 
   async setUserName(name) {
