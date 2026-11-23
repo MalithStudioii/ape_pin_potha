@@ -329,6 +329,12 @@ function bootApp() {
       console.warn('[App] renderPoyaUI error caught safely:', e);
     }
 
+    try {
+      initPoyaAmbientEffect();
+    } catch (e) {
+      console.warn('[App] initPoyaAmbientEffect note:', e);
+    }
+
     // Warm / refresh artisans cache in background (respects 15-min TTL)
     try {
       ensureVerifiedArtisansLoaded().catch(() => {});
@@ -10334,6 +10340,147 @@ function renderPoyaUI(poya) {
     console.warn('[renderPoyaUI] caught safely:', err);
   }
 }
+
+/* ==========================================================================
+   Poya Day Ambient Falling Petals & Bodhi Leaves Overlay Feature
+   ========================================================================== */
+
+let poyaAmbientSubscribed = false;
+
+const POYA_PETAL_SVG = `<svg viewBox="0 0 32 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="poyaPetalGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="65%" stop-color="#fffdf5" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#fef3c7" stop-opacity="0.75"/>
+    </linearGradient>
+  </defs>
+  <path d="M16 2 C23 10, 30 22, 24 36 C20 42, 12 42, 8 36 C2 22, 9 10, 16 2 Z" fill="url(#poyaPetalGrad)"/>
+  <path d="M16 12 C16 20, 16 28, 16 34" stroke="#fef3c7" stroke-width="0.75" stroke-linecap="round" opacity="0.6"/>
+</svg>`;
+
+const POYA_BODHI_SVG = `<svg viewBox="0 0 36 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="poyaBodhiGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a" stop-opacity="0.96"/>
+      <stop offset="45%" stop-color="#fcd34d" stop-opacity="0.92"/>
+      <stop offset="100%" stop-color="#d97706" stop-opacity="0.82"/>
+    </linearGradient>
+  </defs>
+  <path d="M18 50 C18 36, 33 28, 33 17 C33 7, 25 1, 18 0 C11 1, 3 7, 3 17 C3 28, 18 36, 18 50 Z" fill="url(#poyaBodhiGrad)"/>
+  <path d="M18 5 L18 44" stroke="#92400e" stroke-width="0.8" stroke-linecap="round" opacity="0.45"/>
+  <path d="M18 16 Q24 13 29 17 M18 24 Q26 21 29 26 M18 16 Q12 13 7 17 M18 24 Q10 21 7 26" stroke="#92400e" stroke-width="0.6" stroke-linecap="round" opacity="0.35"/>
+</svg>`;
+
+export function renderPoyaAmbientOverlay(enabled, theme = 'petals') {
+  const existingLayer = document.getElementById('poya-ambient-layer');
+  if (!enabled) {
+    if (existingLayer) {
+      existingLayer.style.opacity = '0';
+      setTimeout(() => {
+        if (existingLayer && existingLayer.parentNode) {
+          existingLayer.parentNode.removeChild(existingLayer);
+        }
+      }, 600);
+    }
+    return;
+  }
+
+  // If already running with same theme, leave intact
+  if (existingLayer && existingLayer.dataset.theme === theme) {
+    return;
+  }
+
+  // If theme changed, remove existing first
+  if (existingLayer && existingLayer.parentNode) {
+    existingLayer.parentNode.removeChild(existingLayer);
+  }
+
+  const layer = document.createElement('div');
+  layer.id = 'poya-ambient-layer';
+  layer.dataset.theme = theme;
+  layer.setAttribute('aria-hidden', 'true');
+
+  const count = 15; // 15 serene falling petals or leaves
+  const isBodhi = (theme === 'bodhi');
+  const svgContent = isBodhi ? POYA_BODHI_SVG : POYA_PETAL_SVG;
+  const themeClass = isBodhi ? 'theme-bodhi' : 'theme-petals';
+
+  for (let i = 0; i < count; i++) {
+    const item = document.createElement('div');
+    item.className = `poya-falling-item ${themeClass}`;
+
+    // Stagger horizontal position evenly across the viewport
+    const leftPercent = ((i * 6.5) + (Math.random() * 3.5)).toFixed(1);
+    const size = isBodhi 
+      ? 20 + Math.floor(Math.random() * 12) 
+      : 18 + Math.floor(Math.random() * 10);
+    const height = Math.round(size * 1.38);
+
+    const fallDuration = (14 + Math.random() * 8).toFixed(1); // 14s - 22s slow serene fall
+    const swayDuration = (3.5 + Math.random() * 2.5).toFixed(1); // 3.5s - 6s
+    const delay = (i * 0.9 + Math.random() * 1.5).toFixed(1);
+    const itemOpacity = (0.55 + Math.random() * 0.22).toFixed(2);
+
+    item.style.left = `${leftPercent}%`;
+    item.style.width = `${size}px`;
+    item.style.height = `${height}px`;
+    item.style.opacity = itemOpacity;
+    item.style.animationDuration = `${fallDuration}s, ${swayDuration}s`;
+    // Negative delay allows falling elements to pre-populate the screen on first load
+    item.style.animationDelay = `-${(Math.random() * 12).toFixed(1)}s, -${delay}s`;
+    item.innerHTML = svgContent;
+
+    layer.appendChild(item);
+  }
+
+  document.body.appendChild(layer);
+}
+window.renderPoyaAmbientOverlay = renderPoyaAmbientOverlay;
+
+export async function initPoyaAmbientEffect() {
+  if (poyaAmbientSubscribed) return;
+  poyaAmbientSubscribed = true;
+
+  // Listen for tab visibility changes to pause animations gracefully
+  document.addEventListener('visibilitychange', () => {
+    const layer = document.getElementById('poya-ambient-layer');
+    if (layer) {
+      if (document.hidden) {
+        layer.classList.add('is-paused');
+      } else {
+        layer.classList.remove('is-paused');
+      }
+    }
+  });
+
+  try {
+    const { firebaseConfig, isFirebaseConfigured, COLLECTIONS } = await import('./firebase-config.js?v=22');
+    if (!isFirebaseConfigured()) return;
+
+    const { initializeApp, getApps, getApp } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js');
+    const { getFirestore, doc, onSnapshot } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+
+    const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    onSnapshot(doc(db, COLLECTIONS.SITE_SETTINGS || 'site_settings', 'poya_effect'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        const isEnabled = Boolean(data.enabled);
+        const activeTheme = data.theme === 'bodhi' ? 'bodhi' : 'petals';
+        renderPoyaAmbientOverlay(isEnabled, activeTheme);
+      } else {
+        renderPoyaAmbientOverlay(false);
+      }
+    }, (err) => {
+      console.warn('[PoyaAmbient] onSnapshot note:', err);
+    });
+  } catch (err) {
+    console.warn('[PoyaAmbient] init error:', err);
+  }
+}
+window.initPoyaAmbientEffect = initPoyaAmbientEffect;
 
 window.renderAdminDashboard = async function() {
   if (!StorageService.isMasterAdmin()) return;
