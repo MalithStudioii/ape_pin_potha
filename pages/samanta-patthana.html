@@ -94,11 +94,11 @@
         justify-content: space-between;
         gap: 12px;
       }
-      .brand-box {
+      .brand-box, .brand-box:hover, .brand-box:focus {
         display: flex;
         align-items: center;
         gap: 10px;
-        text-decoration: none;
+        text-decoration: none !important;
         color: #ffffff;
       }
       .brand-logo-icon {
@@ -111,17 +111,28 @@
         justify-content: center;
         color: #fde68a;
         font-size: 1.2rem;
+        flex-shrink: 0;
       }
       .brand-title {
         font-family: var(--font-serif);
         font-size: 1.15rem;
         font-weight: 700;
-        margin: 0;
+        color: #ffffff !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        text-decoration: none !important;
+        line-height: 1.25;
       }
       .brand-sub {
         font-size: 0.74rem;
-        color: #fde68a;
+        color: #fde68a !important;
         display: block;
+        margin: 2px 0 0 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        text-decoration: none !important;
+        line-height: 1.25;
       }
       .home-btn {
         background: rgba(255, 255, 255, 0.15);
@@ -320,7 +331,7 @@
             <a href="../index.html" class="brand-box" title="අපේ පිං පොත මුල් පිටුවට">
                 <div class="brand-logo-icon"><i class="fa-solid fa-dharmachakra"></i></div>
                 <div>
-                    <h2 class="brand-title">අපේ පිං පොත</h2>
+                    <div class="brand-title">අපේ පිං පොත</div>
                     <span class="brand-sub">හිත නිවන, පින් පුරන කල්‍යාණ මිත්‍ර එකමුතුව</span>
                 </div>
             </a>
