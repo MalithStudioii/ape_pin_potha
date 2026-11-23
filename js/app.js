@@ -569,36 +569,16 @@ function bootApp() {
   }
 }
 
-// Build outgoing share URLs using the dedicated dynamic OG share domain (https://share.apepinpotha.lk)
+// Build clean production-ready share URLs (e.g. https://apepinpotha.lk/?a=ID or /?p=ID)
 function buildCleanShareUrl(paramKey, paramValue, extraParams = {}) {
-  const SHARE_BASE_URL = 'https://share.apepinpotha.lk';
-  const cleanVal = paramValue ? String(paramValue).trim() : '';
-
-  // Outgoing post share URL: https://share.apepinpotha.lk/p/:id
-  if (paramKey === 'p' && cleanVal) {
-    const qs = extraParams && typeof extraParams === 'object' && Object.keys(extraParams).length > 0
-      ? '?' + new URLSearchParams(extraParams).toString()
-      : '';
-    return `${SHARE_BASE_URL}/p/${encodeURIComponent(cleanVal)}${qs}`;
-  }
-
-  // Outgoing artisan profile share URL: https://share.apepinpotha.lk/a/:id
-  if (paramKey === 'a' && cleanVal) {
-    const qs = extraParams && typeof extraParams === 'object' && Object.keys(extraParams).length > 0
-      ? '?' + new URLSearchParams(extraParams).toString()
-      : '';
-    return `${SHARE_BASE_URL}/a/${encodeURIComponent(cleanVal)}${qs}`;
-  }
-
-  // Fallback to origin root if type is unknown
-  const origin = window.location.origin || 'https://apepinpotha.lk';
+  const origin = window.location.origin || '';
   let path = (window.location.pathname || '/').replace(/\/index\.html?$/i, '');
   if (!path.endsWith('/')) {
     path += '/';
   }
   const params = new URLSearchParams();
-  if (paramKey && cleanVal) {
-    params.set(paramKey, cleanVal);
+  if (paramKey && paramValue) {
+    params.set(paramKey, String(paramValue).trim());
   }
   if (extraParams && typeof extraParams === 'object') {
     Object.keys(extraParams).forEach(k => {
@@ -14119,11 +14099,14 @@ window.openReadingModal = function(itemId) {
 
   // Populate sections
   contentInner.innerHTML = (item.sections || []).map((sec, idx) => {
+    const rawHeading = (sec.heading || sec.title || '').trim();
+    const cleanHeading = rawHeading.replace(/\s*\([^\)]*Final Blessing[^\)]*\)/i, '').trim();
+    const displayHeading = /^\d+[\.\)]/.test(cleanHeading) ? cleanHeading : `${idx + 1}. ${cleanHeading}`;
     return `
       <section class="reading-section-card" id="section-${idx}">
         <h3 class="reading-section-heading">
           <i class="fa-solid fa-dharmachakra" style="color: #ea580c; font-size: 0.9em;"></i>
-          <span>${sec.heading}</span>
+          <span>${displayHeading}</span>
         </h3>
         <div class="reading-verse-pali">${sec.pali}</div>
         <div class="reading-meaning-box">
@@ -14275,77 +14258,71 @@ window.printLibraryItem = function(itemId) {
 
   const doc = iframe.contentWindow.document;
 
-  // Helper to split Sinhala meaning into natural, non-breaking stanza blocks
-  const splitMeaningBlocks = (text) => {
+  // Determine whether Sinhala meanings should be included in PDF/print output
+  const meaningToggleEl = document.getElementById('readingMeaningToggle');
+  let isMeaningEnabled = true;
+  if (meaningToggleEl) {
+    isMeaningEnabled = Boolean(meaningToggleEl.checked);
+  } else if (typeof showReadingMeaning !== 'undefined') {
+    isMeaningEnabled = Boolean(showReadingMeaning);
+  } else {
+    try {
+      const stored = localStorage.getItem('pinPotha_reading_show_meaning');
+      if (stored !== null) isMeaningEnabled = stored === 'true';
+    } catch (e) {}
+  }
+
+  // Helper to split multi-paragraph text on blank lines into individual clean paragraphs
+  const splitParagraphs = (text) => {
     if (!text) return [];
-    const parts = text.split(/\n\s*\n/).filter(p => p.trim());
-    const result = [];
-    parts.forEach(part => {
-      if (/\n\s*\d+\.\s/.test(part)) {
-        const sub = part.split(/\n(?=\s*\d+\.\s)/).filter(s => s.trim());
-        result.push(...sub);
-      } else {
-        result.push(part);
-      }
-    });
-    return result;
+    return text.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
   };
 
   const sectionsHtml = (item.sections || []).map((sec, idx) => {
-    // Split pali by double newlines into natural stanza blocks
-    const paliBlocks = (sec.pali || '').split(/\n\s*\n/).filter(s => s.trim());
-    const meaningBlocks = splitMeaningBlocks(sec.sinhalaMeaning);
+    const rawHeading = (sec.heading || sec.title || '').trim();
+    const cleanHeading = rawHeading.replace(/\s*\([^\)]*Final Blessing[^\)]*\)/i, '').trim();
+    const numMatch = cleanHeading.match(/^(\d+)[\.\)]\s*(.*)$/);
 
-    let firstBlockHtml = '';
-    let remainingPaliBlocks = paliBlocks;
-    let remainingMeaningBlocks = meaningBlocks;
-
-    if (paliBlocks.length > 0) {
-      firstBlockHtml = `
-        <div class="print-stanza">
-          <div class="print-pali">${paliBlocks[0].trim()}</div>
-        </div>
+    let headingHtml = '';
+    if (numMatch) {
+      headingHtml = `
+        <h3 class="print-heading">
+          <span class="heading-num">${numMatch[1]}.</span> ${numMatch[2]}
+        </h3>
       `;
-      remainingPaliBlocks = paliBlocks.slice(1);
-    } else if (meaningBlocks.length > 0) {
-      firstBlockHtml = `
-        <div class="print-meaning-wrap">
-          <div class="meaning-title">සිංහල අර්ථය:</div>
-          <div class="print-meaning-block">${meaningBlocks[0].trim()}</div>
-        </div>
+    } else {
+      headingHtml = `
+        <h3 class="print-heading">
+          <span class="heading-num">${idx + 1}.</span> ${cleanHeading}
+        </h3>
       `;
-      remainingMeaningBlocks = meaningBlocks.slice(1);
     }
 
-    const remainingPaliHtml = remainingPaliBlocks.map(block => `
-      <div class="print-stanza">
-        <div class="print-pali">${block.trim()}</div>
+    const paliParagraphs = splitParagraphs(sec.pali || '');
+    const paliHtml = paliParagraphs.length > 0 ? `
+      <div class="print-pali-wrap">
+        ${paliParagraphs.map(p => `<p class="print-para print-pali">${p}</p>`).join('')}
       </div>
-    `).join('');
+    ` : '';
 
-    let remainingMeaningHtml = '';
-    if (remainingMeaningBlocks.length > 0) {
-      remainingMeaningHtml = `
-        <div class="print-meaning-wrap">
-          ${paliBlocks.length > 0 ? '<div class="meaning-title">සිංහල අර්ථය:</div>' : ''}
-          ${remainingMeaningBlocks.map(mBlock => `
-            <div class="print-meaning-block">${mBlock.trim()}</div>
-          `).join('')}
-        </div>
-      `;
+    let meaningHtml = '';
+    if (isMeaningEnabled && sec.sinhalaMeaning && sec.sinhalaMeaning.trim()) {
+      const meaningParagraphs = splitParagraphs(sec.sinhalaMeaning);
+      if (meaningParagraphs.length > 0) {
+        meaningHtml = `
+          <div class="print-meaning-wrap">
+            ${paliParagraphs.length > 0 ? '<div class="meaning-title">සිංහල අර්ථය:</div>' : ''}
+            ${meaningParagraphs.map(m => `<p class="print-para print-meaning">${m}</p>`).join('')}
+          </div>
+        `;
+      }
     }
 
     return `
       <section class="print-section">
-        <!-- Heading tied to first stanza to prevent orphaned heading at page bottom -->
-        <div class="print-heading-group">
-          <h3 class="print-heading">
-            <span class="heading-num">${idx + 1}.</span> ${sec.heading}
-          </h3>
-          ${firstBlockHtml}
-        </div>
-        ${remainingPaliHtml}
-        ${remainingMeaningHtml}
+        ${headingHtml}
+        ${paliHtml}
+        ${meaningHtml}
       </section>
     `;
   }).join('');
@@ -14464,14 +14441,10 @@ window.printLibraryItem = function(itemId) {
     /* Section & Natural Page Flow */
     .print-section {
       margin-bottom: 20px;
+      break-inside: auto;
+      page-break-inside: auto;
       height: auto;
       overflow: visible;
-    }
-    /* Heading tied together with the first stanza to eliminate orphaned headings */
-    .print-heading-group {
-      break-inside: avoid;
-      page-break-inside: avoid;
-      margin-bottom: 12px;
     }
     .print-heading {
       font-size: 13.5pt;
@@ -14482,25 +14455,36 @@ window.printLibraryItem = function(itemId) {
       border-bottom: 1.5px solid #fed7aa;
       break-after: avoid;
       page-break-after: avoid;
+      break-inside: avoid;
+      page-break-inside: avoid;
     }
     .heading-num {
       color: #c2410c;
       margin-right: 4px;
     }
-    /* Stanza Block: Prevents breaking mid-verse */
-    .print-stanza {
+    /* Multi-paragraph containers flow naturally across pages */
+    .print-pali-wrap {
+      break-inside: auto;
+      page-break-inside: auto;
+      margin-bottom: 8px;
+    }
+    /* Individual paragraph/stanza: never broken mid-stanza, but flows paragraph by paragraph */
+    .print-para {
+      margin: 0 0 10px;
+      line-height: 1.65;
+      white-space: pre-line;
       break-inside: avoid;
       page-break-inside: avoid;
-      margin-bottom: 12px;
+    }
+    .print-para:last-child {
+      margin-bottom: 0;
     }
     .print-pali {
       font-size: 11.5pt;
       font-weight: 700;
       color: #431407;
-      line-height: 1.65;
-      white-space: pre-line;
     }
-    /* Meaning Block: Natural flow container with stanza-level avoid-break */
+    /* Meaning Block: Natural flow container with paragraph-level avoid-break */
     .print-meaning-wrap {
       margin-top: 10px;
       margin-bottom: 14px;
@@ -14508,6 +14492,8 @@ window.printLibraryItem = function(itemId) {
       background: #fafaf9;
       border-left: 3px solid #ea580c;
       border-radius: 4px;
+      break-inside: auto;
+      page-break-inside: auto;
       height: auto;
       overflow: visible;
     }
@@ -14519,18 +14505,12 @@ window.printLibraryItem = function(itemId) {
       margin-bottom: 6px;
       break-after: avoid;
       page-break-after: avoid;
-    }
-    .print-meaning-block {
-      font-size: 10.5pt;
-      line-height: 1.65;
-      color: #334155;
-      white-space: pre-line;
       break-inside: avoid;
       page-break-inside: avoid;
-      margin-bottom: 8px;
     }
-    .print-meaning-block:last-child {
-      margin-bottom: 0;
+    .print-meaning {
+      font-size: 10.5pt;
+      color: #334155;
     }
     /* Footer */
     .print-footer {
