@@ -40,7 +40,7 @@
     <meta name="twitter:description" content="හිත නිවන, පින් පුරන කල්‍යාණ මිත්‍ර එකමුතුව. දිනපතා පින්කම් සටහන් කරගන්න, මිතුරන්ගේ පින්කම් දැක සාදුකාර දෙමින් සිත පහදවා ගන්න. 🙏">
     <meta name="twitter:image" content="https://raw.githubusercontent.com/MalithStudioii/ape_pin_potha/main/assets/og-banner.jpg">
 
-    <!-- JSON-LD Structured Data Schema (Organization & WebSite) -->
+    <!-- JSON-LD Structured Data Schema (Organization, WebSite & Founder Person) -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -53,6 +53,9 @@
           "logo": "https://apepinpotha.lk/assets/icon-192.png",
           "slogan": "හිත නිවන, පින් පුරන කල්‍යාණ මිත්‍ර එකමුතුව",
           "email": "supportnexiapro@gmail.com",
+          "founder": {
+            "@id": "https://apepinpotha.lk/#founder"
+          },
           "sameAs": [
             "https://share.apepinpotha.lk"
           ]
@@ -66,7 +69,37 @@
           "publisher": {
             "@id": "https://apepinpotha.lk/#organization"
           },
+          "creator": {
+            "@id": "https://apepinpotha.lk/#founder"
+          },
           "inLanguage": "si-LK"
+        },
+        {
+          "@type": "Person",
+          "@id": "https://apepinpotha.lk/#founder",
+          "name": "Malith Dushantha Haputhanthri",
+          "alternateName": [
+            "මලිත් දුෂාන්ත හපුතන්ත්‍රි",
+            "Malith Dushantha"
+          ],
+          "jobTitle": "Full-Stack Web & Mobile Application Developer & AI Content Creator",
+          "description": "Founder of ApePinPotha.lk, Full-Stack Web and Mobile Application Developer, and Founder of NexiaProLanka.",
+          "nationality": "Sri Lankan",
+          "worksFor": {
+            "@type": "Organization",
+            "name": "NexiaProLanka",
+            "url": "https://nexiapro-official.vercel.app"
+          },
+          "knowsAbout": [
+            "Full-Stack Web Development",
+            "Mobile Application Development",
+            "Firebase",
+            "Artificial Intelligence",
+            "Buddhist Digital Platforms"
+          ],
+          "sameAs": [
+            "https://nexiapro-official.vercel.app"
+          ]
         }
       ]
     }
@@ -139,7 +172,8 @@
                 <a href="pages/bodhipuja-kavi.html" style="color: #92400e; font-weight: 600;">බෝධිපූජා කවි (Bodhipuja Kavi)</a> • 
                 <a href="pages/thun-suthraya.html" style="color: #92400e; font-weight: 600;">තුන් සූත්‍රය (Thun Suthraya)</a> • 
                 <a href="pages/aranya-senasana.html" style="color: #92400e; font-weight: 600;">ආරණ්‍ය සේනාසන නාමාවලිය (Aranya Senasana)</a> • 
-                <a href="pages/vihara-sithuwam.html" style="color: #92400e; font-weight: 600;">විහාර කලා ශිල්පීන් හා සිතුවම් (Vihara Sithuwam)</a>
+                <a href="pages/vihara-sithuwam.html" style="color: #92400e; font-weight: 600;">විහාර කලා ශිල්පීන් හා සිතුවම් (Vihara Sithuwam)</a> • 
+                <a href="pages/about.html" style="color: #92400e; font-weight: 600;">අප ගැන (About ApePinPotha)</a>
             </p>
         </div>
     </noscript>
@@ -386,15 +420,16 @@
             <div style="padding: 10px 14px; text-align: center; font-size: 0.72rem; color: #94a3b8; line-height: 1.6;">
                 <a href="javascript:void(0)" onclick="openPoliciesModal('privacy')" style="color: #78350f; text-decoration: none; font-weight: 600;">රහස්‍යතා ප්‍රතිපත්තිය</a> • 
                 <a href="javascript:void(0)" onclick="openPoliciesModal('terms')" style="color: #78350f; text-decoration: none; font-weight: 600;">භාවිත කොන්දේසි</a> • 
-                <a href="javascript:void(0)" onclick="openPoliciesModal('about')" style="color: #78350f; text-decoration: none; font-weight: 600;">පිං පොත ගැන</a>
+                <a href="pages/about.html" style="color: #78350f; text-decoration: none; font-weight: 600;">අප ගැන (About)</a>
                 <div style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed rgba(217, 119, 6, 0.15); font-size: 0.68rem;">
                     <a href="pages/samanta-patthana.html" style="color: #92400e; text-decoration: none;">සමන්ත පට්ඨානය</a> • 
                     <a href="pages/bodhipuja-kavi.html" style="color: #92400e; text-decoration: none;">බෝධිපූජා කවි</a> • 
                     <a href="pages/thun-suthraya.html" style="color: #92400e; text-decoration: none;">තුන් සූත්‍රය</a> • 
                     <a href="pages/aranya-senasana.html" style="color: #92400e; text-decoration: none;">ආරණ්‍ය සේනාසන</a> • 
-                    <a href="pages/vihara-sithuwam.html" style="color: #92400e; text-decoration: none;">විහාර සිතුවම්</a>
+                    <a href="pages/vihara-sithuwam.html" style="color: #92400e; text-decoration: none;">විහාර සිතුවම්</a> • 
+                    <a href="pages/about.html" style="color: #92400e; text-decoration: none; font-weight: 600;">අප ගැන</a>
                 </div>
-                <div style="margin-top: 5px; font-size: 0.68rem; color: #64748b;">© 2026 පිං පොත • A Digital Initiative by <strong style="color: #0284c7; font-weight: 700;">NexiaProLanka</strong></div>
+                <div style="margin-top: 5px; font-size: 0.68rem; color: #64748b;">© 2026 ApePinPotha.lk | සංකල්පය සහ තාක්ෂණික නිර්මාණය: <a href="pages/about.html" style="color: #0284c7; text-decoration: none; font-weight: 700;">මලිත් දුෂාන්ත හපුතන්ත්‍රි (NexiaProLanka)</a></div>
             </div>
 
         </aside>
