@@ -13879,6 +13879,10 @@ body.dark-mode .spotlight-artisan-district {
 
 /* Print Styles */
 @media print {
+  @page {
+    size: A4 portrait;
+    margin: 14mm 15mm;
+  }
   body * {
     visibility: hidden;
   }
@@ -13911,17 +13915,28 @@ body.dark-mode .spotlight-artisan-district {
   .reading-section-card {
     border: none !important;
     box-shadow: none !important;
-    page-break-inside: avoid;
-    padding: 0 0 20px 0 !important;
+    padding: 0 0 18px 0 !important;
+    height: auto !important;
+  }
+  .reading-section-heading {
+    break-after: avoid !important;
+    page-break-after: avoid !important;
+    font-size: 13.5pt !important;
   }
   .reading-verse-pali {
     color: #000000 !important;
-    font-size: 12pt !important;
+    font-size: 11.5pt !important;
+    line-height: 1.65 !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
   .reading-meaning-box {
     background: #f8f9fa !important;
     border-left: 3px solid #333333 !important;
     color: #222222 !important;
-    font-size: 10pt !important;
+    font-size: 10.5pt !important;
+    line-height: 1.65 !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 }

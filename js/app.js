@@ -14255,18 +14255,51 @@ window.printLibraryItem = function(itemId) {
 
   const doc = iframe.contentWindow.document;
 
+  // Helper to split Sinhala meaning into natural, non-breaking stanza blocks
+  const splitMeaningBlocks = (text) => {
+    if (!text) return [];
+    const parts = text.split(/\n\s*\n/).filter(p => p.trim());
+    const result = [];
+    parts.forEach(part => {
+      if (/\n\s*\d+\.\s/.test(part)) {
+        const sub = part.split(/\n(?=\s*\d+\.\s)/).filter(s => s.trim());
+        result.push(...sub);
+      } else {
+        result.push(part);
+      }
+    });
+    return result;
+  };
+
   const sectionsHtml = (item.sections || []).map((sec, idx) => {
+    // Split pali by double newlines into natural stanza blocks so each stanza avoids splitting mid-verse
+    const paliBlocks = (sec.pali || '').split(/\n\s*\n/).filter(s => s.trim());
+    const paliHtml = paliBlocks.map(block => `
+      <div class="print-stanza">
+        <div class="print-pali">${block.trim()}</div>
+      </div>
+    `).join('');
+
+    let meaningHtml = '';
+    const meaningBlocks = splitMeaningBlocks(sec.sinhalaMeaning);
+    if (meaningBlocks.length > 0) {
+      meaningHtml = `
+        <div class="print-meaning-wrap">
+          <div class="meaning-title">සිංහල අර්ථය:</div>
+          ${meaningBlocks.map(mBlock => `
+            <div class="print-meaning-block">${mBlock.trim()}</div>
+          `).join('')}
+        </div>
+      `;
+    }
+
     return `
       <section class="print-section">
         <h3 class="print-heading">
           <span class="heading-num">${idx + 1}.</span> ${sec.heading}
         </h3>
-        <div class="print-pali">${sec.pali}</div>
-        ${sec.sinhalaMeaning ? `
-        <div class="print-meaning">
-          <div class="meaning-title">සිංහල අර්ථය:</div>
-          <div class="meaning-text">${sec.sinhalaMeaning}</div>
-        </div>` : ''}
+        ${paliHtml}
+        ${meaningHtml}
       </section>
     `;
   }).join('');
@@ -14279,7 +14312,7 @@ window.printLibraryItem = function(itemId) {
   <style>
     @page {
       size: A4 portrait;
-      margin: 18mm 16mm;
+      margin: 14mm 15mm;
     }
     *, *::before, *::after {
       box-sizing: border-box;
@@ -14287,8 +14320,11 @@ window.printLibraryItem = function(itemId) {
       print-color-adjust: exact !important;
     }
     html, body {
+      width: 100%;
+      max-width: 100%;
       margin: 0;
       padding: 0;
+      box-sizing: border-box;
       background: #ffffff;
       color: #1e293b;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Sinhala", "Iskoola Pota", Arial, sans-serif;
@@ -14301,7 +14337,7 @@ window.printLibraryItem = function(itemId) {
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      width: 115mm;
+      width: 105mm;
       max-width: 80%;
       opacity: 0.08;
       z-index: 0;
@@ -14310,17 +14346,21 @@ window.printLibraryItem = function(itemId) {
     .print-content-wrapper {
       position: relative;
       z-index: 1;
+      width: 100%;
+      max-width: 100%;
       height: auto;
       overflow: visible;
     }
     /* Clean Header on first page */
     .print-header {
       border-bottom: 2px solid #7c2d12;
-      padding-bottom: 12px;
-      margin-bottom: 20px;
+      padding-bottom: 10px;
+      margin-bottom: 16px;
       display: flex;
       justify-content: space-between;
       align-items: flex-end;
+      break-after: avoid;
+      page-break-after: avoid;
     }
     .print-title {
       font-size: 18pt;
@@ -14350,55 +14390,70 @@ window.printLibraryItem = function(itemId) {
       font-size: 8.5pt;
       color: #78350f;
     }
-    /* Section / Verse Styling with Page Break Avoidance */
+    /* Section & Natural Page Flow */
     .print-section {
-      break-inside: avoid;
-      page-break-inside: avoid;
-      margin-bottom: 18px;
-      padding: 12px 14px;
-      background: #fafaf9;
-      border: 1px solid #e7e5e4;
-      border-radius: 8px;
+      margin-bottom: 20px;
+      height: auto;
+      overflow: visible;
     }
     .print-heading {
-      font-size: 12.5pt;
+      font-size: 13.5pt;
       font-weight: 800;
       color: #7c2d12;
-      margin: 0 0 10px;
+      margin: 16px 0 10px;
       padding-bottom: 6px;
-      border-bottom: 1px dashed #d6d3d1;
+      border-bottom: 1.5px solid #fed7aa;
+      break-after: avoid;
+      page-break-after: avoid;
     }
     .heading-num {
       color: #c2410c;
       margin-right: 4px;
     }
+    /* Stanza Block: Prevents breaking mid-verse */
+    .print-stanza {
+      break-inside: avoid;
+      page-break-inside: avoid;
+      margin-bottom: 12px;
+    }
     .print-pali {
-      font-size: 11pt;
+      font-size: 11.5pt;
       font-weight: 700;
       color: #431407;
-      line-height: 1.85;
+      line-height: 1.65;
       white-space: pre-line;
-      margin-bottom: 10px;
     }
-    .print-meaning {
-      background: #ffffff;
+    /* Meaning Block: Natural flow container with stanza-level avoid-break */
+    .print-meaning-wrap {
+      margin-top: 10px;
+      margin-bottom: 14px;
+      padding: 10px 14px;
+      background: #fafaf9;
       border-left: 3px solid #ea580c;
       border-radius: 4px;
-      padding: 8px 12px;
-      margin-top: 8px;
-      font-size: 9.5pt;
-      line-height: 1.6;
-      color: #334155;
+      height: auto;
+      overflow: visible;
     }
     .meaning-title {
-      font-weight: 700;
-      font-size: 8.5pt;
+      font-weight: 800;
+      font-size: 9pt;
       color: #9a3412;
       text-transform: uppercase;
-      margin-bottom: 4px;
+      margin-bottom: 6px;
+      break-after: avoid;
+      page-break-after: avoid;
     }
-    .meaning-text {
+    .print-meaning-block {
+      font-size: 10.5pt;
+      line-height: 1.65;
+      color: #334155;
       white-space: pre-line;
+      break-inside: avoid;
+      page-break-inside: avoid;
+      margin-bottom: 8px;
+    }
+    .print-meaning-block:last-child {
+      margin-bottom: 0;
     }
     /* Footer */
     .print-footer {
