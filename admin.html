@@ -1360,6 +1360,74 @@
                 align-self: flex-end;
             }
         }
+
+        /* Poya Ambient Effect Toggle & Style Selector */
+        .switch-toggle {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 28px;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .switch-toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .switch-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #334155;
+            transition: .25s ease;
+            border-radius: 28px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        .switch-slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background-color: #ffffff;
+            transition: .25s ease;
+            border-radius: 50%;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
+        }
+        .switch-toggle input:checked + .switch-slider {
+            background: linear-gradient(135deg, #10b981, #059669);
+            border-color: rgba(16, 185, 129, 0.4);
+        }
+        .switch-toggle input:checked + .switch-slider:before {
+            transform: translateX(22px);
+        }
+        .poya-theme-btn {
+            background: transparent;
+            color: #94a3b8;
+            border: 1px solid transparent;
+            font-weight: 600;
+            font-size: 0.8rem;
+            padding: 6px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .poya-theme-btn:hover {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .poya-theme-btn.active {
+            background: var(--gold-gradient);
+            color: #451a03;
+            font-weight: 800;
+            border-color: transparent;
+            box-shadow: 0 2px 8px rgba(245, 158, 11, 0.25);
+        }
     </style>
 </head>
 <body>
@@ -1502,6 +1570,52 @@
 
         <!-- ================= TAB 1: OVERVIEW & GROWTH CHART ================= -->
         <section id="sectionOverview" class="admin-section active">
+
+            <!-- 🌕 Poya Day Ambient Falling Petals / Bodhi Leaves Feature (Visible to Master & Sub Admins) -->
+            <div class="glass-panel" style="border: 1px solid rgba(245, 158, 11, 0.45); background: linear-gradient(145deg, rgba(30, 41, 59, 0.85), rgba(245, 158, 11, 0.08)); margin-bottom: 24px; position: relative; overflow: hidden;">
+                <div style="position: absolute; top: -10px; right: 15px; font-size: 5rem; opacity: 0.06; pointer-events: none; user-select: none;">🌕</div>
+                <div class="panel-header" style="flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;">
+                    <div class="panel-title" style="color: var(--gold-light); display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.45rem; line-height: 1;">🌕</span>
+                        <div>
+                            <span style="font-weight: 800; font-size: 1.05rem;">පෝය දින විශේෂ සැකසුම් (Poya Day Ambient Effect)</span>
+                            <div style="font-size: 0.74rem; color: var(--text-secondary); font-family: var(--font-main); font-weight: 500; margin-top: 2px;">
+                                පෝය සහ උතුම් ආගමික උත්සව දිනයන්හිදී වෙබ් අඩවිය පුරා සුදු මල් පෙති හෝ රන්වන් බෝ පත් පාවීමේ සජීවී ආචරණය (Live Ambient Petals / Bodhi Leaves)
+                            </div>
+                        </div>
+                    </div>
+                    <div id="poyaEffectStatusBadge" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 9999px; font-size: 0.76rem; font-weight: 700; background: rgba(100, 116, 139, 0.2); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.25);">
+                        <i class="fa-solid fa-circle" style="font-size: 0.5rem;"></i> අක්‍රියයි (OFF)
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center; justify-content: space-between; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+                    <!-- Toggle Switch -->
+                    <div style="display: flex; align-items: center; gap: 14px;">
+                        <label class="switch-toggle" title="පෝය ආචරණය සක්‍රිය හෝ අක්‍රිය කරන්න">
+                            <input type="checkbox" id="poyaEffectToggle" onchange="handlePoyaEffectToggle(this.checked)">
+                            <span class="switch-slider"></span>
+                        </label>
+                        <div>
+                            <div style="font-weight: 700; font-size: 0.92rem; color: #f1f5f9;">ආචරණය සක්‍රිය කරන්න (Enable Ambient Effect)</div>
+                            <div style="font-size: 0.73rem; color: #94a3b8;" id="poyaLastUpdatedText">තොරතුරු ලබාගනිමින් පවතී...</div>
+                        </div>
+                    </div>
+
+                    <!-- Theme Style Selector -->
+                    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                        <span style="font-size: 0.8rem; font-weight: 600; color: #cbd5e1;">තේමාව (Theme Style):</span>
+                        <div style="display: inline-flex; background: rgba(15, 23, 42, 0.65); padding: 3px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.1);">
+                            <button type="button" id="btnThemePetals" onclick="handlePoyaThemeSelect('petals')" class="poya-theme-btn active">
+                                🌸 සුදු මල් පෙති (White Petals)
+                            </button>
+                            <button type="button" id="btnThemeBodhi" onclick="handlePoyaThemeSelect('bodhi')" class="poya-theme-btn">
+                                🍃 රන්වන් බෝ පත් (Golden Bodhi Leaves)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <div class="glass-panel">
                 <div class="panel-header">
                     <div class="panel-title">

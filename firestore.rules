@@ -158,5 +158,15 @@ service cloud.firestore {
       // 7.4. Deletes: Admins only
       allow delete: if isAdmin();
     }
+
+    // =========================================================================
+    // 8. වෙබ් අඩවි සැකසුම් (Site Settings, e.g. Poya Ambient Effect)
+    // =========================================================================
+    match /site_settings/{docId} {
+      // 8.1. Anyone can read site settings for ambient UI features
+      allow read: if true;
+      // 8.2. Both Master Admin and Sub Admins can toggle and update site settings
+      allow write: if isAdmin();
+    }
   }
 }

@@ -38,5 +38,6 @@ export const COLLECTIONS = {
   ARANYA: "aranya_senasana",
   ARTISANS: "temple_artisans",
   ARTISAN_APPLICATIONS: "artisan_applications",
-  DHAMMA_SUBMISSIONS: "dhamma_library_submissions"
+  DHAMMA_SUBMISSIONS: "dhamma_library_submissions",
+  SITE_SETTINGS: "site_settings"
 };

@@ -289,7 +289,174 @@ function subscribeToSettings() {
                 }
             }
         });
+
+        // Live subscription to Poya Day Ambient Effect setting in site_settings/poya_effect
+        onSnapshot(doc(db, COLLECTIONS.SITE_SETTINGS || 'site_settings', 'poya_effect'), (snap) => {
+            const data = snap.exists() ? snap.data() : { enabled: false, theme: 'petals' };
+            currentPoyaEffectState = {
+                enabled: !!data.enabled,
+                theme: data.theme === 'bodhi' ? 'bodhi' : 'petals',
+                updatedBy: data.updatedBy || '',
+                updatedAt: data.updatedAt || null
+            };
+            updatePoyaEffectAdminUI(currentPoyaEffectState);
+        }, (err) => {
+            console.warn('[Admin] Poya effect onSnapshot note:', err);
+        });
     });
+}
+
+// ============================================================================
+// 2.1 POYA DAY AMBIENT EFFECT CONTROLLER (MASTER & SUB-ADMINS)
+// ============================================================================
+
+let currentPoyaEffectState = {
+    enabled: false,
+    theme: 'petals',
+    updatedBy: '',
+    updatedAt: null
+};
+
+function updatePoyaEffectAdminUI(state) {
+    const toggleEl = document.getElementById('poyaEffectToggle');
+    const badgeEl = document.getElementById('poyaEffectStatusBadge');
+    const updatedTextEl = document.getElementById('poyaLastUpdatedText');
+    const btnPetals = document.getElementById('btnThemePetals');
+    const btnBodhi = document.getElementById('btnThemeBodhi');
+
+    if (toggleEl) {
+        toggleEl.checked = !!state.enabled;
+    }
+
+    if (badgeEl) {
+        if (state.enabled) {
+            badgeEl.innerHTML = '<i class="fa-solid fa-circle" style="font-size: 0.5rem; color: #10b981;"></i> සක්‍රියයි (LIVE ON)';
+            badgeEl.style.background = 'rgba(16, 185, 129, 0.2)';
+            badgeEl.style.color = '#34d399';
+            badgeEl.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+        } else {
+            badgeEl.innerHTML = '<i class="fa-solid fa-circle" style="font-size: 0.5rem; color: #94a3b8;"></i> අක්‍රියයි (OFF)';
+            badgeEl.style.background = 'rgba(100, 116, 139, 0.2)';
+            badgeEl.style.color = '#94a3b8';
+            badgeEl.style.borderColor = 'rgba(148, 163, 184, 0.25)';
+        }
+    }
+
+    if (btnPetals && btnBodhi) {
+        if (state.theme === 'bodhi') {
+            btnBodhi.classList.add('active');
+            btnPetals.classList.remove('active');
+        } else {
+            btnPetals.classList.add('active');
+            btnBodhi.classList.remove('active');
+        }
+    }
+
+    if (updatedTextEl) {
+        let updatedTimeStr = '';
+        if (state.updatedAt) {
+            try {
+                const dateObj = state.updatedAt.toDate ? state.updatedAt.toDate() : new Date(state.updatedAt);
+                updatedTimeStr = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' (' + dateObj.toLocaleDateString() + ')';
+            } catch(e) {}
+        }
+        const by = state.updatedBy ? ` (මඟින්: ${state.updatedBy})` : '';
+        updatedTextEl.innerText = state.enabled 
+            ? `සක්‍රිය කර ඇත${by} ${updatedTimeStr ? '• ' + updatedTimeStr : ''}` 
+            : `අක්‍රියයි${by} ${updatedTimeStr ? '• ' + updatedTimeStr : ''}`;
+    }
+}
+
+window.handlePoyaEffectToggle = async function(isEnabled) {
+    if (!currentAdminUser) {
+        alert('කරුණාකර ප්‍රථමයෙන් පරිපාලක ලෙස ලොග් වන්න.');
+        return;
+    }
+
+    const newTheme = currentPoyaEffectState.theme || 'petals';
+    try {
+        const { doc, setDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const docRef = doc(db, COLLECTIONS.SITE_SETTINGS || 'site_settings', 'poya_effect');
+        await setDoc(docRef, {
+            enabled: Boolean(isEnabled),
+            theme: newTheme,
+            updatedBy: currentAdminUser.email || currentAdminUser.displayName || 'Admin',
+            updatedAt: serverTimestamp()
+        }, { merge: true });
+
+        currentPoyaEffectState.enabled = Boolean(isEnabled);
+        updatePoyaEffectAdminUI(currentPoyaEffectState);
+
+        const statusMsg = isEnabled 
+            ? (newTheme === 'bodhi' ? '🌕 පෝය ආචරණය සක්‍රිය විය: රන්වන් බෝ පත් 🍃' : '🌕 පෝය ආචරණය සක්‍රිය විය: සුදු මල් පෙති 🌸')
+            : '🌕 පෝය ආචරණය අක්‍රිය කරන ලදී.';
+        showAdminToast(statusMsg, isEnabled ? 'success' : 'info');
+
+        await recordAuditLog(
+            'Poya Ambient Effect Toggled',
+            `Poya ambient effect ${isEnabled ? 'ENABLED (' + newTheme + ')' : 'DISABLED'} by ${currentAdminUser.email || 'Admin'}`
+        );
+    } catch (err) {
+        console.error('[Admin] handlePoyaEffectToggle error:', err);
+        alert('සැකසුම් සුරැකීමේදී දෝෂයක් ඇතිවිය: ' + err.message);
+        // Revert toggle UI
+        const toggleEl = document.getElementById('poyaEffectToggle');
+        if (toggleEl) toggleEl.checked = currentPoyaEffectState.enabled;
+    }
+};
+
+window.handlePoyaThemeSelect = async function(theme) {
+    if (!currentAdminUser) {
+        alert('කරුණාකර ප්‍රථමයෙන් පරිපාලක ලෙස ලොග් වන්න.');
+        return;
+    }
+
+    const selectedTheme = theme === 'bodhi' ? 'bodhi' : 'petals';
+    currentPoyaEffectState.theme = selectedTheme;
+    updatePoyaEffectAdminUI(currentPoyaEffectState);
+
+    try {
+        const { doc, setDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const docRef = doc(db, COLLECTIONS.SITE_SETTINGS || 'site_settings', 'poya_effect');
+        await setDoc(docRef, {
+            enabled: Boolean(currentPoyaEffectState.enabled),
+            theme: selectedTheme,
+            updatedBy: currentAdminUser.email || currentAdminUser.displayName || 'Admin',
+            updatedAt: serverTimestamp()
+        }, { merge: true });
+
+        const themeName = selectedTheme === 'bodhi' ? 'රන්වන් බෝ පත් 🍃' : 'සුදු මල් පෙති 🌸';
+        showAdminToast(`තේමාව වෙනස් විය: ${themeName}`, 'success');
+
+        await recordAuditLog(
+            'Poya Ambient Theme Changed',
+            `Poya ambient effect theme changed to ${selectedTheme} by ${currentAdminUser.email || 'Admin'}`
+        );
+    } catch (err) {
+        console.error('[Admin] handlePoyaThemeSelect error:', err);
+        alert('තේමාව සුරැකීමේදී දෝෂයක් ඇතිවිය: ' + err.message);
+    }
+};
+
+function showAdminToast(msg, type = 'info') {
+    let toastEl = document.getElementById('adminLiveToast');
+    if (!toastEl) {
+        toastEl = document.createElement('div');
+        toastEl.id = 'adminLiveToast';
+        toastEl.style.cssText = 'position: fixed; bottom: 30px; right: 30px; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(12px); color: #ffffff; padding: 12px 22px; border-radius: 12px; font-size: 0.86rem; font-weight: 700; box-shadow: 0 10px 30px rgba(0,0,0,0.4); z-index: 999999; display: flex; align-items: center; gap: 10px; opacity: 0; transform: translateY(20px); transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1); border: 1px solid rgba(245, 158, 11, 0.3); font-family: var(--font-sinhala);';
+        document.body.appendChild(toastEl);
+    }
+    const icon = type === 'success' ? '✨' : (type === 'error' ? '⚠️' : '🌕');
+    toastEl.innerHTML = `<span>${icon}</span> <span>${msg}</span>`;
+    toastEl.style.opacity = '1';
+    toastEl.style.transform = 'translateY(0)';
+    clearTimeout(window._adminToastTimeout);
+    window._adminToastTimeout = setTimeout(() => {
+        if (toastEl) {
+            toastEl.style.opacity = '0';
+            toastEl.style.transform = 'translateY(20px)';
+        }
+    }, 3500);
 }
 
 // ============================================================================
