@@ -10,8 +10,9 @@ import { uploadToImgBB, uploadToCloudinary } from './imgbb-service.js?v=68';
 import { SoundService, triggerHaptic } from './sound.js?v=66';
 import { FeedAlgorithm } from './algorithm.js?v=144';
 import { SPIRITUAL_AVATARS, renderSpiritualAvatarPicker, selectSpiritualAvatar } from './spiritual-avatars.js?v=144';
-import { DHAMMA_LIBRARY_ITEMS } from './dhamma-library-data.js?v=1';
+import { DHAMMA_LIBRARY_ITEMS, DHAMMA_CATEGORIES } from './dhamma-library-data.js?v=2';
 window.DHAMMA_LIBRARY_ITEMS = DHAMMA_LIBRARY_ITEMS;
+window.DHAMMA_CATEGORIES = DHAMMA_CATEGORIES;
 export const BO_LEAF_AVATAR = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjggMTI4IiB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCI+CiAgPGRlZnM+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImdfYm9fbGVhZiIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNkY2ZjZTciLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjZDFmYWU1Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGZpbHRlciBpZD0iZl9ib19sZWFmIiB4PSItMjAlIiB5PSItMjAlIiB3aWR0aD0iMTQwJSIgaGVpZ2h0PSIxNDAlIj4KICAgICAgPGZlRHJvcFNoYWRvdyBkeD0iMCIgZHk9IjMiIHN0ZERldmlhdGlvbj0iMyIgZmxvb2Qtb3BhY2l0eT0iMC4xOCIgZmxvb2QtY29sb3I9IiM0NTFhMDMiLz4KICAgIDwvZmlsdGVyPgogIDwvZGVmcz4KICA8Y2lyY2xlIGN4PSI2NCIgY3k9IjY0IiByPSI2MSIgZmlsbD0idXJsKCNnX2JvX2xlYWYpIiBzdHJva2U9IiMxMGI5ODEiIHN0cm9rZS13aWR0aD0iMi41Ii8+CiAgPHRleHQgeD0iNjQiIHk9IjgwIiBmb250LXNpemU9IjU4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iJ0FwcGxlIENvbG9yIEVtb2ppJywnU2Vnb2UgVUkgRW1vamknLCdOb3RvIENvbG9yIEVtb2ppJywnU2Vnb2UgVUkgU3ltYm9sJyxzYW5zLXNlcmlmIiBmaWx0ZXI9InVybCgjZl9ib19sZWFmKSI+8J+MvzwvdGV4dD4KPC9zdmc+";
 let allCommunityMembersCache = [];
 let infiniteScrollObserver = null;
@@ -1814,6 +1815,7 @@ window.switchTab = function(tab, pushHistory = true) {
     if (banner) banner.style.display = 'none';
 
     try {
+      loadApprovedDhammaLibrarySubmissions();
       renderDhammaLibraryView();
     } catch (err) {
       console.error('[DhammaLibrary] Error rendering library view:', err);
@@ -13921,12 +13923,65 @@ if (!['light', 'sepia', 'dark'].includes(currentReadingTheme)) {
 }
 let showReadingMeaning = localStorage.getItem('pinPotha_reading_show_meaning') !== 'false';
 
+// Dynamic approved submissions cache
+let _cachedApprovedDhammaSubmissions = [];
+
+// Helper to get all combined library items (static items + approved submissions)
+window.getAllDhammaLibraryItems = function() {
+  const staticItems = window.DHAMMA_LIBRARY_ITEMS || DHAMMA_LIBRARY_ITEMS || [];
+  const submissions = Array.isArray(_cachedApprovedDhammaSubmissions) ? _cachedApprovedDhammaSubmissions : [];
+  
+  // Format submission docs to match library item schema
+  const formattedSubmissions = submissions.map(sub => {
+    let catLabel = sub.categoryLabel;
+    if (!catLabel) {
+      const foundCat = (window.DHAMMA_CATEGORIES || []).find(c => c.id === sub.category);
+      catLabel = foundCat ? foundCat.label : 'ධර්ම කරුණු';
+    }
+    return {
+      id: sub.id,
+      title: sub.title || 'ධර්ම කරුණු',
+      subtitle: sub.subtitle || '',
+      category: sub.category || 'dhamma',
+      categoryLabel: catLabel,
+      readTime: sub.readTime || 'විනාඩි 5',
+      pdfUrl: sub.pdfUrl || '',
+      sections: (sub.sections || []).map(s => ({
+        heading: s.title || s.heading || '',
+        pali: s.pali || '',
+        sinhalaMeaning: s.sinhalaMeaning || ''
+      })),
+      isUserContributed: true,
+      authorUid: sub.authorUid || '',
+      authorName: sub.authorName || 'කල්‍යාණ මිත්‍ර සාමාජික',
+      authorPhoto: sub.authorPhoto || '',
+      sadhuCount: sub.sadhuCount || 0,
+      sadhuUsers: Array.isArray(sub.sadhuUsers) ? sub.sadhuUsers : []
+    };
+  });
+
+  return [...staticItems, ...formattedSubmissions];
+};
+
+// Asynchronously load approved Dhamma Library submissions from cloud
+window.loadApprovedDhammaLibrarySubmissions = async function() {
+  try {
+    const list = await StorageService.getApprovedDhammaSubmissions();
+    if (Array.isArray(list)) {
+      _cachedApprovedDhammaSubmissions = list;
+      renderDhammaLibraryView();
+    }
+  } catch (err) {
+    console.warn('[DhammaLibrary] Could not fetch approved contributions:', err);
+  }
+};
+
 // Render Dhamma Library cards grid
 window.renderDhammaLibraryView = function(category = currentLibraryCategory, searchQuery = currentLibrarySearchQuery) {
   currentLibraryCategory = category;
   currentLibrarySearchQuery = searchQuery;
 
-  const items = window.DHAMMA_LIBRARY_ITEMS || DHAMMA_LIBRARY_ITEMS || [];
+  const items = getAllDhammaLibraryItems();
   const grid = document.getElementById('libraryItemsGrid');
   const emptyState = document.getElementById('libraryEmptyState');
   const countEl = document.getElementById('libraryResultsCount');
@@ -13940,17 +13995,18 @@ window.renderDhammaLibraryView = function(category = currentLibraryCategory, sea
     if (category !== 'all' && item.category !== category) {
       return false;
     }
-    // Search match across title, subtitle, or verses
+    // Search match across title, subtitle, category, or verses
     if (q) {
       const matchTitle = (item.title || '').toLowerCase().includes(q);
       const matchSub = (item.subtitle || '').toLowerCase().includes(q);
       const matchCategory = (item.categoryLabel || '').toLowerCase().includes(q);
+      const matchAuthor = (item.authorName || '').toLowerCase().includes(q);
       const matchSection = (item.sections || []).some(s => 
         (s.heading || '').toLowerCase().includes(q) ||
         (s.pali || '').toLowerCase().includes(q) ||
         (s.sinhalaMeaning || '').toLowerCase().includes(q)
       );
-      return matchTitle || matchSub || matchCategory || matchSection;
+      return matchTitle || matchSub || matchCategory || matchAuthor || matchSection;
     }
     return true;
   });
@@ -13978,14 +14034,28 @@ window.renderDhammaLibraryView = function(category = currentLibraryCategory, sea
   grid.innerHTML = filtered.map(item => {
     const isPirith = item.category === 'pirith';
     const isBodhipuja = item.category === 'bodhipuja';
-    const catIcon = isPirith ? '🪷' : (isBodhipuja ? '🌸' : '📖');
+    const isKavi = item.category === 'kavi';
+    const isGatha = item.category === 'gatha';
+    const catIcon = isPirith ? '🪷' : (isBodhipuja ? '🌸' : (isKavi ? '📜' : (isGatha ? '🙏' : '📖')));
+
+    // Contributor credit badge for community submitted books
+    const contributorBadgeHtml = item.isUserContributed && item.authorName ? `
+      <div class="library-contributor-tag" style="display: flex; align-items: center; gap: 6px; background: #fffbeb; border: 1px solid #fde68a; padding: 4px 10px; border-radius: 9999px; margin-bottom: 10px; width: fit-content; max-width: 100%;">
+        <img src="${item.authorPhoto || 'assets/default-avatar.png'}" alt="" style="width: 20px; height: 20px; border-radius: 50%; object-fit: cover; border: 1.5px solid #d97706; flex-shrink: 0;">
+        <span style="font-size: 0.73rem; color: #78350f; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+          දායකත්වය: ${item.authorName}
+        </span>
+        ${item.sadhuCount > 0 ? `<span style="background: rgba(217, 119, 6, 0.15); color: #b45309; padding: 1px 6px; border-radius: 8px; font-size: 0.7rem; font-weight: 800;">🙏 ${item.sadhuCount}</span>` : ''}
+      </div>
+    ` : '';
 
     return `
-      <div class="library-card" data-item-id="${item.id}">
+      <div class="library-card ${item.isUserContributed ? 'library-card-user-contributed' : ''}" data-item-id="${item.id}">
         <div class="library-card-badge-row">
           <span class="library-category-badge">${catIcon} ${item.categoryLabel}</span>
           <span class="library-read-time"><i class="fa-regular fa-clock"></i> ${item.readTime}</span>
         </div>
+        ${contributorBadgeHtml}
         <h2 class="library-card-title">${item.title}</h2>
         <p class="library-card-desc">${item.subtitle}</p>
         <div class="library-card-actions">
@@ -14052,7 +14122,7 @@ window.setDhammaLibraryCategory = function(cat) {
 // Mobile & Desktop Reading Mode Controller
 window.openReadingModal = function(itemId) {
   triggerHaptic(15);
-  const items = window.DHAMMA_LIBRARY_ITEMS || DHAMMA_LIBRARY_ITEMS || [];
+  const items = getAllDhammaLibraryItems();
   const item = items.find(i => i.id === itemId);
   if (!item) return;
 
@@ -14067,10 +14137,43 @@ window.openReadingModal = function(itemId) {
   const progressBar = document.getElementById('readingProgressBar');
   const meaningToggle = document.getElementById('readingMeaningToggle');
 
+  // Contributor elements
+  const contribHeaderBadge = document.getElementById('readingModalContributorBadge');
+  const contribAvatar = document.getElementById('readingContributorAvatar');
+  const contribName = document.getElementById('readingContributorName');
+  const contribFooterCard = document.getElementById('readingModalContributorFooter');
+  const sadhuBadge = document.getElementById('readingSadhuCountBadge');
+  const sadhuBadgeBottom = document.getElementById('readingSadhuCountBadgeBottom');
+
   if (!modal || !contentInner) return;
 
   if (titleEl) titleEl.textContent = item.title;
   if (catEl) catEl.textContent = item.categoryLabel;
+
+  // Setup contributor badge & footer if item is user-contributed
+  if (item.isUserContributed && item.authorName) {
+    if (contribHeaderBadge) {
+      contribHeaderBadge.classList.remove('hidden');
+      contribHeaderBadge.style.display = 'flex';
+    }
+    if (contribAvatar) contribAvatar.src = item.authorPhoto || 'assets/default-avatar.png';
+    if (contribName) contribName.textContent = item.authorName;
+    if (contribFooterCard) {
+      contribFooterCard.classList.remove('hidden');
+      contribFooterCard.style.display = 'block';
+    }
+    if (sadhuBadge) sadhuBadge.textContent = item.sadhuCount || 0;
+    if (sadhuBadgeBottom) sadhuBadgeBottom.textContent = item.sadhuCount || 0;
+  } else {
+    if (contribHeaderBadge) {
+      contribHeaderBadge.classList.add('hidden');
+      contribHeaderBadge.style.display = 'none';
+    }
+    if (contribFooterCard) {
+      contribFooterCard.classList.add('hidden');
+      contribFooterCard.style.display = 'none';
+    }
+  }
 
   // Apply saved theme
   if (modal) {
@@ -14111,11 +14214,13 @@ window.openReadingModal = function(itemId) {
           <i class="fa-solid fa-dharmachakra" style="color: #ea580c; font-size: 0.9em;"></i>
           <span>${displayHeading}</span>
         </h3>
-        <div class="reading-verse-pali">${sec.pali}</div>
-        <div class="reading-meaning-box">
-          <strong><i class="fa-solid fa-circle-info" style="margin-right: 4px;"></i> සිංහල තේරුම:</strong>
-          <span>${sec.sinhalaMeaning}</span>
-        </div>
+        <div class="reading-verse-pali">${sec.pali || ''}</div>
+        ${sec.sinhalaMeaning ? `
+          <div class="reading-meaning-box">
+            <strong><i class="fa-solid fa-circle-info" style="margin-right: 4px;"></i> සිංහල තේරුම:</strong>
+            <span>${sec.sinhalaMeaning}</span>
+          </div>
+        ` : ''}
       </section>
     `;
   }).join('');
@@ -14159,6 +14264,217 @@ window.changeReadingFontSize = function(delta) {
 
   const sizeDisplay = document.getElementById('readingFontSizeDisplay');
   if (sizeDisplay) sizeDisplay.textContent = `${currentReadingFontSize}%`;
+};
+
+// Handle Sadhu reaction inside reading modal
+window.handleReadingSadhuClick = async function() {
+  triggerHaptic(20);
+  if (!StorageService.currentUser || !StorageService.currentUser.uid) {
+    if (typeof showAuthRequiredModal === 'function') {
+      showAuthRequiredModal('ධර්ම දානය සඳහා සාදුකාර දීමට');
+    } else {
+      alert('කරුණාකර පළමුව ලොග් වන්න.');
+    }
+    return;
+  }
+
+  if (!activeReadingItemId) return;
+  const items = getAllDhammaLibraryItems();
+  const item = items.find(i => i.id === activeReadingItemId);
+  if (!item) return;
+
+  const userUid = StorageService.currentUser.uid;
+  if (Array.isArray(item.sadhuUsers) && item.sadhuUsers.includes(userUid)) {
+    alert('ඔබ දැනටමත් මෙම ධර්ම දානයට සාදුකාර දී ඇත. සාදු! සාදු! සාදු!');
+    return;
+  }
+
+  try {
+    const res = await StorageService.giveDhammaSadhu(item.id);
+    if (res.alreadyGiven) {
+      alert('ඔබ දැනටමත් මෙම ධර්ම දානයට සාදුකාර දී ඇත.');
+      return;
+    }
+
+    if (!Array.isArray(item.sadhuUsers)) item.sadhuUsers = [];
+    item.sadhuUsers.push(userUid);
+    item.sadhuCount = (item.sadhuCount || 0) + 1;
+
+    const sadhuBadge = document.getElementById('readingSadhuCountBadge');
+    const sadhuBadgeBottom = document.getElementById('readingSadhuCountBadgeBottom');
+    if (sadhuBadge) sadhuBadge.textContent = item.sadhuCount;
+    if (sadhuBadgeBottom) sadhuBadgeBottom.textContent = item.sadhuCount;
+
+    alert('සාදු! සාදු! සාදු! ඔබගේ පින් අනුමෝදනාව සටහන් විය.');
+    renderDhammaLibraryView();
+  } catch (err) {
+    console.error('[Reading Mode] Sadhu error:', err);
+  }
+};
+
+// ----------------------------------------------------------------------------
+// Member Dhamma Library Contribution Submission Modal Controls
+// ----------------------------------------------------------------------------
+
+window.openDhammaContributeModal = function() {
+  triggerHaptic(12);
+  if (!StorageService.currentUser || !StorageService.currentUser.uid) {
+    if (typeof showAuthRequiredModal === 'function') {
+      showAuthRequiredModal('ධර්ම දානයක් එකතු කිරීමට');
+    } else {
+      alert('ධර්ම දානයක් එක් කිරීමට කරුණාකර පළමුව ලොග් වන්න.');
+    }
+    return;
+  }
+
+  const modal = document.getElementById('dhammaContributeModal');
+  const container = document.getElementById('dhammaSectionsListContainer');
+  if (!modal) return;
+
+  // Clear previous inputs
+  const titleInput = document.getElementById('dhammaContributeTitle');
+  const subInput = document.getElementById('dhammaContributeSubtitle');
+  const readTimeInput = document.getElementById('dhammaContributeReadTime');
+  if (titleInput) titleInput.value = '';
+  if (subInput) subInput.value = '';
+  if (readTimeInput) readTimeInput.value = '';
+
+  // Render initial section input row
+  if (container) {
+    container.innerHTML = '';
+    addDhammaSectionInputRow();
+  }
+
+  modal.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+};
+
+window.closeDhammaContributeModal = function() {
+  triggerHaptic(10);
+  const modal = document.getElementById('dhammaContributeModal');
+  if (modal) modal.classList.add('hidden');
+  document.body.style.overflow = '';
+};
+
+window.addDhammaSectionInputRow = function(title = '', pali = '', meaning = '') {
+  const container = document.getElementById('dhammaSectionsListContainer');
+  if (!container) return;
+
+  const rowIdx = container.children.length;
+  const row = document.createElement('div');
+  row.className = 'dhamma-section-edit-card';
+  row.style.background = '#fafaf9';
+  row.style.border = '1px solid #fed7aa';
+  row.style.borderRadius = '10px';
+  row.style.padding = '12px 14px';
+  row.style.position = 'relative';
+
+  row.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+      <span style="font-weight: 700; color: #9a3412; font-size: 0.82rem;">කොටස #${rowIdx + 1}</span>
+      ${rowIdx > 0 ? `
+        <button type="button" onclick="this.closest('.dhamma-section-edit-card').remove(); updateDhammaSectionLabels();" style="background: none; border: none; color: #dc2626; cursor: pointer; font-size: 0.8rem;">
+          <i class="fa-solid fa-trash-can"></i> ඉවත් කරන්න
+        </button>
+      ` : ''}
+    </div>
+    <div style="margin-bottom: 8px;">
+      <input type="text" class="form-input dhamma-sec-title" placeholder="කොටසේ මාතෘකාව (උදා: 1. නමස්කාරය හෝ කවි පෙළ)" value="${title}" required style="font-size: 0.85rem; padding: 7px 12px;">
+    </div>
+    <div style="margin-bottom: 8px;">
+      <textarea class="form-textarea dhamma-sec-pali" rows="3" placeholder="පාළි ගාථාව හෝ ප්‍රධාන සද්ධර්ම පාඨය මෙහි ලියන්න..." required style="font-size: 0.85rem; padding: 8px 12px;">${pali}</textarea>
+    </div>
+    <div>
+      <textarea class="form-textarea dhamma-sec-meaning" rows="2" placeholder="සිංහල තේරුම (අත්‍යවශ්‍ය නැත)..." style="font-size: 0.82rem; padding: 7px 12px;">${meaning}</textarea>
+    </div>
+  `;
+
+  container.appendChild(row);
+};
+
+window.updateDhammaSectionLabels = function() {
+  const container = document.getElementById('dhammaSectionsListContainer');
+  if (!container) return;
+  const cards = container.querySelectorAll('.dhamma-section-edit-card');
+  cards.forEach((c, idx) => {
+    const lbl = c.querySelector('span');
+    if (lbl) lbl.textContent = `කොටස #${idx + 1}`;
+  });
+};
+
+window.handleDhammaContributeSubmit = async function(e) {
+  if (e) e.preventDefault();
+  triggerHaptic(15);
+
+  const titleEl = document.getElementById('dhammaContributeTitle');
+  const catEl = document.getElementById('dhammaContributeCategory');
+  const subEl = document.getElementById('dhammaContributeSubtitle');
+  const readTimeEl = document.getElementById('dhammaContributeReadTime');
+  const submitBtn = document.getElementById('btnSubmitDhammaContribution');
+
+  const title = titleEl ? titleEl.value.trim() : '';
+  const category = catEl ? catEl.value : 'dhamma';
+  const subtitle = subEl ? subEl.value.trim() : '';
+  const readTime = (readTimeEl && readTimeEl.value.trim()) ? readTimeEl.value.trim() : 'විනාඩි 5';
+
+  if (!title) {
+    alert('කරුණාකර මාතෘකාවක් ඇතුළත් කරන්න.');
+    return;
+  }
+
+  // Collect sections
+  const container = document.getElementById('dhammaSectionsListContainer');
+  const cards = container ? container.querySelectorAll('.dhamma-section-edit-card') : [];
+  const sections = [];
+
+  cards.forEach((card, idx) => {
+    const sTitle = card.querySelector('.dhamma-sec-title')?.value.trim() || `${idx + 1}. කොටස`;
+    const sPali = card.querySelector('.dhamma-sec-pali')?.value.trim() || '';
+    const sMeaning = card.querySelector('.dhamma-sec-meaning')?.value.trim() || '';
+    if (sPali) {
+      sections.push({
+        title: sTitle,
+        pali: sPali,
+        sinhalaMeaning: sMeaning
+      });
+    }
+  });
+
+  if (sections.length === 0) {
+    alert('කරුණාකර අවම වශයෙන් එක් කොටසක් හෝ පාළි/සද්ධර්ම පාඨයක් ඇතුළත් කරන්න.');
+    return;
+  }
+
+  // Get category label
+  const foundCat = (window.DHAMMA_CATEGORIES || []).find(c => c.id === category);
+  const categoryLabel = foundCat ? foundCat.label : 'ධර්ම කරුණු';
+
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> යොමු වෙමින් පවතී...';
+  }
+
+  try {
+    await StorageService.submitDhammaContribution({
+      title,
+      subtitle,
+      category,
+      categoryLabel,
+      readTime,
+      sections
+    });
+
+    closeDhammaContributeModal();
+    alert('සාදු! ඔබේ ධර්ම දානය අනුමැතිය සඳහා යොමු කළා. පරීක්ෂා කිරීමෙන් පසු පුස්තකාලයේ පළ වේවි.');
+  } catch (err) {
+    console.error('[Dhamma Contribution] Submit error:', err);
+    alert('යොමු කිරීමේදී දෝෂයක් සිදුවිය: ' + err.message);
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> <span>අනුමැතිය සඳහා යොමු කරන්න</span>';
+    }
+  }
 };
 
 window.resetReadingFontSize = function() {
@@ -14222,7 +14538,7 @@ window.toggleReadingMeaning = function(forceShow) {
 // PDF Download or formatted Print View
 window.handleLibraryPdfDownload = function(itemId) {
   triggerHaptic(12);
-  const items = window.DHAMMA_LIBRARY_ITEMS || DHAMMA_LIBRARY_ITEMS || [];
+  const items = getAllDhammaLibraryItems();
   const item = items.find(i => i.id === itemId);
   if (!item) return;
 
@@ -14237,7 +14553,7 @@ window.handleLibraryPdfDownload = function(itemId) {
 window.printLibraryItem = function(itemId) {
   triggerHaptic(12);
   const targetId = itemId || activeReadingItemId;
-  const items = window.DHAMMA_LIBRARY_ITEMS || DHAMMA_LIBRARY_ITEMS || [];
+  const items = getAllDhammaLibraryItems();
   const item = items.find(i => i.id === targetId);
   if (!item) return;
 
@@ -14554,6 +14870,7 @@ window.printLibraryItem = function(itemId) {
           ${sectionsHtml}
 
           <footer class="print-footer">
+            ${item.authorName ? `<div style="font-weight: 700; color: #78350f; margin-bottom: 4px;">ධර්ම දානය සඳහා යතුරුලියනයෙන් දායක වූයේ: ${item.authorName}</div>` : ''}
             ශ්‍රී සද්ධර්ම පුස්තකාලය • අපේ පිං පොත (apepinpotha.lk) • සැමට ධර්ම දානය පිණිසයි
           </footer>
         </td>

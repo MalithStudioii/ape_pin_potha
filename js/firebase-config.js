@@ -37,5 +37,6 @@ export const COLLECTIONS = {
   SETTINGS: "admin_settings",
   ARANYA: "aranya_senasana",
   ARTISANS: "temple_artisans",
-  ARTISAN_APPLICATIONS: "artisan_applications"
+  ARTISAN_APPLICATIONS: "artisan_applications",
+  DHAMMA_SUBMISSIONS: "dhamma_library_submissions"
 };

@@ -1,3 +1,12 @@
+// Dhamma Library Categories
+export const DHAMMA_CATEGORIES = [
+  { id: 'pirith', label: 'පිරිත්', icon: '🪷' },
+  { id: 'bodhipuja', label: 'බෝධිපූජා', icon: '🌸' },
+  { id: 'gatha', label: 'ගාථා', icon: '🙏' },
+  { id: 'dhamma', label: 'ධර්ම ග්‍රන්ථ / ලිපි', icon: '📖' },
+  { id: 'kavi', label: 'කවි', icon: '📜' }
+];
+
 // Dhamma Library Data
 export const DHAMMA_LIBRARY_ITEMS = [
   {
@@ -252,5 +261,5 @@ export const DHAMMA_LIBRARY_ITEMS = [
 ];
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { DHAMMA_LIBRARY_ITEMS };
+  module.exports = { DHAMMA_LIBRARY_ITEMS, DHAMMA_CATEGORIES };
 }

@@ -5238,5 +5238,246 @@ export const StorageService = {
 
     localStorage.removeItem('pinPotha_artisans_cache');
     return true;
+  },
+
+  /* ==========================================================================
+     10. DHAMMA LIBRARY CONTRIBUTIONS (MEMBER SUBMISSIONS & ADMIN APPROVAL)
+     ========================================================================== */
+
+  /**
+   * Submit a new Dhamma item for community contribution
+   * @param {Object} data { title, subtitle, category, sections }
+   * @returns {Promise<Object>}
+   */
+  async submitDhammaContribution(data) {
+    if (!this.currentUser || !this.currentUser.uid) {
+      throw new Error("ධර්ම දානයක් එක් කිරීමට කරුණාකර පළමුව ඔබගේ ගිණුමට ලොග් වන්න.");
+    }
+
+    const payload = {
+      title: (data.title || '').trim(),
+      subtitle: (data.subtitle || '').trim(),
+      category: data.category || 'dhamma',
+      categoryLabel: data.categoryLabel || 'ධර්ම කරුණු',
+      sections: Array.isArray(data.sections) ? data.sections : [],
+      authorUid: this.currentUser.uid,
+      authorName: this.currentUser.name || 'කල්‍යාණ මිත්‍ර සාමාජික',
+      authorPhoto: this.currentUser.photo || '',
+      status: 'pending',
+      sadhuCount: 0,
+      sadhuUsers: [],
+      pdfUrl: '',
+      createdAt: Date.now()
+    };
+
+    if (isCloudReady && db) {
+      try {
+        const { collection, addDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const docRef = await addDoc(collection(db, COLLECTIONS.DHAMMA_SUBMISSIONS || 'dhamma_library_submissions'), {
+          ...payload,
+          serverCreatedAt: serverTimestamp()
+        });
+        payload.id = docRef.id;
+      } catch (err) {
+        console.error('[Storage] Cloud submitDhammaContribution failed:', err);
+        throw err;
+      }
+    } else {
+      payload.id = 'dhamma_sub_' + Date.now();
+      try {
+        const localList = JSON.parse(localStorage.getItem('pinPotha_dhamma_submissions') || '[]');
+        localList.unshift(payload);
+        localStorage.setItem('pinPotha_dhamma_submissions', JSON.stringify(localList));
+      } catch (e) {}
+    }
+
+    // Trigger admin notification
+    try {
+      await this.triggerAdminNotification({
+        senderUid: this.currentUser.uid,
+        senderName: this.currentUser.name || 'කල්‍යාණ මිත්‍ර',
+        senderPhoto: this.currentUser.photo || '',
+        message: `නව ධර්ම පුස්තකාල දායකත්වයක් යොමු විය: "${payload.title}"`
+      });
+    } catch (notifErr) {}
+
+    return payload;
+  },
+
+  /**
+   * Fetch approved Dhamma Library submissions from cloud
+   * @returns {Promise<Array>}
+   */
+  async getApprovedDhammaSubmissions() {
+    const list = [];
+    if (isCloudReady && db) {
+      try {
+        const { collection, query, where, getDocs } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const q = query(
+          collection(db, COLLECTIONS.DHAMMA_SUBMISSIONS || 'dhamma_library_submissions'),
+          where('status', '==', 'approved')
+        );
+        const snap = await getDocs(q);
+        snap.forEach(docSnap => {
+          list.push({ id: docSnap.id, ...docSnap.data() });
+        });
+      } catch (err) {
+        console.warn('[Storage] getApprovedDhammaSubmissions cloud fetch failed:', err);
+      }
+    }
+
+    // Merge with any approved local fallback items
+    try {
+      const localList = JSON.parse(localStorage.getItem('pinPotha_dhamma_submissions') || '[]');
+      localList.filter(item => item.status === 'approved').forEach(item => {
+        if (!list.some(x => x.id === item.id)) list.push(item);
+      });
+    } catch (e) {}
+
+    return list;
+  },
+
+  /**
+   * Fetch pending Dhamma Library submissions for admin review
+   * @returns {Promise<Array>}
+   */
+  async getPendingDhammaSubmissions() {
+    const list = [];
+    if (isCloudReady && db) {
+      try {
+        const { collection, query, where, getDocs } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const q = query(
+          collection(db, COLLECTIONS.DHAMMA_SUBMISSIONS || 'dhamma_library_submissions'),
+          where('status', '==', 'pending')
+        );
+        const snap = await getDocs(q);
+        snap.forEach(docSnap => {
+          list.push({ id: docSnap.id, ...docSnap.data() });
+        });
+      } catch (err) {
+        console.error('[Storage] getPendingDhammaSubmissions error:', err);
+      }
+    }
+
+    try {
+      const localList = JSON.parse(localStorage.getItem('pinPotha_dhamma_submissions') || '[]');
+      localList.filter(item => item.status === 'pending').forEach(item => {
+        if (!list.some(x => x.id === item.id)) list.push(item);
+      });
+    } catch (e) {}
+
+    return list;
+  },
+
+  /**
+   * Approve a pending Dhamma Library submission
+   * @param {string} submissionId
+   * @returns {Promise<boolean>}
+   */
+  async approveDhammaSubmission(submissionId) {
+    if (!submissionId) return false;
+
+    if (isCloudReady && db) {
+      try {
+        const { doc, updateDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        await updateDoc(doc(db, COLLECTIONS.DHAMMA_SUBMISSIONS || 'dhamma_library_submissions', submissionId), {
+          status: 'approved',
+          approvedAt: Date.now(),
+          serverApprovedAt: serverTimestamp()
+        });
+      } catch (err) {
+        console.error('[Storage] approveDhammaSubmission error:', err);
+        throw err;
+      }
+    }
+
+    try {
+      const localList = JSON.parse(localStorage.getItem('pinPotha_dhamma_submissions') || '[]');
+      const target = localList.find(x => x.id === submissionId);
+      if (target) {
+        target.status = 'approved';
+        target.approvedAt = Date.now();
+        localStorage.setItem('pinPotha_dhamma_submissions', JSON.stringify(localList));
+      }
+    } catch (e) {}
+
+    return true;
+  },
+
+  /**
+   * Reject / delete a Dhamma Library submission
+   * @param {string} submissionId
+   * @returns {Promise<boolean>}
+   */
+  async rejectDhammaSubmission(submissionId) {
+    if (!submissionId) return false;
+
+    if (isCloudReady && db) {
+      try {
+        const { doc, deleteDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        await deleteDoc(doc(db, COLLECTIONS.DHAMMA_SUBMISSIONS || 'dhamma_library_submissions', submissionId));
+      } catch (err) {
+        console.error('[Storage] rejectDhammaSubmission error:', err);
+        throw err;
+      }
+    }
+
+    try {
+      let localList = JSON.parse(localStorage.getItem('pinPotha_dhamma_submissions') || '[]');
+      localList = localList.filter(x => x.id !== submissionId);
+      localStorage.setItem('pinPotha_dhamma_submissions', JSON.stringify(localList));
+    } catch (e) {}
+
+    return true;
+  },
+
+  /**
+   * Give Sadhu to a Dhamma Library submission
+   * @param {string} itemId
+   * @returns {Promise<Object>} { success, sadhuCount, hasGiven }
+   */
+  async giveDhammaSadhu(itemId) {
+    if (!this.currentUser || !this.currentUser.uid) {
+      throw new Error("සාදුකාර දීම සඳහා කරුණාකර පළමුව ලොග් වන්න.");
+    }
+
+    const uid = this.currentUser.uid;
+    let sadhuCount = 0;
+    let hasGiven = false;
+
+    if (isCloudReady && db) {
+      try {
+        const { doc, getDoc, updateDoc, arrayUnion, increment } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const docRef = doc(db, COLLECTIONS.DHAMMA_SUBMISSIONS || 'dhamma_library_submissions', itemId);
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+          const data = snap.data();
+          const sadhuUsers = Array.isArray(data.sadhuUsers) ? data.sadhuUsers : [];
+          if (sadhuUsers.includes(uid)) {
+            return { success: false, alreadyGiven: true, sadhuCount: data.sadhuCount || 0 };
+          }
+          await updateDoc(docRef, {
+            sadhuCount: increment(1),
+            sadhuUsers: arrayUnion(uid)
+          });
+          sadhuCount = (data.sadhuCount || 0) + 1;
+          hasGiven = true;
+
+          // Increment author's profile sadhuCount if authorUid exists
+          if (data.authorUid) {
+            try {
+              const authorRef = doc(db, COLLECTIONS.USERS, data.authorUid);
+              await updateDoc(authorRef, {
+                sadhuCount: increment(1)
+              });
+            } catch (authErr) {}
+          }
+        }
+      } catch (err) {
+        console.error('[Storage] giveDhammaSadhu cloud error:', err);
+      }
+    }
+
+    return { success: true, sadhuCount, hasGiven };
   }
 };
