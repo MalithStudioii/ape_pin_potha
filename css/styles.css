@@ -2766,18 +2766,18 @@ body {
   position: relative;
   padding: 0 32px 18px 32px;
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 24px;
   flex-wrap: wrap;
 }
 
 .profile-avatar-outer {
-  margin-top: -75px;
+  margin-top: -70px;
   position: relative;
   width: 140px;
   height: 140px;
   flex-shrink: 0;
-  z-index: 5;
+  z-index: 10;
 }
 
 @media (max-width: 768px) {
@@ -2845,6 +2845,7 @@ body {
 .profile-identity-info {
   flex: 1;
   min-width: 260px;
+  padding-top: 16px;
   padding-bottom: 4px;
 }
 
@@ -2955,6 +2956,7 @@ body {
   gap: 10px;
   align-items: center;
   flex-wrap: wrap;
+  padding-top: 16px;
   padding-bottom: 6px;
 }
 
@@ -3125,6 +3127,10 @@ body {
     text-align: center;
     padding: 0 16px 20px 16px;
   }
+  .profile-identity-info {
+    padding-top: 8px;
+    width: 100%;
+  }
   .profile-title-row {
     justify-content: center;
   }
@@ -3134,6 +3140,7 @@ body {
   .profile-header-actions {
     justify-content: center;
     width: 100%;
+    padding-top: 8px;
   }
   .profile-content-grid {
     grid-template-columns: 1fr;
