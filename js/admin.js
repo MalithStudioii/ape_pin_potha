@@ -1169,6 +1169,7 @@ window.switchAdminTab = function(tabId) {
         'overview': document.getElementById('sectionOverview'),
         'users': document.getElementById('sectionUsers'),
         'moderation': document.getElementById('sectionModeration'),
+        'dhamma': document.getElementById('sectionDhamma'),
         'settings': document.getElementById('sectionSettings'),
         'artisans': document.getElementById('sectionArtisans'),
         'audit': document.getElementById('sectionAudit')
@@ -1195,6 +1196,9 @@ window.switchAdminTab = function(tabId) {
 
     if (tabId === 'overview') {
         setTimeout(() => renderGrowthChart(allUsersList), 100);
+    }
+    if (tabId === 'dhamma') {
+        loadAdminDhammaSubmissions();
     }
     if (tabId === 'artisans') {
         loadAdminArtisanApplications();
@@ -3171,5 +3175,176 @@ window.cleanDeadImgBBLinks = async function() {
             btnClean.disabled = false;
             btnClean.style.opacity = '1';
         }
+    }
+};
+
+// ============================================================================
+// 10. DHAMMA LIBRARY SUBMISSIONS APPROVAL WORKFLOW
+// ============================================================================
+
+window.loadAdminDhammaSubmissions = async function() {
+    const container = document.getElementById('adminPendingDhammaList');
+    const badge = document.getElementById('tabBadgeDhamma');
+    if (!container) return;
+
+    container.innerHTML = `
+        <div style="text-align: center; color: var(--text-muted); padding: 30px;">
+            <i class="fa-solid fa-spinner fa-spin" style="font-size: 1.5rem; margin-bottom: 8px; color: var(--gold-light);"></i>
+            <p>පොරොත්තු දායකත්ව පූරණය වෙමින් පවතී...</p>
+        </div>
+    `;
+
+    try {
+        let submissions = [];
+        if (db) {
+            const { collection, query, where, getDocs, orderBy } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+            const q = query(
+                collection(db, COLLECTIONS.DHAMMA_SUBMISSIONS || 'dhamma_library_submissions'),
+                where('status', '==', 'pending')
+            );
+            const snap = await getDocs(q);
+            snap.forEach(docSnap => {
+                submissions.push({ id: docSnap.id, ...docSnap.data() });
+            });
+        }
+
+        // Sort by createdAt descending
+        submissions.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+        if (badge) {
+            badge.textContent = submissions.length;
+            badge.style.display = submissions.length > 0 ? 'inline-block' : 'none';
+        }
+
+        if (submissions.length === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; color: var(--text-muted); padding: 36px 20px; background: rgba(15, 23, 42, 0.4); border-radius: 12px; border: 1px dashed rgba(245, 158, 11, 0.2);">
+                    <i class="fa-solid fa-circle-check" style="font-size: 2rem; color: #10b981; margin-bottom: 10px; display: block;"></i>
+                    <h4 style="color: #fff; margin: 0 0 6px;">සියලු ධර්ම දායකත්ව පරීක්ෂා කර ඇත</h4>
+                    <p style="font-size: 0.82rem; margin: 0;">මෙම අවස්ථාවේ අනුමැතිය සඳහා පොරොත්තු කිසිදු ධර්ම සටහනක් නොමැත.</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = submissions.map(sub => {
+            const dateStr = sub.createdAt ? new Date(sub.createdAt).toLocaleDateString('si-LK', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'නැත';
+            const catLabel = sub.categoryLabel || sub.category || 'ධර්ම කරුණු';
+            const sections = Array.isArray(sub.sections) ? sub.sections : [];
+
+            const sectionsPreviewHtml = sections.map((sec, sIdx) => `
+                <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(254, 215, 170, 0.15); border-radius: 8px; padding: 10px 14px; margin-top: 8px;">
+                    <div style="font-weight: 700; color: #fbbf24; font-size: 0.85rem; margin-bottom: 4px;">
+                        ${sIdx + 1}. ${(sec.title || sec.heading || 'කොටස')}
+                    </div>
+                    <div style="font-size: 0.82rem; color: #e2e8f0; white-space: pre-line; margin-bottom: 6px; line-height: 1.5;">${sec.pali || ''}</div>
+                    ${sec.sinhalaMeaning ? `
+                        <div style="font-size: 0.78rem; color: #cbd5e1; background: rgba(0,0,0,0.25); padding: 6px 10px; border-radius: 6px; border-left: 2px solid #ea580c; white-space: pre-line; line-height: 1.45;">
+                            <strong>සිංහල අර්ථය:</strong> ${sec.sinhalaMeaning}
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+
+            return `
+                <div class="glass-panel" style="margin-bottom: 16px; border: 1px solid rgba(234, 88, 12, 0.35); background: linear-gradient(145deg, rgba(30, 41, 59, 0.8), rgba(234, 88, 12, 0.05));" id="admin-dhamma-card-${sub.id}">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 12px;">
+                        <div>
+                            <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(234, 88, 12, 0.2); color: #fb923c; border: 1px solid rgba(234, 88, 12, 0.4); padding: 2px 10px; border-radius: 9999px; font-size: 0.72rem; font-weight: 700; margin-bottom: 6px;">
+                                📖 ${catLabel}
+                            </div>
+                            <h3 style="color: #fff; font-size: 1.15rem; margin: 0 0 4px; font-weight: 800;">
+                                ${sub.title}
+                            </h3>
+                            ${sub.subtitle ? `<p style="color: #cbd5e1; font-size: 0.84rem; margin: 0 0 6px;">${sub.subtitle}</p>` : ''}
+                        </div>
+
+                        <!-- Author Tag -->
+                        <div style="display: flex; align-items: center; gap: 8px; background: rgba(0, 0, 0, 0.3); padding: 6px 12px; border-radius: 9999px; border: 1px solid rgba(255, 255, 255, 0.1);">
+                            <img src="${sub.authorPhoto || 'assets/default-avatar.png'}" alt="" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover; border: 1.5px solid #f59e0b;">
+                            <div style="font-size: 0.78rem;">
+                                <span style="color: var(--text-muted);">දායකත්වය: </span>
+                                <strong style="color: #fde68a;">${sub.authorName || 'කල්‍යාණ මිත්‍ර'}</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sections Accordion -->
+                    <div style="margin-bottom: 14px;">
+                        <div style="font-size: 0.78rem; font-weight: 700; color: #f59e0b; text-transform: uppercase; letter-spacing: 0.5px;">
+                            අන්තර්ගත කොටස් (${sections.length}) :
+                        </div>
+                        ${sectionsPreviewHtml}
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; pt-2; border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 10px; flex-wrap: wrap; gap: 10px;">
+                        <span style="font-size: 0.75rem; color: var(--text-muted);">
+                            <i class="fa-regular fa-clock"></i> යොමු කළ දිනය: ${dateStr}
+                        </span>
+
+                        <div style="display: flex; gap: 8px;">
+                            <button type="button" onclick="rejectAdminDhammaSubmission('${sub.id}', '${(sub.title || '').replace(/'/g, "\\'")}')" class="btn-action danger" style="padding: 7px 14px; font-size: 0.78rem; border-radius: 8px; display: inline-flex; align-items: center; gap: 5px;">
+                                <i class="fa-solid fa-trash-can"></i>
+                                <span>ප්‍රතික්ෂේප කර මකන්න</span>
+                            </button>
+                            <button type="button" onclick="approveAdminDhammaSubmission('${sub.id}', '${(sub.title || '').replace(/'/g, "\\'")}')" class="btn-action success" style="padding: 7px 18px; font-size: 0.78rem; border-radius: 8px; font-weight: 700; background: linear-gradient(135deg, #10b981, #059669); color: #fff; border: none; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);">
+                                <i class="fa-solid fa-check"></i>
+                                <span>අනුමත කරන්න (Approve)</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+    } catch (err) {
+        console.error('[Admin Dhamma] loadAdminDhammaSubmissions error:', err);
+        container.innerHTML = `
+            <div style="text-align: center; color: #ef4444; padding: 24px;">
+                <p>දත්ත පූරණයේදී දෝෂයක් සිදුවිය: ${err.message}</p>
+            </div>
+        `;
+    }
+};
+
+window.approveAdminDhammaSubmission = async function(submissionId, title) {
+    if (!confirm(`"${title}" ධර්ම දානය අනුමත කර පුස්තකාලයට එක් කිරීමට තහවුරු කරන්නද?`)) return;
+
+    try {
+        if (db) {
+            const { doc, updateDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+            await updateDoc(doc(db, COLLECTIONS.DHAMMA_SUBMISSIONS || 'dhamma_library_submissions', submissionId), {
+                status: 'approved',
+                approvedAt: Date.now(),
+                serverApprovedAt: serverTimestamp()
+            });
+        }
+
+        await recordAuditLog('Dhamma Contribution Approved', `Approved Dhamma Library item: "${title}" (${submissionId})`);
+        alert('සාදු! ධර්ම දානය සාර්ථකව අනුමත කරන ලදී.');
+        loadAdminDhammaSubmissions();
+
+    } catch (err) {
+        console.error('[Admin Dhamma] Approve error:', err);
+        alert('අනුමත කිරීමේදී දෝෂයක් සිදුවිය: ' + err.message);
+    }
+};
+
+window.rejectAdminDhammaSubmission = async function(submissionId, title) {
+    if (!confirm(`"${title}" ධර්ම දානය ප්‍රතික්ෂේප කර ස්ථිරවම මකා දැමීමට තහවුරු කරන්නද?`)) return;
+
+    try {
+        if (db) {
+            const { doc, deleteDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+            await deleteDoc(doc(db, COLLECTIONS.DHAMMA_SUBMISSIONS || 'dhamma_library_submissions', submissionId));
+        }
+
+        await recordAuditLog('Dhamma Contribution Rejected', `Rejected Dhamma Library item: "${title}" (${submissionId})`);
+        alert('ධර්ම දානය ප්‍රතික්ෂේප කර ඉවත් කරන ලදී.');
+        loadAdminDhammaSubmissions();
+
+    } catch (err) {
+        console.error('[Admin Dhamma] Reject error:', err);
+        alert('ඉවත් කිරීමේදී දෝෂයක් සිදුවිය: ' + err.message);
     }
 };

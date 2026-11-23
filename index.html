@@ -1215,6 +1215,10 @@
                             <i class="fa-solid fa-arrow-left"></i>
                             <span>පුණ්‍ය පවුර වෙත</span>
                         </button>
+                        <button type="button" class="btn-library-contribute" onclick="openDhammaContributeModal()" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #ffffff; border: none; padding: 8px 20px; border-radius: 9999px; font-size: 0.84rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; box-shadow: 0 4px 14px rgba(217, 119, 6, 0.35); transition: all 0.2s ease;">
+                            <i class="fa-solid fa-plus-circle"></i>
+                            <span>➕ ධර්ම දානයක් එකතු කරන්න</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1242,8 +1246,14 @@
                     <button type="button" class="library-pill" data-category="pirith" onclick="setDhammaLibraryCategory('pirith')">
                         🪷 පිරිත්
                     </button>
+                    <button type="button" class="library-pill" data-category="gatha" onclick="setDhammaLibraryCategory('gatha')">
+                        🙏 ගාථා
+                    </button>
                     <button type="button" class="library-pill" data-category="dhamma" onclick="setDhammaLibraryCategory('dhamma')">
-                        📖 ධර්ම ග්‍රන්ථ
+                        📖 ධර්ම ග්‍රන්ථ / ලිපි
+                    </button>
+                    <button type="button" class="library-pill" data-category="kavi" onclick="setDhammaLibraryCategory('kavi')">
+                        📜 කවි
                     </button>
                 </div>
             </div>
@@ -2115,10 +2125,109 @@
 
             <!-- Scrollable Reading Content Body -->
             <div class="reading-scroll-body" id="readingScrollBody">
+                <!-- Contributor Profile Credit Badge (Populated for member contributions) -->
+                <div id="readingModalContributorBadge" class="reading-contributor-header-badge hidden" style="display: none; margin: 16px 20px 0; padding: 10px 16px; background: linear-gradient(135deg, #fffbeb, #fef3c7); border: 1px solid #fde68a; border-radius: 12px; align-items: center; gap: 12px;">
+                    <img id="readingContributorAvatar" src="assets/default-avatar.png" alt="Contributor" style="width: 38px; height: 38px; border-radius: 50%; object-fit: cover; border: 2px solid #d97706; flex-shrink: 0;">
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-size: 0.76rem; color: #92400e; font-weight: 600;">ධර්ම දානය සඳහා දායක වූයේ:</div>
+                        <div id="readingContributorName" style="font-size: 0.92rem; font-weight: 700; color: #78350f;">කල්‍යාණ මිත්‍ර සාමාජික</div>
+                    </div>
+                    <button type="button" id="btnReadingModalSadhu" onclick="handleReadingSadhuClick()" style="background: linear-gradient(135deg, #ea580c, #c2410c); color: #fff; border: none; padding: 6px 14px; border-radius: 9999px; font-size: 0.82rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(234, 88, 12, 0.3); white-space: nowrap;">
+                        <span>🙏 සාදු</span>
+                        <span id="readingSadhuCountBadge" style="background: rgba(0,0,0,0.2); padding: 1px 7px; border-radius: 10px; font-size: 0.75rem;">0</span>
+                    </button>
+                </div>
+
                 <div class="reading-content-inner" id="readingContentInner">
                     <!-- Dynamically populated via renderReadingContent() -->
                 </div>
+
+                <!-- Bottom Contributor Appreciation Footer (Populated for member contributions) -->
+                <div id="readingModalContributorFooter" class="reading-contributor-footer-card hidden" style="display: none; margin: 20px 20px 30px; padding: 16px; background: #fff7ed; border: 1.5px dashed #fdba74; border-radius: 14px; text-align: center;">
+                    <p style="margin: 0 0 10px; font-size: 0.88rem; color: #9a3412; font-weight: 600;">
+                        උතුම් ධර්ම දානය පිණිස මෙම සද්ධර්ම කරුණු යතුරුලියනය කර සම්පාදනය කළ කල්‍යාණ මිතුරාට පින් අනුමෝදන් වෙමු!
+                    </p>
+                    <button type="button" id="btnReadingModalSadhuBottom" onclick="handleReadingSadhuClick()" style="background: linear-gradient(135deg, #d97706, #b45309); color: #fff; border: none; padding: 8px 22px; border-radius: 9999px; font-size: 0.9rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 3px 10px rgba(217, 119, 6, 0.35);">
+                        <span>🙏 පින් අනුමෝදන් වෙමි (සාදු)</span>
+                        <span id="readingSadhuCountBadgeBottom" style="background: rgba(0,0,0,0.2); padding: 2px 8px; border-radius: 10px; font-size: 0.8rem;">0</span>
+                    </button>
+                </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Dhamma Contribution Submission Modal Dialog -->
+    <div id="dhammaContributeModal" class="modal-overlay hidden" onclick="if(event.target === this) closeDhammaContributeModal()">
+        <div class="modal-box" style="max-width: 640px; max-height: 90vh; display: flex; flex-direction: column;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #78350f, #451a03); color: #fff; padding: 14px 18px; border-radius: 14px 14px 0 0;">
+                <h3 class="modal-title" style="color: #fde68a; display: flex; align-items: center; gap: 8px; font-size: 1.05rem;">
+                    <i class="fa-solid fa-book-medical" style="color: #fbbf24;"></i>
+                    <span>ධර්ම දානයක් එක් කරන්න (Contribute to Library)</span>
+                </h3>
+                <button type="button" onclick="closeDhammaContributeModal()" class="modal-close-btn" style="color: #fff; background: rgba(255,255,255,0.15);">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="dhammaContributeForm" onsubmit="handleDhammaContributeSubmit(event)" style="padding: 18px; overflow-y: auto; flex: 1;">
+                <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 10px 14px; margin-bottom: 16px; font-size: 0.82rem; color: #92400e; line-height: 1.5;">
+                    <i class="fa-solid fa-circle-info" style="color: #d97706; margin-right: 4px;"></i>
+                    ඔබ යොමු කරන ධර්ම කරුණු පරිපාලක මණ්ඩලය විසින් පරීක්ෂා කර අනුමත කිරීමෙන් පසු සියලු කල්‍යාණ මිතුරන්ට පරිශීලනය කළ හැකි පරිදි පුස්තකාලයේ පළවේ. ඔබගේ නම සහ පැතිකඩ ඡායාරූපය කර්තෘ ගෞරවය ලෙස සටහන් වේ.
+                </div>
+
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label class="form-label" style="font-weight: 700; color: #431407; font-size: 0.86rem;">මාතෘකාව (Title) *</label>
+                    <input type="text" id="dhammaContributeTitle" class="form-input" required placeholder="උදා: මෝර පිරිත, දස ධම්ම සූත්‍රය, කරුණා ගුණ කවි...">
+                </div>
+
+                <div class="admin-grid-2col" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" style="font-weight: 700; color: #431407; font-size: 0.86rem;">වර්ගය (Category) *</label>
+                        <select id="dhammaContributeCategory" class="form-input" required>
+                            <option value="pirith">🪷 පිරිත්</option>
+                            <option value="bodhipuja">🌸 බෝධිපූජා</option>
+                            <option value="gatha">🙏 ගාථා</option>
+                            <option value="dhamma" selected>📖 ධර්ම ග්‍රන්ථ / ලිපි</option>
+                            <option value="kavi">📜 කවි</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" style="font-weight: 700; color: #431407; font-size: 0.86rem;">කියවීමේ කාලය (Read Time)</label>
+                        <input type="text" id="dhammaContributeReadTime" class="form-input" placeholder="උදා: විනාඩි 5">
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label" style="font-weight: 700; color: #431407; font-size: 0.86rem;">කෙටි හැඳින්වීම (Subtitle / Short Description)</label>
+                    <input type="text" id="dhammaContributeSubtitle" class="form-input" placeholder="උදා: අනතුරු සහ බිය දුරු කර ආරක්ෂාව සලසන උතුම් පිරිත...">
+                </div>
+
+                <!-- Sections Builder -->
+                <div style="margin-bottom: 16px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                        <label class="form-label" style="font-weight: 800; color: #78350f; font-size: 0.9rem; margin-bottom: 0;">
+                            📖 අන්තර්ගත කොටස් (Sections) *
+                        </label>
+                        <button type="button" onclick="addDhammaSectionInputRow()" style="background: #fff7ed; border: 1px solid #fdba74; color: #c2410c; padding: 4px 12px; border-radius: 9999px; font-size: 0.78rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                            <i class="fa-solid fa-plus"></i> තව කොටසක් එක්කරන්න
+                        </button>
+                    </div>
+
+                    <div id="dhammaSectionsListContainer" style="display: flex; flex-direction: column; gap: 12px;">
+                        <!-- Dynamically populated or default 1 section -->
+                    </div>
+                </div>
+
+                <div class="modal-footer" style="padding-top: 12px; border-top: 1px solid #fed7aa; display: flex; gap: 10px; justify-content: flex-end;">
+                    <button type="button" onclick="closeDhammaContributeModal()" class="btn-crop-cancel" style="padding: 10px 18px; border-radius: 9999px;">
+                        අවලංගු කරන්න
+                    </button>
+                    <button type="submit" id="btnSubmitDhammaContribution" style="background: linear-gradient(135deg, #d97706, #b45309); color: #fff; border: none; padding: 10px 24px; border-radius: 9999px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.35);">
+                        <i class="fa-solid fa-paper-plane"></i>
+                        <span>අනුමැතිය සඳහා යොමු කරන්න</span>
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 

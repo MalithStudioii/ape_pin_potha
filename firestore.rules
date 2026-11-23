@@ -130,5 +130,33 @@ service cloud.firestore {
       allow create: if true;
       allow read, update, delete: if isAdmin();
     }
+
+    // =========================================================================
+    // 7. ධර්ම පුස්තකාල දායකත්ව (Dhamma Library Submissions)
+    // =========================================================================
+    match /dhamma_library_submissions/{subId} {
+      // 7.1. Anyone can read approved submissions; Authenticated authors can read their own; Admins can read all
+      allow read: if resource.data.status == 'approved'
+                  || (isAuthenticated() && (resource.data.authorUid == request.auth.uid || isAdmin()));
+
+      // 7.2. Authenticated non-banned users can create pending submissions
+      allow create: if isAuthenticated() && !isBanned()
+                    && request.resource.data.authorUid == request.auth.uid
+                    && request.resource.data.status == 'pending'
+                    && request.resource.data.title.size() >= 2
+                    && request.resource.data.title.size() <= 200;
+
+      // 7.3. Updates:
+      // - Admins can approve, reject, or modify any field
+      // - Authenticated users can increment sadhuCount / add themselves to sadhuUsers on approved items
+      allow update: if isAdmin()
+                    || (isAuthenticated() && resource.data.status == 'approved'
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sadhuCount', 'sadhuUsers'])
+                        && request.resource.data.authorUid == resource.data.authorUid
+                        && request.resource.data.status == resource.data.status);
+
+      // 7.4. Deletes: Admins only
+      allow delete: if isAdmin();
+    }
   }
 }

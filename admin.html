@@ -1422,6 +1422,11 @@
                 <span>අන්තර්ගත පාලනය (Moderation)</span>
                 <span class="badge" id="tabBadgeMod">0</span>
             </button>
+            <button class="nav-pill-btn" onclick="switchAdminTab('dhamma')">
+                <i class="fa-solid fa-book-bookmark"></i>
+                <span>📚 ධර්ම පුස්තකාල අනුමැති</span>
+                <span class="badge" id="tabBadgeDhamma" style="display:none; background: #ea580c; color: #fff;">0</span>
+            </button>
             <button class="nav-pill-btn master-only-tab" onclick="switchAdminTab('settings')">
                 <i class="fa-solid fa-sliders"></i>
                 <span>පද්ධති සැකසුම් (Master Only)</span>
@@ -1603,6 +1608,31 @@
                     <div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding: 40px;">
                         <i class="fa-solid fa-spinner fa-spin" style="font-size: 1.5rem; margin-bottom: 8px; color: var(--gold-light);"></i>
                         <p>සටහන් පූරණය වෙමින් පවතී...</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= TAB: DHAMMA LIBRARY SUBMISSIONS APPROVAL ================= -->
+        <section id="sectionDhamma" class="admin-section">
+            <div class="glass-panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <i class="fa-solid fa-book-bookmark" style="color: #ea580c;"></i>
+                        <span>📚 ධර්ම පුස්තකාල අනුමැති (Pending Dhamma Library Submissions)</span>
+                    </div>
+                    <button class="btn-header" onclick="loadAdminDhammaSubmissions()">
+                        <i class="fa-solid fa-rotate"></i>
+                        <span>Refresh</span>
+                    </button>
+                </div>
+                <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 14px;">
+                    සාමාජිකයින් විසින් ශ්‍රී සද්ධර්ම පුස්තකාලයට එක්කිරීම සඳහා යොමු කළ පිරිත්, බෝධිපූජා, ගාථා සහ ධර්ම කරුණුවල නිරවද්‍යතාව පරීක්ෂා කර අනුමත (Approve) හෝ ප්‍රතික්ෂේප (Reject) කරන්න.
+                </p>
+                <div id="adminPendingDhammaList">
+                    <div style="text-align: center; color: var(--text-muted); padding: 30px;">
+                        <i class="fa-solid fa-spinner fa-spin" style="font-size: 1.5rem; margin-bottom: 8px; color: var(--gold-light);"></i>
+                        <p>දායකත්ව දත්ත පූරණය වෙමින් පවතී...</p>
                     </div>
                 </div>
             </div>
