@@ -14255,6 +14255,20 @@ window.printLibraryItem = function(itemId) {
 
   const doc = iframe.contentWindow.document;
 
+  // Determine whether Sinhala meanings should be included in PDF/print output
+  const meaningToggleEl = document.getElementById('readingMeaningToggle');
+  let isMeaningEnabled = true;
+  if (meaningToggleEl) {
+    isMeaningEnabled = Boolean(meaningToggleEl.checked);
+  } else if (typeof showReadingMeaning !== 'undefined') {
+    isMeaningEnabled = Boolean(showReadingMeaning);
+  } else {
+    try {
+      const stored = localStorage.getItem('pinPotha_reading_show_meaning');
+      if (stored !== null) isMeaningEnabled = stored === 'true';
+    } catch (e) {}
+  }
+
   // Helper to split Sinhala meaning into natural, non-breaking stanza blocks
   const splitMeaningBlocks = (text) => {
     if (!text) return [];
@@ -14274,7 +14288,7 @@ window.printLibraryItem = function(itemId) {
   const sectionsHtml = (item.sections || []).map((sec, idx) => {
     // Split pali by double newlines into natural stanza blocks
     const paliBlocks = (sec.pali || '').split(/\n\s*\n/).filter(s => s.trim());
-    const meaningBlocks = splitMeaningBlocks(sec.sinhalaMeaning);
+    const meaningBlocks = isMeaningEnabled ? splitMeaningBlocks(sec.sinhalaMeaning) : [];
 
     let firstBlockHtml = '';
     let remainingPaliBlocks = paliBlocks;
