@@ -17,6 +17,8 @@ export const BO_LEAF_AVATAR = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDo
 let allCommunityMembersCache = [];
 let infiniteScrollObserver = null;
 let isTriggeringLoadMore = false;
+let isPcSidebarExpanded = false;
+let poyaAmbientSubscribed = false;
 
 /* ==========================================================================
    Sri Lanka Provinces & Districts Dataset & Dropdown Helper Functions
@@ -274,7 +276,7 @@ const COVER_PRESETS = [
    Poya Day Ambient Falling Petals & Bodhi Leaves Overlay Feature
    ========================================================================== */
 
-let poyaAmbientSubscribed = false;
+// poyaAmbientSubscribed declared at top of module to prevent TDZ ReferenceError in bootApp
 
 const POYA_PETAL_SVG = `<svg viewBox="0 0 32 44" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
@@ -9190,7 +9192,7 @@ window.filterDirectoryBy = function(type) {
   renderCommunityDirectory(list);
 };
 
-let isPcSidebarExpanded = false;
+// isPcSidebarExpanded declared at top of module to prevent TDZ ReferenceError in bootApp
 window.togglePcSidebarExpanded = function() {
   isPcSidebarExpanded = !isPcSidebarExpanded;
   renderPcSidebarMembers(document.getElementById('pcSidebarMemberSearchInput')?.value || '', false);
