@@ -1,5 +1,5 @@
 // Dhamma Library Data
-const DHAMMA_LIBRARY_ITEMS = [
+export const DHAMMA_LIBRARY_ITEMS = [
   {
     "id": "bodhipuja-handbook",
     "title": "බෝධිපූජා අත්පොත (සම්පූර්ණ ගාථා පෙළ)",
