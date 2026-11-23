@@ -14538,7 +14538,7 @@ window.toggleReadingMeaning = function(forceShow) {
 // PDF Download or formatted Print View
 window.handleLibraryPdfDownload = function(itemId) {
   triggerHaptic(12);
-  const items = window.DHAMMA_LIBRARY_ITEMS || DHAMMA_LIBRARY_ITEMS || [];
+  const items = getAllDhammaLibraryItems();
   const item = items.find(i => i.id === itemId);
   if (!item) return;
 
@@ -14553,7 +14553,7 @@ window.handleLibraryPdfDownload = function(itemId) {
 window.printLibraryItem = function(itemId) {
   triggerHaptic(12);
   const targetId = itemId || activeReadingItemId;
-  const items = window.DHAMMA_LIBRARY_ITEMS || DHAMMA_LIBRARY_ITEMS || [];
+  const items = getAllDhammaLibraryItems();
   const item = items.find(i => i.id === targetId);
   if (!item) return;
 

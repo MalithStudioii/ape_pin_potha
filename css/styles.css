@@ -13662,7 +13662,7 @@ body.dark-mode .spotlight-artisan-district {
 
 .reading-section-heading {
   font-family: var(--font-serif);
-  font-size: 1.25rem;
+  font-size: 1.25em;
   font-weight: 800;
   margin: 0 0 16px;
   padding-bottom: 10px;
@@ -13674,7 +13674,7 @@ body.dark-mode .spotlight-artisan-district {
 
 .reading-verse-pali {
   font-family: var(--font-serif);
-  font-size: 1.05rem;
+  font-size: 1.05em;
   line-height: 1.95;
   white-space: pre-line;
   letter-spacing: 0.35px;
@@ -13685,7 +13685,7 @@ body.dark-mode .spotlight-artisan-district {
   margin-top: 18px;
   padding: 16px 18px;
   border-radius: 12px;
-  font-size: 0.92rem;
+  font-size: 0.92em;
   line-height: 1.75;
   border-left: 4px solid #ea580c;
   white-space: pre-line;
