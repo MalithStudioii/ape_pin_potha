@@ -14272,21 +14272,43 @@ window.printLibraryItem = function(itemId) {
   };
 
   const sectionsHtml = (item.sections || []).map((sec, idx) => {
-    // Split pali by double newlines into natural stanza blocks so each stanza avoids splitting mid-verse
+    // Split pali by double newlines into natural stanza blocks
     const paliBlocks = (sec.pali || '').split(/\n\s*\n/).filter(s => s.trim());
-    const paliHtml = paliBlocks.map(block => `
+    const meaningBlocks = splitMeaningBlocks(sec.sinhalaMeaning);
+
+    let firstBlockHtml = '';
+    let remainingPaliBlocks = paliBlocks;
+    let remainingMeaningBlocks = meaningBlocks;
+
+    if (paliBlocks.length > 0) {
+      firstBlockHtml = `
+        <div class="print-stanza">
+          <div class="print-pali">${paliBlocks[0].trim()}</div>
+        </div>
+      `;
+      remainingPaliBlocks = paliBlocks.slice(1);
+    } else if (meaningBlocks.length > 0) {
+      firstBlockHtml = `
+        <div class="print-meaning-wrap">
+          <div class="meaning-title">සිංහල අර්ථය:</div>
+          <div class="print-meaning-block">${meaningBlocks[0].trim()}</div>
+        </div>
+      `;
+      remainingMeaningBlocks = meaningBlocks.slice(1);
+    }
+
+    const remainingPaliHtml = remainingPaliBlocks.map(block => `
       <div class="print-stanza">
         <div class="print-pali">${block.trim()}</div>
       </div>
     `).join('');
 
-    let meaningHtml = '';
-    const meaningBlocks = splitMeaningBlocks(sec.sinhalaMeaning);
-    if (meaningBlocks.length > 0) {
-      meaningHtml = `
+    let remainingMeaningHtml = '';
+    if (remainingMeaningBlocks.length > 0) {
+      remainingMeaningHtml = `
         <div class="print-meaning-wrap">
-          <div class="meaning-title">සිංහල අර්ථය:</div>
-          ${meaningBlocks.map(mBlock => `
+          ${paliBlocks.length > 0 ? '<div class="meaning-title">සිංහල අර්ථය:</div>' : ''}
+          ${remainingMeaningBlocks.map(mBlock => `
             <div class="print-meaning-block">${mBlock.trim()}</div>
           `).join('')}
         </div>
@@ -14295,11 +14317,15 @@ window.printLibraryItem = function(itemId) {
 
     return `
       <section class="print-section">
-        <h3 class="print-heading">
-          <span class="heading-num">${idx + 1}.</span> ${sec.heading}
-        </h3>
-        ${paliHtml}
-        ${meaningHtml}
+        <!-- Heading tied to first stanza to prevent orphaned heading at page bottom -->
+        <div class="print-heading-group">
+          <h3 class="print-heading">
+            <span class="heading-num">${idx + 1}.</span> ${sec.heading}
+          </h3>
+          ${firstBlockHtml}
+        </div>
+        ${remainingPaliHtml}
+        ${remainingMeaningHtml}
       </section>
     `;
   }).join('');
@@ -14312,7 +14338,7 @@ window.printLibraryItem = function(itemId) {
   <style>
     @page {
       size: A4 portrait;
-      margin: 14mm 15mm;
+      margin: 0;
     }
     *, *::before, *::after {
       box-sizing: border-box;
@@ -14331,7 +14357,7 @@ window.printLibraryItem = function(itemId) {
       font-size: 11pt;
       line-height: 1.6;
     }
-    /* Repeating Watermark on every printed page */
+    /* Repeating Watermark centered on every printed page */
     .print-watermark {
       position: fixed;
       top: 50%;
@@ -14343,13 +14369,38 @@ window.printLibraryItem = function(itemId) {
       z-index: 0;
       pointer-events: none;
     }
-    .print-content-wrapper {
-      position: relative;
-      z-index: 1;
+    /* Print Table Layout: <thead> and <tfoot> provide 14mm margins on every page */
+    .print-layout-table {
       width: 100%;
       max-width: 100%;
-      height: auto;
-      overflow: visible;
+      border-collapse: collapse;
+      border-spacing: 0;
+      border: none;
+      margin: 0;
+      padding: 0;
+      position: relative;
+      z-index: 1;
+      table-layout: fixed;
+    }
+    .print-layout-table thead {
+      display: table-header-group;
+    }
+    .print-layout-table tfoot {
+      display: table-footer-group;
+    }
+    .page-spacer {
+      height: 14mm;
+      padding: 0;
+      margin: 0;
+      border: none;
+      background: transparent;
+    }
+    .page-content {
+      padding: 0 15mm;
+      margin: 0;
+      border: none;
+      vertical-align: top;
+      box-sizing: border-box;
     }
     /* Clean Header on first page */
     .print-header {
@@ -14395,6 +14446,12 @@ window.printLibraryItem = function(itemId) {
       margin-bottom: 20px;
       height: auto;
       overflow: visible;
+    }
+    /* Heading tied together with the first stanza to eliminate orphaned headings */
+    .print-heading-group {
+      break-inside: avoid;
+      page-break-inside: avoid;
+      margin-bottom: 12px;
     }
     .print-heading {
       font-size: 13.5pt;
@@ -14470,24 +14527,36 @@ window.printLibraryItem = function(itemId) {
 </head>
 <body>
   <img src="assets/Watermark.png" class="print-watermark" id="watermarkImg" alt="" />
-  <div class="print-content-wrapper">
-    <header class="print-header">
-      <div>
-        <h1 class="print-title">${item.title}</h1>
-        <p class="print-subtitle">${item.subtitle}</p>
-      </div>
-      <div class="print-site-brand">
-        <span class="print-site-name">අපේ පිං පොත</span>
-        <span class="print-site-url">apepinpotha.lk</span>
-      </div>
-    </header>
+  <table class="print-layout-table">
+    <thead>
+      <tr><td class="page-spacer"></td></tr>
+    </thead>
+    <tfoot>
+      <tr><td class="page-spacer"></td></tr>
+    </tfoot>
+    <tbody>
+      <tr>
+        <td class="page-content">
+          <header class="print-header">
+            <div>
+              <h1 class="print-title">${item.title}</h1>
+              <p class="print-subtitle">${item.subtitle}</p>
+            </div>
+            <div class="print-site-brand">
+              <span class="print-site-name">අපේ පිං පොත</span>
+              <span class="print-site-url">apepinpotha.lk</span>
+            </div>
+          </header>
 
-    ${sectionsHtml}
+          ${sectionsHtml}
 
-    <footer class="print-footer">
-      ශ්‍රී සද්ධර්ම පුස්තකාලය • අපේ පිං පොත (apepinpotha.lk) • සැමට ධර්ම දානය පිණිසයි
-    </footer>
-  </div>
+          <footer class="print-footer">
+            ශ්‍රී සද්ධර්ම පුස්තකාලය • අපේ පිං පොත (apepinpotha.lk) • සැමට ධර්ම දානය පිණිසයි
+          </footer>
+        </td>
+      </tr>
+    </tbody>
+  </table>
 </body>
 </html>`;
 
