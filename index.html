@@ -110,7 +110,7 @@
                 </div>
                 <div>
                     <h1 class="brand-title">පිං පොත</h1>
-                    <span class="brand-subtitle">කල්‍යාණ මිත්‍ර පුණ්‍ය ජාලය</span>
+                    <span class="brand-subtitle">හිත නිවන, පින් පුරන කල්‍යාණ මිත්‍ර එකමුතුව</span>
                 </div>
             </div>
 
@@ -139,6 +139,9 @@
                 </button>
                 <button onclick="switchTab('friends')" id="desk-tab-friends" class="nav-tab-btn" title="කල්‍යාණ මිතුරු පවුර" aria-label="කල්‍යාණ මිතුරු පවුර">
                     <i class="fa-solid fa-user-group" style="color: #0284c7;"></i>
+                </button>
+                <button onclick="switchTab('library')" id="desk-tab-library" class="nav-tab-btn" title="ධර්ම පුස්තකාලය (පිරිත් සහ බෝධිපූජා)" aria-label="ධර්ම පුස්තකාලය">
+                    <i class="fa-solid fa-book-open" style="color: #c2410c;"></i>
                 </button>
             </nav>
 
@@ -296,6 +299,12 @@
                 <button onclick="switchTab('artisans')" id="side-btn-artisans" class="category-item" style="background: linear-gradient(135deg, #fffbeb, #fef3c7); border: 1px solid #fde68a; color: #92400e; font-weight: 700; margin-bottom: 8px;" title="ශ්‍රී ලංකා විහාර නිර්මාණ හා කලා ශිල්පීන් නාමාවලිය">
                     <span><i class="fa-solid fa-palette cat-icon" style="color: #d97706;"></i> විහාර කලා ශිල්පීන්</span>
                     <span class="badge-live" style="background: linear-gradient(135deg, #d97706, #b45309); font-size: 0.65rem; padding: 2px 7px;">නාමාවලිය</span>
+                </button>
+
+                <!-- Dhamma Library Sidebar Shortcut -->
+                <button onclick="switchTab('library')" id="side-btn-library" class="category-item" style="background: linear-gradient(135deg, #fff7ed, #ffedd5); border: 1px solid #fed7aa; color: #9a3412; font-weight: 700; margin-bottom: 8px;" title="ශ්‍රී සද්ධර්ම පුස්තකාලය (පිරිත්, බෝධිපූජා, ධර්ම ග්‍රන්ථ)">
+                    <span><i class="fa-solid fa-book-open cat-icon" style="color: #c2410c;"></i> ධර්ම පුස්තකාලය</span>
+                    <span class="badge-live" style="background: linear-gradient(135deg, #ea580c, #c2410c); font-size: 0.65rem; padding: 2px 7px;">නවතම</span>
                 </button>
 
                 <h3 class="category-title">පින්කම් වර්ගීකරණය</h3>
@@ -1132,6 +1141,88 @@
         </div>
     </div>
 
+    <!-- ========================================================================= -->
+    <!-- Dhamma Library Page Container                                             -->
+    <!-- ========================================================================= -->
+    <div id="dhammaLibraryPageContainer" class="library-page-container hidden" style="display: none;">
+        <div class="library-page-content">
+
+            <!-- Hero Banner Card -->
+            <div class="library-hero-card">
+                <div class="library-hero-content">
+                    <div class="library-hero-badge">
+                        <i class="fa-solid fa-book-open"></i>
+                        <span>සද්ධර්ම පුස්තකාලය</span>
+                    </div>
+                    <h1 class="library-hero-title">ශ්‍රී සද්ධර්ම පුස්තකාලය (Dhamma Library)</h1>
+                    <p class="library-hero-desc">
+                        නිතර පරිශීලනය කරන උතුම් පිරිත් දේශනා, බෝධිපූජා ගාථා සහ ධර්ම ග්‍රන්ථ නිරවුල්ව කියවන්න, පහසුවෙන් මුද්‍රණය හෝ PDF ලෙස බාගත කරගන්න.
+                    </p>
+                    <div class="library-hero-actions">
+                        <button type="button" class="btn-library-back" onclick="switchTab('feed')">
+                            <i class="fa-solid fa-arrow-left"></i>
+                            <span>පුණ්‍ය පවුර වෙත</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Search & Category Filter Pills -->
+            <div class="library-search-filter-card">
+                <div class="library-search-row">
+                    <div class="library-search-input-wrap">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" id="librarySearchInput" placeholder="ගාථා, පිරිත් හෝ ධර්ම ග්‍රන්ථ සොයන්න..." oninput="filterDhammaLibrary()">
+                        <button type="button" id="librarySearchClearBtn" class="library-clear-search-btn hidden" onclick="clearDhammaLibrarySearch()" title="මකන්න">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Category Filter Pills -->
+                <div class="library-category-pills" id="libraryCategoryPills">
+                    <button type="button" class="library-pill active" data-category="all" onclick="setDhammaLibraryCategory('all')">
+                        <i class="fa-solid fa-layer-group"></i> සියල්ල
+                    </button>
+                    <button type="button" class="library-pill" data-category="bodhipuja" onclick="setDhammaLibraryCategory('bodhipuja')">
+                        🌸 බෝධිපූජා
+                    </button>
+                    <button type="button" class="library-pill" data-category="pirith" onclick="setDhammaLibraryCategory('pirith')">
+                        🪷 පිරිත්
+                    </button>
+                    <button type="button" class="library-pill" data-category="dhamma" onclick="setDhammaLibraryCategory('dhamma')">
+                        📖 ධර්ම ග්‍රන්ථ
+                    </button>
+                </div>
+            </div>
+
+            <!-- Results Counter -->
+            <div class="library-results-header">
+                <span id="libraryResultsCount" class="library-results-count">පුස්තකාල පොත් පූරණය වෙමින්...</span>
+                <div class="library-authentic-badge">
+                    <i class="fa-solid fa-circle-check" style="color: #059669;"></i>
+                    <span>සත්‍යාපිත ත්‍රිපිටක හා අට්ඨකථා මූලාශ්‍ර</span>
+                </div>
+            </div>
+
+            <!-- Library Items Grid -->
+            <div class="library-items-grid" id="libraryItemsGrid">
+                <!-- Dynamically populated via renderDhammaLibraryView() -->
+            </div>
+
+            <!-- Empty State -->
+            <div id="libraryEmptyState" class="library-empty-state hidden" style="display: none;">
+                <i class="fa-solid fa-book-bookmark"></i>
+                <h3>ගැලපෙන ධර්ම කරුණක් හමු නොවීය</h3>
+                <p>ඔබ සෙවූ වචනයට අදාළ කිසිදු ගාථාවක් හෝ පොතක් හමු නොවීය. කරුණාකර වෙනත් වචනයකින් සොයන්න.</p>
+                <button type="button" class="btn-clear-filter" onclick="clearDhammaLibrarySearch()">
+                    <i class="fa-solid fa-rotate-left"></i> සියලු පොත් පෙන්වන්න
+                </button>
+            </div>
+
+        </div>
+    </div>
+
     <!-- ================= KALYANA MITHURU PAWURA DIRECTORY VIEW ================= -->
     <div id="friendsPageContainer" class="kmp-page-container hidden" style="display: none;">
         <div class="kmp-page-content">
@@ -1879,6 +1970,85 @@
             <!-- Profile Modal Dynamic Content -->
             <div id="artisanProfileModalContent" class="artisan-profile-modal-body">
                 <!-- Dynamically populated via renderArtisanProfileModal() -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- Dhamma Library Mobile & Desktop Reading Mode Overlay                      -->
+    <!-- ========================================================================= -->
+    <div id="dhammaReadingModal" class="reading-modal-overlay hidden" role="dialog" aria-modal="true" aria-label="ධර්ම කියවීම් මාදිලිය">
+        <div class="reading-modal-container" id="readingModalContainer">
+            <!-- Top Sticky Toolbar with Progress Bar -->
+            <div class="reading-header-bar">
+                <div class="reading-header-top">
+                    <button type="button" class="reading-nav-btn" onclick="closeReadingModal()" title="ආපසු පුස්තකාලය වෙත" aria-label="ආපසු">
+                        <i class="fa-solid fa-arrow-left"></i>
+                        <span class="reading-back-text">පුස්තකාලය</span>
+                    </button>
+                    <div class="reading-header-titles">
+                        <h2 id="readingModalTitle" class="reading-header-title">බෝධිපූජා අත්පොත</h2>
+                        <span id="readingModalCategoryBadge" class="reading-header-cat">බෝධිපූජා</span>
+                    </div>
+                    <div class="reading-header-actions">
+                        <button type="button" class="reading-action-icon-btn" onclick="printLibraryItem()" title="මුද්‍රණය හෝ PDF ලෙස සුරකින්න" aria-label="Print or Save PDF">
+                            <i class="fa-solid fa-print"></i>
+                        </button>
+                        <button type="button" class="reading-close-btn" onclick="closeReadingModal()" title="වසන්න" aria-label="වසන්න">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Secondary Control Toolbar: Font Size, Theme, Sinhala Meaning Toggle -->
+                <div class="reading-control-strip">
+                    <!-- Font Size Controls -->
+                    <div class="reading-control-group font-controls">
+                        <span class="reading-control-label"><i class="fa-solid fa-text-height"></i> අකුරු</span>
+                        <div class="reading-btn-pill-group">
+                            <button type="button" class="reading-pill-btn" onclick="changeReadingFontSize(-10)" title="අකුරු කුඩා කරන්න">A-</button>
+                            <button type="button" class="reading-pill-btn reading-font-reset" onclick="resetReadingFontSize()" title="සාමාන්‍ය ප්‍රමාණය" id="readingFontSizeDisplay">100%</button>
+                            <button type="button" class="reading-pill-btn" onclick="changeReadingFontSize(10)" title="අකුරු විශාල කරන්න">A+</button>
+                        </div>
+                    </div>
+
+                    <!-- Theme Switcher -->
+                    <div class="reading-control-group theme-controls">
+                        <span class="reading-control-label"><i class="fa-solid fa-circle-half-stroke"></i> පසුබිම</span>
+                        <div class="reading-theme-pills">
+                            <button type="button" class="reading-theme-btn theme-btn-light active" data-theme="light" onclick="setReadingTheme('light')" title="සාමාන්‍ය (සුදු)">
+                                <span class="theme-dot dot-light"></span> සුදු
+                            </button>
+                            <button type="button" class="reading-theme-btn theme-btn-sepia" data-theme="sepia" onclick="setReadingTheme('sepia')" title="පුස්කොළ (Sepia)">
+                                <span class="theme-dot dot-sepia"></span> පුස්කොළ
+                            </button>
+                            <button type="button" class="reading-theme-btn theme-btn-dark" data-theme="dark" onclick="setReadingTheme('dark')" title="රාත්‍රී (Dark)">
+                                <span class="theme-dot dot-dark"></span> රාත්‍රී
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Sinhala Meaning Toggle -->
+                    <div class="reading-control-group meaning-toggle-group">
+                        <label class="reading-toggle-label" for="readingMeaningToggle">
+                            <input type="checkbox" id="readingMeaningToggle" onchange="toggleReadingMeaning(this.checked)" checked>
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-text">සිංහල තේරුම</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Reading Progress Bar -->
+                <div class="reading-progress-track">
+                    <div id="readingProgressBar" class="reading-progress-fill" style="width: 0%;"></div>
+                </div>
+            </div>
+
+            <!-- Scrollable Reading Content Body -->
+            <div class="reading-scroll-body" id="readingScrollBody">
+                <div class="reading-content-inner" id="readingContentInner">
+                    <!-- Dynamically populated via renderReadingContent() -->
+                </div>
             </div>
         </div>
     </div>
@@ -3895,18 +4065,32 @@
     <div id="mobileDrawerOverlay" class="mobile-drawer-overlay hidden" onclick="closeMobileMenuDrawer()"></div>
     
     <aside id="mobileDrawer" class="mobile-drawer hidden" aria-label="ප්‍රධාන මෙනුව">
-        <!-- Drawer Header -->
+        <!-- Drawer Header with Brand Logo, Title & Tagline -->
         <div class="mobile-drawer-header">
+            <div class="drawer-brand-row">
+                <div class="drawer-brand-badge" onclick="closeMobileMenuDrawer(); switchTab('feed');">
+                    <div class="drawer-brand-icon">
+                        <i class="fa-solid fa-dharmachakra animate-spin-slow"></i>
+                    </div>
+                    <div class="drawer-brand-text">
+                        <span class="drawer-brand-name">පිං පොත</span>
+                        <span class="drawer-brand-tagline">හිත නිවන, පින් පුරන කල්‍යාණ මිත්‍ර එකමුතුව</span>
+                    </div>
+                </div>
+                <button type="button" class="drawer-close-btn" onclick="closeMobileMenuDrawer()" title="වසන්න" aria-label="වසන්න">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Drawer User Info Tile -->
             <div class="drawer-user-info" onclick="closeMobileMenuDrawer(); switchTab('profile');">
                 <div class="drawer-avatar-circle" id="drawerNavAvatar">ක</div>
                 <div class="drawer-user-meta">
                     <div class="drawer-user-name" id="drawerUserName">කල්‍යාණ මිත්‍ර</div>
                     <span class="drawer-user-status" id="drawerUserStatus">සාමාජික</span>
                 </div>
+                <i class="fa-solid fa-chevron-right drawer-chevron-mini" style="margin-left: auto; color: rgba(254, 243, 199, 0.5);"></i>
             </div>
-            <button type="button" class="drawer-close-btn" onclick="closeMobileMenuDrawer()" title="වසන්න" aria-label="වසන්න">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
         </div>
 
         <!-- Drawer Content Body -->
@@ -3956,6 +4140,21 @@
                             <span id="drawerArtisanNewBadge" class="drawer-new-pill-badge hidden">NEW</span>
                         </div>
                         <p class="drawer-item-desc">විහාර චිත්‍ර, වෙහෙර දාගැබ්, බුදු පිළිම සහ සාම්ප්‍රදායික කැටයම් ශිල්පීන් සම්බන්ධ කරගන්න</p>
+                    </div>
+                    <i class="fa-solid fa-chevron-right drawer-chevron"></i>
+                </button>
+
+                <!-- 3. Dhamma Library Featured Card -->
+                <button type="button" class="drawer-item-card drawer-item-featured" onclick="closeMobileMenuDrawer(); switchTab('library');" style="margin-top: 8px; border-color: rgba(234, 88, 12, 0.35); background: linear-gradient(135deg, rgba(255, 237, 213, 0.45), rgba(255, 247, 237, 0.75));">
+                    <div class="drawer-item-icon-wrap" style="background: linear-gradient(135deg, #ea580c, #c2410c); color: #fff; width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; flex-shrink: 0; box-shadow: 0 4px 10px rgba(234, 88, 12, 0.25);">
+                        <i class="fa-solid fa-book-open"></i>
+                    </div>
+                    <div class="drawer-item-content">
+                        <div class="drawer-item-title-row">
+                            <span class="drawer-item-title">ධර්ම පුස්තකාලය</span>
+                            <span class="drawer-badge-emerald" style="background: linear-gradient(135deg, #ea580c, #c2410c);">නව</span>
+                        </div>
+                        <p class="drawer-item-desc">උතුම් පිරිත් දේශනා, බෝධිපූජා ගාථා සහ ධර්ම ග්‍රන්ථ කියවන්න හා බාගත කරන්න</p>
                     </div>
                     <i class="fa-solid fa-chevron-right drawer-chevron"></i>
                 </button>

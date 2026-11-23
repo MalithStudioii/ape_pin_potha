@@ -9,6 +9,7 @@ const STATIC_ASSETS = [
   './js/storage.js?v=165',
   './js/imgbb-service.js?v=68',
   './js/aranya-data.js',
+  './js/dhamma-library-data.js',
   './js/spiritual-avatars.js?v=147',
   './js/security.js?v=160',
   './js/algorithm.js?v=147',
@@ -20,6 +21,7 @@ const STATIC_ASSETS = [
   './assets/official-welcome-banner.webp',
   './assets/sangha-frame.webp',
   './assets/artisan-banner-buddha.webp',
+  './assets/Watermark.png',
   './assets/banner.webp',
   './assets/nexiapro-logo.webp'
 ];

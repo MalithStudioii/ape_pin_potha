@@ -10,6 +10,8 @@ import { uploadToImgBB, uploadToCloudinary } from './imgbb-service.js?v=68';
 import { SoundService, triggerHaptic } from './sound.js?v=66';
 import { FeedAlgorithm } from './algorithm.js?v=144';
 import { SPIRITUAL_AVATARS, renderSpiritualAvatarPicker, selectSpiritualAvatar } from './spiritual-avatars.js?v=144';
+import { DHAMMA_LIBRARY_ITEMS } from './dhamma-library-data.js?v=1';
+window.DHAMMA_LIBRARY_ITEMS = DHAMMA_LIBRARY_ITEMS;
 export const BO_LEAF_AVATAR = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjggMTI4IiB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCI+CiAgPGRlZnM+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImdfYm9fbGVhZiIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNkY2ZjZTciLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjZDFmYWU1Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGZpbHRlciBpZD0iZl9ib19sZWFmIiB4PSItMjAlIiB5PSItMjAlIiB3aWR0aD0iMTQwJSIgaGVpZ2h0PSIxNDAlIj4KICAgICAgPGZlRHJvcFNoYWRvdyBkeD0iMCIgZHk9IjMiIHN0ZERldmlhdGlvbj0iMyIgZmxvb2Qtb3BhY2l0eT0iMC4xOCIgZmxvb2QtY29sb3I9IiM0NTFhMDMiLz4KICAgIDwvZmlsdGVyPgogIDwvZGVmcz4KICA8Y2lyY2xlIGN4PSI2NCIgY3k9IjY0IiByPSI2MSIgZmlsbD0idXJsKCNnX2JvX2xlYWYpIiBzdHJva2U9IiMxMGI5ODEiIHN0cm9rZS13aWR0aD0iMi41Ii8+CiAgPHRleHQgeD0iNjQiIHk9IjgwIiBmb250LXNpemU9IjU4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iJ0FwcGxlIENvbG9yIEVtb2ppJywnU2Vnb2UgVUkgRW1vamknLCdOb3RvIENvbG9yIEVtb2ppJywnU2Vnb2UgVUkgU3ltYm9sJyxzYW5zLXNlcmlmIiBmaWx0ZXI9InVybCgjZl9ib19sZWFmKSI+8J+MvzwvdGV4dD4KPC9zdmc+";
 let allCommunityMembersCache = [];
 let infiniteScrollObserver = null;
@@ -1578,7 +1580,7 @@ window.switchTab = function(tab, pushHistory = true) {
   document.querySelector('.app-header')?.classList.remove('header-hidden');
 
   // Update navigation buttons (both desktop & mobile)
-  ['feed', 'profile', 'mybook', 'needs', 'friends', 'aranya', 'policies', 'artisans'].forEach(t => {
+  ['feed', 'profile', 'mybook', 'needs', 'friends', 'aranya', 'policies', 'artisans', 'library'].forEach(t => {
     const dBtn = document.getElementById(`desk-tab-${t}`);
     const mBtn = document.getElementById(`mob-tab-${t}`);
     if (dBtn) {
@@ -1603,6 +1605,12 @@ window.switchTab = function(tab, pushHistory = true) {
     else sideArtisansBtn.classList.remove('active');
   }
 
+  const sideLibraryBtn = document.getElementById('side-btn-library');
+  if (sideLibraryBtn) {
+    if (tab === 'library') sideLibraryBtn.classList.add('active');
+    else sideLibraryBtn.classList.remove('active');
+  }
+
   const headerAranyaBtn = document.getElementById('headerAranyaBtn');
   if (headerAranyaBtn) {
     if (tab === 'aranya') headerAranyaBtn.classList.add('active');
@@ -1621,6 +1629,7 @@ window.switchTab = function(tab, pushHistory = true) {
   const friendsContainer = document.getElementById('friendsPageContainer');
   const policiesContainer = document.getElementById('policiesPageContainer');
   const artisansContainer = document.getElementById('artisansPageContainer');
+  const libraryContainer = document.getElementById('dhammaLibraryPageContainer');
   const banner = document.getElementById('tabHeaderBanner');
 
   if (tab === 'policies') {
@@ -1648,6 +1657,10 @@ window.switchTab = function(tab, pushHistory = true) {
     if (artisansContainer) {
       artisansContainer.classList.add('hidden');
       artisansContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (libraryContainer) {
+      libraryContainer.classList.add('hidden');
+      libraryContainer.style.setProperty('display', 'none', 'important');
     }
     if (policiesContainer) {
       policiesContainer.classList.remove('hidden');
@@ -1685,6 +1698,10 @@ window.switchTab = function(tab, pushHistory = true) {
       artisansContainer.classList.add('hidden');
       artisansContainer.style.setProperty('display', 'none', 'important');
     }
+    if (libraryContainer) {
+      libraryContainer.classList.add('hidden');
+      libraryContainer.style.setProperty('display', 'none', 'important');
+    }
     if (profileContainer) {
       profileContainer.classList.remove('hidden');
       profileContainer.style.setProperty('display', 'block', 'important');
@@ -1721,6 +1738,10 @@ window.switchTab = function(tab, pushHistory = true) {
     if (artisansContainer) {
       artisansContainer.classList.add('hidden');
       artisansContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (libraryContainer) {
+      libraryContainer.classList.add('hidden');
+      libraryContainer.style.setProperty('display', 'none', 'important');
     }
     if (aranyaContainer) {
       aranyaContainer.classList.remove('hidden');
@@ -1764,12 +1785,58 @@ window.switchTab = function(tab, pushHistory = true) {
       artisansContainer.classList.remove('hidden');
       artisansContainer.style.setProperty('display', 'block', 'important');
     }
+    if (libraryContainer) {
+      libraryContainer.classList.add('hidden');
+      libraryContainer.style.setProperty('display', 'none', 'important');
+    }
     if (banner) banner.style.display = 'none';
 
     try {
       renderArtisansDirectoryView();
     } catch (err) {
       console.error('[Artisans] Error rendering artisans view:', err);
+    }
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+
+  if (tab === 'library') {
+    stopKmpLivePolling();
+    if (feedLayout) {
+      feedLayout.classList.add('hidden');
+      feedLayout.style.setProperty('display', 'none', 'important');
+    }
+    if (profileContainer) {
+      profileContainer.classList.add('hidden');
+      profileContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (aranyaContainer) {
+      aranyaContainer.classList.add('hidden');
+      aranyaContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (friendsContainer) {
+      friendsContainer.classList.add('hidden');
+      friendsContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (policiesContainer) {
+      policiesContainer.classList.add('hidden');
+      policiesContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (artisansContainer) {
+      artisansContainer.classList.add('hidden');
+      artisansContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (libraryContainer) {
+      libraryContainer.classList.remove('hidden');
+      libraryContainer.style.setProperty('display', 'block', 'important');
+    }
+    if (banner) banner.style.display = 'none';
+
+    try {
+      renderDhammaLibraryView();
+    } catch (err) {
+      console.error('[DhammaLibrary] Error rendering library view:', err);
     }
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1797,6 +1864,10 @@ window.switchTab = function(tab, pushHistory = true) {
     if (artisansContainer) {
       artisansContainer.classList.add('hidden');
       artisansContainer.style.setProperty('display', 'none', 'important');
+    }
+    if (libraryContainer) {
+      libraryContainer.classList.add('hidden');
+      libraryContainer.style.setProperty('display', 'none', 'important');
     }
     if (friendsContainer) {
       friendsContainer.classList.remove('hidden');
@@ -1841,6 +1912,10 @@ window.switchTab = function(tab, pushHistory = true) {
   if (artisansContainer) {
     artisansContainer.classList.add('hidden');
     artisansContainer.style.setProperty('display', 'none', 'important');
+  }
+  if (libraryContainer) {
+    libraryContainer.classList.add('hidden');
+    libraryContainer.style.setProperty('display', 'none', 'important');
   }
 
   // Context banner
@@ -13843,5 +13918,692 @@ window.handleArtisanRegisterSubmit = async function(e) {
     if (uploadStatus) {
       uploadStatus.style.display = 'none';
     }
+  }
+};
+
+/* ==========================================================================
+   Dhamma Library (ධර්ම පුස්තකාලය) & Mobile Reading Mode Controller
+   ========================================================================== */
+
+let currentLibraryCategory = 'all';
+let currentLibrarySearchQuery = '';
+let activeReadingItemId = null;
+let currentReadingFontSize = parseInt(localStorage.getItem('pinPotha_reading_font_size') || '100', 10);
+if (isNaN(currentReadingFontSize) || currentReadingFontSize < 70 || currentReadingFontSize > 160) {
+  currentReadingFontSize = 100;
+}
+let currentReadingTheme = localStorage.getItem('pinPotha_reading_theme') || 'light';
+if (!['light', 'sepia', 'dark'].includes(currentReadingTheme)) {
+  currentReadingTheme = 'light';
+}
+let showReadingMeaning = localStorage.getItem('pinPotha_reading_show_meaning') !== 'false';
+
+// Render Dhamma Library cards grid
+window.renderDhammaLibraryView = function(category = currentLibraryCategory, searchQuery = currentLibrarySearchQuery) {
+  currentLibraryCategory = category;
+  currentLibrarySearchQuery = searchQuery;
+
+  const items = window.DHAMMA_LIBRARY_ITEMS || DHAMMA_LIBRARY_ITEMS || [];
+  const grid = document.getElementById('libraryItemsGrid');
+  const emptyState = document.getElementById('libraryEmptyState');
+  const countEl = document.getElementById('libraryResultsCount');
+
+  if (!grid) return;
+
+  const q = (searchQuery || '').trim().toLowerCase();
+
+  const filtered = items.filter(item => {
+    // Category match
+    if (category !== 'all' && item.category !== category) {
+      return false;
+    }
+    // Search match across title, subtitle, or verses
+    if (q) {
+      const matchTitle = (item.title || '').toLowerCase().includes(q);
+      const matchSub = (item.subtitle || '').toLowerCase().includes(q);
+      const matchCategory = (item.categoryLabel || '').toLowerCase().includes(q);
+      const matchSection = (item.sections || []).some(s => 
+        (s.heading || '').toLowerCase().includes(q) ||
+        (s.pali || '').toLowerCase().includes(q) ||
+        (s.sinhalaMeaning || '').toLowerCase().includes(q)
+      );
+      return matchTitle || matchSub || matchCategory || matchSection;
+    }
+    return true;
+  });
+
+  if (countEl) {
+    countEl.textContent = `පොත් සහ ගාථා පෙළ ${filtered.length} ක් ප්‍රදර්ශනය කෙරේ`;
+  }
+
+  if (filtered.length === 0) {
+    grid.innerHTML = '';
+    grid.classList.add('hidden');
+    if (emptyState) {
+      emptyState.classList.remove('hidden');
+      emptyState.style.display = 'block';
+    }
+    return;
+  }
+
+  if (emptyState) {
+    emptyState.classList.add('hidden');
+    emptyState.style.display = 'none';
+  }
+  grid.classList.remove('hidden');
+
+  grid.innerHTML = filtered.map(item => {
+    const isPirith = item.category === 'pirith';
+    const isBodhipuja = item.category === 'bodhipuja';
+    const catIcon = isPirith ? '🪷' : (isBodhipuja ? '🌸' : '📖');
+
+    return `
+      <div class="library-card" data-item-id="${item.id}">
+        <div class="library-card-badge-row">
+          <span class="library-category-badge">${catIcon} ${item.categoryLabel}</span>
+          <span class="library-read-time"><i class="fa-regular fa-clock"></i> ${item.readTime}</span>
+        </div>
+        <h2 class="library-card-title">${item.title}</h2>
+        <p class="library-card-desc">${item.subtitle}</p>
+        <div class="library-card-actions">
+          <button type="button" class="btn-library-read" onclick="openReadingModal('${item.id}')">
+            <i class="fa-solid fa-book-open-reader"></i>
+            <span>කියවන්න</span>
+          </button>
+          <button type="button" class="btn-library-pdf" onclick="handleLibraryPdfDownload('${item.id}')" title="මුද්‍රණය හෝ PDF ලෙස සුරකින්න">
+            <i class="fa-solid fa-file-arrow-down"></i>
+            <span>PDF</span>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+};
+
+// Search filter triggered on input
+window.filterDhammaLibrary = function() {
+  const input = document.getElementById('librarySearchInput');
+  const clearBtn = document.getElementById('librarySearchClearBtn');
+  const val = input ? input.value : '';
+
+  if (clearBtn) {
+    if (val.trim()) {
+      clearBtn.classList.remove('hidden');
+    } else {
+      clearBtn.classList.add('hidden');
+    }
+  }
+
+  renderDhammaLibraryView(currentLibraryCategory, val);
+};
+
+// Clear search input
+window.clearDhammaLibrarySearch = function() {
+  const input = document.getElementById('librarySearchInput');
+  const clearBtn = document.getElementById('librarySearchClearBtn');
+  if (input) input.value = '';
+  if (clearBtn) clearBtn.classList.add('hidden');
+  renderDhammaLibraryView(currentLibraryCategory, '');
+};
+
+// Category filter selection
+window.setDhammaLibraryCategory = function(cat) {
+  triggerHaptic(10);
+  currentLibraryCategory = cat;
+
+  const container = document.getElementById('libraryCategoryPills');
+  if (container) {
+    const pills = container.querySelectorAll('.library-pill');
+    pills.forEach(pill => {
+      if (pill.getAttribute('data-category') === cat) {
+        pill.classList.add('active');
+      } else {
+        pill.classList.remove('active');
+      }
+    });
+  }
+
+  renderDhammaLibraryView(cat, currentLibrarySearchQuery);
+};
+
+// Mobile & Desktop Reading Mode Controller
+window.openReadingModal = function(itemId) {
+  triggerHaptic(15);
+  const items = window.DHAMMA_LIBRARY_ITEMS || DHAMMA_LIBRARY_ITEMS || [];
+  const item = items.find(i => i.id === itemId);
+  if (!item) return;
+
+  activeReadingItemId = itemId;
+
+  const modal = document.getElementById('dhammaReadingModal');
+  const modalContainer = document.getElementById('readingModalContainer');
+  const titleEl = document.getElementById('readingModalTitle');
+  const catEl = document.getElementById('readingModalCategoryBadge');
+  const contentInner = document.getElementById('readingContentInner');
+  const scrollBody = document.getElementById('readingScrollBody');
+  const progressBar = document.getElementById('readingProgressBar');
+  const meaningToggle = document.getElementById('readingMeaningToggle');
+
+  if (!modal || !contentInner) return;
+
+  if (titleEl) titleEl.textContent = item.title;
+  if (catEl) catEl.textContent = item.categoryLabel;
+
+  // Apply saved theme
+  if (modal) {
+    modal.className = `reading-modal-overlay reading-theme-${currentReadingTheme}`;
+  }
+  const themeButtons = modal.querySelectorAll('.reading-theme-btn');
+  themeButtons.forEach(btn => {
+    if (btn.getAttribute('data-theme') === currentReadingTheme) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+
+  // Apply saved font size
+  contentInner.style.fontSize = `${currentReadingFontSize}%`;
+  const sizeDisplay = document.getElementById('readingFontSizeDisplay');
+  if (sizeDisplay) sizeDisplay.textContent = `${currentReadingFontSize}%`;
+
+  // Apply meaning visibility state
+  if (meaningToggle) meaningToggle.checked = showReadingMeaning;
+  if (modalContainer) {
+    if (showReadingMeaning) {
+      modalContainer.classList.remove('hide-meaning');
+    } else {
+      modalContainer.classList.add('hide-meaning');
+    }
+  }
+
+  // Populate sections
+  contentInner.innerHTML = (item.sections || []).map((sec, idx) => {
+    return `
+      <section class="reading-section-card" id="section-${idx}">
+        <h3 class="reading-section-heading">
+          <i class="fa-solid fa-dharmachakra" style="color: #ea580c; font-size: 0.9em;"></i>
+          <span>${sec.heading}</span>
+        </h3>
+        <div class="reading-verse-pali">${sec.pali}</div>
+        <div class="reading-meaning-box">
+          <strong><i class="fa-solid fa-circle-info" style="margin-right: 4px;"></i> සිංහල තේරුම:</strong>
+          <span>${sec.sinhalaMeaning}</span>
+        </div>
+      </section>
+    `;
+  }).join('');
+
+  // Reset scroll and progress bar
+  if (scrollBody) {
+    scrollBody.scrollTop = 0;
+    scrollBody.onscroll = function() {
+      const maxScroll = scrollBody.scrollHeight - scrollBody.clientHeight;
+      const progress = maxScroll > 0 ? (scrollBody.scrollTop / maxScroll) * 100 : 0;
+      if (progressBar) {
+        progressBar.style.width = `${Math.min(100, Math.max(0, progress))}%`;
+      }
+    };
+  }
+  if (progressBar) progressBar.style.width = '0%';
+
+  modal.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+};
+
+// Close Reading Mode
+window.closeReadingModal = function() {
+  triggerHaptic(10);
+  const modal = document.getElementById('dhammaReadingModal');
+  if (modal) modal.classList.add('hidden');
+  document.body.style.overflow = '';
+  activeReadingItemId = null;
+};
+
+// Font size controls
+window.changeReadingFontSize = function(delta) {
+  triggerHaptic(10);
+  currentReadingFontSize = Math.min(160, Math.max(70, currentReadingFontSize + delta));
+  try {
+    localStorage.setItem('pinPotha_reading_font_size', currentReadingFontSize.toString());
+  } catch (e) {}
+
+  const contentInner = document.getElementById('readingContentInner');
+  if (contentInner) contentInner.style.fontSize = `${currentReadingFontSize}%`;
+
+  const sizeDisplay = document.getElementById('readingFontSizeDisplay');
+  if (sizeDisplay) sizeDisplay.textContent = `${currentReadingFontSize}%`;
+};
+
+window.resetReadingFontSize = function() {
+  triggerHaptic(10);
+  currentReadingFontSize = 100;
+  try {
+    localStorage.setItem('pinPotha_reading_font_size', '100');
+  } catch (e) {}
+
+  const contentInner = document.getElementById('readingContentInner');
+  if (contentInner) contentInner.style.fontSize = '100%';
+
+  const sizeDisplay = document.getElementById('readingFontSizeDisplay');
+  if (sizeDisplay) sizeDisplay.textContent = '100%';
+};
+
+// Theme switcher
+window.setReadingTheme = function(theme) {
+  triggerHaptic(10);
+  if (!['light', 'sepia', 'dark'].includes(theme)) return;
+  currentReadingTheme = theme;
+  try {
+    localStorage.setItem('pinPotha_reading_theme', theme);
+  } catch (e) {}
+
+  const modal = document.getElementById('dhammaReadingModal');
+  if (modal) {
+    modal.className = `reading-modal-overlay reading-theme-${theme}`;
+    const themeButtons = modal.querySelectorAll('.reading-theme-btn');
+    themeButtons.forEach(btn => {
+      if (btn.getAttribute('data-theme') === theme) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+  }
+};
+
+// Sinhala meaning toggle
+window.toggleReadingMeaning = function(forceShow) {
+  triggerHaptic(10);
+  showReadingMeaning = typeof forceShow === 'boolean' ? forceShow : !showReadingMeaning;
+  try {
+    localStorage.setItem('pinPotha_reading_show_meaning', showReadingMeaning ? 'true' : 'false');
+  } catch (e) {}
+
+  const modalContainer = document.getElementById('readingModalContainer');
+  const meaningToggle = document.getElementById('readingMeaningToggle');
+
+  if (meaningToggle) meaningToggle.checked = showReadingMeaning;
+  if (modalContainer) {
+    if (showReadingMeaning) {
+      modalContainer.classList.remove('hide-meaning');
+    } else {
+      modalContainer.classList.add('hide-meaning');
+    }
+  }
+};
+
+// PDF Download or formatted Print View
+window.handleLibraryPdfDownload = function(itemId) {
+  triggerHaptic(12);
+  const items = window.DHAMMA_LIBRARY_ITEMS || DHAMMA_LIBRARY_ITEMS || [];
+  const item = items.find(i => i.id === itemId);
+  if (!item) return;
+
+  if (item.pdfUrl && item.pdfUrl.trim() !== '') {
+    window.open(item.pdfUrl, '_blank');
+  } else {
+    printLibraryItem(itemId);
+  }
+};
+
+// Dedicated Multi-Page A4 PDF / Print Exporter via hidden <iframe>
+window.printLibraryItem = function(itemId) {
+  triggerHaptic(12);
+  const targetId = itemId || activeReadingItemId;
+  const items = window.DHAMMA_LIBRARY_ITEMS || DHAMMA_LIBRARY_ITEMS || [];
+  const item = items.find(i => i.id === targetId);
+  if (!item) return;
+
+  // Remove existing print iframe if any
+  const existingIframe = document.getElementById('dhammaPrintIframe');
+  if (existingIframe) {
+    existingIframe.remove();
+  }
+
+  // Create clean hidden iframe
+  const iframe = document.createElement('iframe');
+  iframe.id = 'dhammaPrintIframe';
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  iframe.style.visibility = 'hidden';
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentWindow.document;
+
+  // Helper to split Sinhala meaning into natural, non-breaking stanza blocks
+  const splitMeaningBlocks = (text) => {
+    if (!text) return [];
+    const parts = text.split(/\n\s*\n/).filter(p => p.trim());
+    const result = [];
+    parts.forEach(part => {
+      if (/\n\s*\d+\.\s/.test(part)) {
+        const sub = part.split(/\n(?=\s*\d+\.\s)/).filter(s => s.trim());
+        result.push(...sub);
+      } else {
+        result.push(part);
+      }
+    });
+    return result;
+  };
+
+  const sectionsHtml = (item.sections || []).map((sec, idx) => {
+    // Split pali by double newlines into natural stanza blocks
+    const paliBlocks = (sec.pali || '').split(/\n\s*\n/).filter(s => s.trim());
+    const meaningBlocks = splitMeaningBlocks(sec.sinhalaMeaning);
+
+    let firstBlockHtml = '';
+    let remainingPaliBlocks = paliBlocks;
+    let remainingMeaningBlocks = meaningBlocks;
+
+    if (paliBlocks.length > 0) {
+      firstBlockHtml = `
+        <div class="print-stanza">
+          <div class="print-pali">${paliBlocks[0].trim()}</div>
+        </div>
+      `;
+      remainingPaliBlocks = paliBlocks.slice(1);
+    } else if (meaningBlocks.length > 0) {
+      firstBlockHtml = `
+        <div class="print-meaning-wrap">
+          <div class="meaning-title">සිංහල අර්ථය:</div>
+          <div class="print-meaning-block">${meaningBlocks[0].trim()}</div>
+        </div>
+      `;
+      remainingMeaningBlocks = meaningBlocks.slice(1);
+    }
+
+    const remainingPaliHtml = remainingPaliBlocks.map(block => `
+      <div class="print-stanza">
+        <div class="print-pali">${block.trim()}</div>
+      </div>
+    `).join('');
+
+    let remainingMeaningHtml = '';
+    if (remainingMeaningBlocks.length > 0) {
+      remainingMeaningHtml = `
+        <div class="print-meaning-wrap">
+          ${paliBlocks.length > 0 ? '<div class="meaning-title">සිංහල අර්ථය:</div>' : ''}
+          ${remainingMeaningBlocks.map(mBlock => `
+            <div class="print-meaning-block">${mBlock.trim()}</div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    return `
+      <section class="print-section">
+        <!-- Heading tied to first stanza to prevent orphaned heading at page bottom -->
+        <div class="print-heading-group">
+          <h3 class="print-heading">
+            <span class="heading-num">${idx + 1}.</span> ${sec.heading}
+          </h3>
+          ${firstBlockHtml}
+        </div>
+        ${remainingPaliHtml}
+        ${remainingMeaningHtml}
+      </section>
+    `;
+  }).join('');
+
+  const htmlContent = `<!DOCTYPE html>
+<html lang="si">
+<head>
+  <meta charset="utf-8">
+  <title>${item.title} - අපේ පිං පොත (Ape Pin Potha)</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 0;
+    }
+    *, *::before, *::after {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    html, body {
+      width: 100%;
+      max-width: 100%;
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      background: #ffffff;
+      color: #1e293b;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Sinhala", "Iskoola Pota", Arial, sans-serif;
+      font-size: 11pt;
+      line-height: 1.6;
+    }
+    /* Repeating Watermark centered on every printed page */
+    .print-watermark {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 105mm;
+      max-width: 80%;
+      opacity: 0.08;
+      z-index: 0;
+      pointer-events: none;
+    }
+    /* Print Table Layout: <thead> and <tfoot> provide 14mm margins on every page */
+    .print-layout-table {
+      width: 100%;
+      max-width: 100%;
+      border-collapse: collapse;
+      border-spacing: 0;
+      border: none;
+      margin: 0;
+      padding: 0;
+      position: relative;
+      z-index: 1;
+      table-layout: fixed;
+    }
+    .print-layout-table thead {
+      display: table-header-group;
+    }
+    .print-layout-table tfoot {
+      display: table-footer-group;
+    }
+    .page-spacer {
+      height: 14mm;
+      padding: 0;
+      margin: 0;
+      border: none;
+      background: transparent;
+    }
+    .page-content {
+      padding: 0 15mm;
+      margin: 0;
+      border: none;
+      vertical-align: top;
+      box-sizing: border-box;
+    }
+    /* Clean Header on first page */
+    .print-header {
+      border-bottom: 2px solid #7c2d12;
+      padding-bottom: 10px;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      break-after: avoid;
+      page-break-after: avoid;
+    }
+    .print-title {
+      font-size: 18pt;
+      font-weight: 800;
+      color: #7c2d12;
+      margin: 0 0 4px;
+      line-height: 1.25;
+    }
+    .print-subtitle {
+      font-size: 9.5pt;
+      color: #64748b;
+      margin: 0;
+      line-height: 1.4;
+    }
+    .print-site-brand {
+      text-align: right;
+      flex-shrink: 0;
+      margin-left: 16px;
+    }
+    .print-site-name {
+      font-size: 10pt;
+      font-weight: 800;
+      color: #9a3412;
+      display: block;
+    }
+    .print-site-url {
+      font-size: 8.5pt;
+      color: #78350f;
+    }
+    /* Section & Natural Page Flow */
+    .print-section {
+      margin-bottom: 20px;
+      height: auto;
+      overflow: visible;
+    }
+    /* Heading tied together with the first stanza to eliminate orphaned headings */
+    .print-heading-group {
+      break-inside: avoid;
+      page-break-inside: avoid;
+      margin-bottom: 12px;
+    }
+    .print-heading {
+      font-size: 13.5pt;
+      font-weight: 800;
+      color: #7c2d12;
+      margin: 16px 0 10px;
+      padding-bottom: 6px;
+      border-bottom: 1.5px solid #fed7aa;
+      break-after: avoid;
+      page-break-after: avoid;
+    }
+    .heading-num {
+      color: #c2410c;
+      margin-right: 4px;
+    }
+    /* Stanza Block: Prevents breaking mid-verse */
+    .print-stanza {
+      break-inside: avoid;
+      page-break-inside: avoid;
+      margin-bottom: 12px;
+    }
+    .print-pali {
+      font-size: 11.5pt;
+      font-weight: 700;
+      color: #431407;
+      line-height: 1.65;
+      white-space: pre-line;
+    }
+    /* Meaning Block: Natural flow container with stanza-level avoid-break */
+    .print-meaning-wrap {
+      margin-top: 10px;
+      margin-bottom: 14px;
+      padding: 10px 14px;
+      background: #fafaf9;
+      border-left: 3px solid #ea580c;
+      border-radius: 4px;
+      height: auto;
+      overflow: visible;
+    }
+    .meaning-title {
+      font-weight: 800;
+      font-size: 9pt;
+      color: #9a3412;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+      break-after: avoid;
+      page-break-after: avoid;
+    }
+    .print-meaning-block {
+      font-size: 10.5pt;
+      line-height: 1.65;
+      color: #334155;
+      white-space: pre-line;
+      break-inside: avoid;
+      page-break-inside: avoid;
+      margin-bottom: 8px;
+    }
+    .print-meaning-block:last-child {
+      margin-bottom: 0;
+    }
+    /* Footer */
+    .print-footer {
+      break-inside: avoid;
+      page-break-inside: avoid;
+      margin-top: 24px;
+      padding-top: 10px;
+      border-top: 1px solid #e2e8f0;
+      text-align: center;
+      font-size: 8.5pt;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+  <img src="assets/Watermark.png" class="print-watermark" id="watermarkImg" alt="" />
+  <table class="print-layout-table">
+    <thead>
+      <tr><td class="page-spacer"></td></tr>
+    </thead>
+    <tfoot>
+      <tr><td class="page-spacer"></td></tr>
+    </tfoot>
+    <tbody>
+      <tr>
+        <td class="page-content">
+          <header class="print-header">
+            <div>
+              <h1 class="print-title">${item.title}</h1>
+              <p class="print-subtitle">${item.subtitle}</p>
+            </div>
+            <div class="print-site-brand">
+              <span class="print-site-name">අපේ පිං පොත</span>
+              <span class="print-site-url">apepinpotha.lk</span>
+            </div>
+          </header>
+
+          ${sectionsHtml}
+
+          <footer class="print-footer">
+            ශ්‍රී සද්ධර්ම පුස්තකාලය • අපේ පිං පොත (apepinpotha.lk) • සැමට ධර්ම දානය පිණිසයි
+          </footer>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</body>
+</html>`;
+
+  doc.open();
+  doc.write(htmlContent);
+  doc.close();
+
+  // Wait for watermark image to load before triggering print
+  const watermarkImg = doc.getElementById('watermarkImg');
+  const triggerPrint = () => {
+    try {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    } catch (e) {
+      console.error('[Print] Iframe print failed, falling back to window.print():', e);
+      window.print();
+    }
+  };
+
+  if (watermarkImg) {
+    if (watermarkImg.complete) {
+      setTimeout(triggerPrint, 150);
+    } else {
+      watermarkImg.onload = () => setTimeout(triggerPrint, 150);
+      watermarkImg.onerror = () => setTimeout(triggerPrint, 150);
+    }
+  } else {
+    setTimeout(triggerPrint, 150);
   }
 };
