@@ -127,13 +127,13 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=182">
+    <link rel="stylesheet" href="css/styles.css?v=183">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
       (function() {
-        var v = 'v182';
-        var cacheLive = 'pin-potha-cache-v182-live';
+        var v = 'v183';
+        var cacheLive = 'pin-potha-cache-v183-live';
         if (localStorage.getItem('pinPotha_active_build') !== v) {
           localStorage.setItem('pinPotha_active_build', v);
           try {
@@ -1468,6 +1468,14 @@
             <!-- Member Cards Grid / List Container -->
             <div class="kmp-grid" id="kmpGridContainer">
                 <!-- Rendered dynamically via JS -->
+            </div>
+
+            <!-- Load More Members Button Container -->
+            <div id="kmpLoadMoreContainer" style="text-align: center; margin: 28px 0 36px; display: none;">
+                <button type="button" id="kmpLoadMoreBtn" class="btn-kmp-load-more" onclick="loadMoreKmpMembers()">
+                    <i class="fa-solid fa-angles-down"></i>
+                    <span>තවත් සාමාජිකයින් බලන්න</span>
+                </button>
             </div>
 
             <!-- Empty State -->
@@ -4488,6 +4496,6 @@
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=182"></script>
+    <script type="module" src="js/app.js?v=183"></script>
 </body>
 </html>

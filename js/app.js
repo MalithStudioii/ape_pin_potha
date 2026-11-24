@@ -4,7 +4,7 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=182';
+import { StorageService } from './storage.js?v=183';
 import { Security } from './security.js?v=160';
 import { uploadToImgBB, uploadToCloudinary } from './imgbb-service.js?v=68';
 import { SoundService, triggerHaptic } from './sound.js?v=66';
@@ -15,6 +15,8 @@ window.DHAMMA_LIBRARY_ITEMS = DHAMMA_LIBRARY_ITEMS;
 window.DHAMMA_CATEGORIES = DHAMMA_CATEGORIES;
 export const BO_LEAF_AVATAR = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjggMTI4IiB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCI+CiAgPGRlZnM+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImdfYm9fbGVhZiIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNkY2ZjZTciLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjZDFmYWU1Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGZpbHRlciBpZD0iZl9ib19sZWFmIiB4PSItMjAlIiB5PSItMjAlIiB3aWR0aD0iMTQwJSIgaGVpZ2h0PSIxNDAlIj4KICAgICAgPGZlRHJvcFNoYWRvdyBkeD0iMCIgZHk9IjMiIHN0ZERldmlhdGlvbj0iMyIgZmxvb2Qtb3BhY2l0eT0iMC4xOCIgZmxvb2QtY29sb3I9IiM0NTFhMDMiLz4KICAgIDwvZmlsdGVyPgogIDwvZGVmcz4KICA8Y2lyY2xlIGN4PSI2NCIgY3k9IjY0IiByPSI2MSIgZmlsbD0idXJsKCNnX2JvX2xlYWYpIiBzdHJva2U9IiMxMGI5ODEiIHN0cm9rZS13aWR0aD0iMi41Ii8+CiAgPHRleHQgeD0iNjQiIHk9IjgwIiBmb250LXNpemU9IjU4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iJ0FwcGxlIENvbG9yIEVtb2ppJywnU2Vnb2UgVUkgRW1vamknLCdOb3RvIENvbG9yIEVtb2ppJywnU2Vnb2UgVUkgU3ltYm9sJyxzYW5zLXNlcmlmIiBmaWx0ZXI9InVybCgjZl9ib19sZWFmKSI+8J+MvzwvdGV4dD4KPC9zdmc+";
 let allCommunityMembersCache = [];
+let kmpMembersCache = [];
+let isKmpLoadingMore = false;
 let infiniteScrollObserver = null;
 let feedSentinelObserver = null;
 let lastPostDoc = null;
@@ -9504,15 +9506,7 @@ export async function renderPcSidebarMembers(filterQuery = '', forceRefresh = fa
         `;
       }).join('');
 
-      let viewAllBtnHtml = `
-        <div style="padding: 8px 4px 2px; text-align: center;">
-          <button type="button" class="btn-sidebar-view-all-members" onclick="event.stopPropagation(); window.handleViewAllSidebarMembersClick()" style="background: linear-gradient(135deg, #fffbeb, #fef3c7); border: 1.5px solid rgba(217, 119, 6, 0.3); border-radius: 9999px; width: 100%; padding: 7px 12px; font-size: 0.74rem; font-weight: 700; color: #92400e; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s; box-shadow: 0 2px 6px rgba(217, 119, 6, 0.08);">
-            <span>සියලු සාමාජිකයින් බලන්න →</span>
-          </button>
-        </div>
-      `;
-
-      container.innerHTML = itemsHtml + viewAllBtnHtml;
+      container.innerHTML = itemsHtml;
     } else {
       container.innerHTML = `
         <div style="text-align: center; padding: 16px 8px; color: #94a3b8; font-size: 0.74rem;">
@@ -9657,7 +9651,6 @@ let kmpActiveSegment = 'all'; // 'all', 'friends', 'online', 'sangha', 'suggeste
 let kmpSearchQuery = '';
 let kmpSortMode = 'active'; // 'active', 'newest', 'name'
 let kmpViewMode = 'grid'; // 'grid', 'list'
-let kmpMembersCache = [];
 
 window.switchKmpSegment = function(seg) {
   triggerHaptic(12);
@@ -9672,15 +9665,39 @@ window.switchKmpSegment = function(seg) {
     }
   });
 
+  if (seg === 'sangha') {
+    StorageService.getCommunityMembersCount().then(totalCount => {
+      if (kmpMembersCache.length < (totalCount || 50)) {
+        StorageService.getAllCommunityMembers().then(fullList => {
+          if (Array.isArray(fullList) && fullList.length > 0) {
+            kmpMembersCache = fullList;
+            renderKmpDirectoryView(false);
+          }
+        });
+      }
+    });
+  }
+
   renderKmpDirectoryView(false);
 };
 
-window.handleKmpSearch = function(val) {
+window.handleKmpSearch = async function(val) {
   kmpSearchQuery = (val || '').trim();
   const clearBtn = document.getElementById('kmpClearSearchBtn');
   if (clearBtn) {
     if (kmpSearchQuery) clearBtn.classList.remove('hidden');
     else clearBtn.classList.add('hidden');
+  }
+  if (kmpSearchQuery) {
+    try {
+      const totalCount = await StorageService.getCommunityMembersCount();
+      if (kmpMembersCache.length < (totalCount || 50)) {
+        const fullList = await StorageService.getAllCommunityMembers();
+        if (Array.isArray(fullList) && fullList.length > 0) {
+          kmpMembersCache = fullList;
+        }
+      }
+    } catch (e) {}
   }
   renderKmpDirectoryView(false);
 };
@@ -9764,7 +9781,11 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
   }
 
   if (forceRefresh || kmpMembersCache.length === 0) {
-    kmpMembersCache = await StorageService.getAllCommunityMembers(forceRefresh);
+    if (kmpSearchQuery) {
+      kmpMembersCache = await StorageService.getAllCommunityMembers(forceRefresh);
+    } else {
+      kmpMembersCache = await StorageService.getPaginatedCommunityMembers(forceRefresh, 15);
+    }
   }
 
   const currentUser = StorageService.currentUser || {};
@@ -9786,7 +9807,15 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
   let onlineCount = kmpMembersCache.filter(m => m.isOnline).length;
   if (onlineCount === 0 && currentUser.uid) onlineCount = 1;
 
-  const totalMembers = kmpMembersCache.length;
+  // Cheaply get total member count via getCountFromServer (cached in sessionStorage)
+  let totalMembers = kmpMembersCache.length;
+  try {
+    const countFromServer = await StorageService.getCommunityMembersCount();
+    if (typeof countFromServer === 'number' && countFromServer > 0) {
+      totalMembers = countFromServer;
+    }
+  } catch (e) {}
+
   const friendsCount = currentMithrayan.length;
   const sanghaCount = kmpMembersCache.filter(m => m.isSangha).length;
 
@@ -9885,7 +9914,17 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
 
   // Results count & segment badge
   const resultsCountEl = document.getElementById('kmpResultsCount');
-  if (resultsCountEl) resultsCountEl.innerText = `සාමාජිකයින් ${list.length} දෙනෙක්`;
+  if (resultsCountEl) {
+    if (kmpActiveSegment === 'all' && !kmpSearchQuery) {
+      if (totalMembers > list.length && StorageService.hasMoreCommunityMembers()) {
+        resultsCountEl.innerText = `සාමාජිකයින් ${totalMembers} න් ${list.length} ක් ප්‍රදර්ශනය වේ`;
+      } else {
+        resultsCountEl.innerText = `සාමාජිකයින් ${totalMembers} දෙනෙක්`;
+      }
+    } else {
+      resultsCountEl.innerText = `සාමාජිකයින් ${list.length} දෙනෙක්`;
+    }
+  }
 
   const badgeEl = document.getElementById('kmpResultsSegmentBadge');
   if (badgeEl) {
@@ -9922,6 +9961,8 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
       }
     }
     container.innerHTML = '';
+    const loadMoreContainer = document.getElementById('kmpLoadMoreContainer');
+    if (loadMoreContainer) loadMoreContainer.style.display = 'none';
     return;
   }
 
@@ -10028,6 +10069,49 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
       </div>
     `;
   }).join('');
+
+  const loadMoreContainer = document.getElementById('kmpLoadMoreContainer');
+  if (loadMoreContainer) {
+    const hasMore = StorageService.hasMoreCommunityMembers();
+    if (hasMore && !kmpSearchQuery && kmpActiveSegment === 'all') {
+      loadMoreContainer.style.display = 'block';
+    } else {
+      loadMoreContainer.style.display = 'none';
+    }
+  }
+};
+
+window.loadMoreKmpMembers = async function() {
+  const btn = document.getElementById('kmpLoadMoreBtn');
+  const container = document.getElementById('kmpLoadMoreContainer');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>පූරණය වෙමින් පවතී...</span>`;
+  }
+
+  try {
+    const res = await StorageService.fetchMoreCommunityMembers(15);
+    if (res && res.success && Array.isArray(res.newUsers) && res.newUsers.length > 0) {
+      const existingUids = new Set(kmpMembersCache.map(u => u.uid));
+      res.newUsers.forEach(u => {
+        if (!existingUids.has(u.uid)) {
+          kmpMembersCache.push(u);
+        }
+      });
+      await renderKmpDirectoryView(false);
+    }
+  } catch (err) {
+    console.warn('[KMP] loadMoreKmpMembers error:', err);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<i class="fa-solid fa-angles-down"></i> <span>තවත් සාමාජිකයින් බලන්න</span>`;
+    }
+    if (container) {
+      const hasMore = StorageService.hasMoreCommunityMembers();
+      container.style.display = (hasMore && !kmpSearchQuery && kmpActiveSegment === 'all') ? 'block' : 'none';
+    }
+  }
 };
 
 window.handleSendKmpRequest = async function(targetUid, targetName) {

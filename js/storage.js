@@ -65,6 +65,11 @@ export const StorageService = {
   _loadedPosts: [],
   currentUser: null,
 
+  _lastUserDoc: null,
+  _hasMoreUsers: true,
+  _isLoadingMoreUsers: false,
+  _paginatedUsers: [],
+
   _knownAdminUids: new Set(),
   _knownSanghaUids: new Set(),
   _cachedOfficialPosts: [],
@@ -567,6 +572,56 @@ export const StorageService = {
   },
 
   /**
+   * Helper to normalize and map a Firestore user document or user data object.
+   */
+  _mapUserDoc(docSnap, now = Date.now()) {
+    if (!docSnap) return null;
+    const data = (typeof docSnap.data === 'function') ? docSnap.data() : docSnap;
+    const uid = docSnap.id || data.uid;
+    if (!uid) return null;
+
+    const isMaster = this.isMasterAdmin({ uid, email: data.email, name: data.name });
+    const isSub = !isMaster && (data.role === 'admin' || data.authorRole === 'admin' || data.isSubAdmin === true);
+    if (isSub) {
+      this._knownAdminUids.add(uid);
+    } else {
+      this._knownAdminUids.delete(uid);
+    }
+    const isMemberSangha = data.isSangha === true || data.role === 'sangha' || (data.authorRole === 'sangha') || this.isSangha({ uid, name: data.name || data.firstName });
+    if (isMemberSangha) {
+      this._knownSanghaUids.add(uid);
+    }
+    const lastActive = data.lastActiveAt || data.updatedAt || 0;
+    const isOnline = (this.currentUser && this.currentUser.uid === uid) || ((now - lastActive) < 7 * 60 * 1000);
+    const isUserAnon = Boolean(
+      data.isAnonymous ||
+      data.useAlias ||
+      (this.currentUser && this.currentUser.uid === uid && (this.currentUser.useAlias || this.currentUser.isAnonymous))
+    );
+    return {
+      uid,
+      name: data.name || data.firstName || 'කල්‍යාණ මිත්‍ර',
+      photo: data.photo || '',
+      coverImage: data.coverImage || 'assets/banner.webp',
+      bio: data.bio || '',
+      location: data.location || data.district || '',
+      joinedDate: data.joinedDate || '',
+      updatedAt: data.updatedAt || 0,
+      lastActiveAt: lastActive,
+      isOnline: isOnline,
+      isAdmin: isMaster,
+      isSubAdmin: isSub,
+      isSangha: isMemberSangha,
+      isAnonymous: isUserAnon,
+      useAlias: Boolean(data.useAlias || isUserAnon),
+      role: data.role || (isMemberSangha ? 'sangha' : (isSub ? 'admin' : 'member')),
+      postsCount: typeof data.postsCount === 'number' ? data.postsCount : 0,
+      totalSadhu: typeof data.totalSadhu === 'number' ? data.totalSadhu : 0,
+      mithrayanCount: Array.isArray(data.mithrayan) ? data.mithrayan.length : 0
+    };
+  },
+
+  /**
    * Fetches only a compact batch (limit 15) of community members for the desktop sidebar.
    * Cached in sessionStorage with 15-minute TTL to prevent reading the entire 57+ collection.
    */
@@ -593,38 +648,8 @@ export const StorageService = {
         const q = query(collection(db, COLLECTIONS.USERS), limit(limitCount));
         const snap = await getDocs(q);
         snap.forEach(docSnap => {
-          const data = docSnap.data();
-          const isMaster = this.isMasterAdmin({ uid: docSnap.id, email: data.email, name: data.name });
-          const isSub = !isMaster && (data.role === 'admin' || data.authorRole === 'admin' || data.isSubAdmin === true);
-          if (isSub) this._knownAdminUids.add(docSnap.id);
-          const isMemberSangha = data.isSangha === true || data.role === 'sangha' || (data.authorRole === 'sangha') || this.isSangha({ uid: docSnap.id, name: data.name || data.firstName });
-          if (isMemberSangha) this._knownSanghaUids.add(docSnap.id);
-          const lastActive = data.lastActiveAt || data.updatedAt || 0;
-          const isOnline = (this.currentUser && this.currentUser.uid === docSnap.id) || ((now - lastActive) < 7 * 60 * 1000);
-          const isUserAnon = Boolean(
-            data.isAnonymous ||
-            data.useAlias ||
-            (this.currentUser && this.currentUser.uid === docSnap.id && (this.currentUser.useAlias || this.currentUser.isAnonymous))
-          );
-          members.push({
-            uid: docSnap.id,
-            name: data.name || data.firstName || 'කල්‍යාණ මිත්‍ර',
-            photo: data.photo || '',
-            coverImage: data.coverImage || 'assets/banner.webp',
-            bio: data.bio || '',
-            location: data.location || data.district || '',
-            joinedDate: data.joinedDate || '',
-            updatedAt: data.updatedAt || 0,
-            lastActiveAt: lastActive,
-            isOnline: isOnline,
-            isAdmin: isMaster,
-            isSubAdmin: isSub,
-            isSangha: isMemberSangha,
-            isAnonymous: isUserAnon,
-            useAlias: Boolean(data.useAlias || isUserAnon),
-            role: data.role || (isMemberSangha ? 'sangha' : (isSub ? 'admin' : 'member')),
-            mithrayanCount: Array.isArray(data.mithrayan) ? data.mithrayan.length : 0
-          });
+          const m = this._mapUserDoc(docSnap, now);
+          if (m) members.push(m);
         });
       } catch (e) {
         console.warn('[Storage] getSidebarCommunityMembers error:', e);
@@ -639,6 +664,151 @@ export const StorageService = {
       this.setSessionCache(CACHE_KEY, members, 15 * 60 * 1000);
     }
     return members;
+  },
+
+  /**
+   * Fetches paginated batch of 15 members for the Members (Kalyana Mithra Pawura) tab.
+   * Uses startAfter(lastUserDoc) for subsequent pages. Cached in sessionStorage with 15-minute TTL.
+   */
+  async getPaginatedCommunityMembers(forceRefresh = false, limitCount = 15) {
+    const now = Date.now();
+    const CACHE_KEY = 'pinPotha_session_paginated_users_p1';
+    if (!forceRefresh) {
+      const sessionData = this.getSessionCache(CACHE_KEY);
+      if (Array.isArray(sessionData) && sessionData.length > 0) {
+        this._paginatedUsers = [...sessionData];
+        return sessionData;
+      }
+    }
+
+    this._lastUserDoc = null;
+    this._hasMoreUsers = true;
+    this._isLoadingMoreUsers = false;
+
+    let members = [];
+    if (isCloudReady && db) {
+      try {
+        const { collection, getDocs, query, limit } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const q = query(collection(db, COLLECTIONS.USERS), limit(limitCount));
+        const snap = await getDocs(q);
+        const docsCount = snap.docs.length;
+        if (docsCount > 0) {
+          this._lastUserDoc = snap.docs[docsCount - 1];
+          this._hasMoreUsers = docsCount >= limitCount;
+          snap.forEach(docSnap => {
+            const m = this._mapUserDoc(docSnap, now);
+            if (m) members.push(m);
+          });
+        } else {
+          this._hasMoreUsers = false;
+        }
+      } catch (e) {
+        console.warn('[Storage] getPaginatedCommunityMembers error:', e);
+      }
+    }
+
+    if (members.length === 0) {
+      members = (this.getInstantLocalCommunityMembers ? this.getInstantLocalCommunityMembers() : []).slice(0, limitCount);
+      this._hasMoreUsers = members.length >= limitCount;
+    }
+
+    this._paginatedUsers = members;
+    if (members.length > 0) {
+      this.setSessionCache(CACHE_KEY, members, 15 * 60 * 1000);
+      if (!Array.isArray(this._cachedCommunityMembers) || this._cachedCommunityMembers.length === 0) {
+        this._cachedCommunityMembers = [...members];
+      }
+    }
+    return members;
+  },
+
+  /**
+   * Fetches the next 15 members using Firestore startAfter(lastUserDoc) cursor pagination.
+   */
+  async fetchMoreCommunityMembers(limitCount = 15) {
+    if (this._isLoadingMoreUsers || !this._hasMoreUsers) {
+      return { success: false, hasMore: this._hasMoreUsers, newUsers: [], allUsers: this._paginatedUsers || [] };
+    }
+
+    // Hydrate lastUserDoc from last loaded user if needed (e.g. after session cache hit)
+    if (!this._lastUserDoc && Array.isArray(this._paginatedUsers) && this._paginatedUsers.length > 0 && isCloudReady && db) {
+      try {
+        const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const lastUid = this._paginatedUsers[this._paginatedUsers.length - 1].uid;
+        if (lastUid) {
+          const docSnap = await getDoc(doc(db, COLLECTIONS.USERS, lastUid));
+          if (docSnap.exists()) {
+            this._lastUserDoc = docSnap;
+          }
+        }
+      } catch (e) {
+        console.warn('[Storage] Hydrate lastUserDoc error:', e);
+      }
+    }
+
+    if (!this._lastUserDoc) {
+      this._hasMoreUsers = false;
+      return { success: false, hasMore: false, newUsers: [], allUsers: this._paginatedUsers || [] };
+    }
+
+    this._isLoadingMoreUsers = true;
+    const now = Date.now();
+    let newUsers = [];
+    try {
+      if (isCloudReady && db) {
+        const { collection, getDocs, query, limit, startAfter } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const q = query(collection(db, COLLECTIONS.USERS), startAfter(this._lastUserDoc), limit(limitCount));
+        const snap = await getDocs(q);
+        const docsCount = snap.docs.length;
+        if (docsCount === 0) {
+          this._hasMoreUsers = false;
+        } else {
+          this._lastUserDoc = snap.docs[docsCount - 1];
+          if (docsCount < limitCount) {
+            this._hasMoreUsers = false;
+          }
+          snap.forEach(docSnap => {
+            const m = this._mapUserDoc(docSnap, now);
+            if (m) newUsers.push(m);
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('[Storage] fetchMoreCommunityMembers error:', e);
+    } finally {
+      this._isLoadingMoreUsers = false;
+    }
+
+    if (newUsers.length > 0) {
+      const existingUids = new Set((this._paginatedUsers || []).map(u => u.uid));
+      const filteredNew = newUsers.filter(u => !existingUids.has(u.uid));
+      this._paginatedUsers = [...(this._paginatedUsers || []), ...filteredNew];
+      if (Array.isArray(this._cachedCommunityMembers)) {
+        filteredNew.forEach(nu => {
+          if (!this._cachedCommunityMembers.some(cu => cu.uid === nu.uid)) {
+            this._cachedCommunityMembers.push(nu);
+          }
+        });
+      }
+      return { success: true, hasMore: this._hasMoreUsers, newUsers: filteredNew, allUsers: this._paginatedUsers };
+    } else {
+      this._hasMoreUsers = false;
+      return { success: true, hasMore: false, newUsers: [], allUsers: this._paginatedUsers };
+    }
+  },
+
+  hasMoreCommunityMembers() {
+    return this._hasMoreUsers;
+  },
+
+  isLoadingMoreUsers() {
+    return this._isLoadingMoreUsers;
+  },
+
+  resetCommunityMembersPagination() {
+    this._lastUserDoc = null;
+    this._hasMoreUsers = true;
+    this._isLoadingMoreUsers = false;
   },
 
   /**
@@ -680,44 +850,8 @@ export const StorageService = {
         const q = query(collection(db, COLLECTIONS.USERS));
         const snap = await getDocs(q);
         snap.forEach(docSnap => {
-          const data = docSnap.data();
-          const isMaster = this.isMasterAdmin({ uid: docSnap.id, email: data.email, name: data.name });
-          const isSub = !isMaster && (data.role === 'admin' || data.authorRole === 'admin' || data.isSubAdmin === true);
-          if (isSub) {
-            this._knownAdminUids.add(docSnap.id);
-          } else {
-            this._knownAdminUids.delete(docSnap.id);
-          }
-          const isMemberSangha = data.isSangha === true || data.role === 'sangha' || (data.authorRole === 'sangha') || this.isSangha({ uid: docSnap.id, name: data.name || data.firstName });
-          if (isMemberSangha) {
-            this._knownSanghaUids.add(docSnap.id);
-          }
-          const lastActive = data.lastActiveAt || data.updatedAt || 0;
-          const isOnline = (this.currentUser && this.currentUser.uid === docSnap.id) || ((now - lastActive) < 7 * 60 * 1000);
-          const isUserAnon = Boolean(
-            data.isAnonymous ||
-            data.useAlias ||
-            (this.currentUser && this.currentUser.uid === docSnap.id && (this.currentUser.useAlias || this.currentUser.isAnonymous))
-          );
-          members.push({
-            uid: docSnap.id,
-            name: data.name || data.firstName || 'කල්‍යාණ මිත්‍ර',
-            photo: data.photo || '',
-            coverImage: data.coverImage || 'assets/banner.webp',
-            bio: data.bio || '',
-            location: data.location || data.district || '',
-            joinedDate: data.joinedDate || '',
-            updatedAt: data.updatedAt || 0,
-            lastActiveAt: lastActive,
-            isOnline: isOnline,
-            isAdmin: isMaster,
-            isSubAdmin: isSub,
-            isSangha: isMemberSangha,
-            isAnonymous: isUserAnon,
-            useAlias: Boolean(data.useAlias || isUserAnon),
-            role: data.role || (isMemberSangha ? 'sangha' : (isSub ? 'admin' : 'member')),
-            mithrayanCount: Array.isArray(data.mithrayan) ? data.mithrayan.length : 0
-          });
+          const m = this._mapUserDoc(docSnap, now);
+          if (m) members.push(m);
         });
       } catch (e) {
         console.warn('[Storage] getAllCommunityMembers error:', e);
