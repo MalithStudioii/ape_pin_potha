@@ -4,7 +4,7 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=165';
+import { StorageService } from './storage.js?v=181';
 import { Security } from './security.js?v=160';
 import { uploadToImgBB, uploadToCloudinary } from './imgbb-service.js?v=68';
 import { SoundService, triggerHaptic } from './sound.js?v=66';
@@ -16,6 +16,12 @@ window.DHAMMA_CATEGORIES = DHAMMA_CATEGORIES;
 export const BO_LEAF_AVATAR = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjggMTI4IiB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCI+CiAgPGRlZnM+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImdfYm9fbGVhZiIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNkY2ZjZTciLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjZDFmYWU1Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGZpbHRlciBpZD0iZl9ib19sZWFmIiB4PSItMjAlIiB5PSItMjAlIiB3aWR0aD0iMTQwJSIgaGVpZ2h0PSIxNDAlIj4KICAgICAgPGZlRHJvcFNoYWRvdyBkeD0iMCIgZHk9IjMiIHN0ZERldmlhdGlvbj0iMyIgZmxvb2Qtb3BhY2l0eT0iMC4xOCIgZmxvb2QtY29sb3I9IiM0NTFhMDMiLz4KICAgIDwvZmlsdGVyPgogIDwvZGVmcz4KICA8Y2lyY2xlIGN4PSI2NCIgY3k9IjY0IiByPSI2MSIgZmlsbD0idXJsKCNnX2JvX2xlYWYpIiBzdHJva2U9IiMxMGI5ODEiIHN0cm9rZS13aWR0aD0iMi41Ii8+CiAgPHRleHQgeD0iNjQiIHk9IjgwIiBmb250LXNpemU9IjU4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iJ0FwcGxlIENvbG9yIEVtb2ppJywnU2Vnb2UgVUkgRW1vamknLCdOb3RvIENvbG9yIEVtb2ppJywnU2Vnb2UgVUkgU3ltYm9sJyxzYW5zLXNlcmlmIiBmaWx0ZXI9InVybCgjZl9ib19sZWFmKSI+8J+MvzwvdGV4dD4KPC9zdmc+";
 let allCommunityMembersCache = [];
 let infiniteScrollObserver = null;
+let feedSentinelObserver = null;
+let lastPostDoc = null;
+let hasMorePosts = true;
+let isLoadingMore = false;
+let autoLoadCount = 0;
+const MAX_AUTO_LOADS = 2;
 let isTriggeringLoadMore = false;
 let isPcSidebarExpanded = false;
 let poyaAmbientSubscribed = false;
@@ -478,16 +484,18 @@ function bootApp() {
       console.warn('[App] initPoyaAmbientEffect note:', e);
     }
 
-    // Warm / refresh artisans cache in background (respects 15-min TTL)
-    try {
-      ensureVerifiedArtisansLoaded().catch(() => {});
-    } catch (e) {}
-
     // Subscribe to real-time database updates with 150ms debounce to prevent multiple consecutive DOM repaints on boot
     let postUpdateDebounceTimer = null;
     StorageService.onPostsUpdate((posts) => {
       const handlePostsUpdate = () => {
         try {
+          if (!lastPostDoc && StorageService.getLastVisibleDoc) {
+            lastPostDoc = StorageService.getLastVisibleDoc();
+          }
+          if (typeof StorageService.hasMorePosts === 'function') {
+            hasMorePosts = StorageService.hasMorePosts();
+          }
+
           const cleanPosts = (posts || []).filter(p => !StorageService.isDummyTestPost || !StorageService.isDummyTestPost(p));
           const prevIds = (currentPostsData || []).map(p => p.id).join(',');
           const newIds = cleanPosts.map(p => p.id).join(',');
@@ -506,7 +514,7 @@ function bootApp() {
             } else {
               updateFeedInPlace(currentPostsData);
             }
-          } else if (hasRenderedCards && prevIds.length > 0 && isTriggeringLoadMore && newIds.startsWith(prevIds)) {
+          } else if (hasRenderedCards && prevIds.length > 0 && (isTriggeringLoadMore || isLoadingMore) && newIds.startsWith(prevIds)) {
             // Posts were appended at the bottom via pagination! Smooth append without resetting DOM or scroll position
             appendNewPostsToFeed(posts, prevIds);
             updateFeedInPlace(currentPostsData);
@@ -3594,8 +3602,8 @@ function renderFeed() {
     return;
   }
 
-  const hasMore = StorageService.hasMorePosts ? StorageService.hasMorePosts() : false;
-  const isLoading = StorageService.isLoadingMorePosts ? StorageService.isLoadingMorePosts() : false;
+  const hasMore = (typeof hasMorePosts === 'boolean') ? hasMorePosts : (StorageService.hasMorePosts ? StorageService.hasMorePosts() : false);
+  const isLoading = isLoadingMore || (StorageService.isLoadingMorePosts ? StorageService.isLoadingMorePosts() : false);
 
   let sentinelHtml = '';
   if (activeTab === 'feed' || activeTab === 'needs') {
@@ -3604,13 +3612,18 @@ function renderFeed() {
         ${isLoading ? `
           <div class="infinite-scroll-loading">
             <i class="fa-solid fa-dharmachakra animate-spin-slow" style="color: #d97706; font-size: 1.3rem;"></i>
-            <span>තවත් පින්කම් ලබා ගනිමින් පවතී...</span>
+            <span>තවත් පින්කම් ලෝඩ් වෙමින් පවතී...</span>
           </div>
-        ` : (hasMore ? `
+        ` : (hasMore ? (autoLoadCount >= MAX_AUTO_LOADS ? `
           <button type="button" class="btn-load-more-posts" onclick="handleLoadMorePostsClick()">
-            <i class="fa-solid fa-arrow-down"></i> තවත් පින්කම් බලන්න (Load More)
+            <i class="fa-solid fa-arrow-down"></i> තවත් සටහන් බලන්න (Load More)
           </button>
-        ` : (ranked.length > 5 ? `
+        ` : `
+          <div class="infinite-scroll-loading" style="opacity: 0.6; padding: 8px 16px; font-size: 0.8rem;">
+            <i class="fa-solid fa-dharmachakra animate-spin-slow" style="color: #d97706; font-size: 1rem;"></i>
+            <span>තවත් පින්කම් ලෝඩ් වෙමින් පවතී...</span>
+          </div>
+        `) : (ranked.length > 5 ? `
           <div class="infinite-scroll-end">
             <span class="end-icon">🪷</span>
             <span>ඔබ සියලුම පින්කම් කියවා අවසන්ය. සියලු දෙනාටම තෙරුවන් සරණයි! 🙏</span>
@@ -3665,56 +3678,17 @@ function renderFeed() {
   container.innerHTML = cardsHtmlArr.join('') + sentinelHtml;
   setupInfiniteScrollObserver();
 
-  // If spotlight should be displayed but artisans are not loaded yet, fetch and dynamically insert
-  if (shouldInjectSpotlight && (!verifiedArtisans || verifiedArtisans.length === 0)) {
-    ensureVerifiedArtisansLoaded().then(loadedArtisans => {
-      // Re-verify user is still on unfiltered home feed
-      const currentSearchQ = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
-      if (activeTab !== 'feed' || currentSearchQ || activeCategory !== 'සියල්ල') return;
-      if (!loadedArtisans || loadedArtisans.length === 0) return;
-
-      const currentContainer = document.getElementById('postsContainer');
-      if (!currentContainer) return;
-
-      // Prevent duplicate insertion
-      if (document.getElementById('artisanSpotlightStrip') || document.getElementById('feedArtisansSpotlight')) {
-        return;
-      }
-
-      const stripHtml = renderFeedArtisanSpotlightHTML(loadedArtisans);
-      if (!stripHtml) return;
-
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = stripHtml.trim();
-      const spotlightEl = tempDiv.firstElementChild;
-      if (!spotlightEl) return;
-
-      // Find post card elements in feed container
-      const postCards = Array.from(currentContainer.children).filter(el => {
-        return el && el.id && el.id.startsWith('post-elem-');
-      });
-
-      if (postCards.length >= 4) {
-        postCards[3].after(spotlightEl);
-      } else if (postCards.length > 0) {
-        postCards[postCards.length - 1].after(spotlightEl);
-      } else {
-        const sentinel = document.getElementById('infiniteScrollSentinel');
-        if (sentinel) {
-          currentContainer.insertBefore(spotlightEl, sentinel);
-        } else {
-          currentContainer.appendChild(spotlightEl);
-        }
-      }
-    }).catch(() => {});
-  }
 }
 
 // ============================================================================
-// High-Scale Feed Pagination & Infinite Scroll Engine (Limit: 20)
+// Hybrid Feed Auto-Scroll & Cursor-based Pagination Engine (10-12 Posts/Page)
 // ============================================================================
 
 export function setupInfiniteScrollObserver() {
+  if (feedSentinelObserver) {
+    feedSentinelObserver.disconnect();
+    feedSentinelObserver = null;
+  }
   if (infiniteScrollObserver) {
     infiniteScrollObserver.disconnect();
     infiniteScrollObserver = null;
@@ -3723,47 +3697,70 @@ export function setupInfiniteScrollObserver() {
   const sentinel = document.getElementById('infiniteScrollSentinel');
   if (!sentinel) return;
 
+  // If user reached max auto-loads (2 triggers) or no more posts, don't observe; update UI
+  if (autoLoadCount >= MAX_AUTO_LOADS || !hasMorePosts) {
+    updateSentinelUI();
+    return;
+  }
+
   if ('IntersectionObserver' in window) {
-    infiniteScrollObserver = new IntersectionObserver((entries) => {
+    feedSentinelObserver = new IntersectionObserver((entries) => {
       const entry = entries[0];
       if (entry && entry.isIntersecting) {
-        triggerLoadMorePosts();
+        if (!isLoadingMore && hasMorePosts && autoLoadCount < MAX_AUTO_LOADS) {
+          triggerHybridLoadMore(true);
+        }
       }
     }, {
-      rootMargin: '300px', // Pre-fetch before user reaches absolute bottom
+      rootMargin: '250px',
       threshold: 0.05
     });
 
-    infiniteScrollObserver.observe(sentinel);
+    feedSentinelObserver.observe(sentinel);
   }
 }
 window.setupInfiniteScrollObserver = setupInfiniteScrollObserver;
 
-export async function triggerLoadMorePosts() {
-  if (isTriggeringLoadMore) return;
-  if (!StorageService.hasMorePosts || !StorageService.hasMorePosts()) return;
-  if (StorageService.isLoadingMorePosts && StorageService.isLoadingMorePosts()) return;
-  if (currentPostsData.length < 5 && StorageService.isInitialSyncDone && !StorageService.isInitialSyncDone()) {
-    return;
-  }
+export async function triggerHybridLoadMore(isAutoTrigger = false) {
+  if (isLoadingMore || !hasMorePosts) return;
 
+  isLoadingMore = true;
   isTriggeringLoadMore = true;
+  if (isAutoTrigger) {
+    autoLoadCount++;
+  }
   updateSentinelUI();
 
   try {
-    await StorageService.fetchMorePosts();
+    const cursor = lastPostDoc || (StorageService.getLastVisibleDoc ? StorageService.getLastVisibleDoc() : null);
+    const result = await StorageService.fetchNextPostBatch(cursor, 12);
+    if (result) {
+      if (result.lastDoc) lastPostDoc = result.lastDoc;
+      hasMorePosts = Boolean(result.hasMore);
+    } else {
+      hasMorePosts = StorageService.hasMorePosts ? StorageService.hasMorePosts() : false;
+    }
   } catch (err) {
-    console.warn('[Feed] Error loading more posts:', err);
+    console.warn('[Feed] Error loading next post batch:', err);
   } finally {
+    isLoadingMore = false;
     isTriggeringLoadMore = false;
     updateSentinelUI();
+
+    if (autoLoadCount < MAX_AUTO_LOADS && hasMorePosts) {
+      setupInfiniteScrollObserver();
+    } else if (feedSentinelObserver) {
+      feedSentinelObserver.disconnect();
+      feedSentinelObserver = null;
+    }
   }
 }
-window.triggerLoadMorePosts = triggerLoadMorePosts;
+window.triggerHybridLoadMore = triggerHybridLoadMore;
+window.triggerLoadMorePosts = triggerHybridLoadMore;
 
 export async function handleLoadMorePostsClick() {
   triggerHaptic(10);
-  await triggerLoadMorePosts();
+  await triggerHybridLoadMore(false);
 }
 window.handleLoadMorePostsClick = handleLoadMorePostsClick;
 
@@ -3771,24 +3768,33 @@ export function updateSentinelUI() {
   const sentinel = document.getElementById('infiniteScrollSentinel');
   if (!sentinel) return;
 
-  const hasMore = StorageService.hasMorePosts ? StorageService.hasMorePosts() : false;
-  const isLoading = (StorageService.isLoadingMorePosts && StorageService.isLoadingMorePosts()) || isTriggeringLoadMore;
-
   const renderedCount = document.querySelectorAll('#postsContainer article.post-card').length;
 
-  if (isLoading) {
+  if (isLoadingMore) {
     sentinel.innerHTML = `
       <div class="infinite-scroll-loading">
         <i class="fa-solid fa-dharmachakra animate-spin-slow" style="color: #d97706; font-size: 1.3rem;"></i>
-        <span>තවත් පින්කම් ලබා ගනිමින් පවතී...</span>
+        <span>තවත් පින්කම් ලෝඩ් වෙමින් පවතී...</span>
       </div>
     `;
-  } else if (hasMore) {
-    sentinel.innerHTML = `
-      <button type="button" class="btn-load-more-posts" onclick="handleLoadMorePostsClick()">
-        <i class="fa-solid fa-arrow-down"></i> තවත් පින්කම් බලන්න (Load More)
-      </button>
-    `;
+    sentinel.style.display = 'flex';
+  } else if (hasMorePosts) {
+    if (autoLoadCount >= MAX_AUTO_LOADS) {
+      sentinel.innerHTML = `
+        <button type="button" class="btn-load-more-posts" onclick="handleLoadMorePostsClick()">
+          <i class="fa-solid fa-arrow-down"></i> තවත් සටහන් බලන්න (Load More)
+        </button>
+      `;
+      sentinel.style.display = 'flex';
+    } else {
+      sentinel.innerHTML = `
+        <div class="infinite-scroll-loading" style="opacity: 0.6; padding: 8px 16px; font-size: 0.8rem;">
+          <i class="fa-solid fa-dharmachakra animate-spin-slow" style="color: #d97706; font-size: 1rem;"></i>
+          <span>තවත් පින්කම් ලෝඩ් වෙමින් පවතී...</span>
+        </div>
+      `;
+      sentinel.style.display = 'flex';
+    }
   } else if (renderedCount > 5) {
     sentinel.innerHTML = `
       <div class="infinite-scroll-end">
@@ -3796,8 +3802,10 @@ export function updateSentinelUI() {
         <span>ඔබ සියලුම පින්කම් කියවා අවසන්ය. සියලු දෙනාටම තෙරුවන් සරණයි! 🙏</span>
       </div>
     `;
+    sentinel.style.display = 'flex';
   } else {
     sentinel.innerHTML = '';
+    sentinel.style.display = 'none';
   }
 }
 window.updateSentinelUI = updateSentinelUI;
