@@ -719,16 +719,23 @@ function bootApp() {
   }
 }
 
-// Build clean production-ready share URLs (e.g. https://apepinpotha.lk/?a=ID or /?p=ID)
+// Build clean production-ready share URLs (e.g. https://share.apepinpotha.lk/p/ID for posts, or https://apepinpotha.lk/?a=ID for artisans)
 function buildCleanShareUrl(paramKey, paramValue, extraParams = {}) {
-  const origin = window.location.origin || '';
+  const cleanVal = paramValue ? String(paramValue).trim() : '';
+
+  // Merit posts consistently use the dynamic sharing service subdomain
+  if ((paramKey === 'p' || paramKey === 'post') && cleanVal) {
+    return `https://share.apepinpotha.lk/p/${encodeURIComponent(cleanVal)}`;
+  }
+
+  const origin = window.location.origin || 'https://apepinpotha.lk';
   let path = (window.location.pathname || '/').replace(/\/index\.html?$/i, '');
   if (!path.endsWith('/')) {
     path += '/';
   }
   const params = new URLSearchParams();
-  if (paramKey && paramValue) {
-    params.set(paramKey, String(paramValue).trim());
+  if (paramKey && cleanVal) {
+    params.set(paramKey, cleanVal);
   }
   if (extraParams && typeof extraParams === 'object') {
     Object.keys(extraParams).forEach(k => {
@@ -738,6 +745,11 @@ function buildCleanShareUrl(paramKey, paramValue, extraParams = {}) {
   const qs = params.toString();
   return `${origin}${path}${qs ? '?' + qs : ''}`;
 }
+
+window.buildCleanShareUrl = buildCleanShareUrl;
+window.getPostShareUrl = function(postId) {
+  return buildCleanShareUrl('p', postId);
+};
 
 // Parse deep link parameters from URL search query or hash
 function extractDeepLinkTargets() {
@@ -752,6 +764,12 @@ function extractDeepLinkTargets() {
   let postId = urlParams.get('p') || urlParams.get('post') || '';
   if (!postId && hash.startsWith('#post_')) {
     postId = hash.replace(/^#post_/, '').trim();
+  }
+  if (!postId) {
+    const pathMatch = (window.location.pathname || '').match(/\/p\/([^\/\?#]+)/i);
+    if (pathMatch && pathMatch[1]) {
+      postId = pathMatch[1].trim();
+    }
   }
 
   return {
@@ -5058,8 +5076,14 @@ window.downloadCurrentStatusCard = function() {
 window.openWhatsAppForStatusShare = function() {
   const postId = currentShareTargetPostId;
   const allPosts = StorageService.getLocalPosts() || [];
-  const post = allPosts.find(p => p.id === postId) || {};
-  const postUrl = buildCleanShareUrl('p', postId || '');
+  let post = allPosts.find(p => p.id === postId) || {};
+  if (!post.id && typeof currentPostsData !== 'undefined' && Array.isArray(currentPostsData)) {
+    post = currentPostsData.find(p => p.id === postId) || post;
+  }
+  const isRepost = post.isRepost || !!post.originalPost;
+  const orig = post.originalPost || null;
+  const targetId = (isRepost && orig && orig.id) ? orig.id : (postId || '');
+  const postUrl = buildCleanShareUrl('p', targetId);
   const isOfficial = !!post.isOfficial;
   const authorName = StorageService.resolveAuthorName(post);
   const shareText = isOfficial
@@ -5160,7 +5184,15 @@ window.executeNativeOrWhatsAppShare = async function() {
 window.copyPostLinkFromModal = async function() {
   closeShareChoiceModal();
   const postId = currentShareTargetPostId;
-  const postUrl = buildCleanShareUrl('p', postId || '');
+  const allPosts = StorageService.getLocalPosts() || [];
+  let post = allPosts.find(p => p.id === postId);
+  if (!post && typeof currentPostsData !== 'undefined' && Array.isArray(currentPostsData)) {
+    post = currentPostsData.find(p => p.id === postId);
+  }
+  const isRepost = post && (post.isRepost || !!post.originalPost);
+  const orig = post && post.originalPost;
+  const targetId = (isRepost && orig && orig.id) ? orig.id : (postId || '');
+  const postUrl = buildCleanShareUrl('p', targetId);
   try {
     if (navigator.clipboard) {
       await navigator.clipboard.writeText(postUrl);
