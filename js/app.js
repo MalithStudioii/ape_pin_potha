@@ -719,16 +719,135 @@ function bootApp() {
   }
 }
 
-// Build clean production-ready share URLs (e.g. https://apepinpotha.lk/?a=ID or /?p=ID)
+// ==========================================================================
+// Dynamic Post Sharing & Smart Human-Style Caption Generators
+// ==========================================================================
+
+// Standalone helper to construct dynamic post share links (share.apepinpotha.lk)
+export function getDynamicShareUrl(postId) {
+  const cleanId = postId ? String(postId).trim() : '';
+  return `https://share.apepinpotha.lk/p/${encodeURIComponent(cleanId)}`;
+}
+window.getDynamicShareUrl = getDynamicShareUrl;
+
+const GENERIC_SHARE_TITLES = ['පින්කම', 'සටහන', 'පින්කමක්', 'සටහනක්', 'merit', 'post', 'untitled'];
+
+function isMeaningfulShareTitle(title) {
+  if (!title || typeof title !== 'string') return false;
+  const clean = title.trim();
+  if (clean.length < 2) return false;
+  if (GENERIC_SHARE_TITLES.includes(clean.toLowerCase())) return false;
+  return true;
+}
+
+function extractCleanShareSnippet(desc, maxLen = 110) {
+  if (!desc || typeof desc !== 'string') return '';
+  const clean = desc.replace(/<[^>]*>?/gm, ' ')
+                    .replace(/[\r\n\t]+/g, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+  if (!clean) return '';
+  if (clean.length <= maxLen) return clean;
+  const truncated = clean.substring(0, maxLen);
+  const lastSpace = truncated.lastIndexOf(' ');
+  if (lastSpace > 40) {
+    return truncated.substring(0, lastSpace).trim() + '...';
+  }
+  return truncated.trim() + '...';
+}
+
+/**
+ * Extracts normalized metadata, clean hook and smart human-style share copy for a post
+ */
+export function getPostShareMetadata(rawPost) {
+  let post = rawPost;
+  if (typeof post === 'string') {
+    const id = post;
+    const found = (typeof currentPostsData !== 'undefined' && currentPostsData.find(p => p.id === id)) ||
+                  (StorageService.getLocalPosts() || []).find(p => p.id === id);
+    post = found || { id };
+  } else if (!post || typeof post !== 'object') {
+    post = {};
+  }
+
+  const isRepost = post.isRepost || !!post.originalPost;
+  const orig = post.originalPost;
+  const canonical = (isRepost && orig && orig.id) ? orig : post;
+  const targetId = canonical.id || post.id || '';
+  const url = getDynamicShareUrl(targetId);
+
+  const authorName = canonical.isOfficial 
+    ? 'අපේ පිං පොත' 
+    : (StorageService.resolveAuthorName(canonical) || 'කල්‍යාණ මිත්‍රයෙක්');
+
+  const hook = isMeaningfulShareTitle(canonical.title) 
+    ? canonical.title.trim() 
+    : (extractCleanShareSnippet(canonical.description, 110) || 'අපේ පිං පොත හරහා බෙදාගත් උතුම් සටහනකි.');
+
+  const type = canonical.type || 'general';
+  const cat = canonical.category || '';
+  const EXCLUDED_CATEGORIES = ['ධර්ම දානමය', 'සිතුවිලි', 'සුබපැතුම්', 'සාමාන්ය', 'සාමාන්‍ය'];
+
+  let smartText = '';
+  if (type === 'need') {
+    smartText = `🤝 කාරුණික උපකාර ඉල්ලීමක්\n\n${hook}\n\n👇 වැඩි විස්තර සහ දායකත්වය සඳහා:\n${url}`;
+  } else if (type === 'reel') {
+    smartText = `🎬 ${authorName} බෙදාගත් සදහම් වීඩියෝව\n\n${hook}\n\n👇 නරඹන්න:\n${url}`;
+  } else if (type === 'merit' && !EXCLUDED_CATEGORIES.includes(cat)) {
+    smartText = `🌸 ${authorName} සිදු කළ උතුම් පින්කම\n\n${hook}\n\n🙏 සාදුකාර දී පින් අනුමෝදන් වන්න:\n${url}`;
+  } else {
+    smartText = `${hook}\n\n✍️ ${authorName} • සම්පූර්ණ සටහන කියවන්න 👇\n${url}`;
+  }
+
+  let thumbnail = null;
+  if (Array.isArray(canonical.images) && canonical.images.length > 0) {
+    thumbnail = canonical.images[0];
+  } else if (canonical.image) {
+    thumbnail = canonical.image;
+  } else if (canonical.videoThumb) {
+    thumbnail = canonical.videoThumb;
+  }
+
+  return {
+    post: canonical,
+    rawPost: post,
+    targetId,
+    url,
+    authorName,
+    hook,
+    smartText,
+    thumbnail
+  };
+}
+
+/**
+ * Builds clean, natural, human-style share copy based on post category and type
+ */
+export function buildSmartShareText(post) {
+  const meta = getPostShareMetadata(post);
+  return meta.smartText;
+}
+
+window.getPostShareMetadata = getPostShareMetadata;
+window.buildSmartShareText = buildSmartShareText;
+
+// Build clean production-ready share URLs (e.g. https://share.apepinpotha.lk/p/ID for posts, or https://apepinpotha.lk/?a=ID for artisans)
 function buildCleanShareUrl(paramKey, paramValue, extraParams = {}) {
-  const origin = window.location.origin || '';
+  const cleanVal = paramValue ? String(paramValue).trim() : '';
+
+  // Merit posts consistently use the dynamic sharing service subdomain
+  if ((paramKey === 'p' || paramKey === 'post') && cleanVal) {
+    return getDynamicShareUrl(cleanVal);
+  }
+
+  const origin = window.location.origin || 'https://apepinpotha.lk';
   let path = (window.location.pathname || '/').replace(/\/index\.html?$/i, '');
   if (!path.endsWith('/')) {
     path += '/';
   }
   const params = new URLSearchParams();
-  if (paramKey && paramValue) {
-    params.set(paramKey, String(paramValue).trim());
+  if (paramKey && cleanVal) {
+    params.set(paramKey, cleanVal);
   }
   if (extraParams && typeof extraParams === 'object') {
     Object.keys(extraParams).forEach(k => {
@@ -738,6 +857,11 @@ function buildCleanShareUrl(paramKey, paramValue, extraParams = {}) {
   const qs = params.toString();
   return `${origin}${path}${qs ? '?' + qs : ''}`;
 }
+
+window.buildCleanShareUrl = buildCleanShareUrl;
+window.getPostShareUrl = function(postId) {
+  return buildCleanShareUrl('p', postId);
+};
 
 // Parse deep link parameters from URL search query or hash
 function extractDeepLinkTargets() {
@@ -752,6 +876,12 @@ function extractDeepLinkTargets() {
   let postId = urlParams.get('p') || urlParams.get('post') || '';
   if (!postId && hash.startsWith('#post_')) {
     postId = hash.replace(/^#post_/, '').trim();
+  }
+  if (!postId) {
+    const pathMatch = (window.location.pathname || '').match(/\/p\/([^\/\?#]+)/i);
+    if (pathMatch && pathMatch[1]) {
+      postId = pathMatch[1].trim();
+    }
   }
 
   return {
@@ -4665,87 +4795,73 @@ window.deletePostPrompt = async function(postId) {
 };
 
 // ==========================================================================
-// Viral Share & WhatsApp Status Card Image Generator (html2canvas)
+// Modern FB / Instagram-Style Share Sheet Modal Controller
 // ==========================================================================
 let currentShareTargetPostId = null;
+let lastSharedPostTargetId = null;
 let currentGeneratedStatusCardDataUrl = null;
 let currentGeneratedStatusCardBlob = null;
 let currentGeneratedStatusCardFileName = null;
 
-/**
- * Direct Facebook Share with Engaging Ad-style Caption & Deep Link
- */
-window.shareToFacebookFromModal = function() {
-  const postId = currentShareTargetPostId;
-  if (!postId) return;
-
-  const allPosts = StorageService.getLocalPosts() || [];
-  let post = allPosts.find(p => p.id === postId);
-  if (!post && typeof currentPostsData !== 'undefined' && Array.isArray(currentPostsData)) {
-    post = currentPostsData.find(p => p.id === postId);
-  }
-  if (!post && StorageService._cachedPosts) {
-    post = StorageService._cachedPosts.find(p => p.id === postId);
-  }
-  if (!post) {
-    post = { id: postId, title: 'පින්කමක්', description: '', author: 'කල්‍යාණ මිත්‍ර' };
-  }
-
-  const isRepost = post.isRepost || !!post.originalPost;
-  const orig = post.originalPost || null;
-  const isNeed = post.type === 'need' || (orig && orig.type === 'need');
-  const realAuthor = post.isOfficial ? 'අපේ පිං පොත' : ((isRepost && orig) ? StorageService.resolveAuthorName(orig) : StorageService.resolveAuthorName(post));
-  const realTitle = (isRepost && orig && orig.title) ? orig.title : (post.title || 'පින්කම');
-  const realDesc = (isRepost && orig && orig.description) ? orig.description : (post.description || '');
-  const realPhone = (isRepost && orig && orig.contact) ? orig.contact : (post.contact || '');
-
-  const targetId = (isRepost && orig && orig.id) ? orig.id : post.id;
-  const extra = isNeed ? { tab: 'needs' } : {};
-  const postUrl = buildCleanShareUrl('p', targetId, extra);
-
+function markPostSharedOnce(targetId) {
+  if (!targetId || lastSharedPostTargetId === targetId) return;
+  lastSharedPostTargetId = targetId;
   try {
     StorageService.incrementShare(targetId);
-    if (postId !== targetId) StorageService.incrementShare(postId);
-    if (post) post.shareCount = (post.shareCount || 0) + 1;
-    const shareBtnEl = document.getElementById(`shares-btn-${postId}`);
-    const shareStatEl = document.getElementById(`stat-shares-${postId}`);
-    if (shareBtnEl) shareBtnEl.innerText = post.shareCount;
-    if (shareStatEl) shareStatEl.innerText = post.shareCount;
-  } catch (e) {}
-
-  let cleanDesc = realDesc ? realDesc.replace(/<[^>]*>?/gm, '').trim() : '';
-  if (cleanDesc.length > 180) cleanDesc = cleanDesc.substring(0, 180) + '...';
-
-  let fbCopy = '';
-  if (isNeed) {
-    fbCopy = `🤝 විශේෂ සත්කාර ඇරයුමකි! | අපේ පිං පොත\n✨ ${realTitle}\n\n${cleanDesc ? `"${cleanDesc}"\n\n` : ''}${realPhone ? `📞 සෘජු දුරකථන අංකය: ${realPhone}\n\n` : ''}🙏 මෙම සත්කාරය පිළිබඳ සියලු ඡායාරූප දැකබලා ගැනීමට, සාදුකාර දී අනුමෝදන් වීමට / දායක වීමට අපේ පිං පොත වෙත පිවිසෙන්න:\n👉 ${postUrl}\n\n#ApePinPotha #SathkaraHawula #PinPotha #KalyanaMithra #SriLanka`;
-  } else {
-    fbCopy = `🌸 උතුම් පින්කමක් දැකබලා සතුටු සිතින් අනුමෝදන් වන්න! | අපේ පිං පොත\n✨ ${realTitle}\n(කල්‍යාණ මිත්‍ර: ${realAuthor})\n\n${cleanDesc ? `"${cleanDesc}"\n\n` : ''}🙏 මෙම පින්කම දැකබලා ඔබත් සාදුකාර දී පින් අනුමෝදන් වීමට පිං පොත වෙත පිවිසෙන්න:\n👉 ${postUrl}\n\n#ApePinPotha #PinPotha #KalyanaMithra #MeritSharing`;
-  }
-
-  try {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(fbCopy);
+    if (currentShareTargetPostId && currentShareTargetPostId !== targetId) {
+      StorageService.incrementShare(currentShareTargetPostId);
     }
-  } catch (err) {}
-
-  closeShareChoiceModal();
-
-  const fbShareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(postUrl)}`;
-  window.open(fbShareUrl, '_blank', 'width=640,height=580,scrollbars=yes,resizable=yes');
-
-  alert('Facebook සටහන සඳහා ආකර්ෂණීය විස්තරය සහ සබැඳිය (Link) පිටපත් කරගන්නා ලදී! 🎉\n\nFacebook කවුළුවෙහි එය Paste කළ හැක.');
-};
-
-window.shareStatusToFacebook = function() {
-  closeStatusCardPreviewModal();
-  shareToFacebookFromModal();
-};
+    const allPosts = StorageService.getLocalPosts() || [];
+    let p = (typeof currentPostsData !== 'undefined' && currentPostsData.find(item => item.id === targetId)) || allPosts.find(item => item.id === targetId);
+    if (p) {
+      p.shareCount = (p.shareCount || 0) + 1;
+      const shareBtnEl = document.getElementById(`shares-btn-${targetId}`);
+      const shareStatEl = document.getElementById(`stat-shares-${targetId}`);
+      if (shareBtnEl) shareBtnEl.innerText = p.shareCount;
+      if (shareStatEl) shareStatEl.innerText = p.shareCount;
+    }
+  } catch (err) {
+    console.warn('[ShareSheet] incrementShare note:', err);
+  }
+}
 
 window.handleShare = function(postId) {
   SoundService.playShare();
-  triggerHaptic(25);
+  triggerHaptic(20);
   currentShareTargetPostId = postId;
+  lastSharedPostTargetId = null; // Reset per sheet open
+
+  const allPosts = StorageService.getLocalPosts() || [];
+  let post = (typeof currentPostsData !== 'undefined' && currentPostsData.find(p => p.id === postId)) ||
+             allPosts.find(p => p.id === postId) || { id: postId };
+
+  const meta = getPostShareMetadata(post);
+  window._currentShareMeta = meta;
+
+  // Populate Post Preview strip in Share Sheet
+  const hookEl = document.getElementById('shareSheetHookText');
+  const thumbWrap = document.getElementById('shareSheetThumbWrap');
+  if (hookEl) {
+    hookEl.textContent = meta.hook || 'පින්කම බෙදාගැනීම';
+  }
+  if (thumbWrap) {
+    if (meta.thumbnail) {
+      thumbWrap.innerHTML = `<img src="${Security.sanitizeUrl(meta.thumbnail)}" alt="Preview" style="width:100%;height:100%;object-fit:cover;">`;
+    } else {
+      const icon = meta.post?.type === 'need' ? '🤝' : (meta.post?.type === 'reel' ? '🎬' : '🌸');
+      thumbWrap.innerHTML = `<span>${icon}</span>`;
+    }
+  }
+
+  // Toggle native 'More' button based on device capability
+  const nativeBtn = document.getElementById('shareSheetBtnNativeMore');
+  if (nativeBtn) {
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      nativeBtn.classList.remove('hidden');
+    } else {
+      nativeBtn.classList.add('hidden');
+    }
+  }
 
   const modal = document.getElementById('shareChoiceModal');
   if (modal) {
@@ -4761,6 +4877,117 @@ window.handleShare = function(postId) {
 window.closeShareChoiceModal = function() {
   const modal = document.getElementById('shareChoiceModal');
   if (modal) modal.classList.add('hidden');
+};
+
+window.closeShareChoiceModalOnBackdrop = function(e) {
+  if (e.target.id === 'shareChoiceModal') {
+    closeShareChoiceModal();
+  }
+};
+
+// 1. WhatsApp Action
+window.shareSheetActionWhatsApp = function() {
+  const meta = window._currentShareMeta || getPostShareMetadata({ id: currentShareTargetPostId });
+  markPostSharedOnce(meta.targetId);
+  closeShareChoiceModal();
+  const waUrl = `https://wa.me/?text=${encodeURIComponent(meta.smartText)}`;
+  window.open(waUrl, '_blank');
+};
+
+// 2. Facebook Action
+window.shareSheetActionFacebook = function() {
+  const meta = window._currentShareMeta || getPostShareMetadata({ id: currentShareTargetPostId });
+  markPostSharedOnce(meta.targetId);
+  closeShareChoiceModal();
+  const fbUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(meta.url)}`;
+  window.open(fbUrl, '_blank', 'width=640,height=580,scrollbars=yes,resizable=yes');
+};
+
+// 3. Copy Link Only
+window.shareSheetActionCopyLink = async function() {
+  const meta = window._currentShareMeta || getPostShareMetadata({ id: currentShareTargetPostId });
+  markPostSharedOnce(meta.targetId);
+  closeShareChoiceModal();
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(meta.url);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = meta.url;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    if (typeof showCustomToast === 'function') {
+      showCustomToast('ලින්ක් එක පිටපත් කරන ලදී! ✓', 'success');
+    } else {
+      alert('ලින්ක් එක පිටපත් කරන ලදී! ✓');
+    }
+  } catch (err) {
+    prompt('මෙම Link එක Copy කරගන්න:', meta.url);
+  }
+};
+
+// 4. Copy Caption + Link
+window.shareSheetActionCopyCaption = async function() {
+  const meta = window._currentShareMeta || getPostShareMetadata({ id: currentShareTargetPostId });
+  markPostSharedOnce(meta.targetId);
+  closeShareChoiceModal();
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(meta.smartText);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = meta.smartText;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    if (typeof showCustomToast === 'function') {
+      showCustomToast('විස්තරය සහ ලින්ක් එක පිටපත් කරන ලදී! ✓', 'success');
+    } else {
+      alert('විස්තරය සහ ලින්ක් එක පිටපත් කරන ලදී! ✓');
+    }
+  } catch (err) {
+    prompt('මෙම විස්තරය Copy කරගන්න:', meta.smartText);
+  }
+};
+
+// 5. Native / More Apps Action
+window.shareSheetActionNative = async function() {
+  const meta = window._currentShareMeta || getPostShareMetadata({ id: currentShareTargetPostId });
+  markPostSharedOnce(meta.targetId);
+  closeShareChoiceModal();
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: `පිං පොත | ${meta.hook}`,
+        text: meta.smartText,
+        url: meta.url
+      });
+      return;
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      console.warn('[ShareSheet] Native share fallback:', err);
+    }
+  }
+  window.shareSheetActionCopyCaption();
+};
+
+// Backwards compatibility aliases
+window.shareToFacebookFromModal = window.shareSheetActionFacebook;
+window.copyPostLinkFromModal = window.shareSheetActionCopyLink;
+window.executeNativeOrWhatsAppShare = window.shareSheetActionNative;
+
+window.shareStatusToFacebook = function() {
+  closeStatusCardPreviewModal();
+  shareSheetActionFacebook();
 };
 
 window.closeShareChoiceModalOnBackdrop = function(e) {
@@ -5056,123 +5283,10 @@ window.downloadCurrentStatusCard = function() {
 };
 
 window.openWhatsAppForStatusShare = function() {
-  const postId = currentShareTargetPostId;
-  const allPosts = StorageService.getLocalPosts() || [];
-  const post = allPosts.find(p => p.id === postId) || {};
-  const postUrl = buildCleanShareUrl('p', postId || '');
-  const isOfficial = !!post.isOfficial;
-  const authorName = StorageService.resolveAuthorName(post);
-  const shareText = isOfficial
-    ? `📢 අපේ පිං පොත නිල නිවේදනය: ${post.title || ''}\n🙏 කියවා අන් අයටද දැනුම් දෙන්න:\n${postUrl}`
-    : `🌸 "${authorName}" ගේ උතුම් පින්කම: ${post.title || ''}\n🙏 දැකබලා සතුටු සිතින් අනුමෝදන් වන්න:\n${postUrl}`;
-  const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
+  const meta = window._currentShareMeta || getPostShareMetadata({ id: currentShareTargetPostId });
+  markPostSharedOnce(meta.targetId);
+  const waUrl = `https://wa.me/?text=${encodeURIComponent(meta.smartText)}`;
   window.open(waUrl, '_blank');
-};
-
-window.executeNativeOrWhatsAppShare = async function() {
-  closeShareChoiceModal();
-  const postId = currentShareTargetPostId;
-  if (!postId) return;
-
-  const allPosts = StorageService.getLocalPosts();
-  let post = (allPosts && allPosts.find(p => p.id === postId));
-  if (!post && typeof currentPostsData !== 'undefined' && Array.isArray(currentPostsData)) {
-    post = currentPostsData.find(p => p.id === postId);
-  }
-  if (!post && StorageService._cachedPosts) {
-    post = StorageService._cachedPosts.find(p => p.id === postId);
-  }
-  if (!post) {
-    post = { id: postId, title: 'පින්කමක්', description: '', author: 'කල්‍යාණ මිත්‍ර' };
-  }
-
-  const isRepost = post.isRepost || !!post.originalPost;
-  const orig = post.originalPost || null;
-  const isOfficial = !!post.isOfficial;
-  const realAuthor = isOfficial ? 'අපේ පිං පොත' : ((isRepost && orig) ? StorageService.resolveAuthorName(orig) : StorageService.resolveAuthorName(post));
-  const realTitle = (isRepost && orig && orig.title) ? orig.title : (post.title || 'පින්කම');
-  const realDesc = (isRepost && orig && orig.description) ? orig.description : (post.description || '');
-  const realImage = (isRepost && orig ? (orig.image || (orig.images && orig.images[0])) : (post.image || (post.images && post.images[0]))) || null;
-
-  const targetId = (isRepost && orig && orig.id) ? orig.id : post.id;
-  const postUrl = buildCleanShareUrl('p', targetId);
-
-  try {
-    StorageService.incrementShare(targetId);
-    if (postId !== targetId) StorageService.incrementShare(postId);
-    if (post) post.shareCount = (post.shareCount || 0) + 1;
-    const shareBtnEl = document.getElementById(`shares-btn-${postId}`);
-    const shareStatEl = document.getElementById(`stat-shares-${postId}`);
-    if (shareBtnEl) shareBtnEl.innerText = post.shareCount;
-    if (shareStatEl) shareStatEl.innerText = post.shareCount;
-  } catch (e) {}
-
-  let shareBody = isOfficial 
-    ? `📢 අපේ පිං පොත නිල නිවේදනය:\n✨ ${realTitle}`
-    : `🌸 "${realAuthor}" ගේ උතුම් පින්කම:\n✨ ${realTitle}`;
-  if (!isOfficial && isRepost) {
-    const reposterName = StorageService.resolveAuthorName(post);
-    if (reposterName && reposterName !== realAuthor) {
-      shareBody += `\n🔄 (යළි බෙදාගත්තේ: ${reposterName})`;
-    }
-  }
-  if (realDesc) {
-    const cleanSnippet = realDesc.replace(/<[^>]*>?/gm, '').trim();
-    if (cleanSnippet && !cleanSnippet.includes('උතුම් පින්කමක් දැක බලා සතුටු සිතින් අනුමෝදන් වෙමි')) {
-      const snippet = cleanSnippet.length > 140 ? cleanSnippet.substring(0, 140) + '...' : cleanSnippet;
-      shareBody += `\n\n"${snippet}"`;
-    }
-  }
-  shareBody += `\n\n🙏 මේ උතුම් පින්කම දැකබලා ඔබත් සාදුකාර දී පින් අනුමෝදන් වන්න:`;
-
-  const shareTitle = `පිං පොත | ${realTitle}`;
-
-  if (navigator.share) {
-    try {
-      await navigator.share({
-        title: shareTitle,
-        text: shareBody,
-        url: postUrl
-      });
-      return;
-    } catch (err) {
-      if (err.name === 'AbortError') return;
-    }
-  }
-
-  // Fallback for clipboard / WhatsApp web
-  const fullTextWithUrl = `${shareBody}\n${postUrl}`;
-  try {
-    if (navigator.clipboard) {
-      await navigator.clipboard.writeText(fullTextWithUrl);
-    }
-  } catch (e) {}
-
-  const openWhatsApp = confirm(
-    `ලිපිනය (Link) සහ විස්තරය පිටපත් කරගන්නා ලදී! 🎉\n\nWhatsApp හරහා මිතුරන් සමඟ බෙදාගැනීමට අවශ්‍යද?`
-  );
-  if (openWhatsApp) {
-    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(fullTextWithUrl)}`;
-    window.open(waUrl, '_blank');
-  }
-};
-
-window.copyPostLinkFromModal = async function() {
-  closeShareChoiceModal();
-  const postId = currentShareTargetPostId;
-  const postUrl = buildCleanShareUrl('p', postId || '');
-  try {
-    if (navigator.clipboard) {
-      await navigator.clipboard.writeText(postUrl);
-    }
-    if (typeof showCustomToast === 'function') {
-      showCustomToast('ලිපිනය (Link) සාර්ථකව Copy කරගන්නා ලදී! 📋', 'success');
-    } else {
-      alert('ලිපිනය (Link) සාර්ථකව Copy කරගන්නා ලදී! 🎉');
-    }
-  } catch (e) {
-    prompt('මෙම Link එක Copy කරගන්න:', postUrl);
-  }
 };
 
 // Check for deep-linked post in URL query (?p=, ?post=) or hash (#post_...) - Instant Facebook / Social traffic arrival
@@ -6632,11 +6746,12 @@ window.handleReelShare = async function(postId, btnEl) {
   triggerHaptic(25);
 
   const reel = (typeof currentPostsData !== 'undefined' && currentPostsData.find(p => p.id === postId)) ||
-               (StorageService.getLocalPosts() || []).find(p => p.id === postId);
+               (StorageService.getLocalPosts() || []).find(p => p.id === postId) || { id: postId, type: 'reel' };
 
-  const shareTitle = reel?.title || 'අපේ පින් පොත - Reels';
-  const shareText = `ධර්ම කරුණක් / පින්කමක් නරඹන්න: ${reel?.title || 'දහම් Reels'}`;
-  const shareUrl = buildCleanShareUrl('p', postId);
+  const meta = getPostShareMetadata(reel);
+  const shareTitle = `පිං පොත | ${meta.hook}`;
+  const shareText = meta.smartText;
+  const shareUrl = meta.url;
 
   // Increment share count atomically
   try {
@@ -11668,6 +11783,10 @@ window.dismissMobileMenuNewBadge = dismissMobileMenuNewBadge;
 // Keyboard Escape listener to dismiss drawer & modals
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
+    const shareModal = document.getElementById('shareChoiceModal');
+    if (shareModal && !shareModal.classList.contains('hidden')) {
+      closeShareChoiceModal();
+    }
     const drawer = document.getElementById('mobileDrawer');
     if (drawer && drawer.classList.contains('open')) {
       closeMobileMenuDrawer();

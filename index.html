@@ -127,13 +127,13 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=178">
+    <link rel="stylesheet" href="css/styles.css?v=180">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
       (function() {
-        var v = 'v178';
-        var cacheLive = 'pin-potha-cache-v178-live';
+        var v = 'v180';
+        var cacheLive = 'pin-potha-cache-v180-live';
         if (localStorage.getItem('pinPotha_active_build') !== v) {
           localStorage.setItem('pinPotha_active_build', v);
           try {
@@ -3714,85 +3714,96 @@
     </div>
 
     <!-- ========================================================================= -->
-    <!-- Share Choice & WhatsApp Status Card Generator Modal                       -->
+    <!-- Modern Dynamic Share Sheet Modal (FB / Instagram Style)                  -->
     <!-- ========================================================================= -->
-    <div id="shareChoiceModal" class="modal-overlay hidden" onclick="closeShareChoiceModalOnBackdrop(event)">
-        <div class="modal-dialog" style="max-width: 440px; border-radius: 20px; overflow: hidden; background: #ffffff; box-shadow: 0 20px 50px rgba(0,0,0,0.3); border: 1px solid rgba(217,119,6,0.2);">
-            <div class="modal-header" style="background: linear-gradient(135deg, #451a03, #78350f); color: #fff; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <i class="fa-solid fa-share-nodes" style="color: #fbbf24;"></i>
-                    <h3 style="font-size: 0.96rem; font-weight: 700; color: #fffbeb;">පින්කම බෙදාගන්න (Share Merit)</h3>
+    <div id="shareChoiceModal" class="share-sheet-overlay hidden" onclick="closeShareChoiceModalOnBackdrop(event)">
+        <div class="share-sheet-container" onclick="event.stopPropagation()">
+            <!-- Mobile Drag / Pull Handle -->
+            <div class="share-sheet-handle-bar">
+                <div class="share-sheet-drag-handle"></div>
+            </div>
+
+            <!-- Share Sheet Header -->
+            <div class="share-sheet-header">
+                <div class="share-sheet-header-title">
+                    <i class="fa-solid fa-share-nodes"></i>
+                    <span>පින්කම බෙදාගන්න (Share)</span>
                 </div>
-                <button type="button" onclick="closeShareChoiceModal()" class="modal-close-btn" style="color: #fff; background: rgba(255,255,255,0.1); border: none; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                <button type="button" onclick="closeShareChoiceModal()" class="share-sheet-close-btn" aria-label="වසන්න">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
-            <div style="padding: 18px;">
-                <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 14px; line-height: 1.5;">
-                    මෙම උතුම් කුසලය අන් අයටත් දැකබලා අනුමෝදන් වීමට පහත ආකාරයෙන් බෙදාගන්න:
-                </p>
 
-                <!-- Option 1: Direct Facebook Share (With Auto-Generated Professional Copy & Deep Link) -->
-                <button type="button" id="btnShareFacebookDirect" onclick="shareToFacebookFromModal()" class="share-choice-btn" style="border: 1.5px solid #bfdbfe; background: linear-gradient(135deg, #eff6ff, #dbeafe); color: #1e40af; margin-bottom: 10px;">
-                    <div style="width: 44px; height: 44px; border-radius: 12px; background: #1877f2; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex-shrink: 0; box-shadow: 0 4px 12px rgba(24, 119, 242, 0.35);">
-                        <i class="fa-brands fa-facebook"></i>
+            <!-- Share Sheet Body -->
+            <div class="share-sheet-body">
+                <!-- Compact Post Preview Strip -->
+                <div id="shareSheetPostPreview" class="share-sheet-preview-card">
+                    <div id="shareSheetThumbWrap" class="share-sheet-thumb-wrap">
+                        <span>🌸</span>
                     </div>
-                    <div style="flex: 1; min-width: 0;">
-                        <div style="font-size: 0.88rem; font-weight: 700; color: #1e3a8a; display: flex; align-items: center; gap: 6px;">
-                            <span>Facebook එකට කෙලින්ම Share කරන්න</span>
-                            <span style="background: #1877f2; color: #fff; font-size: 0.58rem; padding: 1px 6px; border-radius: 9999px; font-weight: 800;">Popular</span>
-                        </div>
-                        <div style="font-size: 0.72rem; color: #1d4ed8; margin-top: 2px;">
-                            Facebook Feed, Groups, Pages වෙත ආකර්ෂණීය විස්තරය සහ Link එක සමඟ බෙදාගන්න
+                    <div class="share-sheet-preview-info">
+                        <div id="shareSheetHookText" class="share-sheet-hook-text">පින්කම බෙදාගැනීම...</div>
+                        <div class="share-sheet-url-badge">
+                            <i class="fa-solid fa-link"></i>
+                            <span>share.apepinpotha.lk</span>
                         </div>
                     </div>
-                </button>
+                </div>
 
-                <!-- Option 2: Facebook, Threads & WhatsApp Viral Card Image -->
-                <button type="button" id="btnShareWhatsAppStatus" onclick="generateWhatsAppStatusCardFromModal()" class="share-choice-btn" style="border: 1.5px solid #a7f3d0; background: linear-gradient(135deg, #ecfdf5, #f0fdf4); color: #065f46; margin-bottom: 10px;">
-                    <div style="width: 44px; height: 44px; border-radius: 12px; background: #059669; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0; box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);">
-                        <i class="fa-solid fa-photo-film"></i>
-                    </div>
-                    <div style="flex: 1; min-width: 0;">
-                        <div style="font-size: 0.88rem; font-weight: 700; color: #065f46; display: flex; align-items: center; gap: 6px;">
-                            <span>Facebook, Threads & WhatsApp Viral Card එක</span>
-                            <span style="background: #059669; color: #fff; font-size: 0.58rem; padding: 1px 6px; border-radius: 9999px; font-weight: 800;">HD Image</span>
+                <!-- One-Tap Action Grid -->
+                <div class="share-sheet-actions-grid">
+                    <!-- WhatsApp -->
+                    <button type="button" class="share-sheet-action-item" onclick="shareSheetActionWhatsApp()" title="WhatsApp හරහා යවන්න">
+                        <div class="share-action-icon-wrap whatsapp-icon">
+                            <i class="fa-brands fa-whatsapp"></i>
                         </div>
-                        <div style="font-size: 0.72rem; color: #047857; margin-top: 2px;">
-                            FB / Threads Ad පෙනුමැති, අන් අය ආකර්ෂණය කරගන්නා වෘත්තීය ඡායාරූප කාඩ්පතක් සාදා ගන්න
-                        </div>
-                    </div>
-                </button>
+                        <span class="share-action-label">WhatsApp</span>
+                    </button>
 
-                <!-- Option 3: WhatsApp / Other Social Channels -->
-                <button type="button" id="btnShareDirectLink" onclick="executeNativeOrWhatsAppShare()" class="share-choice-btn" style="border: 1.5px solid #fef3c7; background: #fffbeb; color: #92400e; margin-bottom: 10px;">
-                    <div style="width: 44px; height: 44px; border-radius: 12px; background: #25d366; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0; box-shadow: 0 4px 12px rgba(37, 211, 102, 0.3);">
-                        <i class="fa-brands fa-whatsapp"></i>
-                    </div>
-                    <div style="flex: 1; min-width: 0;">
-                        <div style="font-size: 0.88rem; font-weight: 700; color: #78350f;">
-                            WhatsApp වෙත සෘජුව යවන්න
+                    <!-- Facebook -->
+                    <button type="button" class="share-sheet-action-item" onclick="shareSheetActionFacebook()" title="Facebook හරහා බෙදාගන්න">
+                        <div class="share-action-icon-wrap facebook-icon">
+                            <i class="fa-brands fa-facebook"></i>
                         </div>
-                        <div style="font-size: 0.72rem; color: #b45309; margin-top: 2px;">
-                            WhatsApp Chat, Groups වෙත සබැඳිය සහ විස්තරය යවන්න
-                        </div>
-                    </div>
-                </button>
+                        <span class="share-action-label">Facebook</span>
+                    </button>
 
-                <!-- Option 4: Copy Link -->
-                <button type="button" onclick="copyPostLinkFromModal()" class="share-choice-btn" style="border: 1px solid #e2e8f0; background: #f8fafc; color: #334155;">
-                    <div style="width: 40px; height: 40px; border-radius: 10px; background: #e2e8f0; color: #475569; display: flex; align-items: center; justify-content: center; font-size: 1.05rem; flex-shrink: 0;">
-                        <i class="fa-regular fa-copy"></i>
-                    </div>
-                    <div style="flex: 1; min-width: 0;">
-                        <div style="font-size: 0.84rem; font-weight: 700; color: #1e293b;">
-                            Link එක කොපි කරගන්න (Copy Direct Link)
+                    <!-- Copy Clean Link Only -->
+                    <button type="button" class="share-sheet-action-item" onclick="shareSheetActionCopyLink()" title="ලින්ක් එක පමණක් පිටපත් කරගන්න">
+                        <div class="share-action-icon-wrap copy-link-icon">
+                            <i class="fa-regular fa-copy"></i>
                         </div>
-                        <div style="font-size: 0.7rem; color: #64748b; margin-top: 1px;">
-                            කෙලින්ම මෙම සටහනට පිවිසිය හැකි වෙබ් ලිපිනය ක්ලිප්බෝඩ් එකට පිටපත් වේ
+                        <span class="share-action-label">ලින්ක් එක Copy</span>
+                    </button>
+
+                    <!-- Copy Caption + Link -->
+                    <button type="button" class="share-sheet-action-item" onclick="shareSheetActionCopyCaption()" title="විස්තරය සමඟ ලින්ක් එක පිටපත් කරගන්න">
+                        <div class="share-action-icon-wrap copy-caption-icon">
+                            <i class="fa-solid fa-clipboard-list"></i>
                         </div>
-                    </div>
-                </button>
+                        <span class="share-action-label">විස්තරය සමඟ Copy</span>
+                    </button>
+
+                    <!-- Native / More Apps (Shown when navigator.share is available) -->
+                    <button type="button" id="shareSheetBtnNativeMore" class="share-sheet-action-item hidden" onclick="shareSheetActionNative()" title="වෙනත් Apps වෙත යවන්න">
+                        <div class="share-action-icon-wrap more-icon">
+                            <i class="fa-solid fa-ellipsis"></i>
+                        </div>
+                        <span class="share-action-label">වෙනත් ඇප්</span>
+                    </button>
+                </div>
+
+                <!-- Secondary Action: Viral Photo Card Generator -->
+                <div class="share-sheet-footer-action">
+                    <button type="button" onclick="generateWhatsAppStatusCardFromModal()" class="share-sheet-photocard-btn" title="HD Status / Photo Card එකක් සාදාගන්න">
+                        <div class="photocard-btn-icon"><i class="fa-solid fa-photo-film"></i></div>
+                        <div class="photocard-btn-text">
+                            <div class="photocard-btn-title">HD Status / Photo Card සාදාගන්න</div>
+                            <div class="photocard-btn-sub">WhatsApp Status, Facebook Ad පෙනුමැති පින්තූරයක් සකසන්න</div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right photocard-btn-arrow"></i>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -4474,6 +4485,6 @@
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=178"></script>
+    <script type="module" src="js/app.js?v=180"></script>
 </body>
 </html>
