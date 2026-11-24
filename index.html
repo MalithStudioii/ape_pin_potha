@@ -127,13 +127,13 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=181">
+    <link rel="stylesheet" href="css/styles.css?v=182">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
       (function() {
-        var v = 'v181';
-        var cacheLive = 'pin-potha-cache-v181-live';
+        var v = 'v182';
+        var cacheLive = 'pin-potha-cache-v182-live';
         if (localStorage.getItem('pinPotha_active_build') !== v) {
           localStorage.setItem('pinPotha_active_build', v);
           try {
@@ -439,6 +439,9 @@
 
         <!-- ================= CENTER COLUMN (Newsfeed Stream) ================= -->
         <main class="main-feed-area">
+
+            <!-- Dedicated Shared Post Spotlight Container (?p=postId Arrival) -->
+            <div id="sharedPostSpotlight" class="shared-post-spotlight-container" style="display: none;"></div>
 
             <!-- "Create Post" Composer Box -->
             <div class="card composer-card">
@@ -4485,6 +4488,6 @@
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=181"></script>
+    <script type="module" src="js/app.js?v=182"></script>
 </body>
 </html>

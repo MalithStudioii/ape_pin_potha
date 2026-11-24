@@ -523,6 +523,125 @@ export const StorageService = {
   },
 
   /**
+   * Returns total registered member count using Firestore getCountFromServer (1 read per 1,000 docs).
+   * Cached in sessionStorage with 15-minute TTL.
+   */
+  async getCommunityMembersCount(forceRefresh = false) {
+    const CACHE_KEY = 'pinPotha_session_users_count';
+    if (!forceRefresh) {
+      const cached = this.getSessionCache(CACHE_KEY);
+      if (typeof cached === 'number' && cached > 0) {
+        return cached;
+      }
+    }
+
+    if (isCloudReady && db) {
+      try {
+        const { collection, getCountFromServer } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        if (typeof getCountFromServer === 'function') {
+          const snap = await getCountFromServer(collection(db, COLLECTIONS.USERS));
+          if (snap && typeof snap.data === 'function') {
+            const count = snap.data().count;
+            if (typeof count === 'number' && count > 0) {
+              this.setSessionCache(CACHE_KEY, count, 15 * 60 * 1000);
+              return count;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[Storage] getCountFromServer note:', err);
+      }
+    }
+
+    if (Array.isArray(this._cachedCommunityMembers) && this._cachedCommunityMembers.length > 0) {
+      return this._cachedCommunityMembers.length;
+    }
+    const local = localStorage.getItem('pinPotha_cached_community_members');
+    if (local) {
+      try {
+        const list = JSON.parse(local);
+        if (Array.isArray(list) && list.length > 0) return list.length;
+      } catch (e) {}
+    }
+    return null;
+  },
+
+  /**
+   * Fetches only a compact batch (limit 15) of community members for the desktop sidebar.
+   * Cached in sessionStorage with 15-minute TTL to prevent reading the entire 57+ collection.
+   */
+  async getSidebarCommunityMembers(forceRefresh = false, limitCount = 15) {
+    const now = Date.now();
+    const CACHE_KEY = 'pinPotha_session_sidebar_users';
+    if (!forceRefresh) {
+      const sessionData = this.getSessionCache(CACHE_KEY);
+      if (Array.isArray(sessionData) && sessionData.length > 0) {
+        return sessionData;
+      }
+    }
+
+    if (Array.isArray(this._cachedCommunityMembers) && this._cachedCommunityMembers.length > 0) {
+      const sliced = this._cachedCommunityMembers.slice(0, limitCount);
+      this.setSessionCache(CACHE_KEY, sliced, 15 * 60 * 1000);
+      return sliced;
+    }
+
+    let members = [];
+    if (isCloudReady && db) {
+      try {
+        const { collection, getDocs, query, limit } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const q = query(collection(db, COLLECTIONS.USERS), limit(limitCount));
+        const snap = await getDocs(q);
+        snap.forEach(docSnap => {
+          const data = docSnap.data();
+          const isMaster = this.isMasterAdmin({ uid: docSnap.id, email: data.email, name: data.name });
+          const isSub = !isMaster && (data.role === 'admin' || data.authorRole === 'admin' || data.isSubAdmin === true);
+          if (isSub) this._knownAdminUids.add(docSnap.id);
+          const isMemberSangha = data.isSangha === true || data.role === 'sangha' || (data.authorRole === 'sangha') || this.isSangha({ uid: docSnap.id, name: data.name || data.firstName });
+          if (isMemberSangha) this._knownSanghaUids.add(docSnap.id);
+          const lastActive = data.lastActiveAt || data.updatedAt || 0;
+          const isOnline = (this.currentUser && this.currentUser.uid === docSnap.id) || ((now - lastActive) < 7 * 60 * 1000);
+          const isUserAnon = Boolean(
+            data.isAnonymous ||
+            data.useAlias ||
+            (this.currentUser && this.currentUser.uid === docSnap.id && (this.currentUser.useAlias || this.currentUser.isAnonymous))
+          );
+          members.push({
+            uid: docSnap.id,
+            name: data.name || data.firstName || 'කල්‍යාණ මිත්‍ර',
+            photo: data.photo || '',
+            coverImage: data.coverImage || 'assets/banner.webp',
+            bio: data.bio || '',
+            location: data.location || data.district || '',
+            joinedDate: data.joinedDate || '',
+            updatedAt: data.updatedAt || 0,
+            lastActiveAt: lastActive,
+            isOnline: isOnline,
+            isAdmin: isMaster,
+            isSubAdmin: isSub,
+            isSangha: isMemberSangha,
+            isAnonymous: isUserAnon,
+            useAlias: Boolean(data.useAlias || isUserAnon),
+            role: data.role || (isMemberSangha ? 'sangha' : (isSub ? 'admin' : 'member')),
+            mithrayanCount: Array.isArray(data.mithrayan) ? data.mithrayan.length : 0
+          });
+        });
+      } catch (e) {
+        console.warn('[Storage] getSidebarCommunityMembers error:', e);
+      }
+    }
+
+    if (members.length === 0) {
+      members = (this.getInstantLocalCommunityMembers ? this.getInstantLocalCommunityMembers() : []).slice(0, limitCount);
+    }
+
+    if (members.length > 0) {
+      this.setSessionCache(CACHE_KEY, members, 15 * 60 * 1000);
+    }
+    return members;
+  },
+
+  /**
    * Returns all registered community members from Firestore with caching & fallback
    */
   async getAllCommunityMembers(forceRefresh = false) {
@@ -1007,8 +1126,7 @@ export const StorageService = {
           }
         }
 
-        // Pre-fetch community members in background to keep author names and photos fresh
-        this.getAllCommunityMembers().catch(() => {});
+        // Community members are loaded lazily on desktop sidebar (limit 15) or Members tab (0 reads on mobile)
 
         return { isCloud: true };
       } catch (err) {
