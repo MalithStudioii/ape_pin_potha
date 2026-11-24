@@ -4,7 +4,7 @@
  * ============================================================================
  */
 
-import { StorageService } from './storage.js?v=165';
+import { StorageService } from './storage.js?v=183';
 import { Security } from './security.js?v=160';
 import { uploadToImgBB, uploadToCloudinary } from './imgbb-service.js?v=68';
 import { SoundService, triggerHaptic } from './sound.js?v=66';
@@ -15,10 +15,19 @@ window.DHAMMA_LIBRARY_ITEMS = DHAMMA_LIBRARY_ITEMS;
 window.DHAMMA_CATEGORIES = DHAMMA_CATEGORIES;
 export const BO_LEAF_AVATAR = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjggMTI4IiB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCI+CiAgPGRlZnM+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImdfYm9fbGVhZiIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNkY2ZjZTciLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjZDFmYWU1Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGZpbHRlciBpZD0iZl9ib19sZWFmIiB4PSItMjAlIiB5PSItMjAlIiB3aWR0aD0iMTQwJSIgaGVpZ2h0PSIxNDAlIj4KICAgICAgPGZlRHJvcFNoYWRvdyBkeD0iMCIgZHk9IjMiIHN0ZERldmlhdGlvbj0iMyIgZmxvb2Qtb3BhY2l0eT0iMC4xOCIgZmxvb2QtY29sb3I9IiM0NTFhMDMiLz4KICAgIDwvZmlsdGVyPgogIDwvZGVmcz4KICA8Y2lyY2xlIGN4PSI2NCIgY3k9IjY0IiByPSI2MSIgZmlsbD0idXJsKCNnX2JvX2xlYWYpIiBzdHJva2U9IiMxMGI5ODEiIHN0cm9rZS13aWR0aD0iMi41Ii8+CiAgPHRleHQgeD0iNjQiIHk9IjgwIiBmb250LXNpemU9IjU4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iJ0FwcGxlIENvbG9yIEVtb2ppJywnU2Vnb2UgVUkgRW1vamknLCdOb3RvIENvbG9yIEVtb2ppJywnU2Vnb2UgVUkgU3ltYm9sJyxzYW5zLXNlcmlmIiBmaWx0ZXI9InVybCgjZl9ib19sZWFmKSI+8J+MvzwvdGV4dD4KPC9zdmc+";
 let allCommunityMembersCache = [];
+let kmpMembersCache = [];
+let isKmpLoadingMore = false;
 let infiniteScrollObserver = null;
+let feedSentinelObserver = null;
+let lastPostDoc = null;
+let hasMorePosts = true;
+let isLoadingMore = false;
+let autoLoadCount = 0;
+const MAX_AUTO_LOADS = 2;
 let isTriggeringLoadMore = false;
 let isPcSidebarExpanded = false;
 let poyaAmbientSubscribed = false;
+let currentSpotlightPostId = null;
 
 /* ==========================================================================
    Sri Lanka Provinces & Districts Dataset & Dropdown Helper Functions
@@ -452,7 +461,9 @@ function bootApp() {
     try { updateUserInfoUI(); } catch (e) { console.warn('[App] updateUserInfoUI error caught safely:', e); }
     try { updateUserStats(); } catch (e) { console.warn('[App] updateUserStats error caught safely:', e); }
     try { renderSideNeeds(); } catch (e) {}
-    try { renderPcSidebarMembers().catch(() => {}); } catch (e) {}
+    if (window.innerWidth >= 1024) {
+      try { renderPcSidebarMembers().catch(() => {}); } catch (e) {}
+    }
 
     // Load initial global announcement, daily verse, and Poya calendar from storage
     try {
@@ -478,17 +489,25 @@ function bootApp() {
       console.warn('[App] initPoyaAmbientEffect note:', e);
     }
 
-    // Warm / refresh artisans cache in background (respects 15-min TTL)
-    try {
-      ensureVerifiedArtisansLoaded().catch(() => {});
-    } catch (e) {}
-
     // Subscribe to real-time database updates with 150ms debounce to prevent multiple consecutive DOM repaints on boot
     let postUpdateDebounceTimer = null;
     StorageService.onPostsUpdate((posts) => {
       const handlePostsUpdate = () => {
         try {
+          if (!lastPostDoc && StorageService.getLastVisibleDoc) {
+            lastPostDoc = StorageService.getLastVisibleDoc();
+          }
+          if (typeof StorageService.hasMorePosts === 'function') {
+            hasMorePosts = StorageService.hasMorePosts();
+          }
+
           const cleanPosts = (posts || []).filter(p => !StorageService.isDummyTestPost || !StorageService.isDummyTestPost(p));
+          if (currentSpotlightPostId) {
+            const spotlightPost = (currentPostsData || []).find(p => p.id === currentSpotlightPostId);
+            if (spotlightPost && !cleanPosts.some(p => p.id === currentSpotlightPostId)) {
+              cleanPosts.push(spotlightPost);
+            }
+          }
           const prevIds = (currentPostsData || []).map(p => p.id).join(',');
           const newIds = cleanPosts.map(p => p.id).join(',');
           currentPostsData = cleanPosts;
@@ -506,7 +525,7 @@ function bootApp() {
             } else {
               updateFeedInPlace(currentPostsData);
             }
-          } else if (hasRenderedCards && prevIds.length > 0 && isTriggeringLoadMore && newIds.startsWith(prevIds)) {
+          } else if (hasRenderedCards && prevIds.length > 0 && (isTriggeringLoadMore || isLoadingMore) && newIds.startsWith(prevIds)) {
             // Posts were appended at the bottom via pagination! Smooth append without resetting DOM or scroll position
             appendNewPostsToFeed(posts, prevIds);
             updateFeedInPlace(currentPostsData);
@@ -517,7 +536,9 @@ function bootApp() {
           try { updateUserInfoUI(); } catch (e) {}
           try { renderSideNeeds(); } catch (e) {}
           try { updateUserStats(); } catch (e) {}
-          try { renderPcSidebarMembers().catch(() => {}); } catch (e) {}
+          if (window.innerWidth >= 1024) {
+            try { renderPcSidebarMembers().catch(() => {}); } catch (e) {}
+          }
           if (activeTab === 'profile') {
             try { renderProfileView(); } catch (e) {}
           }
@@ -3488,7 +3509,8 @@ function renderFeed() {
 
   const filtered = currentPostsData.filter(post => {
     if (!post) return false;
-    if (StorageService.isDummyTestPost && StorageService.isDummyTestPost(post)) return false;
+    if (post.isDeleted === true) return false;
+    if (currentSpotlightPostId && post.id === currentSpotlightPostId) return false;
 
     if (searchQ) {
       const matchTitle = (post.title || '').toLowerCase().includes(searchQ);
@@ -3594,8 +3616,8 @@ function renderFeed() {
     return;
   }
 
-  const hasMore = StorageService.hasMorePosts ? StorageService.hasMorePosts() : false;
-  const isLoading = StorageService.isLoadingMorePosts ? StorageService.isLoadingMorePosts() : false;
+  const hasMore = (typeof hasMorePosts === 'boolean') ? hasMorePosts : (StorageService.hasMorePosts ? StorageService.hasMorePosts() : false);
+  const isLoading = isLoadingMore || (StorageService.isLoadingMorePosts ? StorageService.isLoadingMorePosts() : false);
 
   let sentinelHtml = '';
   if (activeTab === 'feed' || activeTab === 'needs') {
@@ -3604,13 +3626,18 @@ function renderFeed() {
         ${isLoading ? `
           <div class="infinite-scroll-loading">
             <i class="fa-solid fa-dharmachakra animate-spin-slow" style="color: #d97706; font-size: 1.3rem;"></i>
-            <span>තවත් පින්කම් ලබා ගනිමින් පවතී...</span>
+            <span>තවත් පින්කම් ලෝඩ් වෙමින් පවතී...</span>
           </div>
-        ` : (hasMore ? `
+        ` : (hasMore ? (autoLoadCount >= MAX_AUTO_LOADS ? `
           <button type="button" class="btn-load-more-posts" onclick="handleLoadMorePostsClick()">
-            <i class="fa-solid fa-arrow-down"></i> තවත් පින්කම් බලන්න (Load More)
+            <i class="fa-solid fa-arrow-down"></i> තවත් සටහන් බලන්න (Load More)
           </button>
-        ` : (ranked.length > 5 ? `
+        ` : `
+          <div class="infinite-scroll-loading" style="opacity: 0.6; padding: 8px 16px; font-size: 0.8rem;">
+            <i class="fa-solid fa-dharmachakra animate-spin-slow" style="color: #d97706; font-size: 1rem;"></i>
+            <span>තවත් පින්කම් ලෝඩ් වෙමින් පවතී...</span>
+          </div>
+        `) : (ranked.length > 5 ? `
           <div class="infinite-scroll-end">
             <span class="end-icon">🪷</span>
             <span>ඔබ සියලුම පින්කම් කියවා අවසන්ය. සියලු දෙනාටම තෙරුවන් සරණයි! 🙏</span>
@@ -3665,56 +3692,17 @@ function renderFeed() {
   container.innerHTML = cardsHtmlArr.join('') + sentinelHtml;
   setupInfiniteScrollObserver();
 
-  // If spotlight should be displayed but artisans are not loaded yet, fetch and dynamically insert
-  if (shouldInjectSpotlight && (!verifiedArtisans || verifiedArtisans.length === 0)) {
-    ensureVerifiedArtisansLoaded().then(loadedArtisans => {
-      // Re-verify user is still on unfiltered home feed
-      const currentSearchQ = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
-      if (activeTab !== 'feed' || currentSearchQ || activeCategory !== 'සියල්ල') return;
-      if (!loadedArtisans || loadedArtisans.length === 0) return;
-
-      const currentContainer = document.getElementById('postsContainer');
-      if (!currentContainer) return;
-
-      // Prevent duplicate insertion
-      if (document.getElementById('artisanSpotlightStrip') || document.getElementById('feedArtisansSpotlight')) {
-        return;
-      }
-
-      const stripHtml = renderFeedArtisanSpotlightHTML(loadedArtisans);
-      if (!stripHtml) return;
-
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = stripHtml.trim();
-      const spotlightEl = tempDiv.firstElementChild;
-      if (!spotlightEl) return;
-
-      // Find post card elements in feed container
-      const postCards = Array.from(currentContainer.children).filter(el => {
-        return el && el.id && el.id.startsWith('post-elem-');
-      });
-
-      if (postCards.length >= 4) {
-        postCards[3].after(spotlightEl);
-      } else if (postCards.length > 0) {
-        postCards[postCards.length - 1].after(spotlightEl);
-      } else {
-        const sentinel = document.getElementById('infiniteScrollSentinel');
-        if (sentinel) {
-          currentContainer.insertBefore(spotlightEl, sentinel);
-        } else {
-          currentContainer.appendChild(spotlightEl);
-        }
-      }
-    }).catch(() => {});
-  }
 }
 
 // ============================================================================
-// High-Scale Feed Pagination & Infinite Scroll Engine (Limit: 20)
+// Hybrid Feed Auto-Scroll & Cursor-based Pagination Engine (10-12 Posts/Page)
 // ============================================================================
 
 export function setupInfiniteScrollObserver() {
+  if (feedSentinelObserver) {
+    feedSentinelObserver.disconnect();
+    feedSentinelObserver = null;
+  }
   if (infiniteScrollObserver) {
     infiniteScrollObserver.disconnect();
     infiniteScrollObserver = null;
@@ -3723,47 +3711,70 @@ export function setupInfiniteScrollObserver() {
   const sentinel = document.getElementById('infiniteScrollSentinel');
   if (!sentinel) return;
 
+  // If user reached max auto-loads (2 triggers) or no more posts, don't observe; update UI
+  if (autoLoadCount >= MAX_AUTO_LOADS || !hasMorePosts) {
+    updateSentinelUI();
+    return;
+  }
+
   if ('IntersectionObserver' in window) {
-    infiniteScrollObserver = new IntersectionObserver((entries) => {
+    feedSentinelObserver = new IntersectionObserver((entries) => {
       const entry = entries[0];
       if (entry && entry.isIntersecting) {
-        triggerLoadMorePosts();
+        if (!isLoadingMore && hasMorePosts && autoLoadCount < MAX_AUTO_LOADS) {
+          triggerHybridLoadMore(true);
+        }
       }
     }, {
-      rootMargin: '300px', // Pre-fetch before user reaches absolute bottom
+      rootMargin: '250px',
       threshold: 0.05
     });
 
-    infiniteScrollObserver.observe(sentinel);
+    feedSentinelObserver.observe(sentinel);
   }
 }
 window.setupInfiniteScrollObserver = setupInfiniteScrollObserver;
 
-export async function triggerLoadMorePosts() {
-  if (isTriggeringLoadMore) return;
-  if (!StorageService.hasMorePosts || !StorageService.hasMorePosts()) return;
-  if (StorageService.isLoadingMorePosts && StorageService.isLoadingMorePosts()) return;
-  if (currentPostsData.length < 5 && StorageService.isInitialSyncDone && !StorageService.isInitialSyncDone()) {
-    return;
-  }
+export async function triggerHybridLoadMore(isAutoTrigger = false) {
+  if (isLoadingMore || !hasMorePosts) return;
 
+  isLoadingMore = true;
   isTriggeringLoadMore = true;
+  if (isAutoTrigger) {
+    autoLoadCount++;
+  }
   updateSentinelUI();
 
   try {
-    await StorageService.fetchMorePosts();
+    const cursor = lastPostDoc || (StorageService.getLastVisibleDoc ? StorageService.getLastVisibleDoc() : null);
+    const result = await StorageService.fetchNextPostBatch(cursor, 12);
+    if (result) {
+      if (result.lastDoc) lastPostDoc = result.lastDoc;
+      hasMorePosts = Boolean(result.hasMore);
+    } else {
+      hasMorePosts = StorageService.hasMorePosts ? StorageService.hasMorePosts() : false;
+    }
   } catch (err) {
-    console.warn('[Feed] Error loading more posts:', err);
+    console.warn('[Feed] Error loading next post batch:', err);
   } finally {
+    isLoadingMore = false;
     isTriggeringLoadMore = false;
     updateSentinelUI();
+
+    if (autoLoadCount < MAX_AUTO_LOADS && hasMorePosts) {
+      setupInfiniteScrollObserver();
+    } else if (feedSentinelObserver) {
+      feedSentinelObserver.disconnect();
+      feedSentinelObserver = null;
+    }
   }
 }
-window.triggerLoadMorePosts = triggerLoadMorePosts;
+window.triggerHybridLoadMore = triggerHybridLoadMore;
+window.triggerLoadMorePosts = triggerHybridLoadMore;
 
 export async function handleLoadMorePostsClick() {
   triggerHaptic(10);
-  await triggerLoadMorePosts();
+  await triggerHybridLoadMore(false);
 }
 window.handleLoadMorePostsClick = handleLoadMorePostsClick;
 
@@ -3771,24 +3782,33 @@ export function updateSentinelUI() {
   const sentinel = document.getElementById('infiniteScrollSentinel');
   if (!sentinel) return;
 
-  const hasMore = StorageService.hasMorePosts ? StorageService.hasMorePosts() : false;
-  const isLoading = (StorageService.isLoadingMorePosts && StorageService.isLoadingMorePosts()) || isTriggeringLoadMore;
-
   const renderedCount = document.querySelectorAll('#postsContainer article.post-card').length;
 
-  if (isLoading) {
+  if (isLoadingMore) {
     sentinel.innerHTML = `
       <div class="infinite-scroll-loading">
         <i class="fa-solid fa-dharmachakra animate-spin-slow" style="color: #d97706; font-size: 1.3rem;"></i>
-        <span>තවත් පින්කම් ලබා ගනිමින් පවතී...</span>
+        <span>තවත් පින්කම් ලෝඩ් වෙමින් පවතී...</span>
       </div>
     `;
-  } else if (hasMore) {
-    sentinel.innerHTML = `
-      <button type="button" class="btn-load-more-posts" onclick="handleLoadMorePostsClick()">
-        <i class="fa-solid fa-arrow-down"></i> තවත් පින්කම් බලන්න (Load More)
-      </button>
-    `;
+    sentinel.style.display = 'flex';
+  } else if (hasMorePosts) {
+    if (autoLoadCount >= MAX_AUTO_LOADS) {
+      sentinel.innerHTML = `
+        <button type="button" class="btn-load-more-posts" onclick="handleLoadMorePostsClick()">
+          <i class="fa-solid fa-arrow-down"></i> තවත් සටහන් බලන්න (Load More)
+        </button>
+      `;
+      sentinel.style.display = 'flex';
+    } else {
+      sentinel.innerHTML = `
+        <div class="infinite-scroll-loading" style="opacity: 0.6; padding: 8px 16px; font-size: 0.8rem;">
+          <i class="fa-solid fa-dharmachakra animate-spin-slow" style="color: #d97706; font-size: 1rem;"></i>
+          <span>තවත් පින්කම් ලෝඩ් වෙමින් පවතී...</span>
+        </div>
+      `;
+      sentinel.style.display = 'flex';
+    }
   } else if (renderedCount > 5) {
     sentinel.innerHTML = `
       <div class="infinite-scroll-end">
@@ -3796,8 +3816,10 @@ export function updateSentinelUI() {
         <span>ඔබ සියලුම පින්කම් කියවා අවසන්ය. සියලු දෙනාටම තෙරුවන් සරණයි! 🙏</span>
       </div>
     `;
+    sentinel.style.display = 'flex';
   } else {
     sentinel.innerHTML = '';
+    sentinel.style.display = 'none';
   }
 }
 window.updateSentinelUI = updateSentinelUI;
@@ -3815,7 +3837,8 @@ export function appendNewPostsToFeed(allPosts, prevIdsStr) {
   const newlyFetched = (allPosts || []).filter(p => !prevIdSet.has(p.id));
   const filteredNew = newlyFetched.filter(post => {
     if (!post) return false;
-    if (StorageService.isDummyTestPost && StorageService.isDummyTestPost(post)) return false;
+    if (post.isDeleted === true) return false;
+    if (currentSpotlightPostId && post.id === currentSpotlightPostId) return false;
 
     if (searchQ) {
       const matchTitle = (post.title || '').toLowerCase().includes(searchQ);
@@ -4774,6 +4797,9 @@ window.deletePostPrompt = async function(postId) {
       }, 320);
     }
 
+    if (currentSpotlightPostId === postId) {
+      closeSharedPostSpotlight(false);
+    }
     currentPostsData = (currentPostsData || []).filter(p => p.id !== postId);
     try {
       await StorageService.deletePost(postId);
@@ -5289,8 +5315,84 @@ window.openWhatsAppForStatusShare = function() {
   window.open(waUrl, '_blank');
 };
 
+// ============================================================================
+// Dedicated Top Spotlight Card for Shared Posts (?p=postId Arrival)
+// ============================================================================
+
+export function renderSharedPostSpotlight(post) {
+  const container = document.getElementById('sharedPostSpotlight');
+  if (!container || !post) return;
+
+  const user = StorageService.currentUser;
+  const isNeed = post.type === 'need';
+  const isReel = post.type === 'reel' || Boolean(post.isShorts || post.videoId);
+  const badgeLabel = isNeed ? '🤝 ඔබ පිවිසි සත්කාර ඇරයුම' : (isReel ? '🎬 ඔබ පිවිසි සදහම් වීඩියෝව' : '✨ ඔබ පිවිසි සටහන');
+
+  const cardHtml = renderPostCardHTML(post, user);
+
+  container.innerHTML = `
+    <div class="shared-post-spotlight-card">
+      <div class="shared-post-spotlight-header">
+        <div class="shared-post-spotlight-badge">
+          <i class="fa-solid fa-sparkles"></i>
+          <span>${badgeLabel}</span>
+        </div>
+        <button type="button" class="shared-post-spotlight-close" onclick="closeSharedPostSpotlight(true)" title="සියලු සටහන් බලන්න">
+          <i class="fa-solid fa-xmark"></i>
+          <span>සියලු සටහන් බලන්න</span>
+        </button>
+      </div>
+      <div class="shared-post-spotlight-body">
+        ${cardHtml}
+      </div>
+    </div>
+  `;
+  container.style.display = 'block';
+
+  // Automatically expand full text if collapsed
+  const collapsedDesc = document.getElementById(`post-desc-collapsed-${post.id}`);
+  const fullDesc = document.getElementById(`post-desc-full-${post.id}`);
+  if (collapsedDesc && fullDesc) {
+    collapsedDesc.style.display = 'none';
+    fullDesc.style.display = 'block';
+  }
+
+  // Automatically open comments/blessings section
+  const commentsBox = document.getElementById(`comments-box-${post.id}`);
+  if (commentsBox && commentsBox.style.display === 'none') {
+    commentsBox.style.display = 'block';
+  }
+}
+window.renderSharedPostSpotlight = renderSharedPostSpotlight;
+
+export function closeSharedPostSpotlight(shouldRenderFeed = true) {
+  const container = document.getElementById('sharedPostSpotlight');
+  if (container) {
+    container.style.display = 'none';
+    container.innerHTML = '';
+  }
+
+  currentSpotlightPostId = null;
+
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('p');
+    url.searchParams.delete('post');
+    if (window.location.hash.startsWith('#post_')) {
+      history.replaceState(null, '', url.pathname + (url.search ? url.search : ''));
+    } else {
+      history.replaceState(null, '', url.pathname + (url.search ? url.search : '') + url.hash);
+    }
+  } catch (e) {}
+
+  if (shouldRenderFeed) {
+    renderFeed();
+  }
+}
+window.closeSharedPostSpotlight = closeSharedPostSpotlight;
+
 // Check for deep-linked post in URL query (?p=, ?post=) or hash (#post_...) - Instant Facebook / Social traffic arrival
-async function checkUrlDirectPost(explicitPostId = null) {
+export async function checkUrlDirectPost(explicitPostId = null) {
   const urlParams = new URLSearchParams(window.location.search);
   let targetPostId = explicitPostId || urlParams.get('p') || urlParams.get('post');
   if (!targetPostId) {
@@ -5313,7 +5415,7 @@ async function checkUrlDirectPost(explicitPostId = null) {
     targetPost = StorageService._cachedPosts.find(p => p.id === targetPostId);
   }
 
-  // 2. If not in local storage (e.g. brand new visitor arriving from Facebook link), fetch directly from Firestore by ID!
+  // 2. Fetch directly from Firestore by ID if not in memory (1 Firestore read)
   if (!targetPost && typeof StorageService.getPostById === 'function') {
     try {
       targetPost = await StorageService.getPostById(targetPostId);
@@ -5322,63 +5424,50 @@ async function checkUrlDirectPost(explicitPostId = null) {
     }
   }
 
-  // 3. If it's a Sathkara Need post or ?tab=needs, switch to needs tab
-  const isNeedPost = targetPost && targetPost.type === 'need';
+  // 3. If post does not exist or was marked deleted, notify politely and continue normal feed
+  if (!targetPost || targetPost.isDeleted === true) {
+    if (typeof showCustomToast === 'function') {
+      showCustomToast('මෙම සටහන සොයාගත නොහැක හෝ ඉවත් කර ඇත.', 'info');
+    }
+    closeSharedPostSpotlight(false);
+    return;
+  }
+
+  // 4. Gracefully handle Shorts / Reels / Video media
+  if (targetPost.videoUrl && !targetPost.videoId && typeof parseVideoUrl === 'function') {
+    const parsed = parseVideoUrl(targetPost.videoUrl);
+    if (parsed && parsed.videoId) {
+      targetPost.videoId = parsed.videoId;
+      targetPost.videoThumbnail = targetPost.videoThumbnail || parsed.videoThumbnail;
+    }
+  }
+  if (targetPost.type === 'reel') {
+    targetPost.isShorts = true;
+  }
+
+  // 5. If it's a Sathkara Need post or ?tab=needs, switch to needs tab
+  const isNeedPost = targetPost.type === 'need';
   if ((isNeedPost || tabParam === 'needs') && activeTab !== 'needs') {
     switchTab('needs', false);
   }
 
-  // 4. If we have the post, ensure it is at index 0 of currentPostsData so it renders right at the top
-  if (targetPost) {
-    currentPostsData = (currentPostsData || []).filter(p => p.id !== targetPostId);
-    currentPostsData.unshift(targetPost);
-    renderFeed();
+  // Ensure targetPost exists in current memory for actions
+  if (!currentPostsData.some(p => p.id === targetPost.id)) {
+    currentPostsData.push(targetPost);
+    window.currentPostsData = currentPostsData;
   }
 
-  // 5. Scroll to element, add arrival banner, and expand comments for high engagement
-  const tryFocusPost = () => {
-    const elem = document.getElementById(`post-elem-${targetPostId}`);
-    if (elem) {
-      if (!elem.querySelector('.shared-post-direct-banner')) {
-        const banner = document.createElement('div');
-        banner.className = 'shared-post-direct-banner';
-        banner.innerHTML = `
-          <i class="fa-solid fa-arrow-up-right-from-square" style="color: #d97706;"></i>
-          <span>${isNeedPost ? '🤝 ඔබ Facebook / සමාජ මාධ්‍ය සබැඳියෙන් විවෘත කළ සත්කාර ඇරයුම' : '✨ ඔබ Facebook / සමාජ මාධ්‍ය සබැඳියෙන් විවෘත කළ පින්කම'}</span>
-        `;
-        elem.insertBefore(banner, elem.firstChild);
-      }
+  // 6. Set active spotlight post ID and render in top spotlight container
+  currentSpotlightPostId = targetPost.id;
+  renderSharedPostSpotlight(targetPost);
 
-      // Automatically expand full text if collapsed
-      const collapsedDesc = document.getElementById(`post-desc-collapsed-${targetPostId}`);
-      const fullDesc = document.getElementById(`post-desc-full-${targetPostId}`);
-      if (collapsedDesc && fullDesc) {
-        collapsedDesc.style.display = 'none';
-        fullDesc.style.display = 'block';
-      }
+  // 7. Re-render feed below to filter out this post (deduplicate)
+  renderFeed();
 
-      // Automatically open comments/blessings section
-      const commentsBox = document.getElementById(`comments-box-${targetPostId}`);
-      if (commentsBox && commentsBox.style.display === 'none') {
-        commentsBox.style.display = 'block';
-      }
-
-      elem.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      elem.classList.add('highlight-shared-post');
-      setTimeout(() => {
-        elem.classList.remove('highlight-shared-post');
-      }, 6000);
-      return true;
-    }
-    return false;
-  };
-
-  if (!tryFocusPost()) {
-    setTimeout(tryFocusPost, 400);
-    setTimeout(tryFocusPost, 1200);
-    setTimeout(tryFocusPost, 2400);
-  }
+  // 8. Keep viewport strictly at the top (DO NOT scroll down feed)
+  window.scrollTo({ top: 0, behavior: 'instant' });
 }
+window.checkUrlDirectPost = checkUrlDirectPost;
 
 // Modal & Form Handling
 window.openModal = function(type = 'merit', triggerPhoto = false, triggerVideo = false) {
@@ -9310,16 +9399,35 @@ window.filterDirectoryBy = function(type) {
 // isPcSidebarExpanded declared at top of module to prevent TDZ ReferenceError in bootApp
 window.togglePcSidebarExpanded = function() {
   isPcSidebarExpanded = !isPcSidebarExpanded;
-  renderPcSidebarMembers(document.getElementById('pcSidebarMemberSearchInput')?.value || '', false);
+  renderPcSidebarMembers(document.getElementById('pcSidebarMemberSearchInput')?.value || '', false, isPcSidebarExpanded);
 };
 
-export async function renderPcSidebarMembers(filterQuery = '', forceRefresh = false) {
+export async function renderPcSidebarMembers(filterQuery = '', forceRefresh = false, loadFull = false) {
   try {
     const container = document.getElementById('pcSidebarMemberList');
     const countPill = document.getElementById('pcCommunityCountPill');
     if (!container) return;
 
-    // Instant zero-latency local fallback if cache is empty
+    // Mobile Guard: Do NOT fetch users on mobile on initial load (0 reads!)
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
+    if (isMobile && !filterQuery && !forceRefresh && !loadFull) {
+      return;
+    }
+
+    // 1. Total Member Count (using Firestore getCountFromServer, 1 read per 1,000 docs, cached 15 min)
+    if (countPill) {
+      if (allCommunityMembersCache && allCommunityMembersCache.length > 20) {
+        countPill.innerText = `${allCommunityMembersCache.length} දෙනෙක්`;
+      } else {
+        StorageService.getCommunityMembersCount(forceRefresh).then(count => {
+          if (countPill && typeof count === 'number' && count > 0) {
+            countPill.innerText = `${count} දෙනෙක්`;
+          }
+        }).catch(() => {});
+      }
+    }
+
+    // 2. Instant local fallback
     if (Array.isArray(StorageService._cachedCommunityMembers) && StorageService._cachedCommunityMembers.length > (allCommunityMembersCache?.length || 0)) {
       allCommunityMembersCache = StorageService._cachedCommunityMembers;
     } else if (!allCommunityMembersCache || allCommunityMembersCache.length === 0) {
@@ -9331,10 +9439,6 @@ export async function renderPcSidebarMembers(filterQuery = '', forceRefresh = fa
     const currentUser = StorageService.currentUser || {};
     const currentMithrayan = Array.isArray(currentUser.mithrayan) ? currentUser.mithrayan : [];
     const currentSent = Array.isArray(currentUser.pendingMithraSent) ? currentUser.pendingMithraSent : [];
-
-    if (countPill && allCommunityMembersCache.length > 0) {
-      countPill.innerText = `${allCommunityMembersCache.length} දෙනෙක්`;
-    }
 
     let list = allCommunityMembersCache || [];
     if (filterQuery && filterQuery.trim()) {
@@ -9402,19 +9506,7 @@ export async function renderPcSidebarMembers(filterQuery = '', forceRefresh = fa
         `;
       }).join('');
 
-      let toggleBtnHtml = '';
-      if (!isFiltered && list.length > 12) {
-        toggleBtnHtml = `
-          <div style="padding: 6px 4px 2px; text-align: center;">
-            <button type="button" class="btn-sidebar-expand-members" onclick="event.stopPropagation(); window.togglePcSidebarExpanded()" style="background: none; border: 1px dashed #cbd5e1; border-radius: 8px; width: 100%; padding: 6px 8px; font-size: 0.72rem; color: #64748b; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s;">
-              <span>${isPcSidebarExpanded ? 'අඩු කරන්න' : 'තවත් සාමාජිකයින් බලන්න (' + (list.length - 12) + ')'}</span>
-              <i class="fa-solid ${isPcSidebarExpanded ? 'fa-chevron-up' : 'fa-chevron-down'}" style="font-size: 0.65rem;"></i>
-            </button>
-          </div>
-        `;
-      }
-
-      container.innerHTML = itemsHtml + toggleBtnHtml;
+      container.innerHTML = itemsHtml;
     } else {
       container.innerHTML = `
         <div style="text-align: center; padding: 16px 8px; color: #94a3b8; font-size: 0.74rem;">
@@ -9423,13 +9515,24 @@ export async function renderPcSidebarMembers(filterQuery = '', forceRefresh = fa
       `;
     }
 
-    // Seamless background fetch of full directory if needed
-    if (forceRefresh || allCommunityMembersCache.length < 20) {
-      StorageService.getAllCommunityMembers(forceRefresh).then(fresh => {
-        if (Array.isArray(fresh) && fresh.length > 0 && fresh.length !== allCommunityMembersCache.length) {
-          allCommunityMembersCache = fresh;
-          if (countPill) countPill.innerText = `${fresh.length} දෙනෙක්`;
-          renderPcSidebarMembers(filterQuery, false);
+    // 3. Optimized fetch:
+    // If user is searching (filterQuery) or loadFull or expanded, load full directory
+    // Otherwise load only compact sidebar batch (limit 15 docs) with 15-min sessionStorage caching
+    if (filterQuery || loadFull || isPcSidebarExpanded) {
+      if (forceRefresh || allCommunityMembersCache.length < 20) {
+        StorageService.getAllCommunityMembers(forceRefresh).then(fresh => {
+          if (Array.isArray(fresh) && fresh.length > 0) {
+            allCommunityMembersCache = fresh;
+            if (countPill) countPill.innerText = `${fresh.length} දෙනෙක්`;
+            renderPcSidebarMembers(filterQuery, false, false);
+          }
+        }).catch(() => {});
+      }
+    } else if (!allCommunityMembersCache || allCommunityMembersCache.length === 0) {
+      StorageService.getSidebarCommunityMembers(forceRefresh, 15).then(sidebarBatch => {
+        if (Array.isArray(sidebarBatch) && sidebarBatch.length > 0) {
+          allCommunityMembersCache = sidebarBatch;
+          renderPcSidebarMembers('', false, false);
         }
       }).catch(() => {});
     }
@@ -9439,8 +9542,16 @@ export async function renderPcSidebarMembers(filterQuery = '', forceRefresh = fa
 };
 window.renderPcSidebarMembers = renderPcSidebarMembers;
 
+window.handleViewAllSidebarMembersClick = function() {
+  if (typeof switchTab === 'function') {
+    switchTab('friends');
+  } else {
+    renderPcSidebarMembers('', false, true);
+  }
+};
+
 window.handlePcSidebarMemberSearch = function(query) {
-  renderPcSidebarMembers(query);
+  renderPcSidebarMembers(query, false, Boolean(query && query.trim()));
 };
 
 window.handleSidebarMemberAction = async function(targetUid, targetName) {
@@ -9540,7 +9651,6 @@ let kmpActiveSegment = 'all'; // 'all', 'friends', 'online', 'sangha', 'suggeste
 let kmpSearchQuery = '';
 let kmpSortMode = 'active'; // 'active', 'newest', 'name'
 let kmpViewMode = 'grid'; // 'grid', 'list'
-let kmpMembersCache = [];
 
 window.switchKmpSegment = function(seg) {
   triggerHaptic(12);
@@ -9555,15 +9665,39 @@ window.switchKmpSegment = function(seg) {
     }
   });
 
+  if (seg === 'sangha') {
+    StorageService.getCommunityMembersCount().then(totalCount => {
+      if (kmpMembersCache.length < (totalCount || 50)) {
+        StorageService.getAllCommunityMembers().then(fullList => {
+          if (Array.isArray(fullList) && fullList.length > 0) {
+            kmpMembersCache = fullList;
+            renderKmpDirectoryView(false);
+          }
+        });
+      }
+    });
+  }
+
   renderKmpDirectoryView(false);
 };
 
-window.handleKmpSearch = function(val) {
+window.handleKmpSearch = async function(val) {
   kmpSearchQuery = (val || '').trim();
   const clearBtn = document.getElementById('kmpClearSearchBtn');
   if (clearBtn) {
     if (kmpSearchQuery) clearBtn.classList.remove('hidden');
     else clearBtn.classList.add('hidden');
+  }
+  if (kmpSearchQuery) {
+    try {
+      const totalCount = await StorageService.getCommunityMembersCount();
+      if (kmpMembersCache.length < (totalCount || 50)) {
+        const fullList = await StorageService.getAllCommunityMembers();
+        if (Array.isArray(fullList) && fullList.length > 0) {
+          kmpMembersCache = fullList;
+        }
+      }
+    } catch (e) {}
   }
   renderKmpDirectoryView(false);
 };
@@ -9647,7 +9781,11 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
   }
 
   if (forceRefresh || kmpMembersCache.length === 0) {
-    kmpMembersCache = await StorageService.getAllCommunityMembers(forceRefresh);
+    if (kmpSearchQuery) {
+      kmpMembersCache = await StorageService.getAllCommunityMembers(forceRefresh);
+    } else {
+      kmpMembersCache = await StorageService.getPaginatedCommunityMembers(forceRefresh, 15);
+    }
   }
 
   const currentUser = StorageService.currentUser || {};
@@ -9669,7 +9807,15 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
   let onlineCount = kmpMembersCache.filter(m => m.isOnline).length;
   if (onlineCount === 0 && currentUser.uid) onlineCount = 1;
 
-  const totalMembers = kmpMembersCache.length;
+  // Cheaply get total member count via getCountFromServer (cached in sessionStorage)
+  let totalMembers = kmpMembersCache.length;
+  try {
+    const countFromServer = await StorageService.getCommunityMembersCount();
+    if (typeof countFromServer === 'number' && countFromServer > 0) {
+      totalMembers = countFromServer;
+    }
+  } catch (e) {}
+
   const friendsCount = currentMithrayan.length;
   const sanghaCount = kmpMembersCache.filter(m => m.isSangha).length;
 
@@ -9768,7 +9914,17 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
 
   // Results count & segment badge
   const resultsCountEl = document.getElementById('kmpResultsCount');
-  if (resultsCountEl) resultsCountEl.innerText = `සාමාජිකයින් ${list.length} දෙනෙක්`;
+  if (resultsCountEl) {
+    if (kmpActiveSegment === 'all' && !kmpSearchQuery) {
+      if (totalMembers > list.length && StorageService.hasMoreCommunityMembers()) {
+        resultsCountEl.innerText = `සාමාජිකයින් ${totalMembers} න් ${list.length} ක් ප්‍රදර්ශනය වේ`;
+      } else {
+        resultsCountEl.innerText = `සාමාජිකයින් ${totalMembers} දෙනෙක්`;
+      }
+    } else {
+      resultsCountEl.innerText = `සාමාජිකයින් ${list.length} දෙනෙක්`;
+    }
+  }
 
   const badgeEl = document.getElementById('kmpResultsSegmentBadge');
   if (badgeEl) {
@@ -9805,6 +9961,8 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
       }
     }
     container.innerHTML = '';
+    const loadMoreContainer = document.getElementById('kmpLoadMoreContainer');
+    if (loadMoreContainer) loadMoreContainer.style.display = 'none';
     return;
   }
 
@@ -9911,6 +10069,49 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
       </div>
     `;
   }).join('');
+
+  const loadMoreContainer = document.getElementById('kmpLoadMoreContainer');
+  if (loadMoreContainer) {
+    const hasMore = StorageService.hasMoreCommunityMembers();
+    if (hasMore && !kmpSearchQuery && kmpActiveSegment === 'all') {
+      loadMoreContainer.style.display = 'block';
+    } else {
+      loadMoreContainer.style.display = 'none';
+    }
+  }
+};
+
+window.loadMoreKmpMembers = async function() {
+  const btn = document.getElementById('kmpLoadMoreBtn');
+  const container = document.getElementById('kmpLoadMoreContainer');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>පූරණය වෙමින් පවතී...</span>`;
+  }
+
+  try {
+    const res = await StorageService.fetchMoreCommunityMembers(15);
+    if (res && res.success && Array.isArray(res.newUsers) && res.newUsers.length > 0) {
+      const existingUids = new Set(kmpMembersCache.map(u => u.uid));
+      res.newUsers.forEach(u => {
+        if (!existingUids.has(u.uid)) {
+          kmpMembersCache.push(u);
+        }
+      });
+      await renderKmpDirectoryView(false);
+    }
+  } catch (err) {
+    console.warn('[KMP] loadMoreKmpMembers error:', err);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<i class="fa-solid fa-angles-down"></i> <span>තවත් සාමාජිකයින් බලන්න</span>`;
+    }
+    if (container) {
+      const hasMore = StorageService.hasMoreCommunityMembers();
+      container.style.display = (hasMore && !kmpSearchQuery && kmpActiveSegment === 'all') ? 'block' : 'none';
+    }
+  }
 };
 
 window.handleSendKmpRequest = async function(targetUid, targetName) {
