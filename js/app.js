@@ -755,24 +755,42 @@ function bootApp() {
 // ==========================================================================
 
 // Safe absolute image URL resolver with fallback for Open Graph and Social Sharing
-export function resolveShareImageUrl(imgSrc) {
-  const FALLBACK_BANNER = 'https://apepinpotha.lk/assets/og-banner.jpg';
-  if (!imgSrc || typeof imgSrc !== 'string') return FALLBACK_BANNER;
-  let clean = imgSrc.trim();
-  if (!clean) return FALLBACK_BANNER;
-  if (clean.startsWith('http://')) {
-    clean = 'https://' + clean.slice(7);
+export function resolveShareImageUrl(imgSrc, post = null) {
+  const DEFAULT_BANNER = 'https://apepinpotha.lk/assets/og-banner.jpg';
+  const ARTISAN_BANNER = 'https://apepinpotha.lk/assets/artisan-banner-buddha.webp';
+  const WELCOME_BANNER = 'https://apepinpotha.lk/assets/official-welcome-banner.webp';
+
+  // 1. If explicit image src is provided, normalize to absolute HTTPS
+  if (imgSrc && typeof imgSrc === 'string') {
+    let clean = imgSrc.trim();
+    if (clean) {
+      if (clean.startsWith('http://')) {
+        clean = 'https://' + clean.slice(7);
+      } else if (clean.startsWith('//')) {
+        clean = 'https:' + clean;
+      } else if (clean.startsWith('/')) {
+        clean = 'https://apepinpotha.lk' + clean;
+      } else if (!clean.startsWith('https://')) {
+        clean = 'https://apepinpotha.lk/' + clean;
+      }
+      return clean;
+    }
   }
-  if (clean.startsWith('//')) {
-    return 'https:' + clean;
+
+  // 2. Fall back to category/type appropriate preview banner
+  if (post && typeof post === 'object') {
+    if (isCareRequestPost(post)) {
+      return DEFAULT_BANNER;
+    }
+    if (post.category === 'විහාර නිර්මාණ' || post.category === 'ප්‍රතිසංස්කරණ') {
+      return ARTISAN_BANNER;
+    }
+    if (post.isOfficial) {
+      return WELCOME_BANNER;
+    }
   }
-  if (clean.startsWith('https://')) {
-    return clean;
-  }
-  if (clean.startsWith('/')) {
-    return 'https://apepinpotha.lk' + clean;
-  }
-  return 'https://apepinpotha.lk/' + clean;
+
+  return DEFAULT_BANNER;
 }
 window.resolveShareImageUrl = resolveShareImageUrl;
 
@@ -812,6 +830,167 @@ function extractCleanShareSnippet(desc, maxLen = 110) {
   }
   return truncated.trim() + '...';
 }
+
+/**
+ * Maps post category and type to clean, contextual Sinhala badge and emoji
+ */
+export function getShareCategoryBadge(post) {
+  if (!post || typeof post !== 'object') return '🌸 උතුම් පින්කමක්';
+
+  if (isCareRequestPost(post)) {
+    return '🤝 සත්කාර ඉල්ලීමක්';
+  }
+
+  const type = (post.type || '').toLowerCase();
+  if (type === 'reel' || Boolean(post.isShorts || post.videoId)) {
+    return '🎬 සදහම් වීඩියෝවක්';
+  }
+  if (post.isRepost || type === 'repost' || Boolean(post.originalPost)) {
+    return '🔁 යළි බෙදාගත් සටහනක්';
+  }
+
+  const cat = (post.category || '').trim();
+  switch (cat) {
+    case 'දානමය':
+      return '🍲 දානමය පින්කමක්';
+    case 'ශීලමය':
+      return '🪷 ශීලමය පින්කමක්';
+    case 'භාවනාමය':
+      return '🧘 භාවනාමය පින්කමක්';
+    case 'ධර්ම දානමය':
+      return '📖 ධර්ම දානයක්';
+    case 'වන්දනා':
+    case 'වන්දනාමය':
+      return '🛕 වන්දනාමය පින්කමක්';
+    case 'බෝධි පූජා':
+      return '🍃 බෝධි පූජා පින්කමක්';
+    case 'කඨින':
+      return '🪷 කඨින මහා පින්කමක්';
+    case 'ප්‍රතිසංස්කරණ':
+    case 'විහාර නිර්මාණ':
+      return '🏛️ විහාර නිර්මාණයක්';
+    case 'සමාජ සත්කාර':
+    case 'සත්කාර':
+      return '🤝 සමාජ සත්කාරයක්';
+    case 'සිතුවිලි':
+      return '💭 සදහම් සිතුවිල්ලක්';
+    case 'සුබපැතුම්':
+      return '✨ සදහම් සුබපැතුමක්';
+    case 'සාමාන්‍ය':
+    case 'සාමාන්ය':
+      return '🌸 පුණ්‍ය සටහනක්';
+    default:
+      if (type === 'merit') return '🌸 උතුම් පින්කමක්';
+      return '🌸 පුණ්‍ය සටහනක්';
+  }
+}
+window.getShareCategoryBadge = getShareCategoryBadge;
+
+/**
+ * Extracts a concise, meaningful topic snippet (45-60 characters) from post title or content
+ */
+export function extractMeaningfulTopicSnippet(post, maxLen = 50) {
+  if (!post || typeof post !== 'object') return 'උතුම් පුණ්‍ය සටහනක්';
+
+  let raw = '';
+  if (isMeaningfulShareTitle(post.title)) {
+    raw = post.title.trim();
+  } else if (post.description && typeof post.description === 'string') {
+    raw = post.description.trim();
+  }
+
+  if (!raw) return 'උතුම් පුණ්‍ය සටහනක්';
+
+  const clean = raw
+    .replace(/<[^>]*>?/gm, ' ')
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!clean) return 'උතුම් පුණ්‍ය සටහනක්';
+
+  if (clean.length <= maxLen) {
+    return clean.replace(/[\s.,;:!-]+$/, '');
+  }
+
+  const slice = clean.substring(0, maxLen);
+  const lastSpace = slice.lastIndexOf(' ');
+  if (lastSpace > 32) {
+    return slice.substring(0, lastSpace).trim() + '...';
+  }
+  return slice.trim() + '...';
+}
+window.extractMeaningfulTopicSnippet = extractMeaningfulTopicSnippet;
+
+/**
+ * Builds a natural, informative Sinhala summary (~120-160 characters) for Open Graph description
+ */
+export function extractCleanShareDescription(post, maxLen = 155) {
+  if (!post || typeof post !== 'object') {
+    return 'අපේ පිං පොත (apepinpotha.lk) ඩිජිටල් පුණ්‍ය ජාලය හරහා බෙදාගත් උතුම් සටහනකි.';
+  }
+
+  const rawDesc = typeof post.description === 'string' ? post.description : '';
+  const rawTitle = typeof post.title === 'string' ? post.title.trim() : '';
+
+  let clean = rawDesc
+    .replace(/<[^>]*>?/gm, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // Strip leading line if it duplicates the post title
+  if (rawTitle && clean.toLowerCase().startsWith(rawTitle.toLowerCase())) {
+    clean = clean.substring(rawTitle.length).replace(/^[\s:;.-]+/, '').trim();
+  }
+
+  // Handle empty or very short description
+  if (!clean || clean.length < 15) {
+    const authorName = StorageService.resolveAuthorName(post) || 'කල්‍යාණ මිත්‍රයෙක්';
+    if (isCareRequestPost(post)) {
+      const contact = (post.contactNumber || post.phone || post.contact || '').trim();
+      const contactInfo = contact ? ` විමසීම්: ${contact}.` : '';
+      return `විහාරස්ථාන සහ සමාජ සත්කාර සඳහා සිදු කරන කාරුණික ඇරයුමකි.${contactInfo} වැඩිදුර විස්තර සඳහා පිවිසෙන්න.`;
+    }
+    return `${authorName} විසින් අපේ පිං පොත (apepinpotha.lk) වෙත එක් කළ උතුම් සටහනකි. සාදු සිතින් අනුමෝදන් වන්න.`;
+  }
+
+  // Preserve contact number in care requests within the length limit
+  if (isCareRequestPost(post)) {
+    const contact = (post.contactNumber || post.phone || post.contact || '').trim();
+    if (contact && !clean.includes(contact)) {
+      const suffix = ` (විමසීම්: ${contact})`;
+      const targetTextLen = maxLen - suffix.length;
+      if (clean.length > targetTextLen) {
+        const truncated = clean.substring(0, targetTextLen);
+        const lastSpace = truncated.lastIndexOf(' ');
+        clean = (lastSpace > 50 ? truncated.substring(0, lastSpace).trim() : truncated.trim()) + suffix;
+        return clean;
+      } else {
+        return clean + suffix;
+      }
+    }
+  }
+
+  if (clean.length <= maxLen) {
+    return clean;
+  }
+
+  // Truncate cleanly at a word boundary
+  const truncated = clean.substring(0, maxLen);
+  const lastSpace = truncated.lastIndexOf(' ');
+  if (lastSpace > 80) {
+    return truncated.substring(0, lastSpace).trim() + '...';
+  }
+  return truncated.trim() + '...';
+}
+window.extractCleanShareDescription = extractCleanShareDescription;
 
 /**
  * Universal helper to identify care request / support request / charity posts
@@ -854,9 +1033,21 @@ export function getPostShareMetadata(rawPost) {
     ? 'අපේ පිං පොත' 
     : (StorageService.resolveAuthorName(canonical) || 'කල්‍යාණ මිත්‍රයෙක්');
 
+  const categoryBadge = getShareCategoryBadge(canonical);
+  const topicSnippet = extractMeaningfulTopicSnippet(canonical, 50);
+
+  // Context-aware og:title
+  const isOfficial = Boolean(canonical.isOfficial || authorName === 'අපේ පිං පොත' || authorName === 'අපේ පින් පොත');
+  const ogTitle = isOfficial 
+    ? `${categoryBadge}: ${topicSnippet} | අපේ පිං පොත`
+    : `${categoryBadge}: ${topicSnippet} — ${authorName} | අපේ පිං පොත`;
+
+  // Cleaner, natural og:description
+  const ogDescription = extractCleanShareDescription(canonical, 155);
+
   const hook = isMeaningfulShareTitle(canonical.title) 
     ? canonical.title.trim() 
-    : (extractCleanShareSnippet(canonical.description, 110) || 'අපේ පිං පොත හරහා බෙදාගත් උතුම් සටහනකි.');
+    : (topicSnippet || 'අපේ පිං පොත හරහා බෙදාගත් උතුම් සටහනකි.');
 
   const type = canonical.type || 'general';
   const cat = canonical.category || '';
@@ -875,19 +1066,20 @@ export function getPostShareMetadata(rawPost) {
     smartText = `${hook}\n\n✍️ ${authorName} • සම්පූර්ණ සටහන කියවන්න 👇\n${url}`;
   }
 
-  let thumbnail = null;
+  let rawThumbnail = null;
   if (Array.isArray(canonical.images) && canonical.images.length > 0) {
-    thumbnail = canonical.images[0];
+    rawThumbnail = canonical.images[0];
   } else if (canonical.image) {
-    thumbnail = canonical.image;
+    rawThumbnail = canonical.image;
   } else if (canonical.videoThumb) {
-    thumbnail = canonical.videoThumb;
+    rawThumbnail = canonical.videoThumb;
   } else if (canonical.videoThumbnail) {
-    thumbnail = canonical.videoThumbnail;
+    rawThumbnail = canonical.videoThumbnail;
   }
 
-  // Ensure absolute HTTPS URL with reliable fallback banner
-  thumbnail = resolveShareImageUrl(thumbnail);
+  // Ensure absolute HTTPS URL with category-appropriate fallback banner
+  const thumbnail = resolveShareImageUrl(rawThumbnail, canonical);
+  const ogImage = thumbnail;
 
   return {
     post: canonical,
@@ -897,7 +1089,12 @@ export function getPostShareMetadata(rawPost) {
     authorName,
     hook,
     smartText,
-    thumbnail
+    thumbnail,
+    ogTitle,
+    ogDescription,
+    ogImage,
+    categoryBadge,
+    topicSnippet
   };
 }
 
@@ -908,9 +1105,9 @@ export function updateDynamicMetaTags(post) {
   if (!post) return;
   try {
     const meta = getPostShareMetadata(post);
-    const title = `${meta.hook} | අපේ පිං පොත`;
-    const desc = extractCleanShareSnippet(meta.post.description || meta.smartText, 160) || meta.hook;
-    const imageUrl = meta.thumbnail || 'https://apepinpotha.lk/assets/og-banner.jpg';
+    const title = meta.ogTitle || `${meta.hook} | අපේ පිං පොත`;
+    const desc = meta.ogDescription || extractCleanShareSnippet(meta.post.description || meta.smartText, 160) || meta.hook;
+    const imageUrl = meta.ogImage || meta.thumbnail || 'https://apepinpotha.lk/assets/og-banner.jpg';
     const pageUrl = meta.url || `https://apepinpotha.lk/?p=${meta.targetId}`;
 
     document.title = title;
@@ -930,8 +1127,10 @@ export function updateDynamicMetaTags(post) {
     setMeta('property', 'og:image', imageUrl);
     setMeta('property', 'og:image:secure_url', imageUrl);
     setMeta('property', 'og:url', pageUrl);
+    setMeta('property', 'og:site_name', 'අපේ පිං පොත');
 
     setMeta('name', 'description', desc);
+    setMeta('name', 'twitter:card', 'summary_large_image');
     setMeta('name', 'twitter:title', title);
     setMeta('name', 'twitter:description', desc);
     setMeta('name', 'twitter:image', imageUrl);
@@ -5123,7 +5322,7 @@ window.shareSheetActionNative = async function() {
   if (navigator.share) {
     try {
       await navigator.share({
-        title: `පිං පොත | ${meta.hook}`,
+        title: meta.ogTitle || `පිං පොත | ${meta.hook}`,
         text: meta.smartText,
         url: meta.url
       });
@@ -6974,7 +7173,7 @@ window.handleReelShare = async function(postId, btnEl) {
                (StorageService.getLocalPosts() || []).find(p => p.id === postId) || { id: postId, type: 'reel' };
 
   const meta = getPostShareMetadata(reel);
-  const shareTitle = `පිං පොත | ${meta.hook}`;
+  const shareTitle = meta.ogTitle || `පිං පොත | ${meta.hook}`;
   const shareText = meta.smartText;
   const shareUrl = meta.url;
 
