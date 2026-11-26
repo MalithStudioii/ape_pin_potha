@@ -770,10 +770,18 @@ export function resolveShareImageUrl(imgSrc, post = null) {
         clean = 'https:' + clean;
       } else if (clean.startsWith('/')) {
         clean = 'https://apepinpotha.lk' + clean;
+      } else if (clean.startsWith('assets/')) {
+        clean = 'https://apepinpotha.lk/' + clean;
       } else if (!clean.startsWith('https://')) {
         clean = 'https://apepinpotha.lk/' + clean;
       }
-      return clean;
+
+      try {
+        const parsed = new URL(clean);
+        if (parsed.protocol === 'https:') {
+          return parsed.href;
+        }
+      } catch (e) {}
     }
   }
 
@@ -815,6 +823,33 @@ function isMeaningfulShareTitle(title) {
   return true;
 }
 
+/**
+ * Normalizes Unicode string (NFC) and removes stray/unpaired surrogates to prevent '?' replacement boxes
+ */
+export function cleanUnicodeString(str) {
+  if (!str) return '';
+  let s = String(str).normalize('NFC');
+  return s.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '');
+}
+window.cleanUnicodeString = cleanUnicodeString;
+
+/**
+ * Slices string by full Unicode code points (graphemes), never splitting emoji surrogate pairs
+ */
+export function safeUnicodeSlice(str, maxLen = 120) {
+  if (!str) return '';
+  const cleaned = cleanUnicodeString(str);
+  const codePoints = Array.from(cleaned);
+  if (codePoints.length <= maxLen) return cleaned;
+  const sliced = codePoints.slice(0, maxLen).join('');
+  const lastSpace = sliced.lastIndexOf(' ');
+  if (lastSpace > Math.floor(maxLen * 0.55)) {
+    return sliced.substring(0, lastSpace).trim() + '...';
+  }
+  return sliced.trim() + '...';
+}
+window.safeUnicodeSlice = safeUnicodeSlice;
+
 function extractCleanShareSnippet(desc, maxLen = 110) {
   if (!desc || typeof desc !== 'string') return '';
   const clean = desc.replace(/<[^>]*>?/gm, ' ')
@@ -822,13 +857,7 @@ function extractCleanShareSnippet(desc, maxLen = 110) {
                     .replace(/\s+/g, ' ')
                     .trim();
   if (!clean) return '';
-  if (clean.length <= maxLen) return clean;
-  const truncated = clean.substring(0, maxLen);
-  const lastSpace = truncated.lastIndexOf(' ');
-  if (lastSpace > 40) {
-    return truncated.substring(0, lastSpace).trim() + '...';
-  }
-  return truncated.trim() + '...';
+  return safeUnicodeSlice(clean, maxLen);
 }
 
 /**
@@ -909,16 +938,7 @@ export function extractMeaningfulTopicSnippet(post, maxLen = 50) {
 
   if (!clean) return 'උතුම් පුණ්‍ය සටහනක්';
 
-  if (clean.length <= maxLen) {
-    return clean.replace(/[\s.,;:!-]+$/, '');
-  }
-
-  const slice = clean.substring(0, maxLen);
-  const lastSpace = slice.lastIndexOf(' ');
-  if (lastSpace > 32) {
-    return slice.substring(0, lastSpace).trim() + '...';
-  }
-  return slice.trim() + '...';
+  return safeUnicodeSlice(clean, maxLen).replace(/[\s.,;:!-]+$/, '');
 }
 window.extractMeaningfulTopicSnippet = extractMeaningfulTopicSnippet;
 
@@ -967,28 +987,11 @@ export function extractCleanShareDescription(post, maxLen = 155) {
     if (contact && !clean.includes(contact)) {
       const suffix = ` (විමසීම්: ${contact})`;
       const targetTextLen = maxLen - suffix.length;
-      if (clean.length > targetTextLen) {
-        const truncated = clean.substring(0, targetTextLen);
-        const lastSpace = truncated.lastIndexOf(' ');
-        clean = (lastSpace > 50 ? truncated.substring(0, lastSpace).trim() : truncated.trim()) + suffix;
-        return clean;
-      } else {
-        return clean + suffix;
-      }
+      return safeUnicodeSlice(clean, targetTextLen) + suffix;
     }
   }
 
-  if (clean.length <= maxLen) {
-    return clean;
-  }
-
-  // Truncate cleanly at a word boundary
-  const truncated = clean.substring(0, maxLen);
-  const lastSpace = truncated.lastIndexOf(' ');
-  if (lastSpace > 80) {
-    return truncated.substring(0, lastSpace).trim() + '...';
-  }
-  return truncated.trim() + '...';
+  return safeUnicodeSlice(clean, maxLen);
 }
 window.extractCleanShareDescription = extractCleanShareDescription;
 
@@ -1126,6 +1129,9 @@ export function updateDynamicMetaTags(post) {
     setMeta('property', 'og:description', desc);
     setMeta('property', 'og:image', imageUrl);
     setMeta('property', 'og:image:secure_url', imageUrl);
+    setMeta('property', 'og:image:type', imageUrl.endsWith('.png') ? 'image/png' : (imageUrl.endsWith('.webp') ? 'image/webp' : 'image/jpeg'));
+    setMeta('property', 'og:image:width', '1200');
+    setMeta('property', 'og:image:height', '630');
     setMeta('property', 'og:url', pageUrl);
     setMeta('property', 'og:site_name', 'අපේ පිං පොත');
 
