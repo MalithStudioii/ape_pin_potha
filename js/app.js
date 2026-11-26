@@ -461,6 +461,16 @@ function bootApp() {
     try { updateUserInfoUI(); } catch (e) { console.warn('[App] updateUserInfoUI error caught safely:', e); }
     try { updateUserStats(); } catch (e) { console.warn('[App] updateUserStats error caught safely:', e); }
     try { renderSideNeeds(); } catch (e) {}
+    try {
+      if (typeof StorageService.fetchCareRequests === 'function') {
+        StorageService.fetchCareRequests().then(careList => {
+          if (Array.isArray(careList) && careList.length > 0) {
+            try { renderSideNeeds(); } catch (e) {}
+            if (activeTab === 'needs') renderFeed();
+          }
+        }).catch(() => {});
+      }
+    } catch (e) {}
     if (window.innerWidth >= 1024) {
       try { renderPcSidebarMembers().catch(() => {}); } catch (e) {}
     }
@@ -804,6 +814,23 @@ function extractCleanShareSnippet(desc, maxLen = 110) {
 }
 
 /**
+ * Universal helper to identify care request / support request / charity posts
+ */
+export function isCareRequestPost(post) {
+  if (!post || typeof post !== 'object') return false;
+  if (post.isDeleted === true) return false;
+  return Boolean(
+    post.type === 'need' ||
+    post.type === 'sathkara' ||
+    post.type === 'care' ||
+    post.category === 'සමාජ සත්කාර' ||
+    post.isNeed === true ||
+    post.isVerifiedNeed === true
+  );
+}
+window.isCareRequestPost = isCareRequestPost;
+
+/**
  * Extracts normalized metadata, clean hook and smart human-style share copy for a post
  */
 export function getPostShareMetadata(rawPost) {
@@ -836,7 +863,7 @@ export function getPostShareMetadata(rawPost) {
   const EXCLUDED_CATEGORIES = ['ධර්ම දානමය', 'සිතුවිලි', 'සුබපැතුම්', 'සාමාන්ය', 'සාමාන්‍ය'];
 
   let smartText = '';
-  if (type === 'need') {
+  if (isCareRequestPost(canonical) || type === 'need') {
     const contact = (canonical.contactNumber || canonical.phone || canonical.contact || '').trim();
     const contactLine = contact ? `\n📞 විමසීම්: ${contact}` : '';
     smartText = `🤝 කාරුණික සත්කාරක ඉල්ලීමක්\n\n${hook}${contactLine}\n\n👇 වැඩි විස්තර සහ දායකත්වය සඳහා:\n${url}`;
@@ -2289,6 +2316,23 @@ window.switchTab = function(tab, pushHistory = true) {
         <h2>🤝 කල්‍යාණ මිත්‍ර සත්කාර හවුල</h2>
         <p>විහාරස්ථාන, දුෂ්කර පාසල් සහ සමාජ සත්කාර සඳහා අවශ්‍ය ද්‍රව්‍යමය හා ශ්‍රම දායකත්වයන් පමණක් සම්බන්ධීකරණය කෙරේ.</p>
       `;
+
+      if (activeCategory !== 'සියල්ල' && activeCategory !== 'සමාජ සත්කාර') {
+        activeCategory = 'සියල්ල';
+        document.querySelectorAll('.category-item, .category-pill').forEach(btn => {
+          if (btn.getAttribute('data-cat') === 'සියල්ල') btn.classList.add('active');
+          else btn.classList.remove('active');
+        });
+      }
+
+      if (typeof StorageService.fetchCareRequests === 'function') {
+        StorageService.fetchCareRequests().then(fresh => {
+          if (Array.isArray(fresh) && fresh.length > 0) {
+            renderFeed();
+            renderSideNeeds();
+          }
+        }).catch(() => {});
+      }
     } else {
       banner.style.display = 'none';
     }
@@ -3013,7 +3057,7 @@ export function renderPostCardHTML(post, user) {
   const canDelete = isOwner || isMaster;
   const canEditPost = isOwner || isMaster;
   const comments = post.comments || [];
-  const isNeed = post.type === 'need';
+  const isNeed = isCareRequestPost(post);
   const isGeneral = post.type === 'general';
   const isRepost = post.type === 'repost' || post.isRepost === true || !!post.originalPost;
   const orig = post.originalPost;
@@ -3596,10 +3640,11 @@ function renderFeed() {
     const isOfficial = StorageService.isOfficialPost ? StorageService.isOfficialPost(post) : Boolean(post.isOfficial || post.authorRole === 'official' || post.author === 'අපේ පිං පොත' || post.author === 'අපේ පින් පොත');
     post.isOfficial = isOfficial;
 
+    const isCare = isCareRequestPost(post);
     const isCategoryMatch = (activeCategory === 'සියල්ල') ||
       (post.category === activeCategory) ||
       (activeCategory === 'සුබපැතුම්' && (post.category === 'සිතුවිලි' || post.category === 'සාමාන්‍ය')) ||
-      (activeCategory === 'සමාජ සත්කාර' && post.type === 'need');
+      (activeCategory === 'සමාජ සත්කාර' && isCare);
 
     if (activeTab === 'feed') {
       if (!isCategoryMatch && !post.isPinned && !isOfficial) return false;
@@ -3617,8 +3662,7 @@ function renderFeed() {
     }
 
     if (activeTab === 'needs') {
-      if (!isCategoryMatch) return false;
-      return post.type === 'need';
+      return isCare;
     }
 
     return true;
@@ -3924,10 +3968,11 @@ export function appendNewPostsToFeed(allPosts, prevIdsStr) {
     const isOfficial = StorageService.isOfficialPost ? StorageService.isOfficialPost(post) : Boolean(post.isOfficial || post.authorRole === 'official' || post.author === 'අපේ පිං පොත' || post.author === 'අපේ පින් පොත');
     post.isOfficial = isOfficial;
 
+    const isCare = isCareRequestPost(post);
     const isCategoryMatch = (activeCategory === 'සියල්ල') ||
       (post.category === activeCategory) ||
       (activeCategory === 'සුබපැතුම්' && (post.category === 'සිතුවිලි' || post.category === 'සාමාන්‍ය')) ||
-      (activeCategory === 'සමාජ සත්කාර' && post.type === 'need');
+      (activeCategory === 'සමාජ සත්කාර' && isCare);
 
     if (activeTab === 'feed') {
       if (!isCategoryMatch && !post.isPinned && !isOfficial) return false;
@@ -3945,8 +3990,7 @@ export function appendNewPostsToFeed(allPosts, prevIdsStr) {
     }
 
     if (activeTab === 'needs') {
-      if (!isCategoryMatch) return false;
-      return post.type === 'need';
+      return isCare;
     }
 
     return true;
@@ -3972,8 +4016,15 @@ function renderSideNeeds() {
   const container = document.getElementById('sideNeedsList');
   if (!container) return;
 
-  const needs = currentPostsData.filter(p => p.type === 'need' && (!StorageService.isDummyTestPost || !StorageService.isDummyTestPost(p))).slice(0, 3);
+  const needs = (currentPostsData || []).filter(p => isCareRequestPost(p) && (!StorageService.isDummyTestPost || !StorageService.isDummyTestPost(p))).slice(0, 3);
   if (needs.length === 0) {
+    if (typeof StorageService.fetchCareRequests === 'function' && !StorageService._isLoadingCareRequests) {
+      StorageService.fetchCareRequests().then(fetched => {
+        if (Array.isArray(fetched) && fetched.length > 0) {
+          renderSideNeeds();
+        }
+      }).catch(() => {});
+    }
     container.innerHTML = `<p style="font-size: 0.72rem; color: #94a3b8;">දැනට ඉල්ලීම් නොමැත.</p>`;
     return;
   }
@@ -4538,7 +4589,7 @@ window.openEditPostModal = function(postId) {
 
   const contactWrap = document.getElementById('editContactWrapper');
   const contactInput = document.getElementById('editPostContact');
-  if (post.type === 'need') {
+  if (isCareRequestPost(post)) {
     if (contactWrap) contactWrap.style.display = 'block';
     if (contactInput) contactInput.value = post.contact || '';
   } else {
@@ -5172,7 +5223,7 @@ window.generateWhatsAppStatusCardFromModal = async function() {
     const renderBox = document.getElementById('viralStatusCardRenderBox');
     if (!renderBox) throw new Error('Render box not found');
 
-    const isNeed = post.type === 'need' || (orig && orig.type === 'need');
+    const isNeed = isCareRequestPost(post) || (orig && isCareRequestPost(orig));
     const cleanDesc = realDesc ? realDesc.replace(/<[^>]*>?/gm, '').trim() : '';
     const cleanImages = (isRepost && orig)
       ? (orig.images || (orig.image ? [orig.image] : []))
@@ -5403,7 +5454,7 @@ export function renderSharedPostSpotlight(post) {
   if (!container || !post) return;
 
   const user = StorageService.currentUser;
-  const isNeed = post.type === 'need';
+  const isNeed = isCareRequestPost(post);
   const isReel = post.type === 'reel' || Boolean(post.isShorts || post.videoId);
   const badgeLabel = isNeed ? '🤝 ඔබ පිවිසි සත්කාර ඇරයුම' : (isReel ? '🎬 ඔබ පිවිසි සදහම් වීඩියෝව' : '✨ ඔබ පිවිසි සටහන');
 
@@ -5525,7 +5576,7 @@ export async function checkUrlDirectPost(explicitPostId = null) {
   }
 
   // 5. If it's a Sathkara Need post or ?tab=needs, switch to needs tab
-  const isNeedPost = targetPost.type === 'need';
+  const isNeedPost = isCareRequestPost(targetPost);
   if ((isNeedPost || tabParam === 'needs') && activeTab !== 'needs') {
     switchTab('needs', false);
   }
@@ -10903,7 +10954,7 @@ window.renderAdminDashboard = async function() {
   // 1. Stats calculation
   const totalPosts = currentPostsData.length;
   const totalSadhu = currentPostsData.reduce((acc, p) => acc + (p.sadhuCount || 0), 0);
-  const totalNeeds = currentPostsData.filter(p => p.type === 'need').length;
+  const totalNeeds = currentPostsData.filter(p => isCareRequestPost(p)).length;
   const totalOfficial = currentPostsData.filter(p => p.isOfficial).length;
 
   const statPosts = document.getElementById('adminStatPosts');
