@@ -2839,18 +2839,19 @@ function renderPostDescriptionHTML(postId, rawDescription) {
     previewText = (lastSpace > 110) ? sliceTarget.substring(0, lastSpace) : sliceTarget;
   }
 
-  const formattedPreview = formatPostContent(previewText);
+  // Strip trailing punctuation, spaces, or dots from preview to avoid awkward double ellipses before "තව කියවන්න..."
+  const cleanPreviewText = previewText.replace(/[\s.,;:!-]+$/, '');
+  const formattedPreview = formatPostContent(cleanPreviewText);
   const formattedFull = formatPostContent(trimmed);
 
   return `
     <div class="post-desc-wrapper" id="post-desc-wrap-${postId}">
       <p class="post-desc post-desc-collapsed" id="post-desc-collapsed-${postId}">
-        ${formattedPreview}... 
-        <button type="button" class="post-see-more-btn" onclick="togglePostContentExpansion('${postId}', event)">තව කියවන්න... <span class="see-more-en">(See more)</span></button>
+        ${formattedPreview} <button type="button" class="post-see-more-btn" onclick="togglePostContentExpansion('${postId}', event)" aria-expanded="false" title="සම්පූර්ණ සටහන කියවන්න">තව කියවන්න...</button>
       </p>
       <p class="post-desc post-desc-full" id="post-desc-full-${postId}" style="display: none;">
         ${formattedFull}
-        <button type="button" class="post-see-more-btn see-less-btn" onclick="togglePostContentExpansion('${postId}', event)">අඩු කරන්න <span class="see-more-en">(See less)</span></button>
+        <button type="button" class="post-see-more-btn see-less-btn" onclick="togglePostContentExpansion('${postId}', event)" aria-expanded="true" title="සටහන කෙටි කරන්න">අඩුවෙන් පෙන්වන්න</button>
       </p>
     </div>
   `;
