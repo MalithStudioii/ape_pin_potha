@@ -2359,6 +2359,13 @@ body {
   background: #dcfce7;
 }
 
+.side-need-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
 .side-need-location {
   font-size: 0.62rem;
   font-weight: 700;
@@ -2366,6 +2373,26 @@ body {
   background: var(--color-charity-100);
   padding: 2px 6px;
   border-radius: var(--radius-full);
+}
+
+.side-need-share-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-charity-800);
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 0.72rem;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.side-need-share-btn:hover {
+  background: var(--color-charity-200);
+  color: var(--color-charity-950);
+  transform: scale(1.08);
 }
 
 .side-need-title {

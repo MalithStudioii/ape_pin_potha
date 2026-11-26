@@ -744,9 +744,35 @@ function bootApp() {
 // Dynamic Post Sharing & Smart Human-Style Caption Generators
 // ==========================================================================
 
+// Safe absolute image URL resolver with fallback for Open Graph and Social Sharing
+export function resolveShareImageUrl(imgSrc) {
+  const FALLBACK_BANNER = 'https://apepinpotha.lk/assets/og-banner.jpg';
+  if (!imgSrc || typeof imgSrc !== 'string') return FALLBACK_BANNER;
+  let clean = imgSrc.trim();
+  if (!clean) return FALLBACK_BANNER;
+  if (clean.startsWith('http://')) {
+    clean = 'https://' + clean.slice(7);
+  }
+  if (clean.startsWith('//')) {
+    return 'https:' + clean;
+  }
+  if (clean.startsWith('https://')) {
+    return clean;
+  }
+  if (clean.startsWith('/')) {
+    return 'https://apepinpotha.lk' + clean;
+  }
+  return 'https://apepinpotha.lk/' + clean;
+}
+window.resolveShareImageUrl = resolveShareImageUrl;
+
 // Standalone helper to construct dynamic post share links (share.apepinpotha.lk)
 export function getDynamicShareUrl(postId) {
-  const cleanId = postId ? String(postId).trim() : '';
+  if (!postId) return 'https://apepinpotha.lk/';
+  let cleanId = String(postId).trim();
+  try {
+    cleanId = decodeURIComponent(cleanId);
+  } catch (e) {}
   return `https://share.apepinpotha.lk/p/${encodeURIComponent(cleanId)}`;
 }
 window.getDynamicShareUrl = getDynamicShareUrl;
@@ -811,7 +837,9 @@ export function getPostShareMetadata(rawPost) {
 
   let smartText = '';
   if (type === 'need') {
-    smartText = `🤝 කාරුණික උපකාර ඉල්ලීමක්\n\n${hook}\n\n👇 වැඩි විස්තර සහ දායකත්වය සඳහා:\n${url}`;
+    const contact = (canonical.contactNumber || canonical.phone || canonical.contact || '').trim();
+    const contactLine = contact ? `\n📞 විමසීම්: ${contact}` : '';
+    smartText = `🤝 කාරුණික සත්කාරක ඉල්ලීමක්\n\n${hook}${contactLine}\n\n👇 වැඩි විස්තර සහ දායකත්වය සඳහා:\n${url}`;
   } else if (type === 'reel') {
     smartText = `🎬 ${authorName} බෙදාගත් සදහම් වීඩියෝව\n\n${hook}\n\n👇 නරඹන්න:\n${url}`;
   } else if (type === 'merit' && !EXCLUDED_CATEGORIES.includes(cat)) {
@@ -827,7 +855,12 @@ export function getPostShareMetadata(rawPost) {
     thumbnail = canonical.image;
   } else if (canonical.videoThumb) {
     thumbnail = canonical.videoThumb;
+  } else if (canonical.videoThumbnail) {
+    thumbnail = canonical.videoThumbnail;
   }
+
+  // Ensure absolute HTTPS URL with reliable fallback banner
+  thumbnail = resolveShareImageUrl(thumbnail);
 
   return {
     post: canonical,
@@ -840,6 +873,46 @@ export function getPostShareMetadata(rawPost) {
     thumbnail
   };
 }
+
+/**
+ * Dynamically updates document title and Open Graph / Twitter Card meta tags
+ */
+export function updateDynamicMetaTags(post) {
+  if (!post) return;
+  try {
+    const meta = getPostShareMetadata(post);
+    const title = `${meta.hook} | අපේ පිං පොත`;
+    const desc = extractCleanShareSnippet(meta.post.description || meta.smartText, 160) || meta.hook;
+    const imageUrl = meta.thumbnail || 'https://apepinpotha.lk/assets/og-banner.jpg';
+    const pageUrl = meta.url || `https://apepinpotha.lk/?p=${meta.targetId}`;
+
+    document.title = title;
+
+    const setMeta = (attr, key, content) => {
+      let el = document.querySelector(`meta[${attr}="${key}"]`);
+      if (!el) {
+        el = document.createElement('meta');
+        el.setAttribute(attr, key);
+        document.head.appendChild(el);
+      }
+      el.setAttribute('content', content);
+    };
+
+    setMeta('property', 'og:title', title);
+    setMeta('property', 'og:description', desc);
+    setMeta('property', 'og:image', imageUrl);
+    setMeta('property', 'og:image:secure_url', imageUrl);
+    setMeta('property', 'og:url', pageUrl);
+
+    setMeta('name', 'description', desc);
+    setMeta('name', 'twitter:title', title);
+    setMeta('name', 'twitter:description', desc);
+    setMeta('name', 'twitter:image', imageUrl);
+  } catch (e) {
+    console.warn('[Meta] Failed to update dynamic meta tags:', e);
+  }
+}
+window.updateDynamicMetaTags = updateDynamicMetaTags;
 
 /**
  * Builds clean, natural, human-style share copy based on post category and type
@@ -3907,7 +3980,12 @@ function renderSideNeeds() {
 
   container.innerHTML = needs.map(n => `
     <div class="side-need-item" onclick="switchTab('needs')">
-      <span class="side-need-location">${Security.escapeHTML(n.location || 'ලංකාව')}</span>
+      <div class="side-need-header">
+        <span class="side-need-location">${Security.escapeHTML(n.location || 'ලංකාව')}</span>
+        <button type="button" class="side-need-share-btn" onclick="event.stopPropagation(); handleShare('${n.id}')" title="බෙදාගන්න (Share)">
+          <i class="fa-solid fa-share-nodes"></i>
+        </button>
+      </div>
       <h4 class="side-need-title">${Security.escapeHTML(n.title)}</h4>
       <p style="font-size: 0.7rem; color: #64748b; margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
         ${Security.escapeHTML(n.description)}
@@ -5259,10 +5337,11 @@ window.generateWhatsAppStatusCardFromModal = async function() {
       try {
         const file = new File([blob], fileName, { type: 'image/png' });
         if (navigator.canShare({ files: [file] })) {
+          const cardShareMeta = getPostShareMetadata(post || { id: targetId, title: realTitle, author: realAuthor, type: isNeed ? 'need' : 'merit' });
           await navigator.share({
             files: [file],
-            title: `පිං පොත | ${realTitle}`,
-            text: `🌸 "${realAuthor}" ගේ උතුම් පින්කම:\n✨ ${realTitle}\n\n🙏 මේ උතුම් පින්කම දැකබලා ඔබත් සාදුකාර දී පින් අනුමෝදන් වන්න:\n${postUrl}`
+            title: `අපේ පිං පොත | ${realTitle}`,
+            text: cardShareMeta.smartText
           });
           sharedViaFile = true;
         }
@@ -5460,6 +5539,11 @@ export async function checkUrlDirectPost(explicitPostId = null) {
   // 6. Set active spotlight post ID and render in top spotlight container
   currentSpotlightPostId = targetPost.id;
   renderSharedPostSpotlight(targetPost);
+
+  // Dynamically update document title and Open Graph meta tags for shared post
+  try {
+    updateDynamicMetaTags(targetPost);
+  } catch (e) {}
 
   // 7. Re-render feed below to filter out this post (deduplicate)
   renderFeed();
@@ -9579,12 +9663,12 @@ function startKmpLivePolling() {
   kmpLivePollTimer = setInterval(async () => {
     if (activeTab === 'friends' && !document.hidden) {
       try {
-        await renderKmpDirectoryView(true);
+        await renderKmpDirectoryView(false);
       } catch (e) {
         console.warn('[KMP] Live poll error:', e);
       }
     }
-  }, 20000); // Poll every 20 seconds for live updates
+  }, 20000); // Poll every 20 seconds for live updates without disrupting scroll position
 }
 
 function stopKmpLivePolling() {
@@ -9784,7 +9868,8 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
     if (kmpSearchQuery) {
       kmpMembersCache = await StorageService.getAllCommunityMembers(forceRefresh);
     } else {
-      kmpMembersCache = await StorageService.getPaginatedCommunityMembers(forceRefresh, 15);
+      const fetchCount = Math.max(15, kmpMembersCache.length);
+      kmpMembersCache = await StorageService.getPaginatedCommunityMembers(forceRefresh, fetchCount);
     }
   }
 
@@ -9971,6 +10056,10 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
     emptyState.style.display = 'none';
   }
 
+  // Capture current scroll positions before updating DOM
+  const prevWindowY = window.scrollY;
+  const prevContainerY = container ? container.scrollTop : 0;
+
   // Render cards
   container.innerHTML = list.map(m => {
     const isMe = m.uid === currentUser.uid;
@@ -10069,6 +10158,14 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
       </div>
     `;
   }).join('');
+
+  // Restore scroll positions so live refresh never violently jumps the view
+  if (prevWindowY > 0) {
+    window.scrollTo({ top: prevWindowY, behavior: 'instant' });
+  }
+  if (container && prevContainerY > 0) {
+    container.scrollTop = prevContainerY;
+  }
 
   const loadMoreContainer = document.getElementById('kmpLoadMoreContainer');
   if (loadMoreContainer) {

@@ -1298,11 +1298,32 @@ export const StorageService = {
   },
 
   markPostAsDeletedLocally(postId) {
+    if (!postId) return;
     const ids = this.getDeletedPostIds();
     if (!ids.includes(postId)) {
       ids.push(postId);
       localStorage.setItem('pinPotha_deleted_ids', JSON.stringify(ids));
     }
+    // Immediately purge from memory caches
+    if (this._cachedPosts && Array.isArray(this._cachedPosts)) {
+      this._cachedPosts = this._cachedPosts.filter(p => p && p.id !== postId);
+    }
+    if (this._loadedPosts && Array.isArray(this._loadedPosts)) {
+      this._loadedPosts = this._loadedPosts.filter(p => p && p.id !== postId);
+    }
+    // Immediately purge from localStorage raw feed cache
+    try {
+      ['pinPotha_posts', 'pinPotha_sandbox_posts'].forEach(key => {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const list = JSON.parse(raw);
+          if (Array.isArray(list)) {
+            const filtered = list.filter(p => p && p.id !== postId);
+            localStorage.setItem(key, JSON.stringify(filtered));
+          }
+        }
+      });
+    } catch (e) {}
   },
 
   restoreDeletedPostsLocally() {
@@ -1407,14 +1428,8 @@ export const StorageService = {
     this.purgeDummyPostsFromStorage();
     const deletedIds = this.getDeletedPostIds();
     const isCleanPost = (p) => {
-      if (!p || p.isDeleted === true || this.isDummyTestPost(p)) return false;
-      const isOff = this.isOfficialPost(p);
-      const isUser = Boolean(this.currentUser && (
-        p.uid === this.currentUser.uid ||
-        (this.currentUser.email && p.authorEmail && p.authorEmail.toLowerCase() === this.currentUser.email.toLowerCase())
-      ));
-      if (isOff || isUser) return true;
-      return !deletedIds.includes(p.id);
+      if (!p || p.isDeleted === true || deletedIds.includes(p.id) || this.isDummyTestPost(p)) return false;
+      return true;
     };
 
     if (this._loadedPosts && Array.isArray(this._loadedPosts) && this._loadedPosts.length > 0) {
@@ -1478,14 +1493,8 @@ export const StorageService = {
     if (!Array.isArray(posts) || posts.length === 0) return;
     const deletedIds = this.getDeletedPostIds();
     const cleanPosts = (posts || []).filter(p => {
-      if (!p || p.isDeleted === true || this.isDummyTestPost(p)) return false;
-      const isOff = this.isOfficialPost(p);
-      const isUser = Boolean(this.currentUser && (
-        p.uid === this.currentUser.uid ||
-        (this.currentUser.email && p.authorEmail && p.authorEmail.toLowerCase() === this.currentUser.email.toLowerCase())
-      ));
-      if (isOff || isUser) return true;
-      return !deletedIds.includes(p.id);
+      if (!p || p.isDeleted === true || deletedIds.includes(p.id) || this.isDummyTestPost(p)) return false;
+      return true;
     });
 
     if (cleanPosts.length === 0) return;
