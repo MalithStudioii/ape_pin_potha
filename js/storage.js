@@ -2526,7 +2526,12 @@ export const StorageService = {
    * Guarantees that "සත්කාර හවුල (අවශ්‍යතා)" never displays an empty state when care posts exist
    */
   async fetchCareRequests(forceRefresh = false) {
-    if (this._isLoadingCareRequests) return (this._loadedPosts || []).filter(p => this.isCareRequest(p));
+    if (this._careRequestsFetched && !forceRefresh) {
+      return (this._loadedPosts || []).filter(p => this.isCareRequest(p));
+    }
+    if (this._isLoadingCareRequests) {
+      return (this._loadedPosts || []).filter(p => this.isCareRequest(p));
+    }
     this._isLoadingCareRequests = true;
 
     try {
@@ -2554,7 +2559,7 @@ export const StorageService = {
           const qTypeNeed = query(
             collection(db, COLLECTIONS.POSTS),
             where("type", "==", "need"),
-            limit(30)
+            limit(20)
           );
           const snapType = await getDocs(qTypeNeed);
           if (snapType && !snapType.empty) {
@@ -2579,7 +2584,7 @@ export const StorageService = {
           const qCatNeed = query(
             collection(db, COLLECTIONS.POSTS),
             where("category", "==", "සමාජ සත්කාර"),
-            limit(30)
+            limit(20)
           );
           const snapCat = await getDocs(qCatNeed);
           if (snapCat && !snapCat.empty) {
@@ -2606,16 +2611,18 @@ export const StorageService = {
       }
 
       // 3. Merge found care posts into _loadedPosts and _cachedPosts
+      let hasNewPosts = false;
       if (carePosts.length > 0) {
         const existing = this._loadedPosts && Array.isArray(this._loadedPosts) ? [...this._loadedPosts] : (this.getLocalPosts() || []);
         const map = new Map();
         existing.forEach(p => { if (p && p.id) map.set(p.id, p); });
         carePosts.forEach(cp => {
           if (cp && cp.id && !deletedIds.includes(cp.id)) {
-            if (map.has(cp.id)) {
-              map.set(cp.id, { ...map.get(cp.id), ...cp });
-            } else {
+            if (!map.has(cp.id)) {
+              hasNewPosts = true;
               map.set(cp.id, cp);
+            } else {
+              map.set(cp.id, { ...map.get(cp.id), ...cp });
             }
           }
         });
@@ -2623,12 +2630,16 @@ export const StorageService = {
         this._loadedPosts = merged;
         this._cachedPosts = merged;
         this.cacheLocal(merged);
-        this.notifyListeners(merged);
+        if (hasNewPosts) {
+          this.notifyListeners(merged);
+        }
       }
 
+      this._careRequestsFetched = true;
       this._isLoadingCareRequests = false;
       return carePosts;
     } catch (err) {
+      this._careRequestsFetched = true;
       this._isLoadingCareRequests = false;
       console.warn('[Storage] fetchCareRequests general error:', err);
       return [];

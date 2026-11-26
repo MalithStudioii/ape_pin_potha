@@ -828,8 +828,15 @@ function isMeaningfulShareTitle(title) {
  */
 export function cleanUnicodeString(str) {
   if (!str) return '';
-  let s = String(str).normalize('NFC');
-  return s.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '');
+  const s = String(str);
+  if (typeof s.toWellFormed === 'function') {
+    return s.toWellFormed().normalize('NFC');
+  }
+  try {
+    return s.normalize('NFC').replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '');
+  } catch (e) {
+    return s;
+  }
 }
 window.cleanUnicodeString = cleanUnicodeString;
 
@@ -838,7 +845,8 @@ window.cleanUnicodeString = cleanUnicodeString;
  */
 export function safeUnicodeSlice(str, maxLen = 120) {
   if (!str) return '';
-  const cleaned = cleanUnicodeString(str);
+  const truncatedInput = (typeof str === 'string' && str.length > maxLen * 4) ? str.slice(0, maxLen * 4) : str;
+  const cleaned = cleanUnicodeString(truncatedInput);
   const codePoints = Array.from(cleaned);
   if (codePoints.length <= maxLen) return cleaned;
   const sliced = codePoints.slice(0, maxLen).join('');
@@ -4045,6 +4053,9 @@ export function setupInfiniteScrollObserver() {
       const entry = entries[0];
       if (entry && entry.isIntersecting) {
         if (!isLoadingMore && hasMorePosts && autoLoadCount < MAX_AUTO_LOADS) {
+          if (feedSentinelObserver && sentinel) {
+            feedSentinelObserver.unobserve(sentinel);
+          }
           triggerHybridLoadMore(true);
         }
       }
@@ -4224,13 +4235,6 @@ function renderSideNeeds() {
 
   const needs = (currentPostsData || []).filter(p => isCareRequestPost(p) && (!StorageService.isDummyTestPost || !StorageService.isDummyTestPost(p))).slice(0, 3);
   if (needs.length === 0) {
-    if (typeof StorageService.fetchCareRequests === 'function' && !StorageService._isLoadingCareRequests) {
-      StorageService.fetchCareRequests().then(fetched => {
-        if (Array.isArray(fetched) && fetched.length > 0) {
-          renderSideNeeds();
-        }
-      }).catch(() => {});
-    }
     container.innerHTML = `<p style="font-size: 0.72rem; color: #94a3b8;">දැනට ඉල්ලීම් නොමැත.</p>`;
     return;
   }
