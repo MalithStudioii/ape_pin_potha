@@ -749,6 +749,11 @@ function bootApp() {
     // Route incoming deep links for both query params (?a=, ?p=, ?post=) and hashes (#artisan_, #post_)
     try { handleUrlDeepLinks(); } catch (e) {}
     try { window.addEventListener('hashchange', handleUrlDeepLinks); } catch (e) {}
+
+    // Check and show 5-step onboarding guide on initial visit (if not previously seen)
+    setTimeout(() => {
+      try { checkAndShowOnboardingGuide(); } catch (onboardErr) { console.warn('[Onboarding] bootApp trigger error:', onboardErr); }
+    }, 1200);
   } catch (bootErr) {
     console.warn('[App] bootApp error caught safely:', bootErr);
   }
@@ -7726,6 +7731,9 @@ function setupEventListeners() {
       renderFeed();
       if (activeTab === 'profile') renderProfileView();
       checkAndPromptMandatoryName();
+      setTimeout(() => {
+        try { checkAndShowOnboardingGuide(); } catch (e) {}
+      }, 700);
     } else if (res && !res.success && !res.cancelled && res.message && res.code !== 'auth/popup-closed-by-user') {
       if (alertBox) {
         alertBox.classList.remove('hidden');
@@ -7764,6 +7772,9 @@ function setupEventListeners() {
       renderFeed();
       if (activeTab === 'profile') renderProfileView();
       checkAndPromptMandatoryName();
+      setTimeout(() => {
+        try { checkAndShowOnboardingGuide(); } catch (e) {}
+      }, 700);
     } else if (res && !res.success && !res.cancelled && res.message && res.code !== 'auth/popup-closed-by-user') {
       alert(res.message);
     }
@@ -15925,3 +15936,195 @@ window.printLibraryItem = function(itemId) {
     setTimeout(triggerPrint, 150);
   }
 };
+
+/* ==========================================================================
+   5-Step Interactive Welcome & Onboarding Guide Feature
+   ========================================================================== */
+const ONBOARDING_STORAGE_KEY = 'apepinpotha_onboarding_seen';
+let currentOnboardingStep = 0;
+
+const ONBOARDING_STEPS = [
+  {
+    stepNum: 1,
+    category: 'සාදරයෙන් පිළිගනිමු',
+    iconEmoji: '☸️',
+    title: 'අපේ පිං පොතට සාදරයෙන් පිළිගනිමු!',
+    description: 'ශ්‍රී ලංකාවේ ප්‍රථම ඩිජිටල් පුණ්‍ය ප්‍රජාවට ඔබත් එක්වන්න. ඔබ සිදුකරන උතුම් පින්කම් සුරක්ෂිතව සටහන් කරමින්, අන්‍යයන්ගේ පින් දැක සිත පහදවා ගන්න.',
+    tipIcon: '💡',
+    tipText: 'ඔබගේ පෞද්ගලික පින්කම් කිසිවෙකුට නොපෙනෙන සේ "පෞද්ගලික පිං පොතේ" පමණක් රහසිගතව තබාගත හැක.'
+  },
+  {
+    stepNum: 2,
+    category: 'පින්කම් සහ Shorts',
+    iconEmoji: '🌸',
+    title: 'පින්කම් සහ Shorts බෙදාගන්න',
+    description: 'ඔබ සිදුකළ පින්කම්වල ඡායාරූප, වීඩියෝ සහ විස්තර සැදැහැති මිතුරන් සමඟ බෙදාගන්න. අන්‍යයන්ගේ පින්කම්වලට "සාධුකාර" දෙමින් සිත පහදවා ගන්න.',
+    tipIcon: '✨',
+    tipText: 'කෙටි ධාර්මික වීඩියෝ (Shorts) මඟින් ඔබේ පින්කම වඩාත් ආකර්ෂණීයව පින්වත් සැමට දැකගත හැක.'
+  },
+  {
+    stepNum: 3,
+    category: 'සත්කාර හවුල',
+    iconEmoji: '🤝',
+    title: 'සත්කාර හවුලෙන් පිහිට වන්න',
+    description: 'දුෂ්කර විහාරස්ථාන, ආරණ්‍ය සේනාසන සහ සැබෑ සමාජ සත්කාර සඳහා උපකාර අවශ්‍යතා දැනගන්න. ඔබටත් සෘජුවම දායකත්වයන් ලබාදිය හැක.',
+    tipIcon: '🛡️',
+    tipText: 'සියලු සත්කාර ඉල්ලීම් සත්‍යාපනය කර (Verified) පළකරන බැවින් ඔබගේ ආධාර සැබෑ අවශ්‍යතාව වෙතම ළඟාවේ.'
+  },
+  {
+    stepNum: 4,
+    category: 'ධර්ම පුස්තකාලය & පොහොය',
+    iconEmoji: '📜',
+    title: 'ධර්ම පුස්තකාලය සහ පොහොය දින',
+    description: 'බෝධිපූජා කවි, පිරිත් සූත්‍ර, සමන්ත පට්ඨාන සහ සත්‍යාපිත ධර්ම ග්‍රන්ථ පහසුවෙන් කියවන්න. ඉදිරි පොහොය දින සහ තොරතුරු ක්ෂණිකව බලාගන්න.',
+    tipIcon: '🌙',
+    tipText: 'ඕනෑම ධර්ම ග්‍රන්ථයක් හෝ පිරිත් සූත්‍රයක් Offline කියවීමට හෝ A4 ප්‍රමාණයෙන් Print කරගැනීමටද හැකිය.'
+  },
+  {
+    stepNum: 5,
+    category: 'කල්‍යාණ මිතුරු පවුර',
+    iconEmoji: '👥',
+    title: 'කල්‍යාණ මිතුරන් සමඟ එක්වන්න',
+    description: 'සඟරුවන, සිල්වත් උපාසක උපාසිකාවන් සහ ප්‍රදේශයේ කල්‍යාණ මිතුරන් සොයාගන්න. ඔවුනොවුන් සමඟ සුහදව සම්බන්ධ වෙමින් කුසල් වඩාගන්න.',
+    tipIcon: '🚀',
+    tipText: 'ඔබගේ පැතිකඩ (Profile) පින්තූරය සහ නම යාවත්කාලීන කර අදම ඔබේ ප්‍රථම පින්කම සටහන් කරන්න!'
+  }
+];
+
+function renderOnboardingStep(index) {
+  if (index < 0) index = 0;
+  if (index >= ONBOARDING_STEPS.length) index = ONBOARDING_STEPS.length - 1;
+  currentOnboardingStep = index;
+
+  const data = ONBOARDING_STEPS[index];
+  const stepIndicator = document.getElementById('onboardingStepIndicator');
+  const iconEmoji = document.getElementById('onboardingIconEmoji');
+  const categoryPill = document.getElementById('onboardingCategoryPill');
+  const title = document.getElementById('onboardingTitle');
+  const desc = document.getElementById('onboardingDesc');
+  const tipIcon = document.getElementById('onboardingTipIcon');
+  const tipText = document.getElementById('onboardingTipText');
+  const prevBtn = document.getElementById('onboardingPrevBtn');
+  const nextBtn = document.getElementById('onboardingNextBtn');
+  const dots = document.querySelectorAll('#onboardingDotsRow .onboarding-dot');
+
+  if (stepIndicator) stepIndicator.innerHTML = `<span class="step-num">${data.stepNum}</span> / 5 පියවර`;
+  if (iconEmoji) iconEmoji.textContent = data.iconEmoji;
+  if (categoryPill) categoryPill.textContent = data.category;
+  if (title) title.textContent = data.title;
+  if (desc) desc.textContent = data.description;
+  if (tipIcon) tipIcon.textContent = data.tipIcon;
+  if (tipText) tipText.textContent = data.tipText;
+
+  // Update pagination dots
+  dots.forEach((dot, dotIdx) => {
+    if (dotIdx === index) {
+      dot.classList.add('active');
+    } else {
+      dot.classList.remove('active');
+    }
+  });
+
+  // Previous button visibility
+  if (prevBtn) {
+    if (index === 0) {
+      prevBtn.classList.add('hidden');
+    } else {
+      prevBtn.classList.remove('hidden');
+    }
+  }
+
+  // Next / Finish button styling and label
+  if (nextBtn) {
+    if (index === ONBOARDING_STEPS.length - 1) {
+      nextBtn.classList.add('start-cta');
+      nextBtn.innerHTML = `<span>🚀 ආරම්භ කරන්න (Start)</span>`;
+    } else {
+      nextBtn.classList.remove('start-cta');
+      nextBtn.innerHTML = `<span>ඉදිරියට (Next)</span> <i class="fa-solid fa-arrow-right"></i>`;
+    }
+  }
+}
+
+function openOnboardingGuide(resetToFirst = true) {
+  const modal = document.getElementById('onboardingModal');
+  if (!modal) return;
+  if (resetToFirst) currentOnboardingStep = 0;
+  renderOnboardingStep(currentOnboardingStep);
+  modal.classList.remove('hidden');
+}
+
+function closeOnboardingGuide() {
+  const modal = document.getElementById('onboardingModal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function skipOnboardingGuide() {
+  try {
+    localStorage.setItem(ONBOARDING_STORAGE_KEY, 'seen');
+  } catch (e) {}
+  closeOnboardingGuide();
+}
+
+function finishOnboardingGuide() {
+  try {
+    localStorage.setItem(ONBOARDING_STORAGE_KEY, 'seen');
+  } catch (e) {}
+  closeOnboardingGuide();
+  // If user has not completed profile, prompt profile modal smoothly
+  try {
+    const user = StorageService.getUser();
+    if (!user || !user.name || user.name.trim() === '') {
+      setTimeout(() => {
+        try { openProfileModal(); } catch (err) {}
+      }, 350);
+    }
+  } catch (e) {}
+}
+
+function handleOnboardingBackdropClick(e) {
+  if (e.target && e.target.id === 'onboardingModal') {
+    closeOnboardingGuide();
+  }
+}
+
+function nextOnboardingStep() {
+  if (currentOnboardingStep < ONBOARDING_STEPS.length - 1) {
+    renderOnboardingStep(currentOnboardingStep + 1);
+  } else {
+    finishOnboardingGuide();
+  }
+}
+
+function prevOnboardingStep() {
+  if (currentOnboardingStep > 0) {
+    renderOnboardingStep(currentOnboardingStep - 1);
+  }
+}
+
+function jumpToOnboardingStep(index) {
+  renderOnboardingStep(index);
+}
+
+function checkAndShowOnboardingGuide() {
+  try {
+    // Only auto-show if user hasn't seen it yet
+    const hasSeen = localStorage.getItem(ONBOARDING_STORAGE_KEY);
+    if (!hasSeen) {
+      openOnboardingGuide(true);
+    }
+  } catch (e) {
+    console.warn('[Onboarding] check error:', e);
+  }
+}
+
+window.openOnboardingGuide = openOnboardingGuide;
+window.closeOnboardingGuide = closeOnboardingGuide;
+window.skipOnboardingGuide = skipOnboardingGuide;
+window.finishOnboardingGuide = finishOnboardingGuide;
+window.handleOnboardingBackdropClick = handleOnboardingBackdropClick;
+window.nextOnboardingStep = nextOnboardingStep;
+window.prevOnboardingStep = prevOnboardingStep;
+window.jumpToOnboardingStep = jumpToOnboardingStep;
+window.checkAndShowOnboardingGuide = checkAndShowOnboardingGuide;
+
