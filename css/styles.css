@@ -10524,6 +10524,8 @@ body.drawer-open {
   border-radius: 50%;
   display: inline-block;
   box-shadow: 0 0 6px rgba(16, 185, 129, 0.8);
+  animation: kmpPulseDot 1.8s infinite;
+  flex-shrink: 0;
 }
 
 .badge-pending-glow {
@@ -10689,15 +10691,26 @@ body.drawer-open {
 .kmp-presence-tag {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   font-size: 0.7rem;
   color: #059669;
   font-weight: 600;
   margin-bottom: 6px;
+  white-space: nowrap;
+}
+
+.kmp-presence-tag.online {
+  color: #059669;
 }
 
 .kmp-presence-tag.offline {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.kmp-presence-tag.offline i {
   color: #94a3b8;
+  font-size: 0.68rem;
 }
 
 .kmp-location-text {

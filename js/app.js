@@ -10019,27 +10019,27 @@ window.refreshKmpDirectoryLive = async function(e) {
 };
 
 function initPresenceEngine() {
-  // Update presence immediately on start
+  // Update presence immediately on start (force = true on page open)
   StorageService.updateUserPresence(true);
 
-  // Background heartbeat every 60s
+  // Background heartbeat every 2.5 minutes (150,000ms)
   setInterval(() => {
     if (!document.hidden) {
       StorageService.updateUserPresence();
     }
-  }, 60000);
+  }, 150000);
 
   // Handle visibility transitions
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
       StorageService.updateUserPresence(true);
       if (activeTab === 'friends') {
-        renderKmpDirectoryView(true);
+        renderKmpDirectoryView(false);
       }
     }
   });
 
-  // Track user actions (throttled to 60s inside StorageService)
+  // Track user actions (throttled to 2.5 minutes inside StorageService)
   ['click', 'touchstart', 'keydown'].forEach(evt => {
     window.addEventListener(evt, () => {
       StorageService.updateUserPresence();
@@ -10067,7 +10067,7 @@ window.switchKmpSegment = function(seg) {
   triggerHaptic(12);
   kmpActiveSegment = seg;
 
-  const chips = ['all', 'friends', 'online', 'sangha', 'suggested', 'requests'];
+  const chips = ['all', 'online', 'sangha', 'friends', 'suggested', 'requests'];
   chips.forEach(s => {
     const chip = document.getElementById(`kmpSeg${s.charAt(0).toUpperCase() + s.slice(1)}`);
     if (chip) {
@@ -10160,7 +10160,7 @@ window.resetKmpFilters = function() {
   const sortSelect = document.getElementById('kmpSortSelect');
   if (sortSelect) sortSelect.value = 'active';
 
-  const chips = ['all', 'friends', 'online', 'sangha', 'suggested', 'requests'];
+  const chips = ['all', 'online', 'sangha', 'friends', 'suggested', 'requests'];
   chips.forEach(s => {
     const chip = document.getElementById(`kmpSeg${s.charAt(0).toUpperCase() + s.slice(1)}`);
     if (chip) {
@@ -10171,6 +10171,63 @@ window.resetKmpFilters = function() {
 
   renderKmpDirectoryView(false);
 };
+
+// Helper to format dynamic Sinhala relative last seen status
+function formatKmpLastSeen(timestamp, isOnline) {
+  const ts = Number(timestamp) || 0;
+  const now = Date.now();
+  const diffMs = now - ts;
+
+  // 1. Under 3 minutes or explicitly marked online
+  if (isOnline || (ts > 0 && diffMs < 3 * 60 * 1000)) {
+    return {
+      isOnline: true,
+      text: 'දැන් Online'
+    };
+  }
+
+  // 2. Missing, zero, invalid or future timestamp
+  if (!ts || diffMs < 0) {
+    return {
+      isOnline: false,
+      text: 'මෑතකදී ක්‍රියාකාරී විය'
+    };
+  }
+
+  const diffMinutes = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  // 3. 3-59 minutes ago
+  if (diffMinutes >= 3 && diffMinutes < 60) {
+    return {
+      isOnline: false,
+      text: `විනාඩි ${diffMinutes} කට පෙර ක්‍රියාකාරී විය`
+    };
+  }
+
+  // 4. 1-23 hours ago
+  if (diffHours >= 1 && diffHours < 24) {
+    return {
+      isOnline: false,
+      text: `පැය ${diffHours} කට පෙර ක්‍රියාකාරී විය`
+    };
+  }
+
+  // 5. 1-6 days ago
+  if (diffDays >= 1 && diffDays <= 6) {
+    return {
+      isOnline: false,
+      text: `දින ${diffDays} කට පෙර ක්‍රියාකාරී විය`
+    };
+  }
+
+  // 6. Older (7 days or more)
+  return {
+    isOnline: false,
+    text: 'මෑතකදී ක්‍රියාකාරී විය'
+  };
+}
 
 window.renderKmpDirectoryView = async function(forceRefresh = false) {
   const container = document.getElementById('kmpGridContainer');
@@ -10301,27 +10358,41 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
     });
   }
 
-  // Search filter
+  // Search filter (matches name, city, district, location, or bio)
   if (kmpSearchQuery) {
-    const q = kmpSearchQuery.toLowerCase();
-    list = list.filter(m =>
-      (m.name || '').toLowerCase().includes(q) ||
-      (m.bio || '').toLowerCase().includes(q) ||
-      (m.location || '').toLowerCase().includes(q)
-    );
+    const q = kmpSearchQuery.toLowerCase().trim();
+    list = list.filter(m => {
+      const name = (m.name || '').toLowerCase();
+      const fName = (m.firstName || '').toLowerCase();
+      const lName = (m.lastName || '').toLowerCase();
+      const location = (m.location || '').toLowerCase();
+      const city = (m.city || '').toLowerCase();
+      const district = (m.district || '').toLowerCase();
+      const bio = (m.bio || '').toLowerCase();
+      return name.includes(q) ||
+             fName.includes(q) ||
+             lName.includes(q) ||
+             location.includes(q) ||
+             city.includes(q) ||
+             district.includes(q) ||
+             bio.includes(q);
+    });
   }
 
-  // Sorting
+  // Sorting: Active-first default (currently online first, then most recently active descending)
   if (kmpSortMode === 'active') {
     list.sort((a, b) => {
       if (a.isOnline && !b.isOnline) return -1;
       if (!a.isOnline && b.isOnline) return 1;
-      return (b.lastActiveAt || b.updatedAt || 0) - (a.lastActiveAt || a.updatedAt || 0);
+      const timeA = Number(a.lastSeen || a.lastActiveAt || a.updatedAt || 0);
+      const timeB = Number(b.lastSeen || b.lastActiveAt || b.updatedAt || 0);
+      if (timeB !== timeA) return timeB - timeA;
+      return ((b.postsCount || 0) + (b.totalSadhu || 0)) - ((a.postsCount || 0) + (a.totalSadhu || 0));
     });
   } else if (kmpSortMode === 'newest') {
     list.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
   } else if (kmpSortMode === 'name') {
-    list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    list.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'si'));
   }
 
   // Results count & segment badge
@@ -10342,9 +10413,9 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
   if (badgeEl) {
     const segNames = {
       all: 'සියලු සාමාජිකයින්',
-      friends: 'මගේ මිතුරන්',
       online: 'දැන් Online',
-      sangha: 'මහා සංඝරත්නය',
+      sangha: 'පූජනීය සංඝරත්නය',
+      friends: 'මගේ මිතුරන්',
       suggested: 'යෝජිත මිතුරන්',
       requests: 'ලැබුණු ඇරයුම්'
     };
@@ -10384,7 +10455,7 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
   }
 
   // Capture current scroll positions before updating DOM
-  const prevWindowY = window.scrollY;
+  const prevWindowY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
   const prevContainerY = container ? container.scrollTop : 0;
 
   // Render cards
@@ -10407,8 +10478,12 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
 
     const displayName = isMemberAnon ? 'කල්‍යාණ මිත්‍ර සාමාජික' : (m.name || 'කල්‍යාණ මිත්‍ර');
     const displayPhoto = isMemberAnon ? BO_LEAF_AVATAR : (m.photo || '');
-    const displayLocation = isMemberAnon ? (m.location ? 'ශ්‍රී ලංකාව' : '') : (m.location || '');
+    const displayLocation = isMemberAnon ? (m.location ? 'ශ්‍රී ලංකාව' : '') : (m.location || m.city || m.district || '');
     const initial = isMemberAnon ? '🌿' : (displayName || 'ක').charAt(0);
+
+    // Format dynamic Last Seen status
+    const lastSeenTime = Number(m.lastSeen || m.lastActiveAt || m.updatedAt || 0);
+    const presenceStatus = formatKmpLastSeen(lastSeenTime, m.isOnline);
 
     // Incoming request check
     const pendingReq = pendingIncoming.find(r => r.senderUid === m.uid);
@@ -10451,7 +10526,7 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
         <div class="kmp-card-top">
           <div class="kmp-avatar-wrap ${isMemberSangha && !isMemberAnon ? 'kmp-sangha-avatar' : ''}" onclick="event.stopPropagation(); openPublicProfile('${m.uid}')" style="cursor: pointer;" title="පැතිකඩ බලන්න">
             ${displayPhoto ? `<img src="${Security.sanitizeUrl(displayPhoto)}" alt="${Security.escapeHTML(displayName)}" class="kmp-avatar-img" onerror="this.parentElement.innerHTML = '<div class=\\\'kmp-avatar-initial\\\'>${initial}</div>';">` : `<div class="kmp-avatar-initial">${initial}</div>`}
-            ${m.isOnline ? `<span class="kmp-online-dot" title="දැන් සජීවීව Online"></span>` : ''}
+            ${presenceStatus.isOnline ? `<span class="kmp-online-dot" title="දැන් සජීවීව Online"></span>` : ''}
             ${isMemberSangha && !isMemberAnon ? '<img src="assets/sangha-frame.webp" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
           </div>
           <div class="kmp-card-meta">
@@ -10460,9 +10535,9 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
               ${!isMemberAnon && isMemberMaster ? `<span class="badge-crown" title="කල්‍යාණ මිත්‍ර">👑</span>` : (!isMemberAnon && isMemberSubAdmin ? `<span class="badge-shield" title="කල්‍යාණ මිත්‍ර">🛡️</span>` : '')}
               ${!isMemberAnon && isMemberSangha ? `<span class="sangha-author-badge" style="margin-left: 3px; padding: 1px 6px; font-size: 0.6rem;"><i class="fa-solid fa-dharmachakra"></i> පූජනීය සංඝරත්නය</span>` : ''}
             </div>
-            ${m.isOnline
-              ? `<div class="kmp-presence-tag"><span class="kmp-pulse-dot-mini"></span> <span>දැන් Online</span></div>`
-              : `<div class="kmp-presence-tag offline"><i class="fa-solid fa-clock-rotate-left"></i> <span>ක්‍රියාකාරී විය</span></div>`
+            ${presenceStatus.isOnline
+              ? `<div class="kmp-presence-tag online"><span class="kmp-pulse-dot-mini"></span> <span>${presenceStatus.text}</span></div>`
+              : `<div class="kmp-presence-tag offline"><i class="fa-solid fa-clock-rotate-left"></i> <span>${presenceStatus.text}</span></div>`
             }
             ${displayLocation ? `<div class="kmp-location-text"><i class="fa-solid fa-location-dot" style="color: #ea580c;"></i> <span>${Security.escapeHTML(displayLocation)}</span></div>` : ''}
           </div>
@@ -10486,9 +10561,12 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
     `;
   }).join('');
 
-  // Restore scroll positions so live refresh never violently jumps the view
+  // Restore scroll positions so live refresh or filter toggling never violently jumps the view
   if (prevWindowY > 0) {
     window.scrollTo({ top: prevWindowY, behavior: 'instant' });
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: prevWindowY, behavior: 'instant' });
+    });
   }
   if (container && prevContainerY > 0) {
     container.scrollTop = prevContainerY;

@@ -648,8 +648,8 @@ export const StorageService = {
     if (isMemberSangha) {
       this._knownSanghaUids.add(uid);
     }
-    const lastActive = data.lastActiveAt || data.updatedAt || 0;
-    const isOnline = (this.currentUser && this.currentUser.uid === uid) || ((now - lastActive) < 7 * 60 * 1000);
+    const lastActive = Number(data.lastSeen || data.lastActiveAt || data.updatedAt || 0);
+    const isOnline = (this.currentUser && this.currentUser.uid === uid) || (lastActive > 0 && (now - lastActive) < 3 * 60 * 1000);
     const isUserAnon = Boolean(
       data.isAnonymous ||
       data.useAlias ||
@@ -661,9 +661,12 @@ export const StorageService = {
       photo: data.photo || '',
       coverImage: data.coverImage || 'assets/banner.webp',
       bio: data.bio || '',
-      location: data.location || data.district || '',
+      location: data.location || data.city || data.district || '',
+      district: data.district || '',
+      city: data.city || '',
       joinedDate: data.joinedDate || '',
       updatedAt: data.updatedAt || 0,
+      lastSeen: lastActive,
       lastActiveAt: lastActive,
       isOnline: isOnline,
       isAdmin: isMaster,
@@ -1020,13 +1023,14 @@ export const StorageService = {
     if (!this.currentUser || !this.currentUser.uid) return;
     const now = Date.now();
     this.currentUser.lastActiveAt = now;
+    this.currentUser.lastSeen = now;
     try {
       localStorage.setItem('pinPotha_last_presence', now.toString());
       localStorage.setItem('pinPotha_currentUser', JSON.stringify(this.currentUser));
     } catch (e) {}
 
-    // Throttle remote Firestore write to at most once per 60s (unless forced on startup/tab focus)
-    if (!force && (now - this._lastPresenceWriteTime < 60000)) {
+    // Throttle remote Firestore write to once every 2.5 minutes (150,000ms) unless forced (on login/page open)
+    if (!force && (now - this._lastPresenceWriteTime < 150000)) {
       return;
     }
     this._lastPresenceWriteTime = now;
@@ -1035,7 +1039,8 @@ export const StorageService = {
       try {
         const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
         await updateDoc(doc(db, COLLECTIONS.USERS, this.currentUser.uid), {
-          lastActiveAt: now
+          lastActiveAt: now,
+          lastSeen: now
         }).catch(() => {});
       } catch (e) {}
     }
@@ -1910,8 +1915,8 @@ export const StorageService = {
         const role = f.role?.stringValue || (isMaster ? 'master_admin' : 'member');
         const isSub = !isMaster && (role === 'admin' || f.isAdmin?.booleanValue === true);
         const isSangha = f.isSangha?.booleanValue === true || role === 'sangha' || this.isSangha({ uid, name });
-        const lastActive = parseInt(f.lastActiveAt?.integerValue || f.updatedAt?.integerValue || '0', 10);
-        const isOnline = (this.currentUser && this.currentUser.uid === uid) || ((now - lastActive) < 7 * 60 * 1000);
+        const lastActive = parseInt(f.lastSeen?.integerValue || f.lastActiveAt?.integerValue || f.updatedAt?.integerValue || '0', 10);
+        const isOnline = (this.currentUser && this.currentUser.uid === uid) || (lastActive > 0 && (now - lastActive) < 3 * 60 * 1000);
         const useAlias = f.useAlias?.booleanValue === true;
         const isAnonymous = f.isAnonymous?.booleanValue === true || useAlias || Boolean(this.currentUser && this.currentUser.uid === uid && (this.currentUser.useAlias || this.currentUser.isAnonymous));
         list.push({
@@ -1923,11 +1928,12 @@ export const StorageService = {
           photo: f.photo?.stringValue || '',
           coverImage: f.coverImage?.stringValue || 'assets/banner.webp',
           bio: f.bio?.stringValue || '',
-          location: f.location?.stringValue || f.district?.stringValue || '',
+          location: f.location?.stringValue || f.city?.stringValue || f.district?.stringValue || '',
           district: f.district?.stringValue || '',
           city: f.city?.stringValue || '',
           occupation: f.occupation?.stringValue || '',
           joinedDate: f.joinedDate?.stringValue || '2026 ඔක්තෝබර්',
+          lastSeen: lastActive,
           lastActiveAt: lastActive,
           isOnline,
           isAdmin: isMaster,
@@ -4159,6 +4165,7 @@ export const StorageService = {
     }
     this.notifyListeners();
     this.notifyNotificationListeners();
+    this.updateUserPresence(true).catch(() => {});
 
     // 4. Asynchronously query Firestore users collection to get latest cloud profile and sync
     if (isCloudReady && db) {
@@ -4536,6 +4543,7 @@ export const StorageService = {
 
     this.notifyListeners();
     this.notifyNotificationListeners();
+    this.updateUserPresence(true).catch(() => {});
     return isNowFollowing;
   },
 
@@ -4727,6 +4735,7 @@ export const StorageService = {
 
     this.notifyListeners();
     this.notifyNotificationListeners();
+    this.updateUserPresence(true).catch(() => {});
     return true;
   },
 
@@ -4801,6 +4810,7 @@ export const StorageService = {
 
     this.notifyListeners();
     this.notifyNotificationListeners();
+    this.updateUserPresence(true).catch(() => {});
     return true;
   },
 
@@ -5424,6 +5434,7 @@ export const StorageService = {
     } catch (e) {}
     this.notifyListeners();
     this.notifyNotificationListeners();
+    this.updateUserPresence(true).catch(() => {});
   },
 
   /**

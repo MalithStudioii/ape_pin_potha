@@ -127,7 +127,7 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=197">
+    <link rel="stylesheet" href="css/styles.css?v=198">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
@@ -1419,17 +1419,12 @@
                     </div>
                 </div>
 
-                <!-- Segments Scrollable Bar (All, Friends, Online Now, Sangha, Suggested, Requests) -->
+                <!-- Segments Scrollable Bar (All, Online Now, Sangha, Friends, Suggested, Requests) -->
                 <div class="kmp-segments-bar" id="kmpSegmentsBar">
                     <button type="button" class="kmp-segment-chip active" id="kmpSegAll" onclick="switchKmpSegment('all')">
                         <i class="fa-solid fa-users"></i>
                         <span>සියලු සාමාජිකයින්</span>
                         <span class="kmp-chip-count" id="kmpSegCountAll">0</span>
-                    </button>
-                    <button type="button" class="kmp-segment-chip" id="kmpSegFriends" onclick="switchKmpSegment('friends')">
-                        <i class="fa-solid fa-user-check"></i>
-                        <span>මගේ මිතුරන්</span>
-                        <span class="kmp-chip-count" id="kmpSegCountFriends">0</span>
                     </button>
                     <button type="button" class="kmp-segment-chip" id="kmpSegOnline" onclick="switchKmpSegment('online')">
                         <span class="kmp-pulse-dot-mini"></span>
@@ -1438,8 +1433,13 @@
                     </button>
                     <button type="button" class="kmp-segment-chip" id="kmpSegSangha" onclick="switchKmpSegment('sangha')">
                         <i class="fa-solid fa-dharmachakra" style="color: #d97706;"></i>
-                        <span>මහා සංඝරත්නය</span>
+                        <span>පූජනීය සංඝරත්නය</span>
                         <span class="kmp-chip-count" id="kmpSegCountSangha">0</span>
+                    </button>
+                    <button type="button" class="kmp-segment-chip" id="kmpSegFriends" onclick="switchKmpSegment('friends')">
+                        <i class="fa-solid fa-user-check"></i>
+                        <span>මගේ මිතුරන්</span>
+                        <span class="kmp-chip-count" id="kmpSegCountFriends">0</span>
                     </button>
                     <button type="button" class="kmp-segment-chip" id="kmpSegSuggested" onclick="switchKmpSegment('suggested')">
                         <i class="fa-solid fa-wand-magic-sparkles" style="color: #8b5cf6;"></i>
@@ -4502,6 +4502,6 @@
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=197"></script>
+    <script type="module" src="js/app.js?v=198"></script>
 </body>
 </html>
