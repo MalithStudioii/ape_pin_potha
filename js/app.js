@@ -3359,7 +3359,7 @@ export function renderPostCardHTML(post, user) {
               <span class="repost-time">${Security.escapeHTML(formatRelativeTimeSinhala(post.timestamp, post.date || 'දැන්'))}</span>
             </div>
           </div>
-          <div style="display: flex; align-items: center; gap: 6px;">
+          <div class="post-header-actions">
             ${isMaster ? `
               <button class="post-official-btn ${post.isOfficial ? 'is-official' : ''}" onclick="toggleOfficialPrompt('${post.id}')" title="${post.isOfficial ? 'නිල නිවේදන ලාංඡනය ඉවත් කරන්න' : 'නිල නිවේදනයක් (Official Post) බවට පත් කරන්න'}">
                 <i class="fa-solid fa-bullhorn"></i>
@@ -3423,23 +3423,23 @@ export function renderPostCardHTML(post, user) {
               <div class="post-avatar official-avatar-circle" onclick="openPoliciesModal('about')" style="cursor: pointer;" title="අපේ පිං පොත පිළිබඳ විස්තර">
                 <i class="fa-solid fa-dharmachakra" style="font-size: 1.35rem; color: #fef3c7; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));"></i>
               </div>
-              <div>
+              <div class="post-author-meta-block">
                 <div class="post-badges-wrap" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                   <span class="post-author-name official-author-name" onclick="openPoliciesModal('about')" style="cursor: pointer;" title="අපේ පිං පොත පිළිබඳ විස්තර">අපේ පිං පොත</span>
                   ${post.visibility === 'private' ? '<span class="post-badge private"><i class="fa-solid fa-lock" style="font-size: 9px;"></i> Private</span>' : ''}
                 </div>
                 <div class="post-meta-sub">
-                  <span>${Security.escapeHTML(formatRelativeTimeSinhala(post.timestamp, post.date || 'දැන්'))}</span>
-                  ${post.location ? `<span>• <i class="fa-solid fa-location-dot" style="color: #d97706;"></i> ${Security.escapeHTML(post.location)}</span>` : ''}
-                  <span>• <i class="fa-solid fa-earth-asia" style="font-size: 10px;"></i></span>
+                  <span class="post-meta-token post-meta-time">${Security.escapeHTML(formatRelativeTimeSinhala(post.timestamp, post.date || 'දැන්'))}</span>
+                  ${post.location ? `<span class="post-meta-token post-meta-location"><span class="post-meta-dot">•</span><i class="fa-solid fa-location-dot" style="color: #d97706; font-size: 11px;"></i><span>${Security.escapeHTML(post.location)}</span></span>` : ''}
+                  <span class="post-meta-token post-meta-visibility"><span class="post-meta-dot">•</span><i class="fa-solid fa-earth-asia" style="font-size: 10px;"></i></span>
                 </div>
               </div>
             ` : `
               <div class="post-avatar ${isNeed ? 'need' : ''} ${isAuthorSangha ? 'sangha-framed-avatar' : ''}" onclick="viewUserProfile('${post.uid || ''}', '${Security.escapeHTML(postAuthorName)}', '${postAuthorPhoto ? Security.sanitizeUrl(postAuthorPhoto) : ''}')" style="cursor: pointer;" title="${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න">
-                ${postAuthorPhoto ? `<img src="${Security.sanitizeUrl(postAuthorPhoto)}" loading="lazy" decoding="async" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover;">` : `<span>${Security.escapeHTML(postAuthorName.charAt(0))}</span>`}
+                ${postAuthorPhoto ? `<img src="${Security.sanitizeUrl(postAuthorPhoto)}" loading="lazy" decoding="async" class="post-avatar-img" alt="${Security.escapeHTML(postAuthorName)}">` : `<span>${Security.escapeHTML(postAuthorName.charAt(0))}</span>`}
                 ${isAuthorSangha ? '<img src="assets/sangha-frame.webp" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
               </div>
-              <div>
+              <div class="post-author-meta-block">
                 <div class="post-badges-wrap">
                   <span class="post-author-name author-click-link" onclick="viewUserProfile('${post.uid || ''}', '${Security.escapeHTML(postAuthorName)}', '${postAuthorPhoto ? Security.sanitizeUrl(postAuthorPhoto) : ''}')" style="cursor: pointer;" title="${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න">${Security.escapeHTML(postAuthorName)}</span>
                   ${isAuthorMaster ? `<span class="badge-crown" title="කල්‍යාණ මිත්‍ර">👑</span>` : (isAuthorSubAdmin ? `<span class="badge-shield" title="කල්‍යාණ මිත්‍ර">🛡️</span>` : '')}
@@ -3453,16 +3453,18 @@ export function renderPostCardHTML(post, user) {
                   ${post.visibility === 'private' ? '<span class="post-badge private"><i class="fa-solid fa-lock" style="font-size: 9px;"></i> Private</span>' : ''}
                 </div>
                 <div class="post-meta-sub">
-                  <span>${Security.escapeHTML(formatRelativeTimeSinhala(post.timestamp, post.date || 'දැන්'))}</span>
-                  ${post.isEdited ? `<span class="post-edited-tag" title="මෙම සටහන සංස්කරණය කරන ලදී">(සංස්කරණය කළ)</span>` : ''}
-                  ${post.location ? `<span>• <i class="fa-solid fa-location-dot" style="color: #d97706;"></i> ${Security.escapeHTML(post.location)}</span>` : ''}
-                  <span>• <i class="fa-solid ${post.visibility === 'private' ? 'fa-lock' : 'fa-earth-asia'}" style="font-size: 10px;"></i></span>
+                  <span class="post-meta-token post-meta-time">
+                    <span>${Security.escapeHTML(formatRelativeTimeSinhala(post.timestamp, post.date || 'දැන්'))}</span>
+                    ${post.isEdited ? `<span class="post-edited-tag" title="මෙම සටහන සංස්කරණය කරන ලදී">(සංස්කරණය කළ)</span>` : ''}
+                  </span>
+                  ${post.location ? `<span class="post-meta-token post-meta-location"><span class="post-meta-dot">•</span><i class="fa-solid fa-location-dot" style="color: #d97706; font-size: 11px;"></i><span>${Security.escapeHTML(post.location)}</span></span>` : ''}
+                  <span class="post-meta-token post-meta-visibility"><span class="post-meta-dot">•</span><i class="fa-solid ${post.visibility === 'private' ? 'fa-lock' : 'fa-earth-asia'}" style="font-size: 10px;"></i></span>
                 </div>
               </div>
             `}
           </div>
 
-          <div style="display: flex; align-items: center; gap: 6px;">
+          <div class="post-header-actions">
             ${isMaster && isNeed ? `
               <button class="post-verify-btn ${post.isVerifiedNeed ? 'verified' : ''}" onclick="toggleVerifyNeedPrompt('${post.id}')" title="${post.isVerifiedNeed ? 'සත්‍යාපනය ඉවත් කරන්න' : 'සත්කාරය සත්‍යාපනය කරන්න'}">
                 <i class="fa-solid fa-circle-check"></i> <span class="btn-text-resp">${post.isVerifiedNeed ? 'Verified' : 'Verify'}</span>
