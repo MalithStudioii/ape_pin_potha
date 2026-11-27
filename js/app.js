@@ -881,7 +881,7 @@ function extractCleanShareSnippet(desc, maxLen = 110) {
  * Maps post category and type to clean, contextual Sinhala badge and emoji
  */
 export function getShareCategoryBadge(post) {
-  if (!post || typeof post !== 'object') return '🌸 උතුම් පින්කමක්';
+  if (!post || typeof post !== 'object') return '🌸 පුණ්‍ය සටහනක්';
 
   if (isCareRequestPost(post)) {
     return '🤝 සත්කාර ඉල්ලීමක්';
@@ -924,9 +924,7 @@ export function getShareCategoryBadge(post) {
       return '✨ සදහම් සුබපැතුමක්';
     case 'සාමාන්‍ය':
     case 'සාමාන්ය':
-      return '🌸 පුණ්‍ය සටහනක්';
     default:
-      if (type === 'merit') return '🌸 උතුම් පින්කමක්';
       return '🌸 පුණ්‍ය සටහනක්';
   }
 }
@@ -1079,7 +1077,7 @@ export function getPostShareMetadata(rawPost) {
 
   // Context-aware og:title (clean emoji/category + topic hook + author + site name)
   const isOfficial = Boolean(canonical.isOfficial || authorName === 'අපේ පිං පොත' || authorName === 'අපේ පින් පොත');
-  const isGeneralCategory = (categoryBadge === '🌸 පුණ්‍ය සටහනක්' || categoryBadge === '🌸 උතුම් පින්කමක්');
+  const isGeneralCategory = (categoryBadge === '🌸 පුණ්‍ය සටහනක්');
   const ogTitle = isOfficial 
     ? (isGeneralCategory ? `🌸 ${topicSnippet} | අපේ පිං පොත` : `${categoryBadge}: ${topicSnippet} | අපේ පිං පොත`)
     : (isGeneralCategory ? `🌸 ${topicSnippet} — ${authorName} | අපේ පිං පොත` : `${categoryBadge}: ${topicSnippet} — ${authorName} | අපේ පිං පොත`);
