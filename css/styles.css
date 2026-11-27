@@ -14828,7 +14828,8 @@ body.dark-mode .spotlight-artisan-district {
 }
 
 /* ==========================================================================
-   5-Step Interactive Welcome & Onboarding Guide Modal (Ape Pin Potha Theme)
+   5-Step Interactive Welcome & Onboarding Guide Modal (TukTuk Pro Inspired)
+   Sacred Gold & Cream Theme with Centered GPU-Accelerated Hero Visual Stages
    ========================================================================== */
 .onboarding-modal-overlay {
   position: fixed;
@@ -14837,7 +14838,7 @@ body.dark-mode .spotlight-artisan-district {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(15, 23, 42, 0.65);
+  background: rgba(15, 23, 42, 0.68);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   padding: 16px;
@@ -14859,12 +14860,14 @@ body.dark-mode .spotlight-artisan-district {
   background: linear-gradient(155deg, #ffffff 0%, #fffdf8 50%, #fef9ee 100%);
   border: 1.5px solid rgba(245, 158, 11, 0.45);
   border-radius: 24px;
-  box-shadow: 0 20px 45px -10px rgba(180, 83, 9, 0.25), 0 0 0 1px rgba(251, 191, 36, 0.2);
+  box-shadow: 0 0 32px -4px rgba(245, 158, 11, 0.35), 0 20px 45px -10px rgba(180, 83, 9, 0.22), 0 0 0 1px rgba(251, 191, 36, 0.25);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   animation: onboardingCardPop 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   box-sizing: border-box;
+  position: relative;
+  touch-action: pan-y;
 }
 
 @keyframes onboardingCardPop {
@@ -14884,7 +14887,7 @@ body.dark-mode .spotlight-artisan-district {
   justify-content: space-between;
   padding: 14px 18px 10px;
   border-bottom: 1px solid rgba(251, 191, 36, 0.2);
-  background: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.65);
   flex-shrink: 0;
 }
 
@@ -14922,31 +14925,459 @@ body.dark-mode .spotlight-artisan-district {
 }
 
 .onboarding-card-body {
-  padding: 20px 20px 16px;
+  padding: 16px 20px 16px;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   flex: 1 1 auto;
+  will-change: transform, opacity;
 }
 
-.onboarding-badge-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 14px;
+/* Directional Smooth Slide Animations */
+.onboarding-card-body.slide-forward {
+  animation: stepSlideForward 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.onboarding-icon-avatar {
-  width: 52px;
-  height: 52px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-  border: 1.5px solid rgba(245, 158, 11, 0.4);
+.onboarding-card-body.slide-backward {
+  animation: stepSlideBackward 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes stepSlideForward {
+  0% {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes stepSlideBackward {
+  0% {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Centered Animated Hero Visual Stage */
+.onboarding-hero-wrapper {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.75rem;
-  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.15);
-  flex-shrink: 0;
+  width: 100%;
+  min-height: 102px;
+  margin: 2px 0 12px;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-stage {
+  position: relative;
+  width: 100%;
+  height: 98px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hero-icon-circle {
+  width: 66px;
+  height: 66px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 2;
+  box-shadow: 0 8px 24px -4px rgba(217, 119, 6, 0.28);
+  font-size: 2rem;
+  will-change: transform;
+}
+
+.hero-glyph {
+  display: inline-block;
+  line-height: 1;
+}
+
+.hero-halo {
+  position: absolute;
+  width: 110px;
+  height: 110px;
+  border-radius: 9999px;
+  z-index: 1;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+/* Step 1: Dhamma Wheel Rotation + Sacred Pulsing Halo + Sparkles */
+.hero-halo.halo-pulse {
+  background: radial-gradient(circle, rgba(251, 191, 36, 0.42) 0%, rgba(245, 158, 11, 0.16) 55%, transparent 75%);
+  animation: haloPulse 3.2s ease-in-out infinite;
+}
+.gold-wheel-spin {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 50%, #fde68a 100%);
+  border: 1.5px solid rgba(245, 158, 11, 0.5);
+  color: #d97706;
+}
+.gold-wheel-spin i {
+  display: inline-block;
+  animation: wheelSpinSmooth 18s linear infinite;
+  will-change: transform;
+}
+.hero-sparkles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+.hero-sparkles .sparkle {
+  position: absolute;
+  color: #f59e0b;
+  font-size: 0.95rem;
+  will-change: transform, opacity;
+}
+.hero-sparkles .sp-1 {
+  top: 10px;
+  left: 28%;
+  animation: floatSparkle1 2.8s ease-in-out infinite;
+}
+.hero-sparkles .sp-2 {
+  bottom: 12px;
+  right: 28%;
+  font-size: 1.15rem;
+  animation: floatSparkle2 3.2s ease-in-out infinite 0.7s;
+}
+.hero-sparkles .sp-3 {
+  top: 18px;
+  right: 30%;
+  animation: floatSparkle1 3.5s ease-in-out infinite 1.4s;
+}
+
+@keyframes haloPulse {
+  0%, 100% {
+    transform: scale(0.92);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.95;
+  }
+}
+
+@keyframes wheelSpinSmooth {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes floatSparkle1 {
+  0%, 100% {
+    transform: translateY(0) scale(0.85);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateY(-8px) scale(1.15);
+    opacity: 1;
+  }
+}
+
+@keyframes floatSparkle2 {
+  0%, 100% {
+    transform: translateY(0) scale(0.9);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translateY(-9px) scale(1.2);
+    opacity: 1;
+  }
+}
+
+/* Step 2: Floating Lotus Emblem + Rising Sadhu Particles */
+.hero-halo.halo-lotus {
+  background: radial-gradient(circle, rgba(244, 114, 182, 0.32) 0%, rgba(251, 191, 36, 0.18) 55%, transparent 75%);
+  animation: haloPulse 3s ease-in-out infinite;
+}
+.lotus-float {
+  background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 50%, #fecdd3 100%);
+  border: 1.5px solid rgba(244, 63, 94, 0.35);
+  animation: lotusHover 3.4s ease-in-out infinite;
+  will-change: transform;
+}
+.hero-sadhu-particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+.hero-sadhu-particles .particle {
+  position: absolute;
+  font-weight: 800;
+  will-change: transform, opacity;
+}
+.hero-sadhu-particles .p-1 {
+  left: 20%;
+  bottom: 24px;
+  font-size: 0.72rem;
+  color: #e11d48;
+  background: rgba(255, 241, 242, 0.92);
+  padding: 1px 6px;
+  border-radius: 9999px;
+  border: 1px solid rgba(244, 63, 94, 0.3);
+  animation: sadhuRise1 2.8s ease-out infinite;
+}
+.hero-sadhu-particles .p-2 {
+  right: 22%;
+  bottom: 20px;
+  font-size: 0.72rem;
+  color: #b45309;
+  background: rgba(254, 243, 199, 0.92);
+  padding: 1px 6px;
+  border-radius: 9999px;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  animation: sadhuRise2 3.1s ease-out infinite 0.9s;
+}
+.hero-sadhu-particles .p-3 {
+  left: 30%;
+  top: 10px;
+  font-size: 1rem;
+  animation: floatSparkle1 2.5s ease-in-out infinite 0.4s;
+}
+.hero-sadhu-particles .p-4 {
+  right: 28%;
+  top: 12px;
+  font-size: 1rem;
+  animation: floatSparkle2 2.7s ease-in-out infinite 1.2s;
+}
+
+@keyframes lotusHover {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-7px) scale(1.04);
+  }
+}
+
+@keyframes sadhuRise1 {
+  0% {
+    transform: translate(0, 0) scale(0.75);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.95;
+  }
+  80% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate(-10px, -34px) scale(1.05);
+    opacity: 0;
+  }
+}
+
+@keyframes sadhuRise2 {
+  0% {
+    transform: translate(0, 0) scale(0.75);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.95;
+  }
+  80% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate(10px, -34px) scale(1.05);
+    opacity: 0;
+  }
+}
+
+/* Step 3: Care Hands Pulse + Golden Ripples */
+.hero-halo.halo-care {
+  background: radial-gradient(circle, rgba(251, 191, 36, 0.38) 0%, rgba(245, 158, 11, 0.16) 55%, transparent 75%);
+}
+.hands-pulse {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 50%, #fde68a 100%);
+  border: 1.5px solid rgba(245, 158, 11, 0.45);
+  animation: handsHeartbeat 2.6s ease-in-out infinite;
+  will-change: transform;
+}
+.hero-ripples {
+  position: absolute;
+  width: 68px;
+  height: 68px;
+  z-index: 1;
+  pointer-events: none;
+}
+.hero-ripples .ripple {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 1.5px solid rgba(245, 158, 11, 0.55);
+  will-change: transform, opacity;
+}
+.hero-ripples .r-1 {
+  animation: rippleOut 2.8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+.hero-ripples .r-2 {
+  animation: rippleOut 2.8s cubic-bezier(0.16, 1, 0.3, 1) infinite 1.4s;
+}
+
+@keyframes handsHeartbeat {
+  0%, 100% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.08);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+  70% {
+    transform: scale(1.06);
+  }
+}
+
+@keyframes rippleOut {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(1.85);
+    opacity: 0;
+  }
+}
+
+/* Step 4: Scripture Book Hover + Moon/Starlight Shimmer */
+.hero-halo.halo-book {
+  background: radial-gradient(circle, rgba(147, 197, 253, 0.3) 0%, rgba(251, 191, 36, 0.22) 55%, transparent 75%);
+  animation: haloPulse 3.5s ease-in-out infinite;
+}
+.book-float {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 50%, #bbf7d0 100%);
+  border: 1.5px solid rgba(34, 197, 94, 0.35);
+  animation: bookSway 3.2s ease-in-out infinite;
+  will-change: transform;
+}
+.hero-shimmer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+.hero-shimmer .star-item {
+  position: absolute;
+  will-change: transform, opacity;
+}
+.hero-shimmer .st-1 {
+  top: 6px;
+  right: 28%;
+  font-size: 1.3rem;
+  animation: moonGlow 3.6s ease-in-out infinite;
+}
+.hero-shimmer .st-2 {
+  bottom: 12px;
+  left: 26%;
+  font-size: 1.15rem;
+  animation: floatSparkle1 2.8s ease-in-out infinite 0.5s;
+}
+.hero-shimmer .st-3 {
+  top: 14px;
+  left: 28%;
+  font-size: 1rem;
+  animation: floatSparkle2 3s ease-in-out infinite 1.1s;
+}
+
+@keyframes bookSway {
+  0%, 100% {
+    transform: translateY(0) rotate(-1.5deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(1.5deg);
+  }
+}
+
+@keyframes moonGlow {
+  0%, 100% {
+    transform: scale(0.95);
+    opacity: 0.75;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+
+/* Step 5: Community Nodes + Live Pulse Rings */
+.hero-halo.halo-nodes {
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.26) 0%, rgba(251, 191, 36, 0.22) 55%, transparent 75%);
+}
+.node-pulse {
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 50%, #a7f3d0 100%);
+  border: 1.5px solid rgba(16, 185, 129, 0.4);
+  animation: lotusHover 3s ease-in-out infinite;
+  will-change: transform;
+}
+.hero-network-rings {
+  position: absolute;
+  width: 68px;
+  height: 68px;
+  z-index: 1;
+  pointer-events: none;
+}
+.hero-network-rings .net-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 1.5px solid rgba(16, 185, 129, 0.55);
+  will-change: transform, opacity;
+}
+.hero-network-rings .nr-1 {
+  animation: rippleOut 2.6s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+.hero-network-rings .nr-2 {
+  animation: rippleOut 2.6s cubic-bezier(0.16, 1, 0.3, 1) infinite 1.3s;
+}
+.hero-network-rings .net-dot {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.7);
+  will-change: transform, opacity;
+}
+.hero-network-rings .nd-1 {
+  top: 4px;
+  left: 8px;
+  animation: floatSparkle1 2.4s ease-in-out infinite;
+}
+.hero-network-rings .nd-2 {
+  bottom: 6px;
+  right: 6px;
+  animation: floatSparkle2 2.7s ease-in-out infinite 0.7s;
+}
+.hero-network-rings .nd-3 {
+  top: 8px;
+  right: 12px;
+  background: #f59e0b;
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.7);
+  animation: floatSparkle1 2.9s ease-in-out infinite 1.2s;
+}
+
+.onboarding-meta-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
 }
 
 .onboarding-category-pill {
@@ -14955,32 +15386,41 @@ body.dark-mode .spotlight-artisan-district {
   color: #b45309;
   background: #fffbeb;
   border: 1px solid #fde68a;
-  padding: 4px 10px;
+  padding: 4px 12px;
   border-radius: 9999px;
   display: inline-block;
+  letter-spacing: 0.01em;
 }
 
 .onboarding-title {
   font-size: 1.15rem;
   font-weight: 800;
   color: #451a03;
-  margin: 0 0 10px;
+  margin: 0 0 8px;
   line-height: 1.4;
   letter-spacing: -0.01em;
+}
+
+.onboarding-title.text-center {
+  text-align: center;
 }
 
 .onboarding-desc {
   font-size: 0.88rem;
   color: #57534e;
   line-height: 1.6;
-  margin: 0 0 16px;
+  margin: 0 0 14px;
+}
+
+.onboarding-desc.text-center {
+  text-align: center;
 }
 
 .onboarding-tip-box {
   background: rgba(254, 243, 199, 0.45);
   border: 1px dashed rgba(245, 158, 11, 0.55);
   border-radius: 14px;
-  padding: 12px 14px;
+  padding: 11px 13px;
   display: flex;
   align-items: flex-start;
   gap: 10px;
@@ -15005,7 +15445,7 @@ body.dark-mode .spotlight-artisan-district {
   align-items: center;
   justify-content: space-between;
   padding: 14px 18px 16px;
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.85);
   border-top: 1px solid rgba(251, 191, 36, 0.2);
   gap: 12px;
   flex-shrink: 0;
@@ -15081,10 +15521,34 @@ body.dark-mode .spotlight-artisan-district {
   box-shadow: 0 6px 16px rgba(217, 119, 6, 0.4);
 }
 
+/* Primary CTA Button with Shine Sweep */
 .btn-onboarding-next.start-cta {
   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   border-color: #047857;
-  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-onboarding-next.start-cta::after {
+  content: '';
+  position: absolute;
+  top: -60%;
+  left: -70%;
+  width: 45%;
+  height: 220%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  transform: rotate(25deg);
+  animation: ctaShineSweep 2.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes ctaShineSweep {
+  0% {
+    left: -70%;
+  }
+  40%, 100% {
+    left: 150%;
+  }
 }
 
 .btn-onboarding-next.start-cta:hover {
@@ -15096,7 +15560,20 @@ body.dark-mode .spotlight-artisan-district {
     border-radius: 20px;
   }
   .onboarding-card-body {
-    padding: 16px 16px 14px;
+    padding: 14px 16px 14px;
+  }
+  .onboarding-hero-wrapper {
+    min-height: 94px;
+    margin-bottom: 8px;
+  }
+  .hero-stage {
+    height: 90px;
+  }
+  .hero-icon-circle {
+    width: 60px;
+    height: 60px;
+    font-size: 1.8rem;
+    border-radius: 18px;
   }
   .onboarding-title {
     font-size: 1.05rem;

@@ -127,7 +127,7 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=199">
+    <link rel="stylesheet" href="css/styles.css?v=200">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
@@ -4343,18 +4343,30 @@
                 </button>
             </div>
 
-            <!-- Card Body: Icon Badge, Category Pill, Title, Description & Tip Box -->
-            <div class="onboarding-card-body">
-                <div class="onboarding-badge-row">
-                    <div class="onboarding-icon-avatar" id="onboardingIconBadge">
-                        <span id="onboardingIconEmoji">☸️</span>
+            <!-- Card Body: Centered Hero Visual Stage, Category Pill, Title, Description & Tip Box -->
+            <div class="onboarding-card-body" id="onboardingCardBody">
+                <!-- Centered Animated Hero Visual Stage -->
+                <div class="onboarding-hero-wrapper" id="onboardingHeroStage">
+                    <div class="hero-stage step-1">
+                        <div class="hero-halo halo-pulse"></div>
+                        <div class="hero-sparkles">
+                            <span class="sparkle sp-1">✦</span>
+                            <span class="sparkle sp-2">✨</span>
+                            <span class="sparkle sp-3">✦</span>
+                        </div>
+                        <div class="hero-icon-circle gold-wheel-spin">
+                            <i class="fa-solid fa-dharmachakra"></i>
+                        </div>
                     </div>
+                </div>
+
+                <div class="onboarding-meta-center">
                     <span class="onboarding-category-pill" id="onboardingCategoryPill">සාදරයෙන් පිළිගනිමු</span>
                 </div>
 
-                <h2 class="onboarding-title" id="onboardingTitle">අපේ පිං පොතට සාදරයෙන් පිළිගනිමු!</h2>
+                <h2 class="onboarding-title text-center" id="onboardingTitle">අපේ පිං පොතට සාදරයෙන් පිළිගනිමු!</h2>
                 
-                <p class="onboarding-desc" id="onboardingDesc">
+                <p class="onboarding-desc text-center" id="onboardingDesc">
                     ශ්‍රී ලංකාවේ ප්‍රථම ඩිජිටල් පුණ්‍ය ප්‍රජාවට ඔබත් එක්වන්න. ඔබ සිදුකරන උතුම් පින්කම් සුරක්ෂිතව සටහන් කරමින්, අන්‍යයන්ගේ පින් දැක සිත පහදවා ගන්න.
                 </p>
 
@@ -4582,6 +4594,6 @@
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=199"></script>
+    <script type="module" src="js/app.js?v=200"></script>
 </body>
 </html>

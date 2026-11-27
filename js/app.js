@@ -15939,6 +15939,7 @@ window.printLibraryItem = function(itemId) {
 
 /* ==========================================================================
    5-Step Interactive Welcome & Onboarding Guide Feature
+   TukTuk Pro Inspired with Centered Animated Hero Stages & Touch Swipe
    ========================================================================== */
 const ONBOARDING_STORAGE_KEY = 'apepinpotha_onboarding_seen';
 let currentOnboardingStep = 0;
@@ -15947,7 +15948,19 @@ const ONBOARDING_STEPS = [
   {
     stepNum: 1,
     category: 'සාදරයෙන් පිළිගනිමු',
-    iconEmoji: '☸️',
+    heroHtml: `
+      <div class="hero-stage step-1">
+        <div class="hero-halo halo-pulse"></div>
+        <div class="hero-sparkles">
+          <span class="sparkle sp-1">✦</span>
+          <span class="sparkle sp-2">✨</span>
+          <span class="sparkle sp-3">✦</span>
+        </div>
+        <div class="hero-icon-circle gold-wheel-spin">
+          <i class="fa-solid fa-dharmachakra"></i>
+        </div>
+      </div>
+    `,
     title: 'අපේ පිං පොතට සාදරයෙන් පිළිගනිමු!',
     description: 'ශ්‍රී ලංකාවේ ප්‍රථම ඩිජිටල් පුණ්‍ය ප්‍රජාවට ඔබත් එක්වන්න. ඔබ සිදුකරන උතුම් පින්කම් සුරක්ෂිතව සටහන් කරමින්, අන්‍යයන්ගේ පින් දැක සිත පහදවා ගන්න.',
     tipIcon: '💡',
@@ -15956,7 +15969,20 @@ const ONBOARDING_STEPS = [
   {
     stepNum: 2,
     category: 'පින්කම් සහ Shorts',
-    iconEmoji: '🌸',
+    heroHtml: `
+      <div class="hero-stage step-2">
+        <div class="hero-halo halo-lotus"></div>
+        <div class="hero-sadhu-particles">
+          <span class="particle p-1">සාධු!</span>
+          <span class="particle p-2">🌸</span>
+          <span class="particle p-3">✨</span>
+          <span class="particle p-4">සාධු!</span>
+        </div>
+        <div class="hero-icon-circle lotus-float">
+          <span class="hero-glyph">🪷</span>
+        </div>
+      </div>
+    `,
     title: 'පින්කම් සහ Shorts බෙදාගන්න',
     description: 'ඔබ සිදුකළ පින්කම්වල ඡායාරූප, වීඩියෝ සහ විස්තර සැදැහැති මිතුරන් සමඟ බෙදාගන්න. අන්‍යයන්ගේ පින්කම්වලට "සාධුකාර" දෙමින් සිත පහදවා ගන්න.',
     tipIcon: '✨',
@@ -15965,7 +15991,18 @@ const ONBOARDING_STEPS = [
   {
     stepNum: 3,
     category: 'සත්කාර හවුල',
-    iconEmoji: '🤝',
+    heroHtml: `
+      <div class="hero-stage step-3">
+        <div class="hero-halo halo-care"></div>
+        <div class="hero-ripples">
+          <div class="ripple r-1"></div>
+          <div class="ripple r-2"></div>
+        </div>
+        <div class="hero-icon-circle hands-pulse">
+          <span class="hero-glyph">🤝</span>
+        </div>
+      </div>
+    `,
     title: 'සත්කාර හවුලෙන් පිහිට වන්න',
     description: 'දුෂ්කර විහාරස්ථාන, ආරණ්‍ය සේනාසන සහ සැබෑ සමාජ සත්කාර සඳහා උපකාර අවශ්‍යතා දැනගන්න. ඔබටත් සෘජුවම දායකත්වයන් ලබාදිය හැක.',
     tipIcon: '🛡️',
@@ -15974,7 +16011,19 @@ const ONBOARDING_STEPS = [
   {
     stepNum: 4,
     category: 'ධර්ම පුස්තකාලය & පොහොය',
-    iconEmoji: '📜',
+    heroHtml: `
+      <div class="hero-stage step-4">
+        <div class="hero-halo halo-book"></div>
+        <div class="hero-shimmer">
+          <span class="star-item st-1">🌙</span>
+          <span class="star-item st-2">✨</span>
+          <span class="star-item st-3">⭐</span>
+        </div>
+        <div class="hero-icon-circle book-float">
+          <span class="hero-glyph">📜</span>
+        </div>
+      </div>
+    `,
     title: 'ධර්ම පුස්තකාලය සහ පොහොය දින',
     description: 'බෝධිපූජා කවි, පිරිත් සූත්‍ර, සමන්ත පට්ඨාන සහ සත්‍යාපිත ධර්ම ග්‍රන්ථ පහසුවෙන් කියවන්න. ඉදිරි පොහොය දින සහ තොරතුරු ක්ෂණිකව බලාගන්න.',
     tipIcon: '🌙',
@@ -15983,7 +16032,21 @@ const ONBOARDING_STEPS = [
   {
     stepNum: 5,
     category: 'කල්‍යාණ මිතුරු පවුර',
-    iconEmoji: '👥',
+    heroHtml: `
+      <div class="hero-stage step-5">
+        <div class="hero-halo halo-nodes"></div>
+        <div class="hero-network-rings">
+          <div class="net-ring nr-1"></div>
+          <div class="net-ring nr-2"></div>
+          <span class="net-dot nd-1"></span>
+          <span class="net-dot nd-2"></span>
+          <span class="net-dot nd-3"></span>
+        </div>
+        <div class="hero-icon-circle node-pulse">
+          <span class="hero-glyph">👥</span>
+        </div>
+      </div>
+    `,
     title: 'කල්‍යාණ මිතුරන් සමඟ එක්වන්න',
     description: 'සඟරුවන, සිල්වත් උපාසක උපාසිකාවන් සහ ප්‍රදේශයේ කල්‍යාණ මිතුරන් සොයාගන්න. ඔවුනොවුන් සමඟ සුහදව සම්බන්ධ වෙමින් කුසල් වඩාගන්න.',
     tipIcon: '🚀',
@@ -15991,14 +16054,43 @@ const ONBOARDING_STEPS = [
   }
 ];
 
-function renderOnboardingStep(index) {
+function initOnboardingTouchSwipe() {
+  const cardBox = document.querySelector('.onboarding-card-box');
+  if (cardBox && !cardBox._swipeAttached) {
+    let touchStartX = 0;
+    let touchStartY = 0;
+    cardBox.addEventListener('touchstart', (e) => {
+      if (e.touches && e.touches.length > 0) {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+      }
+    }, { passive: true });
+
+    cardBox.addEventListener('touchend', (e) => {
+      if (e.changedTouches && e.changedTouches.length > 0) {
+        const deltaX = e.changedTouches[0].clientX - touchStartX;
+        const deltaY = e.changedTouches[0].clientY - touchStartY;
+        if (Math.abs(deltaX) > 42 && Math.abs(deltaX) > Math.abs(deltaY) * 1.3) {
+          if (deltaX < 0) {
+            nextOnboardingStep(); // Swiped left -> Forward
+          } else {
+            prevOnboardingStep(); // Swiped right -> Backward
+          }
+        }
+      }
+    }, { passive: true });
+    cardBox._swipeAttached = true;
+  }
+}
+
+function renderOnboardingStep(index, direction = 'none') {
   if (index < 0) index = 0;
   if (index >= ONBOARDING_STEPS.length) index = ONBOARDING_STEPS.length - 1;
   currentOnboardingStep = index;
 
   const data = ONBOARDING_STEPS[index];
   const stepIndicator = document.getElementById('onboardingStepIndicator');
-  const iconEmoji = document.getElementById('onboardingIconEmoji');
+  const heroStage = document.getElementById('onboardingHeroStage');
   const categoryPill = document.getElementById('onboardingCategoryPill');
   const title = document.getElementById('onboardingTitle');
   const desc = document.getElementById('onboardingDesc');
@@ -16007,9 +16099,22 @@ function renderOnboardingStep(index) {
   const prevBtn = document.getElementById('onboardingPrevBtn');
   const nextBtn = document.getElementById('onboardingNextBtn');
   const dots = document.querySelectorAll('#onboardingDotsRow .onboarding-dot');
+  const cardBody = document.getElementById('onboardingCardBody');
+
+  // Trigger smooth directional step transition
+  if (cardBody && direction !== 'none') {
+    cardBody.classList.remove('slide-forward', 'slide-backward');
+    // Force layout reflow for animation restart
+    void cardBody.offsetWidth;
+    if (direction === 'forward') {
+      cardBody.classList.add('slide-forward');
+    } else if (direction === 'backward') {
+      cardBody.classList.add('slide-backward');
+    }
+  }
 
   if (stepIndicator) stepIndicator.innerHTML = `<span class="step-num">${data.stepNum}</span> / 5 පියවර`;
-  if (iconEmoji) iconEmoji.textContent = data.iconEmoji;
+  if (heroStage) heroStage.innerHTML = data.heroHtml;
   if (categoryPill) categoryPill.textContent = data.category;
   if (title) title.textContent = data.title;
   if (desc) desc.textContent = data.description;
@@ -16050,8 +16155,9 @@ function openOnboardingGuide(resetToFirst = true) {
   const modal = document.getElementById('onboardingModal');
   if (!modal) return;
   if (resetToFirst) currentOnboardingStep = 0;
-  renderOnboardingStep(currentOnboardingStep);
+  renderOnboardingStep(currentOnboardingStep, 'none');
   modal.classList.remove('hidden');
+  initOnboardingTouchSwipe();
 }
 
 function closeOnboardingGuide() {
@@ -16090,7 +16196,7 @@ function handleOnboardingBackdropClick(e) {
 
 function nextOnboardingStep() {
   if (currentOnboardingStep < ONBOARDING_STEPS.length - 1) {
-    renderOnboardingStep(currentOnboardingStep + 1);
+    renderOnboardingStep(currentOnboardingStep + 1, 'forward');
   } else {
     finishOnboardingGuide();
   }
@@ -16098,12 +16204,13 @@ function nextOnboardingStep() {
 
 function prevOnboardingStep() {
   if (currentOnboardingStep > 0) {
-    renderOnboardingStep(currentOnboardingStep - 1);
+    renderOnboardingStep(currentOnboardingStep - 1, 'backward');
   }
 }
 
 function jumpToOnboardingStep(index) {
-  renderOnboardingStep(index);
+  const dir = index > currentOnboardingStep ? 'forward' : (index < currentOnboardingStep ? 'backward' : 'none');
+  renderOnboardingStep(index, dir);
 }
 
 function checkAndShowOnboardingGuide() {
