@@ -1000,7 +1000,7 @@ body {
   background: rgba(26, 10, 2, 0.45);
   color: #fffbeb;
   border: 1px solid rgba(251, 191, 36, 0.3);
-  padding: 3px 10px 3px 5px;
+  padding: 3px 11px 3px 5px;
   height: 36px;
   border-radius: var(--radius-full);
   font-size: 0.75rem;
@@ -1008,16 +1008,16 @@ body {
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   transition: all 0.2s ease;
   flex-shrink: 0;
   white-space: nowrap;
   box-sizing: border-box;
-  max-width: 165px;
+  max-width: 175px;
 }
 
 #userNameDisplay {
-  max-width: 95px;
+  max-width: 105px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1027,10 +1027,10 @@ body {
 
 @media (min-width: 1100px) {
   .user-profile-btn {
-    max-width: 185px;
+    max-width: 195px;
   }
   #userNameDisplay {
-    max-width: 110px;
+    max-width: 125px;
   }
 }
 
@@ -7671,78 +7671,69 @@ html, body {
   white-space: nowrap;
 }
 
-/* Medium-to-large desktop responsive tuning to keep search bar spacious without overflowing header */
+/* Hide PWA Install Button on PC/Desktop header (keep visible only on mobile/tablet viewports <= 768px) */
+@media (min-width: 769px) {
+  .header-pwa-install-btn {
+    display: none !important;
+  }
+}
+
+/* Medium-to-large desktop responsive tuning to keep search bar spacious and right-side profile comfortable */
 @media (min-width: 769px) and (max-width: 1024px) {
   .header-container {
     gap: 8px;
-    padding: 0 12px;
+    padding: 0 14px;
   }
   .brand-subtitle {
-    max-width: 110px;
+    max-width: 120px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   .nav-tabs-desktop {
-    gap: 2px;
+    gap: 3px;
   }
   .nav-tab-btn {
-    min-width: 42px;
-    padding: 0 9px;
+    min-width: 44px;
+    padding: 0 10px;
     font-size: 1.15rem;
   }
   .header-actions {
     gap: 6px;
-  }
-  .header-pwa-install-btn span {
-    display: none;
-  }
-  .header-pwa-install-btn {
-    padding: 0;
-    width: 36px;
-    justify-content: center;
   }
   .btn-post-action {
     padding: 0 9px;
     font-size: 0.72rem;
   }
   #userNameDisplay {
-    max-width: 85px;
+    max-width: 95px;
   }
 }
 
 @media (min-width: 1025px) and (max-width: 1240px) {
   .header-container {
     gap: 10px;
-    padding: 0 14px;
+    padding: 0 16px;
   }
   .brand-subtitle {
-    max-width: 150px;
+    max-width: 160px;
   }
   .nav-tabs-desktop {
-    gap: 3px;
+    gap: 4px;
   }
   .nav-tab-btn {
-    min-width: 46px;
-    padding: 0 11px;
+    min-width: 48px;
+    padding: 0 12px;
   }
   .header-actions {
-    gap: 6px;
-  }
-  .header-pwa-install-btn span {
-    display: none;
-  }
-  .header-pwa-install-btn {
-    padding: 0;
-    width: 36px;
-    justify-content: center;
+    gap: 8px;
   }
   .btn-post-action {
     padding: 0 10px;
     font-size: 0.74rem;
   }
   #userNameDisplay {
-    max-width: 110px;
+    max-width: 120px;
   }
 }
 
