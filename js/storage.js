@@ -2527,7 +2527,8 @@ export const StorageService = {
    */
   async fetchCareRequests(forceRefresh = false) {
     if (this._careRequestsFetched && !forceRefresh) {
-      return (this._loadedPosts || []).filter(p => this.isCareRequest(p));
+      const cached = (this._loadedPosts || []).filter(p => this.isCareRequest(p));
+      if (cached.length > 0) return cached;
     }
     if (this._isLoadingCareRequests) {
       return (this._loadedPosts || []).filter(p => this.isCareRequest(p));
@@ -2550,6 +2551,14 @@ export const StorageService = {
         }
       } catch (e) {}
 
+      // Wait for cloud readiness if not ready yet (up to 3.5 seconds)
+      if (!isCloudReady || !db) {
+        const startWait = Date.now();
+        while ((!isCloudReady || !db) && (Date.now() - startWait < 3500)) {
+          await new Promise(r => setTimeout(r, 100));
+        }
+      }
+
       // 2. Fetch care request posts from Firestore
       if (isCloudReady && db) {
         try {
@@ -2559,7 +2568,7 @@ export const StorageService = {
           const qTypeNeed = query(
             collection(db, COLLECTIONS.POSTS),
             where("type", "==", "need"),
-            limit(20)
+            limit(25)
           );
           const snapType = await getDocs(qTypeNeed);
           if (snapType && !snapType.empty) {
@@ -2584,7 +2593,7 @@ export const StorageService = {
           const qCatNeed = query(
             collection(db, COLLECTIONS.POSTS),
             where("category", "==", "සමාජ සත්කාර"),
-            limit(20)
+            limit(25)
           );
           const snapCat = await getDocs(qCatNeed);
           if (snapCat && !snapCat.empty) {
@@ -2635,11 +2644,15 @@ export const StorageService = {
         }
       }
 
-      this._careRequestsFetched = true;
+      if (isCloudReady && db) {
+        this._careRequestsFetched = true;
+      }
       this._isLoadingCareRequests = false;
       return carePosts;
     } catch (err) {
-      this._careRequestsFetched = true;
+      if (isCloudReady && db) {
+        this._careRequestsFetched = true;
+      }
       this._isLoadingCareRequests = false;
       console.warn('[Storage] fetchCareRequests general error:', err);
       return [];

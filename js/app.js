@@ -465,6 +465,10 @@ function bootApp() {
       if (typeof StorageService.fetchCareRequests === 'function') {
         StorageService.fetchCareRequests().then(careList => {
           if (Array.isArray(careList) && careList.length > 0) {
+            const map = new Map((currentPostsData || []).map(p => [p.id, p]));
+            careList.forEach(p => { if (p && p.id) map.set(p.id, p); });
+            currentPostsData = Array.from(map.values());
+            window.currentPostsData = currentPostsData;
             try { renderSideNeeds(); } catch (e) {}
             if (activeTab === 'needs') renderFeed();
           }
@@ -2570,6 +2574,10 @@ window.switchTab = function(tab, pushHistory = true) {
       if (typeof StorageService.fetchCareRequests === 'function') {
         StorageService.fetchCareRequests().then(fresh => {
           if (Array.isArray(fresh) && fresh.length > 0) {
+            const map = new Map((currentPostsData || []).map(p => [p.id, p]));
+            fresh.forEach(p => { if (p && p.id) map.set(p.id, p); });
+            currentPostsData = Array.from(map.values());
+            window.currentPostsData = currentPostsData;
             renderFeed();
             renderSideNeeds();
           }
@@ -3862,6 +3870,20 @@ function renderFeed() {
   const container = document.getElementById('postsContainer');
   if (!container) return;
 
+  // If viewing care requests tab, ensure care requests are merged from storage if not yet in currentPostsData
+  if (activeTab === 'needs') {
+    const careInCurrent = (currentPostsData || []).some(p => isCareRequestPost(p));
+    if (!careInCurrent && typeof StorageService !== 'undefined') {
+      const backupCare = (StorageService._loadedPosts || StorageService.getLocalPosts() || []).filter(p => isCareRequestPost(p));
+      if (backupCare.length > 0) {
+        const map = new Map((currentPostsData || []).map(p => [p.id, p]));
+        backupCare.forEach(p => { if (p && p.id) map.set(p.id, p); });
+        currentPostsData = Array.from(map.values());
+        window.currentPostsData = currentPostsData;
+      }
+    }
+  }
+
   const searchQ = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
   const user = StorageService.currentUser;
 
@@ -4262,7 +4284,20 @@ function renderSideNeeds() {
   const container = document.getElementById('sideNeedsList');
   if (!container) return;
 
-  const needs = (currentPostsData || []).filter(p => isCareRequestPost(p) && (!StorageService.isDummyTestPost || !StorageService.isDummyTestPost(p))).slice(0, 3);
+  let pool = currentPostsData || [];
+  let needs = pool.filter(p => isCareRequestPost(p) && (!StorageService.isDummyTestPost || !StorageService.isDummyTestPost(p)));
+  if (needs.length === 0 && typeof StorageService !== 'undefined') {
+    const backupPool = StorageService._loadedPosts || StorageService.getLocalPosts() || [];
+    needs = backupPool.filter(p => isCareRequestPost(p) && (!StorageService.isDummyTestPost || !StorageService.isDummyTestPost(p)));
+    if (needs.length > 0) {
+      const map = new Map((currentPostsData || []).map(p => [p.id, p]));
+      needs.forEach(p => { if (p && p.id) map.set(p.id, p); });
+      currentPostsData = Array.from(map.values());
+      window.currentPostsData = currentPostsData;
+    }
+  }
+  needs = needs.slice(0, 3);
+
   if (needs.length === 0) {
     container.innerHTML = `<p style="font-size: 0.72rem; color: #94a3b8;">දැනට ඉල්ලීම් නොමැත.</p>`;
     return;
