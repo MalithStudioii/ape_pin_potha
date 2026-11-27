@@ -265,11 +265,14 @@ body {
   background: rgba(26, 10, 2, 0.4);
   border: 1px solid rgba(251, 191, 36, 0.25);
   border-radius: var(--radius-full);
-  padding: 6px 12px;
-  width: 190px;
-  max-width: 200px;
-  transition: all 0.2s ease;
-  flex-shrink: 1;
+  padding: 6px 14px;
+  min-width: 180px;
+  width: auto;
+  max-width: 260px;
+  flex: 1 1 200px;
+  flex-shrink: 0;
+  transition: all 0.25s ease;
+  box-sizing: border-box;
 }
 
 @media (min-width: 640px) {
@@ -278,11 +281,28 @@ body {
   }
 }
 
+@media (min-width: 1100px) {
+  .search-wrapper {
+    min-width: 200px;
+    max-width: 280px;
+    flex: 1 1 240px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .search-wrapper {
+    min-width: 220px;
+    max-width: 320px;
+    flex: 1 1 280px;
+  }
+}
+
 .search-wrapper:focus-within {
   background: rgba(26, 10, 2, 0.7);
   border-color: var(--color-primary-400);
-  width: 220px;
-  max-width: 230px;
+  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.25);
+  max-width: 340px;
+  flex: 1 1 260px;
 }
 
 .search-wrapper input {
@@ -290,9 +310,10 @@ body {
   border: none;
   outline: none;
   color: #ffffff;
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   width: 100%;
   margin-left: 8px;
+  min-width: 0;
 }
 
 .search-wrapper input::placeholder {
@@ -404,7 +425,8 @@ body {
   font-weight: 700;
   font-size: 0.74rem;
   border: none;
-  padding: 6px 11px;
+  padding: 0 11px;
+  height: 36px;
   border-radius: var(--radius-full);
   cursor: pointer;
   box-shadow: var(--shadow-sm);
@@ -414,6 +436,7 @@ body {
   transition: all 0.2s ease;
   white-space: nowrap;
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 .btn-post-action span {
@@ -432,11 +455,12 @@ body {
   position: relative;
   display: inline-flex;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .notification-bell-btn {
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   border-radius: var(--radius-full);
   background: rgba(26, 10, 2, 0.45);
   border: 1px solid rgba(251, 191, 36, 0.3);
@@ -447,6 +471,8 @@ body {
   cursor: pointer;
   position: relative;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-shrink: 0;
+  box-sizing: border-box;
   font-size: 0.95rem;
 }
 
@@ -951,15 +977,34 @@ body {
   background: rgba(26, 10, 2, 0.45);
   color: #fffbeb;
   border: 1px solid rgba(251, 191, 36, 0.3);
-  padding: 4px 12px 4px 5px;
+  padding: 3px 11px 3px 5px;
+  height: 36px;
   border-radius: var(--radius-full);
   font-size: 0.75rem;
   font-weight: 500;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   transition: all 0.2s ease;
+  flex-shrink: 0;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+#userNameDisplay {
+  max-width: 105px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+@media (min-width: 1240px) {
+  #userNameDisplay {
+    max-width: 145px;
+  }
 }
 
 .user-profile-btn:hover {
@@ -7572,7 +7617,8 @@ html, body {
   background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(217, 119, 6, 0.35));
   border: 1px solid rgba(245, 158, 11, 0.5);
   color: #ffffff;
-  padding: 5px 10px;
+  padding: 0 10px;
+  height: 36px;
   border-radius: 9999px;
   font-size: 0.74rem;
   font-weight: 700;
@@ -7582,10 +7628,51 @@ html, body {
   animation: pwaPulse 3s infinite;
   white-space: nowrap;
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 .header-pwa-install-btn span {
   white-space: nowrap;
+}
+
+/* Medium-to-large desktop responsive tuning to keep search bar spacious */
+@media (min-width: 769px) and (max-width: 1100px) {
+  .header-container {
+    gap: 8px;
+    padding: 0 12px;
+  }
+  .brand-subtitle {
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .nav-tabs-desktop {
+    gap: 3px;
+  }
+  .nav-tab-btn {
+    min-width: 44px;
+    padding: 0 10px;
+    font-size: 1.15rem;
+  }
+  .header-actions {
+    gap: 6px;
+  }
+  .header-pwa-install-btn span {
+    display: none;
+  }
+  .header-pwa-install-btn {
+    padding: 0 10px;
+    width: 36px;
+    justify-content: center;
+  }
+  .btn-post-action {
+    padding: 0 9px;
+    font-size: 0.72rem;
+  }
+  #userNameDisplay {
+    max-width: 85px;
+  }
 }
 
 .header-pwa-install-btn:hover {
