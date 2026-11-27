@@ -16,6 +16,7 @@ export const DHAMMA_LIBRARY_ITEMS = [
     "category": "bodhipuja",
     "categoryLabel": "බෝධිපූජා",
     "readTime": "විනාඩි 10",
+    "views": 120,
     "pdfUrl": "",
     "sections": [
       {
@@ -62,6 +63,7 @@ export const DHAMMA_LIBRARY_ITEMS = [
     "category": "pirith",
     "categoryLabel": "පිරිත්",
     "readTime": "විනාඩි 25",
+    "views": 254,
     "pdfUrl": "",
     "sections": [
       {
@@ -88,6 +90,7 @@ export const DHAMMA_LIBRARY_ITEMS = [
     "category": "bodhipuja",
     "categoryLabel": "බෝධිපූජා",
     "readTime": "විනාඩි 20",
+    "views": 98,
     "pdfUrl": "",
     "sections": [
       {
@@ -119,6 +122,7 @@ export const DHAMMA_LIBRARY_ITEMS = [
     "category": "dhamma",
     "categoryLabel": "ධර්ම ග්‍රන්ථ",
     "readTime": "විනාඩි 45",
+    "views": 186,
     "pdfUrl": "",
     "sections": [
       {

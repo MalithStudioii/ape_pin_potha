@@ -14836,6 +14836,7 @@ window.getAllDhammaLibraryItems = function() {
       category: sub.category || 'dhamma',
       categoryLabel: catLabel,
       readTime: sub.readTime || 'විනාඩි 5',
+      views: sub.viewCount || sub.views || 0,
       pdfUrl: sub.pdfUrl || '',
       sections: (sub.sections || []).map(s => ({
         heading: s.title || s.heading || '',
@@ -14866,6 +14867,16 @@ window.loadApprovedDhammaLibrarySubmissions = async function() {
     console.warn('[DhammaLibrary] Could not fetch approved contributions:', err);
   }
 };
+
+// Formats view counts cleanly (e.g. 120, 1.2K, 15K, 1.5M)
+export function formatDhammaViewCount(count) {
+  const num = typeof count === 'number' ? count : parseInt(count, 10);
+  if (isNaN(num) || num <= 0) return '0';
+  if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+  return num.toString();
+}
+window.formatDhammaViewCount = formatDhammaViewCount;
 
 // Render Dhamma Library cards grid
 window.renderDhammaLibraryView = function(category = currentLibraryCategory, searchQuery = currentLibrarySearchQuery) {
@@ -14940,11 +14951,21 @@ window.renderDhammaLibraryView = function(category = currentLibraryCategory, sea
       </div>
     ` : '';
 
+    const views = (typeof StorageService !== 'undefined' && typeof StorageService.getDhammaItemViews === 'function')
+      ? StorageService.getDhammaItemViews(item.id, item.views || 0)
+      : (item.views || 0);
+
     return `
       <div class="library-card ${item.isUserContributed ? 'library-card-user-contributed' : ''}" data-item-id="${item.id}">
         <div class="library-card-badge-row">
           <span class="library-category-badge">${catIcon} ${item.categoryLabel}</span>
-          <span class="library-read-time"><i class="fa-regular fa-clock"></i> ${item.readTime}</span>
+          <div class="library-card-meta-right">
+            <span class="library-view-count" title="${views} වාරයක් කියවා ඇත">
+              <i class="fa-regular fa-eye"></i>
+              <span>${formatDhammaViewCount(views)}</span>
+            </span>
+            <span class="library-read-time"><i class="fa-regular fa-clock"></i> ${item.readTime}</span>
+          </div>
         </div>
         ${contributorBadgeHtml}
         <h2 class="library-card-title">${item.title}</h2>
@@ -15040,6 +15061,32 @@ window.openReadingModal = function(itemId) {
 
   if (titleEl) titleEl.textContent = item.title;
   if (catEl) catEl.textContent = item.categoryLabel;
+
+  const currentItemViews = (typeof StorageService !== 'undefined' && typeof StorageService.getDhammaItemViews === 'function')
+    ? StorageService.getDhammaItemViews(item.id, item.views || 0)
+    : (item.views || 0);
+  const modalViews = document.getElementById('readingModalViewsText');
+  if (modalViews) modalViews.textContent = formatDhammaViewCount(currentItemViews);
+  const modalViewBadge = document.getElementById('readingModalViewBadge');
+  if (modalViewBadge) {
+    modalViewBadge.setAttribute('title', `${currentItemViews} වාරයක් කියවා ඇත`);
+  }
+
+  // Increment view count with session deduplication to prevent inflated re-render counts
+  if (typeof StorageService !== 'undefined' && typeof StorageService.incrementDhammaItemViews === 'function') {
+    const baseViews = item.views || 0;
+    StorageService.incrementDhammaItemViews(itemId, baseViews).then(newCount => {
+      const card = document.querySelector(`.library-card[data-item-id="${itemId}"]`);
+      if (card) {
+        const countSpan = card.querySelector('.library-view-count span');
+        if (countSpan) countSpan.textContent = formatDhammaViewCount(newCount);
+        const viewBadge = card.querySelector('.library-view-count');
+        if (viewBadge) viewBadge.setAttribute('title', `${newCount} වාරයක් කියවා ඇත`);
+      }
+      if (modalViews) modalViews.textContent = formatDhammaViewCount(newCount);
+      if (modalViewBadge) modalViewBadge.setAttribute('title', `${newCount} වාරයක් කියවා ඇත`);
+    }).catch(() => {});
+  }
 
   // Setup contributor badge & footer if item is user-contributed
   if (item.isUserContributed && item.authorName) {

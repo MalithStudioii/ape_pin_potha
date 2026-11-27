@@ -127,7 +127,7 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=192">
+    <link rel="stylesheet" href="css/styles.css?v=193">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
@@ -2116,7 +2116,13 @@
                     </button>
                     <div class="reading-header-titles">
                         <h2 id="readingModalTitle" class="reading-header-title">බෝධිපූජා අත්පොත</h2>
-                        <span id="readingModalCategoryBadge" class="reading-header-cat">බෝධිපූජා</span>
+                        <div class="reading-header-sub-badges" style="display: flex; align-items: center; gap: 8px;">
+                            <span id="readingModalCategoryBadge" class="reading-header-cat">බෝධිපූජා</span>
+                            <span id="readingModalViewBadge" class="reading-header-views" title="කියවූ වාර ගණන" style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.72rem; opacity: 0.85;">
+                                <i class="fa-regular fa-eye"></i>
+                                <span id="readingModalViewsText">120</span>
+                            </span>
+                        </div>
                     </div>
                     <div class="reading-header-actions">
                         <button type="button" class="reading-action-icon-btn" onclick="printLibraryItem()" title="මුද්‍රණය හෝ PDF ලෙස සුරකින්න" aria-label="Print or Save PDF">
@@ -4496,6 +4502,6 @@
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=192"></script>
+    <script type="module" src="js/app.js?v=193"></script>
 </body>
 </html>

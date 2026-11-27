@@ -1286,7 +1286,7 @@ export const StorageService = {
         if (!sessionSettingsCached) {
           try {
             const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
-            const settingsDocs = ['global_announcement', 'daily_verse', 'poya_event', 'banned_words', 'deleted_posts'];
+            const settingsDocs = ['global_announcement', 'daily_verse', 'poya_event', 'banned_words', 'deleted_posts', 'dhamma_views'];
             await Promise.all(settingsDocs.map(async (settingId) => {
               try {
                 const snap = await getDoc(doc(db, COLLECTIONS.SETTINGS, settingId));
@@ -1312,6 +1312,18 @@ export const StorageService = {
                   } else if (settingId === 'deleted_posts') {
                     const cloudDeletedIds = Array.isArray(data.ids) ? data.ids : [];
                     this.syncCloudDeletedIds(cloudDeletedIds);
+                  } else if (settingId === 'dhamma_views') {
+                    try {
+                      const localStored = localStorage.getItem('pinPotha_dhamma_views');
+                      const localMap = localStored ? JSON.parse(localStored) : {};
+                      const merged = { ...localMap };
+                      for (const [id, count] of Object.entries(data)) {
+                        if (typeof count === 'number') {
+                          merged[id] = Math.max(merged[id] || 0, count);
+                        }
+                      }
+                      localStorage.setItem('pinPotha_dhamma_views', JSON.stringify(merged));
+                    } catch (e) {}
                   }
                 }
               } catch (e) {}
@@ -6124,5 +6136,113 @@ export const StorageService = {
     }
 
     return { success: true, sadhuCount, hasGiven };
+  },
+
+  /**
+   * Get cached view count for a Dhamma Library item
+   * @param {string} itemId
+   * @param {number} defaultVal
+   * @returns {number}
+   */
+  getDhammaItemViews(itemId, defaultVal = 0) {
+    if (!itemId) return defaultVal;
+    try {
+      const stored = localStorage.getItem('pinPotha_dhamma_views');
+      if (stored) {
+        const map = JSON.parse(stored);
+        if (map && typeof map[itemId] === 'number') {
+          return map[itemId];
+        }
+      }
+    } catch (e) {}
+    return defaultVal;
+  },
+
+  /**
+   * Safely increments the view count of a Dhamma Library item
+   * Deduplicates per session to avoid inflation on simple feed re-renders or page reloads
+   * @param {string} itemId
+   * @param {number} defaultVal
+   * @returns {Promise<number>}
+   */
+  async incrementDhammaItemViews(itemId, defaultVal = 0) {
+    if (!itemId) return defaultVal;
+
+    const sessionKey = 'pinPotha_viewed_dhamma_' + itemId;
+    let alreadyViewed = false;
+    try {
+      alreadyViewed = Boolean(sessionStorage.getItem(sessionKey));
+    } catch (e) {}
+
+    const currentViews = this.getDhammaItemViews(itemId, defaultVal);
+    if (alreadyViewed) {
+      return currentViews;
+    }
+
+    try {
+      sessionStorage.setItem(sessionKey, '1');
+    } catch (e) {}
+
+    const newCount = currentViews + 1;
+
+    // Update local cache immediately
+    try {
+      const stored = localStorage.getItem('pinPotha_dhamma_views');
+      const map = stored ? JSON.parse(stored) : {};
+      map[itemId] = newCount;
+      localStorage.setItem('pinPotha_dhamma_views', JSON.stringify(map));
+    } catch (e) {}
+
+    // Persist to cloud in background
+    if (isCloudReady && db) {
+      try {
+        const { doc, setDoc, updateDoc, increment } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        await setDoc(doc(db, COLLECTIONS.SETTINGS, 'dhamma_views'), {
+          [itemId]: increment(1)
+        }, { merge: true });
+
+        // If item is a community submission, also increment on the doc itself
+        if (itemId.startsWith('dhamma_sub_') || itemId.length > 15) {
+          try {
+            await updateDoc(doc(db, COLLECTIONS.DHAMMA_SUBMISSIONS || 'dhamma_library_submissions', itemId), {
+              viewCount: increment(1),
+              views: increment(1)
+            });
+          } catch (subErr) {}
+        }
+      } catch (cloudErr) {
+        console.warn('[Storage] incrementDhammaItemViews cloud error:', cloudErr);
+      }
+    }
+
+    return newCount;
+  },
+
+  /**
+   * Fetches latest Dhamma item view counts from cloud
+   * @returns {Promise<Object>}
+   */
+  async fetchDhammaViews() {
+    if (!isCloudReady || !db) return {};
+    try {
+      const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+      const snap = await getDoc(doc(db, COLLECTIONS.SETTINGS, 'dhamma_views'));
+      if (snap.exists()) {
+        const remoteViews = snap.data() || {};
+        const localStored = localStorage.getItem('pinPotha_dhamma_views');
+        const localMap = localStored ? JSON.parse(localStored) : {};
+        const merged = { ...localMap };
+        for (const [id, count] of Object.entries(remoteViews)) {
+          if (typeof count === 'number') {
+            merged[id] = Math.max(merged[id] || 0, count);
+          }
+        }
+        localStorage.setItem('pinPotha_dhamma_views', JSON.stringify(merged));
+        return merged;
+      }
+    } catch (err) {
+      console.warn('[Storage] fetchDhammaViews error:', err);
+    }
+    return {};
   }
 };
