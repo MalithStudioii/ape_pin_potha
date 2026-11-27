@@ -1059,16 +1059,45 @@ window.deletePostByAdmin = async function(postId, authorUid) {
     }
 
     try {
-        const { doc, updateDoc, arrayUnion, setDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        const { doc, updateDoc, deleteDoc, arrayUnion, setDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
         
-        // 1. Mark as deleted in merit_posts collection (or deleteDoc)
-        await updateDoc(doc(db, COLLECTIONS.POSTS, postId), {
-            isDeleted: true,
-            deletedAt: Date.now(),
-            deletedBy: currentAdminUser.email
-        });
+        // 1. Mark as deleted in local caches immediately
+        try {
+            if (typeof StorageService !== 'undefined' && typeof StorageService.markPostAsDeletedLocally === 'function') {
+                StorageService.markPostAsDeletedLocally(postId);
+            } else {
+                const ids = JSON.parse(localStorage.getItem('pinPotha_deleted_ids') || '[]');
+                if (!ids.includes(postId)) {
+                    ids.push(postId);
+                    localStorage.setItem('pinPotha_deleted_ids', JSON.stringify(ids));
+                }
+                ['pinPotha_posts', 'pinPotha_sandbox_posts'].forEach(key => {
+                    const raw = localStorage.getItem(key);
+                    if (raw) {
+                        const list = JSON.parse(raw);
+                        if (Array.isArray(list)) {
+                            localStorage.setItem(key, JSON.stringify(list.filter(p => p && p.id !== postId)));
+                        }
+                    }
+                });
+            }
+        } catch (localErr) {
+            console.warn('[Admin] Local deletion cache purge note:', localErr);
+        }
 
-        // 2. Sync to cloud deleted_posts array in admin_settings
+        // 2. Hard deletion from Firestore merit_posts collection (with soft-delete fallback)
+        try {
+            await deleteDoc(doc(db, COLLECTIONS.POSTS, postId));
+        } catch (delErr) {
+            console.warn('[Admin] Hard deleteDoc note (attempting soft-delete fallback):', delErr);
+            await updateDoc(doc(db, COLLECTIONS.POSTS, postId), {
+                isDeleted: true,
+                deletedAt: Date.now(),
+                deletedBy: (currentAdminUser && currentAdminUser.email) || 'admin'
+            });
+        }
+
+        // 3. Sync to cloud deleted_posts array in admin_settings
         await setDoc(doc(db, COLLECTIONS.SETTINGS, 'deleted_posts'), {
             ids: arrayUnion(postId),
             updatedAt: Date.now()

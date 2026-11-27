@@ -26,8 +26,8 @@
     <meta property="og:site_name" content="අපේ පිං පොත - Ape Pin Potha">
     <meta property="og:title" content="අපේ පිං පොත (Ape Pin Potha) | පිංකම්, ධර්ම පුස්තකාලය, බෝධිපූජා කවි, සමන්ත පට්ඨාන">
     <meta property="og:description" content="හිත නිවන, පින් පුරන කල්‍යාණ මිත්‍ර එකමුතුව. දිනපතා පින්කම් සටහන් කරගන්න, ධර්ම පුස්තකාලය පරිශීලනය කරන්න, ආරණ්‍ය සේනාසන හා විහාර කලා ශිල්පීන් සොයාගන්න. 🙏">
-    <meta property="og:image" content="https://raw.githubusercontent.com/MalithStudioii/ape_pin_potha/main/assets/og-banner.jpg">
-    <meta property="og:image:secure_url" content="https://raw.githubusercontent.com/MalithStudioii/ape_pin_potha/main/assets/og-banner.jpg">
+    <meta property="og:image" content="https://apepinpotha.lk/assets/og-banner.jpg">
+    <meta property="og:image:secure_url" content="https://apepinpotha.lk/assets/og-banner.jpg">
     <meta property="og:image:type" content="image/jpeg">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
@@ -38,7 +38,7 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="අපේ පිං පොත (Ape Pin Potha) | පිංකම්, ධර්ම පුස්තකාලය, බෝධිපූජා කවි">
     <meta name="twitter:description" content="හිත නිවන, පින් පුරන කල්‍යාණ මිත්‍ර එකමුතුව. දිනපතා පින්කම් සටහන් කරගන්න, මිතුරන්ගේ පින්කම් දැක සාදුකාර දෙමින් සිත පහදවා ගන්න. 🙏">
-    <meta name="twitter:image" content="https://raw.githubusercontent.com/MalithStudioii/ape_pin_potha/main/assets/og-banner.jpg">
+    <meta name="twitter:image" content="https://apepinpotha.lk/assets/og-banner.jpg">
 
     <!-- JSON-LD Structured Data Schema (Organization, WebSite & Founder Person) -->
     <script type="application/ld+json">
@@ -127,7 +127,7 @@
     <link rel="apple-touch-icon" href="assets/icon-192.png">
 
     <!-- Core Pure CSS Design System -->
-    <link rel="stylesheet" href="css/styles.css?v=183">
+    <link rel="stylesheet" href="css/styles.css?v=200">
 
     <!-- Immediate Service Worker & Cache Invalidation Script -->
     <script>
@@ -606,12 +606,12 @@
                 </div>
                 <div style="display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 12px; background: #fffbeb; border: 1px solid #fef3c7;">
                     <div style="background: #d97706; color: #fff; font-weight: 800; padding: 4px 10px; border-radius: 8px; text-align: center; line-height: 1.1;">
-                        <span id="poyaMonthBadge" style="font-size: 0.65rem; display: block;">නොවැ</span>
+                        <span id="poyaMonthBadge" style="font-size: 0.65rem; display: block;">දෙසැ</span>
                         <span id="poyaDayBadge" style="font-size: 0.95rem;">24</span>
                     </div>
                     <div>
-                        <h4 id="poyaEventTitle" style="font-size: 0.78rem; font-weight: 700; color: #1e293b;">ඉල් පුර පසළොස්වක පොහොය</h4>
-                        <p id="poyaEventDesc" style="font-size: 0.68rem; color: #64748b;">කඨින චීවර පූජා මහා පින්කම් සමයේ අවසානය</p>
+                        <h4 id="poyaEventTitle" style="font-size: 0.78rem; font-weight: 700; color: #1e293b;">උඳුවප් පුර පසළොස්වක පොහොය</h4>
+                        <p id="poyaEventDesc" style="font-size: 0.68rem; color: #64748b;">සඟමිත් තෙරණිය ලක්දිවට ජය ශ්‍රී මහා බෝධි දක්ෂිණ ශාඛාව වැඩමවීම</p>
                     </div>
                 </div>
             </div>
@@ -1419,17 +1419,12 @@
                     </div>
                 </div>
 
-                <!-- Segments Scrollable Bar (All, Friends, Online Now, Sangha, Suggested, Requests) -->
+                <!-- Segments Scrollable Bar (All, Online Now, Sangha, Friends, Suggested, Requests) -->
                 <div class="kmp-segments-bar" id="kmpSegmentsBar">
                     <button type="button" class="kmp-segment-chip active" id="kmpSegAll" onclick="switchKmpSegment('all')">
                         <i class="fa-solid fa-users"></i>
                         <span>සියලු සාමාජිකයින්</span>
                         <span class="kmp-chip-count" id="kmpSegCountAll">0</span>
-                    </button>
-                    <button type="button" class="kmp-segment-chip" id="kmpSegFriends" onclick="switchKmpSegment('friends')">
-                        <i class="fa-solid fa-user-check"></i>
-                        <span>මගේ මිතුරන්</span>
-                        <span class="kmp-chip-count" id="kmpSegCountFriends">0</span>
                     </button>
                     <button type="button" class="kmp-segment-chip" id="kmpSegOnline" onclick="switchKmpSegment('online')">
                         <span class="kmp-pulse-dot-mini"></span>
@@ -1438,8 +1433,13 @@
                     </button>
                     <button type="button" class="kmp-segment-chip" id="kmpSegSangha" onclick="switchKmpSegment('sangha')">
                         <i class="fa-solid fa-dharmachakra" style="color: #d97706;"></i>
-                        <span>මහා සංඝරත්නය</span>
+                        <span>පූජනීය සංඝරත්නය</span>
                         <span class="kmp-chip-count" id="kmpSegCountSangha">0</span>
+                    </button>
+                    <button type="button" class="kmp-segment-chip" id="kmpSegFriends" onclick="switchKmpSegment('friends')">
+                        <i class="fa-solid fa-user-check"></i>
+                        <span>මගේ මිතුරන්</span>
+                        <span class="kmp-chip-count" id="kmpSegCountFriends">0</span>
                     </button>
                     <button type="button" class="kmp-segment-chip" id="kmpSegSuggested" onclick="switchKmpSegment('suggested')">
                         <i class="fa-solid fa-wand-magic-sparkles" style="color: #8b5cf6;"></i>
@@ -2116,7 +2116,13 @@
                     </button>
                     <div class="reading-header-titles">
                         <h2 id="readingModalTitle" class="reading-header-title">බෝධිපූජා අත්පොත</h2>
-                        <span id="readingModalCategoryBadge" class="reading-header-cat">බෝධිපූජා</span>
+                        <div class="reading-header-sub-badges" style="display: flex; align-items: center; gap: 8px;">
+                            <span id="readingModalCategoryBadge" class="reading-header-cat">බෝධිපූජා</span>
+                            <span id="readingModalViewBadge" class="reading-header-views" title="කියවූ වාර ගණන" style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.72rem; opacity: 0.85;">
+                                <i class="fa-regular fa-eye"></i>
+                                <span id="readingModalViewsText">120</span>
+                            </span>
+                        </div>
                     </div>
                     <div class="reading-header-actions">
                         <button type="button" class="reading-action-icon-btn" onclick="printLibraryItem()" title="මුද්‍රණය හෝ PDF ලෙස සුරකින්න" aria-label="Print or Save PDF">
@@ -2675,6 +2681,14 @@
                 <p style="font-size: 0.68rem; color: #94a3b8; text-align: center; margin-top: 8px;">
                     නම පමණක් ඇතුළත් කර හෝ Google Sign-In මඟින් සත්‍යාපනය වී පින්කම් එක් කළ හැක.
                 </p>
+
+                <!-- App Guide / Onboarding Replay Button in Profile -->
+                <div style="margin-top: 14px; text-align: center; padding-top: 12px; border-top: 1px dashed #e2e8f0;">
+                    <button type="button" onclick="closeProfileModal(); openOnboardingGuide(true);" class="btn-guide-replay" style="background: #fffbeb; border: 1px solid #fde68a; color: #92400e; font-size: 0.8rem; font-weight: 600; padding: 7px 14px; border-radius: 9999px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; transition: all 0.2s ease;">
+                        <i class="fa-solid fa-compass" style="color: #d97706;"></i>
+                        <span>ඇප් මඟපෙන්වීම නැවත බලන්න (App Guide)</span>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -4315,6 +4329,78 @@
     </div>
 
     <!-- ========================================================================= -->
+    <!-- Interactive 5-Step Welcome / Onboarding Guide Modal                       -->
+    <!-- ========================================================================= -->
+    <div id="onboardingModal" class="onboarding-modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle" onclick="handleOnboardingBackdropClick(event)">
+        <div class="onboarding-card-box" onclick="event.stopPropagation()">
+            <!-- Top Bar: Step Indicator & Skip Button -->
+            <div class="onboarding-top-bar">
+                <div class="onboarding-step-pill" id="onboardingStepIndicator">
+                    <span class="step-num">1</span> / 5 පියවර
+                </div>
+                <button type="button" class="onboarding-skip-btn" onclick="skipOnboardingGuide()" aria-label="මඟහරින්න">
+                    ඉවතලන්න (Skip) <i class="fa-solid fa-xmark" style="font-size: 0.85rem; margin-left: 2px;"></i>
+                </button>
+            </div>
+
+            <!-- Card Body: Centered Hero Visual Stage, Category Pill, Title, Description & Tip Box -->
+            <div class="onboarding-card-body" id="onboardingCardBody">
+                <!-- Centered Animated Hero Visual Stage -->
+                <div class="onboarding-hero-wrapper" id="onboardingHeroStage">
+                    <div class="hero-stage step-1">
+                        <div class="hero-halo halo-pulse"></div>
+                        <div class="hero-sparkles">
+                            <span class="sparkle sp-1">✦</span>
+                            <span class="sparkle sp-2">✨</span>
+                            <span class="sparkle sp-3">✦</span>
+                        </div>
+                        <div class="hero-icon-circle gold-wheel-spin">
+                            <i class="fa-solid fa-dharmachakra"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="onboarding-meta-center">
+                    <span class="onboarding-category-pill" id="onboardingCategoryPill">සාදරයෙන් පිළිගනිමු</span>
+                </div>
+
+                <h2 class="onboarding-title text-center" id="onboardingTitle">අපේ පිං පොතට සාදරයෙන් පිළිගනිමු!</h2>
+                
+                <p class="onboarding-desc text-center" id="onboardingDesc">
+                    ශ්‍රී ලංකාවේ ප්‍රථම ඩිජිටල් පුණ්‍ය ප්‍රජාවට ඔබත් එක්වන්න. ඔබ සිදුකරන උතුම් පින්කම් සුරක්ෂිතව සටහන් කරමින්, අන්‍යයන්ගේ පින් දැක සිත පහදවා ගන්න.
+                </p>
+
+                <div class="onboarding-tip-box" id="onboardingTipBox">
+                    <div class="onboarding-tip-icon" id="onboardingTipIcon">💡</div>
+                    <div class="onboarding-tip-content" id="onboardingTipText">
+                        ඔබගේ පෞද්ගලික පින්කම් කිසිවෙකුට නොපෙනෙන සේ 'පෞද්ගලික පිං පොතේ' පමණක් රහසිගතව තබාගත හැක.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Navigation Bar: Pagination Dots & Action Buttons -->
+            <div class="onboarding-bottom-bar">
+                <div class="onboarding-dots-row" id="onboardingDotsRow">
+                    <span class="onboarding-dot active" onclick="jumpToOnboardingStep(0)"></span>
+                    <span class="onboarding-dot" onclick="jumpToOnboardingStep(1)"></span>
+                    <span class="onboarding-dot" onclick="jumpToOnboardingStep(2)"></span>
+                    <span class="onboarding-dot" onclick="jumpToOnboardingStep(3)"></span>
+                    <span class="onboarding-dot" onclick="jumpToOnboardingStep(4)"></span>
+                </div>
+
+                <div class="onboarding-nav-actions">
+                    <button type="button" id="onboardingPrevBtn" class="btn-onboarding-prev hidden" onclick="prevOnboardingStep()">
+                        <i class="fa-solid fa-arrow-left"></i> පෙරට
+                    </button>
+                    <button type="button" id="onboardingNextBtn" class="btn-onboarding-next" onclick="nextOnboardingStep()">
+                        <span>ඉදිරියට (Next)</span> <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
     <!-- Native Mobile App Slide Drawer Menu                                       -->
     <!-- ========================================================================= -->
     <div id="mobileDrawerOverlay" class="mobile-drawer-overlay hidden" onclick="closeMobileMenuDrawer()"></div>
@@ -4459,6 +4545,18 @@
                         <i class="fa-solid fa-chevron-right drawer-chevron-mini"></i>
                     </button>
 
+                    <!-- App Guide / Onboarding Replay in Drawer -->
+                    <button type="button" class="drawer-list-btn" onclick="closeMobileMenuDrawer(); openOnboardingGuide(true);">
+                        <div class="drawer-btn-icon" style="background: rgba(245, 158, 11, 0.15); color: #d97706;">
+                            <i class="fa-solid fa-compass"></i>
+                        </div>
+                        <div class="drawer-btn-text">
+                            <span class="drawer-btn-title">ඇප් මඟපෙන්වීම (App Guide)</span>
+                            <span class="drawer-btn-sub">ප්‍රධාන විශේෂාංග 5 ක් සරලව හඳුනාගන්න</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-right drawer-chevron-mini"></i>
+                    </button>
+
                     <!-- Settings & Policies -->
                     <button type="button" class="drawer-list-btn" onclick="closeMobileMenuDrawer(); openPoliciesModal('about');">
                         <div class="drawer-btn-icon" style="background: rgba(217, 119, 6, 0.12); color: #d97706;">
@@ -4496,6 +4594,6 @@
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Application ES Modules -->
-    <script type="module" src="js/app.js?v=183"></script>
+    <script type="module" src="js/app.js?v=200"></script>
 </body>
 </html>

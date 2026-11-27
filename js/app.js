@@ -461,6 +461,20 @@ function bootApp() {
     try { updateUserInfoUI(); } catch (e) { console.warn('[App] updateUserInfoUI error caught safely:', e); }
     try { updateUserStats(); } catch (e) { console.warn('[App] updateUserStats error caught safely:', e); }
     try { renderSideNeeds(); } catch (e) {}
+    try {
+      if (typeof StorageService.fetchCareRequests === 'function') {
+        StorageService.fetchCareRequests().then(careList => {
+          if (Array.isArray(careList) && careList.length > 0) {
+            const map = new Map((currentPostsData || []).map(p => [p.id, p]));
+            careList.forEach(p => { if (p && p.id) map.set(p.id, p); });
+            currentPostsData = Array.from(map.values());
+            window.currentPostsData = currentPostsData;
+            try { renderSideNeeds(); } catch (e) {}
+            if (activeTab === 'needs') renderFeed();
+          }
+        }).catch(() => {});
+      }
+    } catch (e) {}
     if (window.innerWidth >= 1024) {
       try { renderPcSidebarMembers().catch(() => {}); } catch (e) {}
     }
@@ -735,6 +749,11 @@ function bootApp() {
     // Route incoming deep links for both query params (?a=, ?p=, ?post=) and hashes (#artisan_, #post_)
     try { handleUrlDeepLinks(); } catch (e) {}
     try { window.addEventListener('hashchange', handleUrlDeepLinks); } catch (e) {}
+
+    // Check and show 5-step onboarding guide on initial visit (if not previously seen)
+    setTimeout(() => {
+      try { checkAndShowOnboardingGuide(); } catch (onboardErr) { console.warn('[Onboarding] bootApp trigger error:', onboardErr); }
+    }, 1200);
   } catch (bootErr) {
     console.warn('[App] bootApp error caught safely:', bootErr);
   }
@@ -744,22 +763,118 @@ function bootApp() {
 // Dynamic Post Sharing & Smart Human-Style Caption Generators
 // ==========================================================================
 
+// Safe absolute image URL resolver with fallback for Open Graph and Social Sharing
+export function resolveShareImageUrl(imgSrc, post = null) {
+  const DEFAULT_BANNER = 'https://apepinpotha.lk/assets/og-banner.jpg';
+  const ARTISAN_BANNER = 'https://apepinpotha.lk/assets/artisan-banner-buddha.webp';
+  const WELCOME_BANNER = 'https://apepinpotha.lk/assets/official-welcome-banner.webp';
+
+  // 1. If explicit image src is provided, normalize to absolute HTTPS
+  if (imgSrc && typeof imgSrc === 'string') {
+    let clean = imgSrc.trim();
+    if (clean) {
+      if (clean.startsWith('http://')) {
+        clean = 'https://' + clean.slice(7);
+      } else if (clean.startsWith('//')) {
+        clean = 'https:' + clean;
+      } else if (clean.startsWith('/')) {
+        clean = 'https://apepinpotha.lk' + clean;
+      } else if (clean.startsWith('assets/')) {
+        clean = 'https://apepinpotha.lk/' + clean;
+      } else if (!clean.startsWith('https://')) {
+        clean = 'https://apepinpotha.lk/' + clean;
+      }
+
+      try {
+        const parsed = new URL(clean);
+        if (parsed.protocol === 'https:') {
+          return parsed.href;
+        }
+      } catch (e) {}
+    }
+  }
+
+  // 2. Fall back to category/type appropriate preview banner
+  if (post && typeof post === 'object') {
+    if (isCareRequestPost(post)) {
+      return DEFAULT_BANNER;
+    }
+    if (post.category === 'විහාර නිර්මාණ' || post.category === 'ප්‍රතිසංස්කරණ') {
+      return ARTISAN_BANNER;
+    }
+    if (post.isOfficial) {
+      return WELCOME_BANNER;
+    }
+  }
+
+  return DEFAULT_BANNER;
+}
+window.resolveShareImageUrl = resolveShareImageUrl;
+
 // Standalone helper to construct dynamic post share links (share.apepinpotha.lk)
 export function getDynamicShareUrl(postId) {
-  const cleanId = postId ? String(postId).trim() : '';
+  if (!postId) return 'https://apepinpotha.lk/';
+  let cleanId = String(postId).trim();
+  try {
+    cleanId = decodeURIComponent(cleanId);
+  } catch (e) {}
   return `https://share.apepinpotha.lk/p/${encodeURIComponent(cleanId)}`;
 }
 window.getDynamicShareUrl = getDynamicShareUrl;
 
-const GENERIC_SHARE_TITLES = ['පින්කම', 'සටහන', 'පින්කමක්', 'සටහනක්', 'merit', 'post', 'untitled'];
+const GENERIC_SHARE_TITLES = [
+  'පින්කම', 'පින්කමක්', 'උතුම් පින්කම', 'උතුම් පින්කමක්', 'උතුම පින්කම', 'උතුම පින්කමක්',
+  'සටහන', 'සටහනක්', 'පුණ්‍ය සටහන', 'පුණ්‍ය සටහනක්', 'කුසල් සටහන', 'දෛනික කුසල්', 'දෛනික කුසල් සටහන',
+  'merit', 'post', 'untitled', 'pin potha', 'ape pin potha', 'share'
+];
 
-function isMeaningfulShareTitle(title) {
+export function isMeaningfulShareTitle(title) {
   if (!title || typeof title !== 'string') return false;
-  const clean = title.trim();
-  if (clean.length < 2) return false;
-  if (GENERIC_SHARE_TITLES.includes(clean.toLowerCase())) return false;
-  return true;
+  const clean = title
+    .replace(/<[^>]*>?/gm, '')
+    .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u27BF]|\uD83C[\uDF00-\uDFFF]|\uD83D[\uDC00-\uDE4F]|\uD83E[\uDD00-\uDDFF]/g, '')
+    .replace(/[\s\-_.,;!?]+/g, ' ')
+    .trim()
+    .toLowerCase();
+  if (clean.length < 3) return false;
+  return !GENERIC_SHARE_TITLES.includes(clean);
 }
+window.isMeaningfulShareTitle = isMeaningfulShareTitle;
+
+/**
+ * Normalizes Unicode string (NFC) and removes stray/unpaired surrogates to prevent '?' replacement boxes
+ */
+export function cleanUnicodeString(str) {
+  if (!str) return '';
+  const s = String(str);
+  if (typeof s.toWellFormed === 'function') {
+    return s.toWellFormed().normalize('NFC');
+  }
+  try {
+    return s.normalize('NFC').replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '');
+  } catch (e) {
+    return s;
+  }
+}
+window.cleanUnicodeString = cleanUnicodeString;
+
+/**
+ * Slices string by full Unicode code points (graphemes), never splitting emoji surrogate pairs
+ */
+export function safeUnicodeSlice(str, maxLen = 120) {
+  if (!str) return '';
+  const truncatedInput = (typeof str === 'string' && str.length > maxLen * 4) ? str.slice(0, maxLen * 4) : str;
+  const cleaned = cleanUnicodeString(truncatedInput);
+  const codePoints = Array.from(cleaned);
+  if (codePoints.length <= maxLen) return cleaned;
+  const sliced = codePoints.slice(0, maxLen).join('');
+  const lastSpace = sliced.lastIndexOf(' ');
+  if (lastSpace > Math.floor(maxLen * 0.55)) {
+    return sliced.substring(0, lastSpace).trim() + '...';
+  }
+  return sliced.trim() + '...';
+}
+window.safeUnicodeSlice = safeUnicodeSlice;
 
 function extractCleanShareSnippet(desc, maxLen = 110) {
   if (!desc || typeof desc !== 'string') return '';
@@ -768,14 +883,179 @@ function extractCleanShareSnippet(desc, maxLen = 110) {
                     .replace(/\s+/g, ' ')
                     .trim();
   if (!clean) return '';
-  if (clean.length <= maxLen) return clean;
-  const truncated = clean.substring(0, maxLen);
-  const lastSpace = truncated.lastIndexOf(' ');
-  if (lastSpace > 40) {
-    return truncated.substring(0, lastSpace).trim() + '...';
-  }
-  return truncated.trim() + '...';
+  return safeUnicodeSlice(clean, maxLen);
 }
+
+/**
+ * Maps post category and type to clean, contextual Sinhala badge and emoji
+ */
+export function getShareCategoryBadge(post) {
+  if (!post || typeof post !== 'object') return '🌸 පුණ්‍ය සටහනක්';
+
+  if (isCareRequestPost(post)) {
+    return '🤝 සත්කාර ඉල්ලීමක්';
+  }
+
+  const type = (post.type || '').toLowerCase();
+  if (type === 'reel' || Boolean(post.isShorts || post.videoId)) {
+    return '🎬 සදහම් වීඩියෝවක්';
+  }
+  if (post.isRepost || type === 'repost' || Boolean(post.originalPost)) {
+    return '🔁 යළි බෙදාගත් සටහනක්';
+  }
+
+  const cat = (post.category || '').trim();
+  switch (cat) {
+    case 'දානමය':
+      return '🍲 දානමය පින්කමක්';
+    case 'ශීලමය':
+      return '🪷 ශීලමය පින්කමක්';
+    case 'භාවනාමය':
+      return '🧘 භාවනාමය පින්කමක්';
+    case 'ධර්ම දානමය':
+      return '📖 ධර්ම දානයක්';
+    case 'වන්දනා':
+    case 'වන්දනාමය':
+      return '🛕 වන්දනාමය පින්කමක්';
+    case 'බෝධි පූජා':
+      return '🍃 බෝධි පූජා පින්කමක්';
+    case 'කඨින':
+      return '🪷 කඨින මහා පින්කමක්';
+    case 'ප්‍රතිසංස්කරණ':
+    case 'විහාර නිර්මාණ':
+      return '🏛️ විහාර නිර්මාණයක්';
+    case 'සමාජ සත්කාර':
+    case 'සත්කාර':
+      return '🤝 සමාජ සත්කාරයක්';
+    case 'සිතුවිලි':
+      return '💭 සදහම් සිතුවිල්ලක්';
+    case 'සුබපැතුම්':
+      return '✨ සදහම් සුබපැතුමක්';
+    case 'සාමාන්‍ය':
+    case 'සාමාන්ය':
+    default:
+      return '🌸 පුණ්‍ය සටහනක්';
+  }
+}
+window.getShareCategoryBadge = getShareCategoryBadge;
+
+/**
+ * Extracts a concise, meaningful topic hook (35-50 characters) from post title or opening content
+ */
+export function extractMeaningfulTopicSnippet(post, maxLen = 45) {
+  if (!post || typeof post !== 'object') return 'උතුම් පුණ්‍ය සටහන';
+
+  let raw = '';
+  if (isMeaningfulShareTitle(post.title)) {
+    raw = post.title.trim();
+  } else if (post.description && typeof post.description === 'string') {
+    raw = post.description.trim();
+  } else if (post.content && typeof post.content === 'string') {
+    raw = post.content.trim();
+  } else if (post.text && typeof post.text === 'string') {
+    raw = post.text.trim();
+  }
+
+  // Fallback to category-specific natural label if content is completely empty
+  if (!raw) {
+    if (isCareRequestPost(post)) return 'කාරුණික සත්කාරක ඉල්ලීම';
+    if (post.type === 'reel') return 'සදහම් වීඩියෝව';
+    if (post.category === 'දානමය') return 'උතුම් දානමය පින්කම';
+    if (post.category === 'ශීලමය') return 'උතුම් ශීලමය පින්කම';
+    if (post.category === 'භාවනාමය') return 'භාවනාමය සිතුවිල්ල';
+    return 'උතුම් පුණ්‍ය සටහන';
+  }
+
+  let clean = raw
+    .replace(/<[^>]*>?/gm, ' ')
+    .replace(/https?:\/\/\S+/gi, ' ')
+    .replace(/[\r\n\t]+/g, ' ')
+    .trim();
+
+  // Strip repetitive checklist headers, decorative emojis, or boilerplate greetings
+  clean = clean.replace(/^(?:🌸\s*)?අද\s+දින\s*(?:\([^)]+\))?\s*(?:මම|අප)?\s*සම්පූර්ණ\s*කළ\s*දෛනික\s*කුසල්\s*[:\-\s]*/i, '');
+  clean = clean.replace(/^(?:🌸|✨|🙏|✅|👉|•|-|\*)\s*/, '');
+  clean = clean.replace(/^(?:සාදරයෙන්\s+පිළිගනිමු!?|සාදු\s+සාදු\s+සාදු!?)\s*/i, '');
+  clean = clean.replace(/\s+/g, ' ').trim();
+
+  if (!clean) {
+    return 'උතුම් පුණ්‍ය සටහන';
+  }
+
+  let sliced = safeUnicodeSlice(clean, maxLen);
+  return sliced.replace(/\.{2,}$/, '').replace(/[\s.,;:!\-]+$/, '').trim();
+}
+window.extractMeaningfulTopicSnippet = extractMeaningfulTopicSnippet;
+
+/**
+ * Builds a natural, informative Sinhala summary (~120-160 characters) for Open Graph description
+ */
+export function extractCleanShareDescription(post, maxLen = 155) {
+  if (!post || typeof post !== 'object') {
+    return 'අපේ පිං පොත (apepinpotha.lk) ඩිජිටල් පුණ්‍ය ජාලය හරහා බෙදාගත් උතුම් සටහනකි.';
+  }
+
+  const rawDesc = typeof post.description === 'string' ? post.description : '';
+  const rawTitle = typeof post.title === 'string' ? post.title.trim() : '';
+
+  let clean = rawDesc
+    .replace(/<[^>]*>?/gm, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // Strip leading line if it duplicates the post title
+  if (rawTitle && clean.toLowerCase().startsWith(rawTitle.toLowerCase())) {
+    clean = clean.substring(rawTitle.length).replace(/^[\s:;.-]+/, '').trim();
+  }
+
+  // Handle empty or very short description
+  if (!clean || clean.length < 15) {
+    const authorName = StorageService.resolveAuthorName(post) || 'කල්‍යාණ මිත්‍රයෙක්';
+    if (isCareRequestPost(post)) {
+      const contact = (post.contactNumber || post.phone || post.contact || '').trim();
+      const contactInfo = contact ? ` විමසීම්: ${contact}.` : '';
+      return `විහාරස්ථාන සහ සමාජ සත්කාර සඳහා සිදු කරන කාරුණික ඇරයුමකි.${contactInfo} වැඩිදුර විස්තර සඳහා පිවිසෙන්න.`;
+    }
+    return `${authorName} විසින් අපේ පිං පොත (apepinpotha.lk) වෙත එක් කළ උතුම් සටහනකි. සාදු සිතින් අනුමෝදන් වන්න.`;
+  }
+
+  // Preserve contact number in care requests within the length limit
+  if (isCareRequestPost(post)) {
+    const contact = (post.contactNumber || post.phone || post.contact || '').trim();
+    if (contact && !clean.includes(contact)) {
+      const suffix = ` (විමසීම්: ${contact})`;
+      const targetTextLen = maxLen - suffix.length;
+      return safeUnicodeSlice(clean, targetTextLen) + suffix;
+    }
+  }
+
+  return safeUnicodeSlice(clean, maxLen);
+}
+window.extractCleanShareDescription = extractCleanShareDescription;
+
+/**
+ * Universal helper to identify care request / support request / charity posts
+ */
+export function isCareRequestPost(post) {
+  if (!post || typeof post !== 'object') return false;
+  if (post.isDeleted === true) return false;
+  return Boolean(
+    post.type === 'need' ||
+    post.type === 'sathkara' ||
+    post.type === 'care' ||
+    post.category === 'සමාජ සත්කාර' ||
+    post.isNeed === true ||
+    post.isVerifiedNeed === true
+  );
+}
+window.isCareRequestPost = isCareRequestPost;
 
 /**
  * Extracts normalized metadata, clean hook and smart human-style share copy for a post
@@ -801,17 +1081,32 @@ export function getPostShareMetadata(rawPost) {
     ? 'අපේ පිං පොත' 
     : (StorageService.resolveAuthorName(canonical) || 'කල්‍යාණ මිත්‍රයෙක්');
 
+  const categoryBadge = getShareCategoryBadge(canonical);
+  const topicSnippet = extractMeaningfulTopicSnippet(canonical, 45);
+
+  // Context-aware og:title (clean emoji/category + topic hook + author + site name)
+  const isOfficial = Boolean(canonical.isOfficial || authorName === 'අපේ පිං පොත' || authorName === 'අපේ පින් පොත');
+  const isGeneralCategory = (categoryBadge === '🌸 පුණ්‍ය සටහනක්');
+  const ogTitle = isOfficial 
+    ? (isGeneralCategory ? `🌸 ${topicSnippet} | අපේ පිං පොත` : `${categoryBadge}: ${topicSnippet} | අපේ පිං පොත`)
+    : (isGeneralCategory ? `🌸 ${topicSnippet} — ${authorName} | අපේ පිං පොත` : `${categoryBadge}: ${topicSnippet} — ${authorName} | අපේ පිං පොත`);
+
+  // Cleaner, natural og:description
+  const ogDescription = extractCleanShareDescription(canonical, 155);
+
   const hook = isMeaningfulShareTitle(canonical.title) 
     ? canonical.title.trim() 
-    : (extractCleanShareSnippet(canonical.description, 110) || 'අපේ පිං පොත හරහා බෙදාගත් උතුම් සටහනකි.');
+    : (topicSnippet || 'අපේ පිං පොත හරහා බෙදාගත් උතුම් සටහනකි.');
 
   const type = canonical.type || 'general';
   const cat = canonical.category || '';
   const EXCLUDED_CATEGORIES = ['ධර්ම දානමය', 'සිතුවිලි', 'සුබපැතුම්', 'සාමාන්ය', 'සාමාන්‍ය'];
 
   let smartText = '';
-  if (type === 'need') {
-    smartText = `🤝 කාරුණික උපකාර ඉල්ලීමක්\n\n${hook}\n\n👇 වැඩි විස්තර සහ දායකත්වය සඳහා:\n${url}`;
+  if (isCareRequestPost(canonical) || type === 'need') {
+    const contact = (canonical.contactNumber || canonical.phone || canonical.contact || '').trim();
+    const contactLine = contact ? `\n📞 විමසීම්: ${contact}` : '';
+    smartText = `🤝 කාරුණික සත්කාරක ඉල්ලීමක්\n\n${hook}${contactLine}\n\n👇 වැඩි විස්තර සහ දායකත්වය සඳහා:\n${url}`;
   } else if (type === 'reel') {
     smartText = `🎬 ${authorName} බෙදාගත් සදහම් වීඩියෝව\n\n${hook}\n\n👇 නරඹන්න:\n${url}`;
   } else if (type === 'merit' && !EXCLUDED_CATEGORIES.includes(cat)) {
@@ -820,14 +1115,20 @@ export function getPostShareMetadata(rawPost) {
     smartText = `${hook}\n\n✍️ ${authorName} • සම්පූර්ණ සටහන කියවන්න 👇\n${url}`;
   }
 
-  let thumbnail = null;
+  let rawThumbnail = null;
   if (Array.isArray(canonical.images) && canonical.images.length > 0) {
-    thumbnail = canonical.images[0];
+    rawThumbnail = canonical.images[0];
   } else if (canonical.image) {
-    thumbnail = canonical.image;
+    rawThumbnail = canonical.image;
   } else if (canonical.videoThumb) {
-    thumbnail = canonical.videoThumb;
+    rawThumbnail = canonical.videoThumb;
+  } else if (canonical.videoThumbnail) {
+    rawThumbnail = canonical.videoThumbnail;
   }
+
+  // Ensure absolute HTTPS URL with category-appropriate fallback banner
+  const thumbnail = resolveShareImageUrl(rawThumbnail, canonical);
+  const ogImage = thumbnail;
 
   return {
     post: canonical,
@@ -837,9 +1138,59 @@ export function getPostShareMetadata(rawPost) {
     authorName,
     hook,
     smartText,
-    thumbnail
+    thumbnail,
+    ogTitle,
+    ogDescription,
+    ogImage,
+    categoryBadge,
+    topicSnippet
   };
 }
+
+/**
+ * Dynamically updates document title and Open Graph / Twitter Card meta tags
+ */
+export function updateDynamicMetaTags(post) {
+  if (!post) return;
+  try {
+    const meta = getPostShareMetadata(post);
+    const title = meta.ogTitle || `${meta.hook} | අපේ පිං පොත`;
+    const desc = meta.ogDescription || extractCleanShareSnippet(meta.post.description || meta.smartText, 160) || meta.hook;
+    const imageUrl = meta.ogImage || meta.thumbnail || 'https://apepinpotha.lk/assets/og-banner.jpg';
+    const pageUrl = meta.url || `https://apepinpotha.lk/?p=${meta.targetId}`;
+
+    document.title = title;
+
+    const setMeta = (attr, key, content) => {
+      let el = document.querySelector(`meta[${attr}="${key}"]`);
+      if (!el) {
+        el = document.createElement('meta');
+        el.setAttribute(attr, key);
+        document.head.appendChild(el);
+      }
+      el.setAttribute('content', content);
+    };
+
+    setMeta('property', 'og:title', title);
+    setMeta('property', 'og:description', desc);
+    setMeta('property', 'og:image', imageUrl);
+    setMeta('property', 'og:image:secure_url', imageUrl);
+    setMeta('property', 'og:image:type', imageUrl.endsWith('.png') ? 'image/png' : (imageUrl.endsWith('.webp') ? 'image/webp' : 'image/jpeg'));
+    setMeta('property', 'og:image:width', '1200');
+    setMeta('property', 'og:image:height', '630');
+    setMeta('property', 'og:url', pageUrl);
+    setMeta('property', 'og:site_name', 'අපේ පිං පොත');
+
+    setMeta('name', 'description', desc);
+    setMeta('name', 'twitter:card', 'summary_large_image');
+    setMeta('name', 'twitter:title', title);
+    setMeta('name', 'twitter:description', desc);
+    setMeta('name', 'twitter:image', imageUrl);
+  } catch (e) {
+    console.warn('[Meta] Failed to update dynamic meta tags:', e);
+  }
+}
+window.updateDynamicMetaTags = updateDynamicMetaTags;
 
 /**
  * Builds clean, natural, human-style share copy based on post category and type
@@ -2216,6 +2567,27 @@ window.switchTab = function(tab, pushHistory = true) {
         <h2>🤝 කල්‍යාණ මිත්‍ර සත්කාර හවුල</h2>
         <p>විහාරස්ථාන, දුෂ්කර පාසල් සහ සමාජ සත්කාර සඳහා අවශ්‍ය ද්‍රව්‍යමය හා ශ්‍රම දායකත්වයන් පමණක් සම්බන්ධීකරණය කෙරේ.</p>
       `;
+
+      if (activeCategory !== 'සියල්ල' && activeCategory !== 'සමාජ සත්කාර') {
+        activeCategory = 'සියල්ල';
+        document.querySelectorAll('.category-item, .category-pill').forEach(btn => {
+          if (btn.getAttribute('data-cat') === 'සියල්ල') btn.classList.add('active');
+          else btn.classList.remove('active');
+        });
+      }
+
+      if (typeof StorageService.fetchCareRequests === 'function') {
+        StorageService.fetchCareRequests().then(fresh => {
+          if (Array.isArray(fresh) && fresh.length > 0) {
+            const map = new Map((currentPostsData || []).map(p => [p.id, p]));
+            fresh.forEach(p => { if (p && p.id) map.set(p.id, p); });
+            currentPostsData = Array.from(map.values());
+            window.currentPostsData = currentPostsData;
+            renderFeed();
+            renderSideNeeds();
+          }
+        }).catch(() => {});
+      }
     } else {
       banner.style.display = 'none';
     }
@@ -2722,18 +3094,19 @@ function renderPostDescriptionHTML(postId, rawDescription) {
     previewText = (lastSpace > 110) ? sliceTarget.substring(0, lastSpace) : sliceTarget;
   }
 
-  const formattedPreview = formatPostContent(previewText);
+  // Strip trailing punctuation, spaces, or dots from preview to avoid awkward double ellipses before "තව කියවන්න..."
+  const cleanPreviewText = previewText.replace(/[\s.,;:!-]+$/, '');
+  const formattedPreview = formatPostContent(cleanPreviewText);
   const formattedFull = formatPostContent(trimmed);
 
   return `
     <div class="post-desc-wrapper" id="post-desc-wrap-${postId}">
       <p class="post-desc post-desc-collapsed" id="post-desc-collapsed-${postId}">
-        ${formattedPreview}... 
-        <button type="button" class="post-see-more-btn" onclick="togglePostContentExpansion('${postId}', event)">තව කියවන්න... <span class="see-more-en">(See more)</span></button>
+        ${formattedPreview} <button type="button" class="post-see-more-btn" onclick="togglePostContentExpansion('${postId}', event)" aria-expanded="false" title="සම්පූර්ණ සටහන කියවන්න">තව කියවන්න...</button>
       </p>
       <p class="post-desc post-desc-full" id="post-desc-full-${postId}" style="display: none;">
         ${formattedFull}
-        <button type="button" class="post-see-more-btn see-less-btn" onclick="togglePostContentExpansion('${postId}', event)">අඩු කරන්න <span class="see-more-en">(See less)</span></button>
+        <button type="button" class="post-see-more-btn see-less-btn" onclick="togglePostContentExpansion('${postId}', event)" aria-expanded="true" title="සටහන කෙටි කරන්න">අඩුවෙන් පෙන්වන්න</button>
       </p>
     </div>
   `;
@@ -2940,7 +3313,7 @@ export function renderPostCardHTML(post, user) {
   const canDelete = isOwner || isMaster;
   const canEditPost = isOwner || isMaster;
   const comments = post.comments || [];
-  const isNeed = post.type === 'need';
+  const isNeed = isCareRequestPost(post);
   const isGeneral = post.type === 'general';
   const isRepost = post.type === 'repost' || post.isRepost === true || !!post.originalPost;
   const orig = post.originalPost;
@@ -2991,7 +3364,7 @@ export function renderPostCardHTML(post, user) {
               <span class="repost-time">${Security.escapeHTML(formatRelativeTimeSinhala(post.timestamp, post.date || 'දැන්'))}</span>
             </div>
           </div>
-          <div style="display: flex; align-items: center; gap: 6px;">
+          <div class="post-header-actions">
             ${isMaster ? `
               <button class="post-official-btn ${post.isOfficial ? 'is-official' : ''}" onclick="toggleOfficialPrompt('${post.id}')" title="${post.isOfficial ? 'නිල නිවේදන ලාංඡනය ඉවත් කරන්න' : 'නිල නිවේදනයක් (Official Post) බවට පත් කරන්න'}">
                 <i class="fa-solid fa-bullhorn"></i>
@@ -3055,23 +3428,23 @@ export function renderPostCardHTML(post, user) {
               <div class="post-avatar official-avatar-circle" onclick="openPoliciesModal('about')" style="cursor: pointer;" title="අපේ පිං පොත පිළිබඳ විස්තර">
                 <i class="fa-solid fa-dharmachakra" style="font-size: 1.35rem; color: #fef3c7; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));"></i>
               </div>
-              <div>
+              <div class="post-author-meta-block">
                 <div class="post-badges-wrap" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                   <span class="post-author-name official-author-name" onclick="openPoliciesModal('about')" style="cursor: pointer;" title="අපේ පිං පොත පිළිබඳ විස්තර">අපේ පිං පොත</span>
                   ${post.visibility === 'private' ? '<span class="post-badge private"><i class="fa-solid fa-lock" style="font-size: 9px;"></i> Private</span>' : ''}
                 </div>
                 <div class="post-meta-sub">
-                  <span>${Security.escapeHTML(formatRelativeTimeSinhala(post.timestamp, post.date || 'දැන්'))}</span>
-                  ${post.location ? `<span>• <i class="fa-solid fa-location-dot" style="color: #d97706;"></i> ${Security.escapeHTML(post.location)}</span>` : ''}
-                  <span>• <i class="fa-solid fa-earth-asia" style="font-size: 10px;"></i></span>
+                  <span class="post-meta-token post-meta-time">${Security.escapeHTML(formatRelativeTimeSinhala(post.timestamp, post.date || 'දැන්'))}</span>
+                  ${post.location ? `<span class="post-meta-token post-meta-location"><span class="post-meta-dot">•</span><i class="fa-solid fa-location-dot" style="color: #d97706; font-size: 11px;"></i><span>${Security.escapeHTML(post.location)}</span></span>` : ''}
+                  <span class="post-meta-token post-meta-visibility"><span class="post-meta-dot">•</span><i class="fa-solid fa-earth-asia" style="font-size: 10px;"></i></span>
                 </div>
               </div>
             ` : `
               <div class="post-avatar ${isNeed ? 'need' : ''} ${isAuthorSangha ? 'sangha-framed-avatar' : ''}" onclick="viewUserProfile('${post.uid || ''}', '${Security.escapeHTML(postAuthorName)}', '${postAuthorPhoto ? Security.sanitizeUrl(postAuthorPhoto) : ''}')" style="cursor: pointer;" title="${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න">
-                ${postAuthorPhoto ? `<img src="${Security.sanitizeUrl(postAuthorPhoto)}" loading="lazy" decoding="async" style="width: 100%; height: 100%; border-radius: 9999px; object-fit: cover;">` : `<span>${Security.escapeHTML(postAuthorName.charAt(0))}</span>`}
+                ${postAuthorPhoto ? `<img src="${Security.sanitizeUrl(postAuthorPhoto)}" loading="lazy" decoding="async" class="post-avatar-img" alt="${Security.escapeHTML(postAuthorName)}">` : `<span>${Security.escapeHTML(postAuthorName.charAt(0))}</span>`}
                 ${isAuthorSangha ? '<img src="assets/sangha-frame.webp" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
               </div>
-              <div>
+              <div class="post-author-meta-block">
                 <div class="post-badges-wrap">
                   <span class="post-author-name author-click-link" onclick="viewUserProfile('${post.uid || ''}', '${Security.escapeHTML(postAuthorName)}', '${postAuthorPhoto ? Security.sanitizeUrl(postAuthorPhoto) : ''}')" style="cursor: pointer;" title="${Security.escapeHTML(postAuthorName)} ගේ Profile එක බලන්න">${Security.escapeHTML(postAuthorName)}</span>
                   ${isAuthorMaster ? `<span class="badge-crown" title="කල්‍යාණ මිත්‍ර">👑</span>` : (isAuthorSubAdmin ? `<span class="badge-shield" title="කල්‍යාණ මිත්‍ර">🛡️</span>` : '')}
@@ -3085,16 +3458,18 @@ export function renderPostCardHTML(post, user) {
                   ${post.visibility === 'private' ? '<span class="post-badge private"><i class="fa-solid fa-lock" style="font-size: 9px;"></i> Private</span>' : ''}
                 </div>
                 <div class="post-meta-sub">
-                  <span>${Security.escapeHTML(formatRelativeTimeSinhala(post.timestamp, post.date || 'දැන්'))}</span>
-                  ${post.isEdited ? `<span class="post-edited-tag" title="මෙම සටහන සංස්කරණය කරන ලදී">(සංස්කරණය කළ)</span>` : ''}
-                  ${post.location ? `<span>• <i class="fa-solid fa-location-dot" style="color: #d97706;"></i> ${Security.escapeHTML(post.location)}</span>` : ''}
-                  <span>• <i class="fa-solid ${post.visibility === 'private' ? 'fa-lock' : 'fa-earth-asia'}" style="font-size: 10px;"></i></span>
+                  <span class="post-meta-token post-meta-time">
+                    <span>${Security.escapeHTML(formatRelativeTimeSinhala(post.timestamp, post.date || 'දැන්'))}</span>
+                    ${post.isEdited ? `<span class="post-edited-tag" title="මෙම සටහන සංස්කරණය කරන ලදී">(සංස්කරණය කළ)</span>` : ''}
+                  </span>
+                  ${post.location ? `<span class="post-meta-token post-meta-location"><span class="post-meta-dot">•</span><i class="fa-solid fa-location-dot" style="color: #d97706; font-size: 11px;"></i><span>${Security.escapeHTML(post.location)}</span></span>` : ''}
+                  <span class="post-meta-token post-meta-visibility"><span class="post-meta-dot">•</span><i class="fa-solid ${post.visibility === 'private' ? 'fa-lock' : 'fa-earth-asia'}" style="font-size: 10px;"></i></span>
                 </div>
               </div>
             `}
           </div>
 
-          <div style="display: flex; align-items: center; gap: 6px;">
+          <div class="post-header-actions">
             ${isMaster && isNeed ? `
               <button class="post-verify-btn ${post.isVerifiedNeed ? 'verified' : ''}" onclick="toggleVerifyNeedPrompt('${post.id}')" title="${post.isVerifiedNeed ? 'සත්‍යාපනය ඉවත් කරන්න' : 'සත්කාරය සත්‍යාපනය කරන්න'}">
                 <i class="fa-solid fa-circle-check"></i> <span class="btn-text-resp">${post.isVerifiedNeed ? 'Verified' : 'Verify'}</span>
@@ -3502,6 +3877,20 @@ function renderFeed() {
   const container = document.getElementById('postsContainer');
   if (!container) return;
 
+  // If viewing care requests tab, ensure care requests are merged from storage if not yet in currentPostsData
+  if (activeTab === 'needs') {
+    const careInCurrent = (currentPostsData || []).some(p => isCareRequestPost(p));
+    if (!careInCurrent && typeof StorageService !== 'undefined') {
+      const backupCare = (StorageService._loadedPosts || StorageService.getLocalPosts() || []).filter(p => isCareRequestPost(p));
+      if (backupCare.length > 0) {
+        const map = new Map((currentPostsData || []).map(p => [p.id, p]));
+        backupCare.forEach(p => { if (p && p.id) map.set(p.id, p); });
+        currentPostsData = Array.from(map.values());
+        window.currentPostsData = currentPostsData;
+      }
+    }
+  }
+
   const searchQ = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
   const user = StorageService.currentUser;
 
@@ -3523,10 +3912,11 @@ function renderFeed() {
     const isOfficial = StorageService.isOfficialPost ? StorageService.isOfficialPost(post) : Boolean(post.isOfficial || post.authorRole === 'official' || post.author === 'අපේ පිං පොත' || post.author === 'අපේ පින් පොත');
     post.isOfficial = isOfficial;
 
+    const isCare = isCareRequestPost(post);
     const isCategoryMatch = (activeCategory === 'සියල්ල') ||
       (post.category === activeCategory) ||
       (activeCategory === 'සුබපැතුම්' && (post.category === 'සිතුවිලි' || post.category === 'සාමාන්‍ය')) ||
-      (activeCategory === 'සමාජ සත්කාර' && post.type === 'need');
+      (activeCategory === 'සමාජ සත්කාර' && isCare);
 
     if (activeTab === 'feed') {
       if (!isCategoryMatch && !post.isPinned && !isOfficial) return false;
@@ -3544,8 +3934,7 @@ function renderFeed() {
     }
 
     if (activeTab === 'needs') {
-      if (!isCategoryMatch) return false;
-      return post.type === 'need';
+      return isCare;
     }
 
     return true;
@@ -3722,6 +4111,9 @@ export function setupInfiniteScrollObserver() {
       const entry = entries[0];
       if (entry && entry.isIntersecting) {
         if (!isLoadingMore && hasMorePosts && autoLoadCount < MAX_AUTO_LOADS) {
+          if (feedSentinelObserver && sentinel) {
+            feedSentinelObserver.unobserve(sentinel);
+          }
           triggerHybridLoadMore(true);
         }
       }
@@ -3851,10 +4243,11 @@ export function appendNewPostsToFeed(allPosts, prevIdsStr) {
     const isOfficial = StorageService.isOfficialPost ? StorageService.isOfficialPost(post) : Boolean(post.isOfficial || post.authorRole === 'official' || post.author === 'අපේ පිං පොත' || post.author === 'අපේ පින් පොත');
     post.isOfficial = isOfficial;
 
+    const isCare = isCareRequestPost(post);
     const isCategoryMatch = (activeCategory === 'සියල්ල') ||
       (post.category === activeCategory) ||
       (activeCategory === 'සුබපැතුම්' && (post.category === 'සිතුවිලි' || post.category === 'සාමාන්‍ය')) ||
-      (activeCategory === 'සමාජ සත්කාර' && post.type === 'need');
+      (activeCategory === 'සමාජ සත්කාර' && isCare);
 
     if (activeTab === 'feed') {
       if (!isCategoryMatch && !post.isPinned && !isOfficial) return false;
@@ -3872,8 +4265,7 @@ export function appendNewPostsToFeed(allPosts, prevIdsStr) {
     }
 
     if (activeTab === 'needs') {
-      if (!isCategoryMatch) return false;
-      return post.type === 'need';
+      return isCare;
     }
 
     return true;
@@ -3899,7 +4291,20 @@ function renderSideNeeds() {
   const container = document.getElementById('sideNeedsList');
   if (!container) return;
 
-  const needs = currentPostsData.filter(p => p.type === 'need' && (!StorageService.isDummyTestPost || !StorageService.isDummyTestPost(p))).slice(0, 3);
+  let pool = currentPostsData || [];
+  let needs = pool.filter(p => isCareRequestPost(p) && (!StorageService.isDummyTestPost || !StorageService.isDummyTestPost(p)));
+  if (needs.length === 0 && typeof StorageService !== 'undefined') {
+    const backupPool = StorageService._loadedPosts || StorageService.getLocalPosts() || [];
+    needs = backupPool.filter(p => isCareRequestPost(p) && (!StorageService.isDummyTestPost || !StorageService.isDummyTestPost(p)));
+    if (needs.length > 0) {
+      const map = new Map((currentPostsData || []).map(p => [p.id, p]));
+      needs.forEach(p => { if (p && p.id) map.set(p.id, p); });
+      currentPostsData = Array.from(map.values());
+      window.currentPostsData = currentPostsData;
+    }
+  }
+  needs = needs.slice(0, 3);
+
   if (needs.length === 0) {
     container.innerHTML = `<p style="font-size: 0.72rem; color: #94a3b8;">දැනට ඉල්ලීම් නොමැත.</p>`;
     return;
@@ -3907,7 +4312,12 @@ function renderSideNeeds() {
 
   container.innerHTML = needs.map(n => `
     <div class="side-need-item" onclick="switchTab('needs')">
-      <span class="side-need-location">${Security.escapeHTML(n.location || 'ලංකාව')}</span>
+      <div class="side-need-header">
+        <span class="side-need-location">${Security.escapeHTML(n.location || 'ලංකාව')}</span>
+        <button type="button" class="side-need-share-btn" onclick="event.stopPropagation(); handleShare('${n.id}')" title="බෙදාගන්න (Share)">
+          <i class="fa-solid fa-share-nodes"></i>
+        </button>
+      </div>
       <h4 class="side-need-title">${Security.escapeHTML(n.title)}</h4>
       <p style="font-size: 0.7rem; color: #64748b; margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
         ${Security.escapeHTML(n.description)}
@@ -4460,7 +4870,7 @@ window.openEditPostModal = function(postId) {
 
   const contactWrap = document.getElementById('editContactWrapper');
   const contactInput = document.getElementById('editPostContact');
-  if (post.type === 'need') {
+  if (isCareRequestPost(post)) {
     if (contactWrap) contactWrap.style.display = 'block';
     if (contactInput) contactInput.value = post.contact || '';
   } else {
@@ -4993,7 +5403,7 @@ window.shareSheetActionNative = async function() {
   if (navigator.share) {
     try {
       await navigator.share({
-        title: `පිං පොත | ${meta.hook}`,
+        title: meta.ogTitle || `පිං පොත | ${meta.hook}`,
         text: meta.smartText,
         url: meta.url
       });
@@ -5094,7 +5504,7 @@ window.generateWhatsAppStatusCardFromModal = async function() {
     const renderBox = document.getElementById('viralStatusCardRenderBox');
     if (!renderBox) throw new Error('Render box not found');
 
-    const isNeed = post.type === 'need' || (orig && orig.type === 'need');
+    const isNeed = isCareRequestPost(post) || (orig && isCareRequestPost(orig));
     const cleanDesc = realDesc ? realDesc.replace(/<[^>]*>?/gm, '').trim() : '';
     const cleanImages = (isRepost && orig)
       ? (orig.images || (orig.image ? [orig.image] : []))
@@ -5259,10 +5669,11 @@ window.generateWhatsAppStatusCardFromModal = async function() {
       try {
         const file = new File([blob], fileName, { type: 'image/png' });
         if (navigator.canShare({ files: [file] })) {
+          const cardShareMeta = getPostShareMetadata(post || { id: targetId, title: realTitle, author: realAuthor, type: isNeed ? 'need' : 'merit' });
           await navigator.share({
             files: [file],
-            title: `පිං පොත | ${realTitle}`,
-            text: `🌸 "${realAuthor}" ගේ උතුම් පින්කම:\n✨ ${realTitle}\n\n🙏 මේ උතුම් පින්කම දැකබලා ඔබත් සාදුකාර දී පින් අනුමෝදන් වන්න:\n${postUrl}`
+            title: `අපේ පිං පොත | ${realTitle}`,
+            text: cardShareMeta.smartText
           });
           sharedViaFile = true;
         }
@@ -5324,7 +5735,7 @@ export function renderSharedPostSpotlight(post) {
   if (!container || !post) return;
 
   const user = StorageService.currentUser;
-  const isNeed = post.type === 'need';
+  const isNeed = isCareRequestPost(post);
   const isReel = post.type === 'reel' || Boolean(post.isShorts || post.videoId);
   const badgeLabel = isNeed ? '🤝 ඔබ පිවිසි සත්කාර ඇරයුම' : (isReel ? '🎬 ඔබ පිවිසි සදහම් වීඩියෝව' : '✨ ඔබ පිවිසි සටහන');
 
@@ -5446,7 +5857,7 @@ export async function checkUrlDirectPost(explicitPostId = null) {
   }
 
   // 5. If it's a Sathkara Need post or ?tab=needs, switch to needs tab
-  const isNeedPost = targetPost.type === 'need';
+  const isNeedPost = isCareRequestPost(targetPost);
   if ((isNeedPost || tabParam === 'needs') && activeTab !== 'needs') {
     switchTab('needs', false);
   }
@@ -5460,6 +5871,11 @@ export async function checkUrlDirectPost(explicitPostId = null) {
   // 6. Set active spotlight post ID and render in top spotlight container
   currentSpotlightPostId = targetPost.id;
   renderSharedPostSpotlight(targetPost);
+
+  // Dynamically update document title and Open Graph meta tags for shared post
+  try {
+    updateDynamicMetaTags(targetPost);
+  } catch (e) {}
 
   // 7. Re-render feed below to filter out this post (deduplicate)
   renderFeed();
@@ -6838,7 +7254,7 @@ window.handleReelShare = async function(postId, btnEl) {
                (StorageService.getLocalPosts() || []).find(p => p.id === postId) || { id: postId, type: 'reel' };
 
   const meta = getPostShareMetadata(reel);
-  const shareTitle = `පිං පොත | ${meta.hook}`;
+  const shareTitle = meta.ogTitle || `පිං පොත | ${meta.hook}`;
   const shareText = meta.smartText;
   const shareUrl = meta.url;
 
@@ -7315,6 +7731,9 @@ function setupEventListeners() {
       renderFeed();
       if (activeTab === 'profile') renderProfileView();
       checkAndPromptMandatoryName();
+      setTimeout(() => {
+        try { checkAndShowOnboardingGuide(); } catch (e) {}
+      }, 700);
     } else if (res && !res.success && !res.cancelled && res.message && res.code !== 'auth/popup-closed-by-user') {
       if (alertBox) {
         alertBox.classList.remove('hidden');
@@ -7353,6 +7772,9 @@ function setupEventListeners() {
       renderFeed();
       if (activeTab === 'profile') renderProfileView();
       checkAndPromptMandatoryName();
+      setTimeout(() => {
+        try { checkAndShowOnboardingGuide(); } catch (e) {}
+      }, 700);
     } else if (res && !res.success && !res.cancelled && res.message && res.code !== 'auth/popup-closed-by-user') {
       alert(res.message);
     }
@@ -9579,12 +10001,12 @@ function startKmpLivePolling() {
   kmpLivePollTimer = setInterval(async () => {
     if (activeTab === 'friends' && !document.hidden) {
       try {
-        await renderKmpDirectoryView(true);
+        await renderKmpDirectoryView(false);
       } catch (e) {
         console.warn('[KMP] Live poll error:', e);
       }
     }
-  }, 20000); // Poll every 20 seconds for live updates
+  }, 20000); // Poll every 20 seconds for live updates without disrupting scroll position
 }
 
 function stopKmpLivePolling() {
@@ -9608,27 +10030,27 @@ window.refreshKmpDirectoryLive = async function(e) {
 };
 
 function initPresenceEngine() {
-  // Update presence immediately on start
+  // Update presence immediately on start (force = true on page open)
   StorageService.updateUserPresence(true);
 
-  // Background heartbeat every 60s
+  // Background heartbeat every 2.5 minutes (150,000ms)
   setInterval(() => {
     if (!document.hidden) {
       StorageService.updateUserPresence();
     }
-  }, 60000);
+  }, 150000);
 
   // Handle visibility transitions
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
       StorageService.updateUserPresence(true);
       if (activeTab === 'friends') {
-        renderKmpDirectoryView(true);
+        renderKmpDirectoryView(false);
       }
     }
   });
 
-  // Track user actions (throttled to 60s inside StorageService)
+  // Track user actions (throttled to 2.5 minutes inside StorageService)
   ['click', 'touchstart', 'keydown'].forEach(evt => {
     window.addEventListener(evt, () => {
       StorageService.updateUserPresence();
@@ -9656,7 +10078,7 @@ window.switchKmpSegment = function(seg) {
   triggerHaptic(12);
   kmpActiveSegment = seg;
 
-  const chips = ['all', 'friends', 'online', 'sangha', 'suggested', 'requests'];
+  const chips = ['all', 'online', 'sangha', 'friends', 'suggested', 'requests'];
   chips.forEach(s => {
     const chip = document.getElementById(`kmpSeg${s.charAt(0).toUpperCase() + s.slice(1)}`);
     if (chip) {
@@ -9749,7 +10171,7 @@ window.resetKmpFilters = function() {
   const sortSelect = document.getElementById('kmpSortSelect');
   if (sortSelect) sortSelect.value = 'active';
 
-  const chips = ['all', 'friends', 'online', 'sangha', 'suggested', 'requests'];
+  const chips = ['all', 'online', 'sangha', 'friends', 'suggested', 'requests'];
   chips.forEach(s => {
     const chip = document.getElementById(`kmpSeg${s.charAt(0).toUpperCase() + s.slice(1)}`);
     if (chip) {
@@ -9760,6 +10182,63 @@ window.resetKmpFilters = function() {
 
   renderKmpDirectoryView(false);
 };
+
+// Helper to format dynamic Sinhala relative last seen status
+function formatKmpLastSeen(timestamp, isOnline) {
+  const ts = Number(timestamp) || 0;
+  const now = Date.now();
+  const diffMs = now - ts;
+
+  // 1. Under 3 minutes or explicitly marked online
+  if (isOnline || (ts > 0 && diffMs < 3 * 60 * 1000)) {
+    return {
+      isOnline: true,
+      text: 'දැන් Online'
+    };
+  }
+
+  // 2. Missing, zero, invalid or future timestamp
+  if (!ts || diffMs < 0) {
+    return {
+      isOnline: false,
+      text: 'මෑතකදී ක්‍රියාකාරී විය'
+    };
+  }
+
+  const diffMinutes = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  // 3. 3-59 minutes ago
+  if (diffMinutes >= 3 && diffMinutes < 60) {
+    return {
+      isOnline: false,
+      text: `විනාඩි ${diffMinutes} කට පෙර ක්‍රියාකාරී විය`
+    };
+  }
+
+  // 4. 1-23 hours ago
+  if (diffHours >= 1 && diffHours < 24) {
+    return {
+      isOnline: false,
+      text: `පැය ${diffHours} කට පෙර ක්‍රියාකාරී විය`
+    };
+  }
+
+  // 5. 1-6 days ago
+  if (diffDays >= 1 && diffDays <= 6) {
+    return {
+      isOnline: false,
+      text: `දින ${diffDays} කට පෙර ක්‍රියාකාරී විය`
+    };
+  }
+
+  // 6. Older (7 days or more)
+  return {
+    isOnline: false,
+    text: 'මෑතකදී ක්‍රියාකාරී විය'
+  };
+}
 
 window.renderKmpDirectoryView = async function(forceRefresh = false) {
   const container = document.getElementById('kmpGridContainer');
@@ -9784,7 +10263,8 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
     if (kmpSearchQuery) {
       kmpMembersCache = await StorageService.getAllCommunityMembers(forceRefresh);
     } else {
-      kmpMembersCache = await StorageService.getPaginatedCommunityMembers(forceRefresh, 15);
+      const fetchCount = Math.max(15, kmpMembersCache.length);
+      kmpMembersCache = await StorageService.getPaginatedCommunityMembers(forceRefresh, fetchCount);
     }
   }
 
@@ -9889,27 +10369,41 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
     });
   }
 
-  // Search filter
+  // Search filter (matches name, city, district, location, or bio)
   if (kmpSearchQuery) {
-    const q = kmpSearchQuery.toLowerCase();
-    list = list.filter(m =>
-      (m.name || '').toLowerCase().includes(q) ||
-      (m.bio || '').toLowerCase().includes(q) ||
-      (m.location || '').toLowerCase().includes(q)
-    );
+    const q = kmpSearchQuery.toLowerCase().trim();
+    list = list.filter(m => {
+      const name = (m.name || '').toLowerCase();
+      const fName = (m.firstName || '').toLowerCase();
+      const lName = (m.lastName || '').toLowerCase();
+      const location = (m.location || '').toLowerCase();
+      const city = (m.city || '').toLowerCase();
+      const district = (m.district || '').toLowerCase();
+      const bio = (m.bio || '').toLowerCase();
+      return name.includes(q) ||
+             fName.includes(q) ||
+             lName.includes(q) ||
+             location.includes(q) ||
+             city.includes(q) ||
+             district.includes(q) ||
+             bio.includes(q);
+    });
   }
 
-  // Sorting
+  // Sorting: Active-first default (currently online first, then most recently active descending)
   if (kmpSortMode === 'active') {
     list.sort((a, b) => {
       if (a.isOnline && !b.isOnline) return -1;
       if (!a.isOnline && b.isOnline) return 1;
-      return (b.lastActiveAt || b.updatedAt || 0) - (a.lastActiveAt || a.updatedAt || 0);
+      const timeA = Number(a.lastSeen || a.lastActiveAt || a.updatedAt || 0);
+      const timeB = Number(b.lastSeen || b.lastActiveAt || b.updatedAt || 0);
+      if (timeB !== timeA) return timeB - timeA;
+      return ((b.postsCount || 0) + (b.totalSadhu || 0)) - ((a.postsCount || 0) + (a.totalSadhu || 0));
     });
   } else if (kmpSortMode === 'newest') {
     list.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
   } else if (kmpSortMode === 'name') {
-    list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    list.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'si'));
   }
 
   // Results count & segment badge
@@ -9930,9 +10424,9 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
   if (badgeEl) {
     const segNames = {
       all: 'සියලු සාමාජිකයින්',
-      friends: 'මගේ මිතුරන්',
       online: 'දැන් Online',
-      sangha: 'මහා සංඝරත්නය',
+      sangha: 'පූජනීය සංඝරත්නය',
+      friends: 'මගේ මිතුරන්',
       suggested: 'යෝජිත මිතුරන්',
       requests: 'ලැබුණු ඇරයුම්'
     };
@@ -9971,6 +10465,10 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
     emptyState.style.display = 'none';
   }
 
+  // Capture current scroll positions before updating DOM
+  const prevWindowY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
+  const prevContainerY = container ? container.scrollTop : 0;
+
   // Render cards
   container.innerHTML = list.map(m => {
     const isMe = m.uid === currentUser.uid;
@@ -9991,8 +10489,12 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
 
     const displayName = isMemberAnon ? 'කල්‍යාණ මිත්‍ර සාමාජික' : (m.name || 'කල්‍යාණ මිත්‍ර');
     const displayPhoto = isMemberAnon ? BO_LEAF_AVATAR : (m.photo || '');
-    const displayLocation = isMemberAnon ? (m.location ? 'ශ්‍රී ලංකාව' : '') : (m.location || '');
+    const displayLocation = isMemberAnon ? (m.location ? 'ශ්‍රී ලංකාව' : '') : (m.location || m.city || m.district || '');
     const initial = isMemberAnon ? '🌿' : (displayName || 'ක').charAt(0);
+
+    // Format dynamic Last Seen status
+    const lastSeenTime = Number(m.lastSeen || m.lastActiveAt || m.updatedAt || 0);
+    const presenceStatus = formatKmpLastSeen(lastSeenTime, m.isOnline);
 
     // Incoming request check
     const pendingReq = pendingIncoming.find(r => r.senderUid === m.uid);
@@ -10035,7 +10537,7 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
         <div class="kmp-card-top">
           <div class="kmp-avatar-wrap ${isMemberSangha && !isMemberAnon ? 'kmp-sangha-avatar' : ''}" onclick="event.stopPropagation(); openPublicProfile('${m.uid}')" style="cursor: pointer;" title="පැතිකඩ බලන්න">
             ${displayPhoto ? `<img src="${Security.sanitizeUrl(displayPhoto)}" alt="${Security.escapeHTML(displayName)}" class="kmp-avatar-img" onerror="this.parentElement.innerHTML = '<div class=\\\'kmp-avatar-initial\\\'>${initial}</div>';">` : `<div class="kmp-avatar-initial">${initial}</div>`}
-            ${m.isOnline ? `<span class="kmp-online-dot" title="දැන් සජීවීව Online"></span>` : ''}
+            ${presenceStatus.isOnline ? `<span class="kmp-online-dot" title="දැන් සජීවීව Online"></span>` : ''}
             ${isMemberSangha && !isMemberAnon ? '<img src="assets/sangha-frame.webp" class="sangha-vatapatha-frame" alt="වටාපත">' : ''}
           </div>
           <div class="kmp-card-meta">
@@ -10044,9 +10546,9 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
               ${!isMemberAnon && isMemberMaster ? `<span class="badge-crown" title="කල්‍යාණ මිත්‍ර">👑</span>` : (!isMemberAnon && isMemberSubAdmin ? `<span class="badge-shield" title="කල්‍යාණ මිත්‍ර">🛡️</span>` : '')}
               ${!isMemberAnon && isMemberSangha ? `<span class="sangha-author-badge" style="margin-left: 3px; padding: 1px 6px; font-size: 0.6rem;"><i class="fa-solid fa-dharmachakra"></i> පූජනීය සංඝරත්නය</span>` : ''}
             </div>
-            ${m.isOnline
-              ? `<div class="kmp-presence-tag"><span class="kmp-pulse-dot-mini"></span> <span>දැන් Online</span></div>`
-              : `<div class="kmp-presence-tag offline"><i class="fa-solid fa-clock-rotate-left"></i> <span>ක්‍රියාකාරී විය</span></div>`
+            ${presenceStatus.isOnline
+              ? `<div class="kmp-presence-tag online"><span class="kmp-pulse-dot-mini"></span> <span>${presenceStatus.text}</span></div>`
+              : `<div class="kmp-presence-tag offline"><i class="fa-solid fa-clock-rotate-left"></i> <span>${presenceStatus.text}</span></div>`
             }
             ${displayLocation ? `<div class="kmp-location-text"><i class="fa-solid fa-location-dot" style="color: #ea580c;"></i> <span>${Security.escapeHTML(displayLocation)}</span></div>` : ''}
           </div>
@@ -10069,6 +10571,17 @@ window.renderKmpDirectoryView = async function(forceRefresh = false) {
       </div>
     `;
   }).join('');
+
+  // Restore scroll positions so live refresh or filter toggling never violently jumps the view
+  if (prevWindowY > 0) {
+    window.scrollTo({ top: prevWindowY, behavior: 'instant' });
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: prevWindowY, behavior: 'instant' });
+    });
+  }
+  if (container && prevContainerY > 0) {
+    container.scrollTop = prevContainerY;
+  }
 
   const loadMoreContainer = document.getElementById('kmpLoadMoreContainer');
   if (loadMoreContainer) {
@@ -10806,7 +11319,7 @@ window.renderAdminDashboard = async function() {
   // 1. Stats calculation
   const totalPosts = currentPostsData.length;
   const totalSadhu = currentPostsData.reduce((acc, p) => acc + (p.sadhuCount || 0), 0);
-  const totalNeeds = currentPostsData.filter(p => p.type === 'need').length;
+  const totalNeeds = currentPostsData.filter(p => isCareRequestPost(p)).length;
   const totalOfficial = currentPostsData.filter(p => p.isOfficial).length;
 
   const statPosts = document.getElementById('adminStatPosts');
@@ -14414,6 +14927,7 @@ window.getAllDhammaLibraryItems = function() {
       category: sub.category || 'dhamma',
       categoryLabel: catLabel,
       readTime: sub.readTime || 'විනාඩි 5',
+      views: sub.viewCount || sub.views || 0,
       pdfUrl: sub.pdfUrl || '',
       sections: (sub.sections || []).map(s => ({
         heading: s.title || s.heading || '',
@@ -14444,6 +14958,16 @@ window.loadApprovedDhammaLibrarySubmissions = async function() {
     console.warn('[DhammaLibrary] Could not fetch approved contributions:', err);
   }
 };
+
+// Formats view counts cleanly (e.g. 120, 1.2K, 15K, 1.5M)
+export function formatDhammaViewCount(count) {
+  const num = typeof count === 'number' ? count : parseInt(count, 10);
+  if (isNaN(num) || num <= 0) return '0';
+  if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+  return num.toString();
+}
+window.formatDhammaViewCount = formatDhammaViewCount;
 
 // Render Dhamma Library cards grid
 window.renderDhammaLibraryView = function(category = currentLibraryCategory, searchQuery = currentLibrarySearchQuery) {
@@ -14518,11 +15042,21 @@ window.renderDhammaLibraryView = function(category = currentLibraryCategory, sea
       </div>
     ` : '';
 
+    const views = (typeof StorageService !== 'undefined' && typeof StorageService.getDhammaItemViews === 'function')
+      ? StorageService.getDhammaItemViews(item.id, item.views || 0)
+      : (item.views || 0);
+
     return `
       <div class="library-card ${item.isUserContributed ? 'library-card-user-contributed' : ''}" data-item-id="${item.id}">
         <div class="library-card-badge-row">
           <span class="library-category-badge">${catIcon} ${item.categoryLabel}</span>
-          <span class="library-read-time"><i class="fa-regular fa-clock"></i> ${item.readTime}</span>
+          <div class="library-card-meta-right">
+            <span class="library-view-count" title="${views} වාරයක් කියවා ඇත">
+              <i class="fa-regular fa-eye"></i>
+              <span>${formatDhammaViewCount(views)}</span>
+            </span>
+            <span class="library-read-time"><i class="fa-regular fa-clock"></i> ${item.readTime}</span>
+          </div>
         </div>
         ${contributorBadgeHtml}
         <h2 class="library-card-title">${item.title}</h2>
@@ -14618,6 +15152,32 @@ window.openReadingModal = function(itemId) {
 
   if (titleEl) titleEl.textContent = item.title;
   if (catEl) catEl.textContent = item.categoryLabel;
+
+  const currentItemViews = (typeof StorageService !== 'undefined' && typeof StorageService.getDhammaItemViews === 'function')
+    ? StorageService.getDhammaItemViews(item.id, item.views || 0)
+    : (item.views || 0);
+  const modalViews = document.getElementById('readingModalViewsText');
+  if (modalViews) modalViews.textContent = formatDhammaViewCount(currentItemViews);
+  const modalViewBadge = document.getElementById('readingModalViewBadge');
+  if (modalViewBadge) {
+    modalViewBadge.setAttribute('title', `${currentItemViews} වාරයක් කියවා ඇත`);
+  }
+
+  // Increment view count with session deduplication to prevent inflated re-render counts
+  if (typeof StorageService !== 'undefined' && typeof StorageService.incrementDhammaItemViews === 'function') {
+    const baseViews = item.views || 0;
+    StorageService.incrementDhammaItemViews(itemId, baseViews).then(newCount => {
+      const card = document.querySelector(`.library-card[data-item-id="${itemId}"]`);
+      if (card) {
+        const countSpan = card.querySelector('.library-view-count span');
+        if (countSpan) countSpan.textContent = formatDhammaViewCount(newCount);
+        const viewBadge = card.querySelector('.library-view-count');
+        if (viewBadge) viewBadge.setAttribute('title', `${newCount} වාරයක් කියවා ඇත`);
+      }
+      if (modalViews) modalViews.textContent = formatDhammaViewCount(newCount);
+      if (modalViewBadge) modalViewBadge.setAttribute('title', `${newCount} වාරයක් කියවා ඇත`);
+    }).catch(() => {});
+  }
 
   // Setup contributor badge & footer if item is user-contributed
   if (item.isUserContributed && item.authorName) {
@@ -15376,3 +15936,302 @@ window.printLibraryItem = function(itemId) {
     setTimeout(triggerPrint, 150);
   }
 };
+
+/* ==========================================================================
+   5-Step Interactive Welcome & Onboarding Guide Feature
+   TukTuk Pro Inspired with Centered Animated Hero Stages & Touch Swipe
+   ========================================================================== */
+const ONBOARDING_STORAGE_KEY = 'apepinpotha_onboarding_seen';
+let currentOnboardingStep = 0;
+
+const ONBOARDING_STEPS = [
+  {
+    stepNum: 1,
+    category: 'සාදරයෙන් පිළිගනිමු',
+    heroHtml: `
+      <div class="hero-stage step-1">
+        <div class="hero-halo halo-pulse"></div>
+        <div class="hero-sparkles">
+          <span class="sparkle sp-1">✦</span>
+          <span class="sparkle sp-2">✨</span>
+          <span class="sparkle sp-3">✦</span>
+        </div>
+        <div class="hero-icon-circle gold-wheel-spin">
+          <i class="fa-solid fa-dharmachakra"></i>
+        </div>
+      </div>
+    `,
+    title: 'අපේ පිං පොතට සාදරයෙන් පිළිගනිමු!',
+    description: 'ශ්‍රී ලංකාවේ ප්‍රථම ඩිජිටල් පුණ්‍ය ප්‍රජාවට ඔබත් එක්වන්න. ඔබ සිදුකරන උතුම් පින්කම් සුරක්ෂිතව සටහන් කරමින්, අන්‍යයන්ගේ පින් දැක සිත පහදවා ගන්න.',
+    tipIcon: '💡',
+    tipText: 'ඔබගේ පෞද්ගලික පින්කම් කිසිවෙකුට නොපෙනෙන සේ "පෞද්ගලික පිං පොතේ" පමණක් රහසිගතව තබාගත හැක.'
+  },
+  {
+    stepNum: 2,
+    category: 'පින්කම් සහ Shorts',
+    heroHtml: `
+      <div class="hero-stage step-2">
+        <div class="hero-halo halo-lotus"></div>
+        <div class="hero-sadhu-particles">
+          <span class="particle p-1">සාධු!</span>
+          <span class="particle p-2">🌸</span>
+          <span class="particle p-3">✨</span>
+          <span class="particle p-4">සාධු!</span>
+        </div>
+        <div class="hero-icon-circle lotus-float">
+          <span class="hero-glyph">🪷</span>
+        </div>
+      </div>
+    `,
+    title: 'පින්කම් සහ Shorts බෙදාගන්න',
+    description: 'ඔබ සිදුකළ පින්කම්වල ඡායාරූප, වීඩියෝ සහ විස්තර සැදැහැති මිතුරන් සමඟ බෙදාගන්න. අන්‍යයන්ගේ පින්කම්වලට "සාධුකාර" දෙමින් සිත පහදවා ගන්න.',
+    tipIcon: '✨',
+    tipText: 'කෙටි ධාර්මික වීඩියෝ (Shorts) මඟින් ඔබේ පින්කම වඩාත් ආකර්ෂණීයව පින්වත් සැමට දැකගත හැක.'
+  },
+  {
+    stepNum: 3,
+    category: 'සත්කාර හවුල',
+    heroHtml: `
+      <div class="hero-stage step-3">
+        <div class="hero-halo halo-care"></div>
+        <div class="hero-ripples">
+          <div class="ripple r-1"></div>
+          <div class="ripple r-2"></div>
+        </div>
+        <div class="hero-icon-circle hands-pulse">
+          <span class="hero-glyph">🤝</span>
+        </div>
+      </div>
+    `,
+    title: 'සත්කාර හවුලෙන් පිහිට වන්න',
+    description: 'දුෂ්කර විහාරස්ථාන, ආරණ්‍ය සේනාසන සහ සැබෑ සමාජ සත්කාර සඳහා උපකාර අවශ්‍යතා දැනගන්න. ඔබටත් සෘජුවම දායකත්වයන් ලබාදිය හැක.',
+    tipIcon: '🛡️',
+    tipText: 'සියලු සත්කාර ඉල්ලීම් සත්‍යාපනය කර (Verified) පළකරන බැවින් ඔබගේ ආධාර සැබෑ අවශ්‍යතාව වෙතම ළඟාවේ.'
+  },
+  {
+    stepNum: 4,
+    category: 'ධර්ම පුස්තකාලය & පොහොය',
+    heroHtml: `
+      <div class="hero-stage step-4">
+        <div class="hero-halo halo-book"></div>
+        <div class="hero-shimmer">
+          <span class="star-item st-1">🌙</span>
+          <span class="star-item st-2">✨</span>
+          <span class="star-item st-3">⭐</span>
+        </div>
+        <div class="hero-icon-circle book-float">
+          <span class="hero-glyph">📜</span>
+        </div>
+      </div>
+    `,
+    title: 'ධර්ම පුස්තකාලය සහ පොහොය දින',
+    description: 'බෝධිපූජා කවි, පිරිත් සූත්‍ර, සමන්ත පට්ඨාන සහ සත්‍යාපිත ධර්ම ග්‍රන්ථ පහසුවෙන් කියවන්න. ඉදිරි පොහොය දින සහ තොරතුරු ක්ෂණිකව බලාගන්න.',
+    tipIcon: '🌙',
+    tipText: 'ඕනෑම ධර්ම ග්‍රන්ථයක් හෝ පිරිත් සූත්‍රයක් Offline කියවීමට හෝ A4 ප්‍රමාණයෙන් Print කරගැනීමටද හැකිය.'
+  },
+  {
+    stepNum: 5,
+    category: 'කල්‍යාණ මිතුරු පවුර',
+    heroHtml: `
+      <div class="hero-stage step-5">
+        <div class="hero-halo halo-nodes"></div>
+        <div class="hero-network-rings">
+          <div class="net-ring nr-1"></div>
+          <div class="net-ring nr-2"></div>
+          <span class="net-dot nd-1"></span>
+          <span class="net-dot nd-2"></span>
+          <span class="net-dot nd-3"></span>
+        </div>
+        <div class="hero-icon-circle node-pulse">
+          <span class="hero-glyph">👥</span>
+        </div>
+      </div>
+    `,
+    title: 'කල්‍යාණ මිතුරන් සමඟ එක්වන්න',
+    description: 'සඟරුවන, සිල්වත් උපාසක උපාසිකාවන් සහ ප්‍රදේශයේ කල්‍යාණ මිතුරන් සොයාගන්න. ඔවුනොවුන් සමඟ සුහදව සම්බන්ධ වෙමින් කුසල් වඩාගන්න.',
+    tipIcon: '🚀',
+    tipText: 'ඔබගේ පැතිකඩ (Profile) පින්තූරය සහ නම යාවත්කාලීන කර අදම ඔබේ ප්‍රථම පින්කම සටහන් කරන්න!'
+  }
+];
+
+function initOnboardingTouchSwipe() {
+  const cardBox = document.querySelector('.onboarding-card-box');
+  if (cardBox && !cardBox._swipeAttached) {
+    let touchStartX = 0;
+    let touchStartY = 0;
+    cardBox.addEventListener('touchstart', (e) => {
+      if (e.touches && e.touches.length > 0) {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+      }
+    }, { passive: true });
+
+    cardBox.addEventListener('touchend', (e) => {
+      if (e.changedTouches && e.changedTouches.length > 0) {
+        const deltaX = e.changedTouches[0].clientX - touchStartX;
+        const deltaY = e.changedTouches[0].clientY - touchStartY;
+        if (Math.abs(deltaX) > 42 && Math.abs(deltaX) > Math.abs(deltaY) * 1.3) {
+          if (deltaX < 0) {
+            nextOnboardingStep(); // Swiped left -> Forward
+          } else {
+            prevOnboardingStep(); // Swiped right -> Backward
+          }
+        }
+      }
+    }, { passive: true });
+    cardBox._swipeAttached = true;
+  }
+}
+
+function renderOnboardingStep(index, direction = 'none') {
+  if (index < 0) index = 0;
+  if (index >= ONBOARDING_STEPS.length) index = ONBOARDING_STEPS.length - 1;
+  currentOnboardingStep = index;
+
+  const data = ONBOARDING_STEPS[index];
+  const stepIndicator = document.getElementById('onboardingStepIndicator');
+  const heroStage = document.getElementById('onboardingHeroStage');
+  const categoryPill = document.getElementById('onboardingCategoryPill');
+  const title = document.getElementById('onboardingTitle');
+  const desc = document.getElementById('onboardingDesc');
+  const tipIcon = document.getElementById('onboardingTipIcon');
+  const tipText = document.getElementById('onboardingTipText');
+  const prevBtn = document.getElementById('onboardingPrevBtn');
+  const nextBtn = document.getElementById('onboardingNextBtn');
+  const dots = document.querySelectorAll('#onboardingDotsRow .onboarding-dot');
+  const cardBody = document.getElementById('onboardingCardBody');
+
+  // Trigger smooth directional step transition
+  if (cardBody && direction !== 'none') {
+    cardBody.classList.remove('slide-forward', 'slide-backward');
+    // Force layout reflow for animation restart
+    void cardBody.offsetWidth;
+    if (direction === 'forward') {
+      cardBody.classList.add('slide-forward');
+    } else if (direction === 'backward') {
+      cardBody.classList.add('slide-backward');
+    }
+  }
+
+  if (stepIndicator) stepIndicator.innerHTML = `<span class="step-num">${data.stepNum}</span> / 5 පියවර`;
+  if (heroStage) heroStage.innerHTML = data.heroHtml;
+  if (categoryPill) categoryPill.textContent = data.category;
+  if (title) title.textContent = data.title;
+  if (desc) desc.textContent = data.description;
+  if (tipIcon) tipIcon.textContent = data.tipIcon;
+  if (tipText) tipText.textContent = data.tipText;
+
+  // Update pagination dots
+  dots.forEach((dot, dotIdx) => {
+    if (dotIdx === index) {
+      dot.classList.add('active');
+    } else {
+      dot.classList.remove('active');
+    }
+  });
+
+  // Previous button visibility
+  if (prevBtn) {
+    if (index === 0) {
+      prevBtn.classList.add('hidden');
+    } else {
+      prevBtn.classList.remove('hidden');
+    }
+  }
+
+  // Next / Finish button styling and label
+  if (nextBtn) {
+    if (index === ONBOARDING_STEPS.length - 1) {
+      nextBtn.classList.add('start-cta');
+      nextBtn.innerHTML = `<span>🚀 ආරම්භ කරන්න (Start)</span>`;
+    } else {
+      nextBtn.classList.remove('start-cta');
+      nextBtn.innerHTML = `<span>ඉදිරියට (Next)</span> <i class="fa-solid fa-arrow-right"></i>`;
+    }
+  }
+}
+
+function openOnboardingGuide(resetToFirst = true) {
+  const modal = document.getElementById('onboardingModal');
+  if (!modal) return;
+  if (resetToFirst) currentOnboardingStep = 0;
+  renderOnboardingStep(currentOnboardingStep, 'none');
+  modal.classList.remove('hidden');
+  initOnboardingTouchSwipe();
+}
+
+function closeOnboardingGuide() {
+  const modal = document.getElementById('onboardingModal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function skipOnboardingGuide() {
+  try {
+    localStorage.setItem(ONBOARDING_STORAGE_KEY, 'seen');
+  } catch (e) {}
+  closeOnboardingGuide();
+}
+
+function finishOnboardingGuide() {
+  try {
+    localStorage.setItem(ONBOARDING_STORAGE_KEY, 'seen');
+  } catch (e) {}
+  closeOnboardingGuide();
+  // If user has not completed profile, prompt profile modal smoothly
+  try {
+    const user = StorageService.getUser();
+    if (!user || !user.name || user.name.trim() === '') {
+      setTimeout(() => {
+        try { openProfileModal(); } catch (err) {}
+      }, 350);
+    }
+  } catch (e) {}
+}
+
+function handleOnboardingBackdropClick(e) {
+  if (e.target && e.target.id === 'onboardingModal') {
+    closeOnboardingGuide();
+  }
+}
+
+function nextOnboardingStep() {
+  if (currentOnboardingStep < ONBOARDING_STEPS.length - 1) {
+    renderOnboardingStep(currentOnboardingStep + 1, 'forward');
+  } else {
+    finishOnboardingGuide();
+  }
+}
+
+function prevOnboardingStep() {
+  if (currentOnboardingStep > 0) {
+    renderOnboardingStep(currentOnboardingStep - 1, 'backward');
+  }
+}
+
+function jumpToOnboardingStep(index) {
+  const dir = index > currentOnboardingStep ? 'forward' : (index < currentOnboardingStep ? 'backward' : 'none');
+  renderOnboardingStep(index, dir);
+}
+
+function checkAndShowOnboardingGuide() {
+  try {
+    // Only auto-show if user hasn't seen it yet
+    const hasSeen = localStorage.getItem(ONBOARDING_STORAGE_KEY);
+    if (!hasSeen) {
+      openOnboardingGuide(true);
+    }
+  } catch (e) {
+    console.warn('[Onboarding] check error:', e);
+  }
+}
+
+window.openOnboardingGuide = openOnboardingGuide;
+window.closeOnboardingGuide = closeOnboardingGuide;
+window.skipOnboardingGuide = skipOnboardingGuide;
+window.finishOnboardingGuide = finishOnboardingGuide;
+window.handleOnboardingBackdropClick = handleOnboardingBackdropClick;
+window.nextOnboardingStep = nextOnboardingStep;
+window.prevOnboardingStep = prevOnboardingStep;
+window.jumpToOnboardingStep = jumpToOnboardingStep;
+window.checkAndShowOnboardingGuide = checkAndShowOnboardingGuide;
+

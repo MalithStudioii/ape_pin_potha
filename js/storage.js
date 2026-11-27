@@ -35,11 +35,68 @@ export const MASTER_ADMIN_EMAILS = [
   "silvadilan9@gmail.com"
 ];
 
-const DEFAULT_POYA_EVENT = {
-  month: 'නොවැ',
+export const SRI_LANKA_POYA_CALENDAR = [
+  { year: 2026, month: 'ජන', day: '03', date: '2026-01-03', title: 'දුරුතු පුර පසළොස්වක පොහොය', desc: 'බුදුරජාණන් වහන්සේගේ ප්‍රථම ලංකාගමනය - මහියංගනය' },
+  { year: 2026, month: 'පෙබ', day: '01', date: '2026-02-01', title: 'නවම් පුර පසළොස්වක පොහොය', desc: 'සැරියුත් මුගලන් අග්‍රශ්‍රාවක පදවි ලැබීම සහ ඕවාද ප්‍රාතිමෝක්ෂය' },
+  { year: 2026, month: 'මාර්තු', day: '03', date: '2026-03-03', title: 'මැදින් පුර පසළොස්වක පොහොය', desc: 'බුදුරදුන් කිඹුල්වත්පුරයට වැඩමවීම ආරම්භ කිරීම' },
+  { year: 2026, month: 'අප්‍රේල්', day: '01', date: '2026-04-01', title: 'බක් පුර පසළොස්වක පොහොය', desc: 'බුදුරජාණන් වහන්සේගේ දෙවන ලංකාගමනය - නාගදීපය' },
+  { year: 2026, month: 'මැයි', day: '01', date: '2026-05-01', title: 'වෙසක් පුර පසළොස්වක පොහොය', desc: 'තථාගතයන් වහන්සේගේ තෙමඟුල සිහිපත් කිරීම' },
+  { year: 2026, month: 'මැයි', day: '30', date: '2026-05-30', title: 'අධි පොසොන් පුර පසළොස්වක පොහොය', desc: 'පොසොන් පූර්ව පුණ්‍ය සතිය' },
+  { year: 2026, month: 'ජූනි', day: '29', date: '2026-06-29', title: 'පොසොන් පුර පසළොස්වක පොහොය', desc: 'මිහිඳු මහරහතන් වහන්සේගේ ලංකාගමනය - මිහින්තලය' },
+  { year: 2026, month: 'ජූලි', day: '28', date: '2026-07-28', title: 'ඇසළ පුර පසළොස්වක පොහොය', desc: 'ප්‍රථම ධර්ම දේශනාව - දම්සක් පැවතුම් සූත්‍රය' },
+  { year: 2026, month: 'අගෝ', day: '27', date: '2026-08-27', title: 'නිකිණි පුර පසළොස්වක පොහොය', desc: 'ප්‍රථම ධර්ම සංගායනාව සහ ආනන්ද හිමියන් රහත් වීම' },
+  { year: 2026, month: 'සැප්', day: '25', date: '2026-09-25', title: 'බිනර පුර පසළොස්වක පොහොය', desc: 'භික්ෂුණී ශාසනය ආරම්භ වීම' },
+  { year: 2026, month: 'ඔක්', day: '25', date: '2026-10-25', title: 'වප් පුර පසළොස්වක පොහොය', desc: 'කඨින චීවර මාසයේ ආරම්භය' },
+  { year: 2026, month: 'නොවැ', day: '24', date: '2026-11-24', title: 'ඉල් පුර පසළොස්වක පොහොය', desc: 'කඨින චීවර පූජා මහා පින්කම් සමයේ අවසානය' },
+  { year: 2026, month: 'දෙසැ', day: '24', date: '2026-12-24', title: 'උඳුවප් පුර පසළොස්වක පොහොය', desc: 'සඟමිත් තෙරණිය ලක්දිවට ජය ශ්‍රී මහා බෝධි දක්ෂිණ ශාඛාව වැඩමවීම' },
+  { year: 2027, month: 'ජන', day: '22', date: '2027-01-22', title: 'දුරුතු පුර පසළොස්වක පොහොය', desc: 'බුදුරජාණන් වහන්සේගේ ප්‍රථම ලංකාගමනය - මහියංගනය' },
+  { year: 2027, month: 'පෙබ', day: '21', date: '2027-02-21', title: 'නවම් පුර පසළොස්වක පොහොය', desc: 'සැරියුත් මුගලන් අග්‍රශ්‍රාවක පදවි ලැබීම සහ ඕවාද ප්‍රාතිමෝක්ෂය' },
+  { year: 2027, month: 'මාර්තු', day: '22', date: '2027-03-22', title: 'මැදින් පුර පසළොස්වක පොහොය', desc: 'බුදුරදුන් කිඹුල්වත්පුරයට වැඩමවීම ආරම්භ කිරීම' },
+  { year: 2027, month: 'අප්‍රේල්', day: '21', date: '2027-04-21', title: 'බක් පුර පසළොස්වක පොහොය', desc: 'බුදුරජාණන් වහන්සේගේ දෙවන ලංකාගමනය - නාගදීපය' },
+  { year: 2027, month: 'මැයි', day: '20', date: '2027-05-20', title: 'වෙසක් පුර පසළොස්වක පොහොය', desc: 'තථාගතයන් වහන්සේගේ තෙමඟුල සිහිපත් කිරීම' },
+  { year: 2027, month: 'ජූනි', day: '19', date: '2027-06-19', title: 'පොසොන් පුර පසළොස්වක පොහොය', desc: 'මිහිඳු මහරහතන් වහන්සේගේ ලංකාගමනය - මිහින්තලය' },
+  { year: 2027, month: 'ජූලි', day: '18', date: '2027-07-18', title: 'ඇසළ පුර පසළොස්වක පොහොය', desc: 'ප්‍රථම ධර්ම දේශනාව - දම්සක් පැවතුම් සූත්‍රය' },
+  { year: 2027, month: 'අගෝ', day: '17', date: '2027-08-17', title: 'නිකිණි පුර පසළොස්වක පොහොය', desc: 'ප්‍රථම ධර්ම සංගායනාව සහ ආනන්ද හිමියන් රහත් වීම' },
+  { year: 2027, month: 'සැප්', day: '15', date: '2027-09-15', title: 'බිනර පුර පසළොස්වක පොහොය', desc: 'භික්ෂුණී ශාසනය ආරම්භ වීම' },
+  { year: 2027, month: 'ඔක්', day: '15', date: '2027-10-15', title: 'වප් පුර පසළොස්වක පොහොය', desc: 'කඨින චීවර මාසයේ ආරම්භය' },
+  { year: 2027, month: 'නොවැ', day: '13', date: '2027-11-13', title: 'ඉල් පුර පසළොස්වක පොහොය', desc: 'කඨින සමයේ අවසානය සහ මෛත්‍රී බෝසතුන් නියත විවරණ ලැබීම' },
+  { year: 2027, month: 'දෙසැ', day: '13', date: '2027-12-13', title: 'උඳුවප් පුර පසළොස්වක පොහොය', desc: 'සඟමිත් තෙරණිය ලක්දිවට ජය ශ්‍රී මහා බෝධි දක්ෂිණ ශාඛාව වැඩමවීම' }
+];
+
+export function isPoyaEventPast(poya, now = new Date()) {
+  if (!poya) return true;
+  if (poya.date && typeof poya.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(poya.date)) {
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    return poya.date < todayStr;
+  }
+  const pastMonths2026 = ['ජන', 'පෙබ', 'මාර්තු', 'අප්‍රේල්', 'මැයි', 'ජූනි', 'ජූලි', 'අගෝ', 'සැප්', 'ඔක්'];
+  if (pastMonths2026.includes(poya.month)) return true;
+  if (poya.month === 'නොවැ' && parseInt(poya.day, 10) <= 24) return true;
+  if (poya.title && (poya.title.includes('වප්') || poya.title.includes('ඉල්'))) return true;
+  return false;
+}
+
+export function getUpcomingPoyaEvent(refDate = new Date()) {
+  const now = refDate instanceof Date ? refDate : new Date(refDate);
+  const nowYear = now.getFullYear();
+  const nowMonth = now.getMonth() + 1;
+  const nowDay = now.getDate();
+  const nowStr = `${nowYear}-${String(nowMonth).padStart(2, '0')}-${String(nowDay).padStart(2, '0')}`;
+
+  for (const p of SRI_LANKA_POYA_CALENDAR) {
+    if (p.date >= nowStr) {
+      return p;
+    }
+  }
+  return SRI_LANKA_POYA_CALENDAR[SRI_LANKA_POYA_CALENDAR.length - 1];
+}
+
+export const DEFAULT_POYA_EVENT = {
+  month: 'දෙසැ',
   day: '24',
-  title: 'ඉල් පුර පසළොස්වක පොහොය',
-  desc: 'කඨින චීවර පූජා මහා පින්කම් සමයේ අවසානය'
+  date: '2026-12-24',
+  title: 'උඳුවප් පුර පසළොස්වක පොහොය',
+  desc: 'සඟමිත් තෙරණිය ලක්දිවට ජය ශ්‍රී මහා බෝධි දක්ෂිණ ශාඛාව වැඩමවීම'
 };
 
 const DEFAULT_BANNED_WORDS = [
@@ -591,8 +648,8 @@ export const StorageService = {
     if (isMemberSangha) {
       this._knownSanghaUids.add(uid);
     }
-    const lastActive = data.lastActiveAt || data.updatedAt || 0;
-    const isOnline = (this.currentUser && this.currentUser.uid === uid) || ((now - lastActive) < 7 * 60 * 1000);
+    const lastActive = Number(data.lastSeen || data.lastActiveAt || data.updatedAt || 0);
+    const isOnline = (this.currentUser && this.currentUser.uid === uid) || (lastActive > 0 && (now - lastActive) < 3 * 60 * 1000);
     const isUserAnon = Boolean(
       data.isAnonymous ||
       data.useAlias ||
@@ -604,9 +661,12 @@ export const StorageService = {
       photo: data.photo || '',
       coverImage: data.coverImage || 'assets/banner.webp',
       bio: data.bio || '',
-      location: data.location || data.district || '',
+      location: data.location || data.city || data.district || '',
+      district: data.district || '',
+      city: data.city || '',
       joinedDate: data.joinedDate || '',
       updatedAt: data.updatedAt || 0,
+      lastSeen: lastActive,
       lastActiveAt: lastActive,
       isOnline: isOnline,
       isAdmin: isMaster,
@@ -963,13 +1023,14 @@ export const StorageService = {
     if (!this.currentUser || !this.currentUser.uid) return;
     const now = Date.now();
     this.currentUser.lastActiveAt = now;
+    this.currentUser.lastSeen = now;
     try {
       localStorage.setItem('pinPotha_last_presence', now.toString());
       localStorage.setItem('pinPotha_currentUser', JSON.stringify(this.currentUser));
     } catch (e) {}
 
-    // Throttle remote Firestore write to at most once per 60s (unless forced on startup/tab focus)
-    if (!force && (now - this._lastPresenceWriteTime < 60000)) {
+    // Throttle remote Firestore write to once every 2.5 minutes (150,000ms) unless forced (on login/page open)
+    if (!force && (now - this._lastPresenceWriteTime < 150000)) {
       return;
     }
     this._lastPresenceWriteTime = now;
@@ -978,7 +1039,8 @@ export const StorageService = {
       try {
         const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
         await updateDoc(doc(db, COLLECTIONS.USERS, this.currentUser.uid), {
-          lastActiveAt: now
+          lastActiveAt: now,
+          lastSeen: now
         }).catch(() => {});
       } catch (e) {}
     }
@@ -1229,7 +1291,7 @@ export const StorageService = {
         if (!sessionSettingsCached) {
           try {
             const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
-            const settingsDocs = ['global_announcement', 'daily_verse', 'poya_event', 'banned_words', 'deleted_posts'];
+            const settingsDocs = ['global_announcement', 'daily_verse', 'poya_event', 'banned_words', 'deleted_posts', 'dhamma_views'];
             await Promise.all(settingsDocs.map(async (settingId) => {
               try {
                 const snap = await getDoc(doc(db, COLLECTIONS.SETTINGS, settingId));
@@ -1242,14 +1304,31 @@ export const StorageService = {
                     localStorage.setItem('pinKetha_dhamma_verse', JSON.stringify(data));
                     this.notifyVerseListeners(data);
                   } else if (settingId === 'poya_event') {
-                    localStorage.setItem('pinKetha_poya_event', JSON.stringify(data));
-                    this.notifyPoyaListeners(data);
+                    if (data && !isPoyaEventPast(data)) {
+                      localStorage.setItem('pinKetha_poya_event', JSON.stringify(data));
+                      this.notifyPoyaListeners(data);
+                    } else {
+                      localStorage.removeItem('pinKetha_poya_event');
+                      this.notifyPoyaListeners(getUpcomingPoyaEvent());
+                    }
                   } else if (settingId === 'banned_words') {
                     localStorage.setItem('pinKetha_banned_words', JSON.stringify(data));
                     this.notifyBannedWordsListeners(data);
                   } else if (settingId === 'deleted_posts') {
                     const cloudDeletedIds = Array.isArray(data.ids) ? data.ids : [];
                     this.syncCloudDeletedIds(cloudDeletedIds);
+                  } else if (settingId === 'dhamma_views') {
+                    try {
+                      const localStored = localStorage.getItem('pinPotha_dhamma_views');
+                      const localMap = localStored ? JSON.parse(localStored) : {};
+                      const merged = { ...localMap };
+                      for (const [id, count] of Object.entries(data)) {
+                        if (typeof count === 'number') {
+                          merged[id] = Math.max(merged[id] || 0, count);
+                        }
+                      }
+                      localStorage.setItem('pinPotha_dhamma_views', JSON.stringify(merged));
+                    } catch (e) {}
                   }
                 }
               } catch (e) {}
@@ -1298,11 +1377,32 @@ export const StorageService = {
   },
 
   markPostAsDeletedLocally(postId) {
+    if (!postId) return;
     const ids = this.getDeletedPostIds();
     if (!ids.includes(postId)) {
       ids.push(postId);
       localStorage.setItem('pinPotha_deleted_ids', JSON.stringify(ids));
     }
+    // Immediately purge from memory caches
+    if (this._cachedPosts && Array.isArray(this._cachedPosts)) {
+      this._cachedPosts = this._cachedPosts.filter(p => p && p.id !== postId);
+    }
+    if (this._loadedPosts && Array.isArray(this._loadedPosts)) {
+      this._loadedPosts = this._loadedPosts.filter(p => p && p.id !== postId);
+    }
+    // Immediately purge from localStorage raw feed cache
+    try {
+      ['pinPotha_posts', 'pinPotha_sandbox_posts'].forEach(key => {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const list = JSON.parse(raw);
+          if (Array.isArray(list)) {
+            const filtered = list.filter(p => p && p.id !== postId);
+            localStorage.setItem(key, JSON.stringify(filtered));
+          }
+        }
+      });
+    } catch (e) {}
   },
 
   restoreDeletedPostsLocally() {
@@ -1407,14 +1507,8 @@ export const StorageService = {
     this.purgeDummyPostsFromStorage();
     const deletedIds = this.getDeletedPostIds();
     const isCleanPost = (p) => {
-      if (!p || p.isDeleted === true || this.isDummyTestPost(p)) return false;
-      const isOff = this.isOfficialPost(p);
-      const isUser = Boolean(this.currentUser && (
-        p.uid === this.currentUser.uid ||
-        (this.currentUser.email && p.authorEmail && p.authorEmail.toLowerCase() === this.currentUser.email.toLowerCase())
-      ));
-      if (isOff || isUser) return true;
-      return !deletedIds.includes(p.id);
+      if (!p || p.isDeleted === true || deletedIds.includes(p.id) || this.isDummyTestPost(p)) return false;
+      return true;
     };
 
     if (this._loadedPosts && Array.isArray(this._loadedPosts) && this._loadedPosts.length > 0) {
@@ -1478,14 +1572,8 @@ export const StorageService = {
     if (!Array.isArray(posts) || posts.length === 0) return;
     const deletedIds = this.getDeletedPostIds();
     const cleanPosts = (posts || []).filter(p => {
-      if (!p || p.isDeleted === true || this.isDummyTestPost(p)) return false;
-      const isOff = this.isOfficialPost(p);
-      const isUser = Boolean(this.currentUser && (
-        p.uid === this.currentUser.uid ||
-        (this.currentUser.email && p.authorEmail && p.authorEmail.toLowerCase() === this.currentUser.email.toLowerCase())
-      ));
-      if (isOff || isUser) return true;
-      return !deletedIds.includes(p.id);
+      if (!p || p.isDeleted === true || deletedIds.includes(p.id) || this.isDummyTestPost(p)) return false;
+      return true;
     });
 
     if (cleanPosts.length === 0) return;
@@ -1584,7 +1672,7 @@ export const StorageService = {
     let hasChanged = false;
     additionalPosts.forEach(p => {
       if (!p || this.isDummyTestPost(p)) return;
-      if ((!deletedIds.includes(p.id) || p.isOfficial) && p.isDeleted !== true) {
+      if (!deletedIds.includes(p.id) && p.isDeleted !== true) {
         if (!map.has(p.id)) {
           map.set(p.id, p);
           hasChanged = true;
@@ -1827,8 +1915,8 @@ export const StorageService = {
         const role = f.role?.stringValue || (isMaster ? 'master_admin' : 'member');
         const isSub = !isMaster && (role === 'admin' || f.isAdmin?.booleanValue === true);
         const isSangha = f.isSangha?.booleanValue === true || role === 'sangha' || this.isSangha({ uid, name });
-        const lastActive = parseInt(f.lastActiveAt?.integerValue || f.updatedAt?.integerValue || '0', 10);
-        const isOnline = (this.currentUser && this.currentUser.uid === uid) || ((now - lastActive) < 7 * 60 * 1000);
+        const lastActive = parseInt(f.lastSeen?.integerValue || f.lastActiveAt?.integerValue || f.updatedAt?.integerValue || '0', 10);
+        const isOnline = (this.currentUser && this.currentUser.uid === uid) || (lastActive > 0 && (now - lastActive) < 3 * 60 * 1000);
         const useAlias = f.useAlias?.booleanValue === true;
         const isAnonymous = f.isAnonymous?.booleanValue === true || useAlias || Boolean(this.currentUser && this.currentUser.uid === uid && (this.currentUser.useAlias || this.currentUser.isAnonymous));
         list.push({
@@ -1840,11 +1928,12 @@ export const StorageService = {
           photo: f.photo?.stringValue || '',
           coverImage: f.coverImage?.stringValue || 'assets/banner.webp',
           bio: f.bio?.stringValue || '',
-          location: f.location?.stringValue || f.district?.stringValue || '',
+          location: f.location?.stringValue || f.city?.stringValue || f.district?.stringValue || '',
           district: f.district?.stringValue || '',
           city: f.city?.stringValue || '',
           occupation: f.occupation?.stringValue || '',
           joinedDate: f.joinedDate?.stringValue || '2026 ඔක්තෝබර්',
+          lastSeen: lastActive,
           lastActiveAt: lastActive,
           isOnline,
           isAdmin: isMaster,
@@ -1943,7 +2032,7 @@ export const StorageService = {
             ));
 
             const isDeletedInCloud = data.isDeleted === true;
-            const isLocallyDeleted = deletedIds.includes(docSnap.id) && !isOfficial && !isUserPost;
+            const isLocallyDeleted = deletedIds.includes(docSnap.id);
 
             if (!isDeletedInCloud && !isLocallyDeleted) {
               const rawSadhu = typeof data.sadhuCount === 'number' ? data.sadhuCount : 0;
@@ -2303,7 +2392,7 @@ export const StorageService = {
     });
   },
 
-  async savePoyaEvent({ month, day, title, desc }) {
+  async savePoyaEvent({ month, day, title, desc, date }) {
     if (!this.isMasterAdmin() && !this.isSubAdmin(this.currentUser)) {
       throw new Error('පරිපාලක අවසරය අවශ්‍ය වේ.');
     }
@@ -2312,9 +2401,11 @@ export const StorageService = {
       day: Security.escapeHTML(Security.sanitizeText(day || '15')),
       title: Security.escapeHTML(Security.sanitizeText(title || 'පුර පසළොස්වක පොහොය')),
       desc: Security.escapeHTML(Security.sanitizeText(desc || 'පින්කම් දිනයකි')),
+      date: date || null,
       updatedAt: Date.now()
     };
     localStorage.setItem('pinKetha_poya_event', JSON.stringify(payload));
+    this.clearSessionCache('pinPotha_session_settings');
     if (isCloudReady && db) {
       try {
         const { doc, setDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
@@ -2328,18 +2419,22 @@ export const StorageService = {
   },
 
   getPoyaEvent() {
+    const upcoming = getUpcomingPoyaEvent();
     try {
       const raw = localStorage.getItem('pinKetha_poya_event');
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed.month === 'ඔක්' && (parsed.day === '25' || parsed.title?.includes('වප්'))) {
-          return DEFAULT_POYA_EVENT;
+        if (parsed && parsed.title && parsed.day && parsed.month) {
+          if (isPoyaEventPast(parsed)) {
+            localStorage.removeItem('pinKetha_poya_event');
+            return upcoming;
+          }
+          return parsed;
         }
-        return parsed;
       }
-      return DEFAULT_POYA_EVENT;
+      return upcoming;
     } catch {
-      return DEFAULT_POYA_EVENT;
+      return upcoming;
     }
   },
 
@@ -2426,6 +2521,160 @@ export const StorageService = {
     this.cacheLocal(posts);
     this.notifyListeners(posts);
     return newStatus;
+  },
+
+  /**
+   * Helper to identify care request / support request posts
+   */
+  isCareRequest(post) {
+    if (!post || typeof post !== 'object') return false;
+    if (post.isDeleted === true) return false;
+    return Boolean(
+      post.type === 'need' ||
+      post.type === 'sathkara' ||
+      post.type === 'care' ||
+      post.category === 'සමාජ සත්කාර' ||
+      post.isNeed === true ||
+      post.isVerifiedNeed === true
+    );
+  },
+
+  /**
+   * Fetches care requests & services posts specifically from Firestore and local cache
+   * Guarantees that "සත්කාර හවුල (අවශ්‍යතා)" never displays an empty state when care posts exist
+   */
+  async fetchCareRequests(forceRefresh = false) {
+    if (this._careRequestsFetched && !forceRefresh) {
+      const cached = (this._loadedPosts || []).filter(p => this.isCareRequest(p));
+      if (cached.length > 0) return cached;
+    }
+    if (this._isLoadingCareRequests) {
+      return (this._loadedPosts || []).filter(p => this.isCareRequest(p));
+    }
+    this._isLoadingCareRequests = true;
+
+    try {
+      const deletedIds = this.getDeletedPostIds();
+      const carePosts = [];
+
+      // 1. Gather seed care posts from _seedPostsCache or initial-seed.js
+      try {
+        const seedPosts = await getSeedPosts();
+        if (Array.isArray(seedPosts)) {
+          seedPosts.forEach(p => {
+            if (this.isCareRequest(p) && !deletedIds.includes(p.id)) {
+              carePosts.push({ ...p, isOfficial: this.isOfficialPost(p) });
+            }
+          });
+        }
+      } catch (e) {}
+
+      // Wait for cloud readiness if not ready yet (up to 3.5 seconds)
+      if (!isCloudReady || !db) {
+        const startWait = Date.now();
+        while ((!isCloudReady || !db) && (Date.now() - startWait < 3500)) {
+          await new Promise(r => setTimeout(r, 100));
+        }
+      }
+
+      // 2. Fetch care request posts from Firestore
+      if (isCloudReady && db) {
+        try {
+          const { collection, getDocs, query, where, limit } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+          
+          // Query posts where type == 'need'
+          const qTypeNeed = query(
+            collection(db, COLLECTIONS.POSTS),
+            where("type", "==", "need"),
+            limit(25)
+          );
+          const snapType = await getDocs(qTypeNeed);
+          if (snapType && !snapType.empty) {
+            snapType.forEach(docSnap => {
+              const data = docSnap.data();
+              if (data.isDeleted === true || deletedIds.includes(docSnap.id)) return;
+              const normTimestamp = typeof data.timestamp === 'number' ? data.timestamp : (data.serverCreatedAt?.toMillis ? data.serverCreatedAt.toMillis() : Date.now());
+              carePosts.push({
+                id: docSnap.id,
+                ...data,
+                timestamp: normTimestamp,
+                type: 'need',
+                isOfficial: this.isOfficialPost(data),
+                sadhuCount: Math.max(0, typeof data.sadhuCount === 'number' ? data.sadhuCount : 0),
+                sadhuUsers: Array.isArray(data.sadhuUsers) ? data.sadhuUsers : [],
+                comments: Array.isArray(data.comments) ? data.comments : []
+              });
+            });
+          }
+
+          // Query posts where category == 'සමාජ සත්කාර'
+          const qCatNeed = query(
+            collection(db, COLLECTIONS.POSTS),
+            where("category", "==", "සමාජ සත්කාර"),
+            limit(25)
+          );
+          const snapCat = await getDocs(qCatNeed);
+          if (snapCat && !snapCat.empty) {
+            snapCat.forEach(docSnap => {
+              const data = docSnap.data();
+              if (data.isDeleted === true || deletedIds.includes(docSnap.id)) return;
+              if (carePosts.some(p => p.id === docSnap.id)) return;
+              const normTimestamp = typeof data.timestamp === 'number' ? data.timestamp : (data.serverCreatedAt?.toMillis ? data.serverCreatedAt.toMillis() : Date.now());
+              carePosts.push({
+                id: docSnap.id,
+                ...data,
+                timestamp: normTimestamp,
+                type: data.type || 'need',
+                isOfficial: this.isOfficialPost(data),
+                sadhuCount: Math.max(0, typeof data.sadhuCount === 'number' ? data.sadhuCount : 0),
+                sadhuUsers: Array.isArray(data.sadhuUsers) ? data.sadhuUsers : [],
+                comments: Array.isArray(data.comments) ? data.comments : []
+              });
+            });
+          }
+        } catch (cloudErr) {
+          console.warn('[Storage] fetchCareRequests cloud error:', cloudErr);
+        }
+      }
+
+      // 3. Merge found care posts into _loadedPosts and _cachedPosts
+      let hasNewPosts = false;
+      if (carePosts.length > 0) {
+        const existing = this._loadedPosts && Array.isArray(this._loadedPosts) ? [...this._loadedPosts] : (this.getLocalPosts() || []);
+        const map = new Map();
+        existing.forEach(p => { if (p && p.id) map.set(p.id, p); });
+        carePosts.forEach(cp => {
+          if (cp && cp.id && !deletedIds.includes(cp.id)) {
+            if (!map.has(cp.id)) {
+              hasNewPosts = true;
+              map.set(cp.id, cp);
+            } else {
+              map.set(cp.id, { ...map.get(cp.id), ...cp });
+            }
+          }
+        });
+        const merged = Array.from(map.values());
+        this._loadedPosts = merged;
+        this._cachedPosts = merged;
+        this.cacheLocal(merged);
+        if (hasNewPosts) {
+          this.notifyListeners(merged);
+        }
+      }
+
+      if (isCloudReady && db) {
+        this._careRequestsFetched = true;
+      }
+      this._isLoadingCareRequests = false;
+      return carePosts;
+    } catch (err) {
+      if (isCloudReady && db) {
+        this._careRequestsFetched = true;
+      }
+      this._isLoadingCareRequests = false;
+      console.warn('[Storage] fetchCareRequests general error:', err);
+      return [];
+    }
   },
 
   simulateAdminLogin() {
@@ -3916,6 +4165,7 @@ export const StorageService = {
     }
     this.notifyListeners();
     this.notifyNotificationListeners();
+    this.updateUserPresence(true).catch(() => {});
 
     // 4. Asynchronously query Firestore users collection to get latest cloud profile and sync
     if (isCloudReady && db) {
@@ -4293,6 +4543,7 @@ export const StorageService = {
 
     this.notifyListeners();
     this.notifyNotificationListeners();
+    this.updateUserPresence(true).catch(() => {});
     return isNowFollowing;
   },
 
@@ -4484,6 +4735,7 @@ export const StorageService = {
 
     this.notifyListeners();
     this.notifyNotificationListeners();
+    this.updateUserPresence(true).catch(() => {});
     return true;
   },
 
@@ -4558,6 +4810,7 @@ export const StorageService = {
 
     this.notifyListeners();
     this.notifyNotificationListeners();
+    this.updateUserPresence(true).catch(() => {});
     return true;
   },
 
@@ -5181,6 +5434,7 @@ export const StorageService = {
     } catch (e) {}
     this.notifyListeners();
     this.notifyNotificationListeners();
+    this.updateUserPresence(true).catch(() => {});
   },
 
   /**
@@ -5893,5 +6147,113 @@ export const StorageService = {
     }
 
     return { success: true, sadhuCount, hasGiven };
+  },
+
+  /**
+   * Get cached view count for a Dhamma Library item
+   * @param {string} itemId
+   * @param {number} defaultVal
+   * @returns {number}
+   */
+  getDhammaItemViews(itemId, defaultVal = 0) {
+    if (!itemId) return defaultVal;
+    try {
+      const stored = localStorage.getItem('pinPotha_dhamma_views');
+      if (stored) {
+        const map = JSON.parse(stored);
+        if (map && typeof map[itemId] === 'number') {
+          return map[itemId];
+        }
+      }
+    } catch (e) {}
+    return defaultVal;
+  },
+
+  /**
+   * Safely increments the view count of a Dhamma Library item
+   * Deduplicates per session to avoid inflation on simple feed re-renders or page reloads
+   * @param {string} itemId
+   * @param {number} defaultVal
+   * @returns {Promise<number>}
+   */
+  async incrementDhammaItemViews(itemId, defaultVal = 0) {
+    if (!itemId) return defaultVal;
+
+    const sessionKey = 'pinPotha_viewed_dhamma_' + itemId;
+    let alreadyViewed = false;
+    try {
+      alreadyViewed = Boolean(sessionStorage.getItem(sessionKey));
+    } catch (e) {}
+
+    const currentViews = this.getDhammaItemViews(itemId, defaultVal);
+    if (alreadyViewed) {
+      return currentViews;
+    }
+
+    try {
+      sessionStorage.setItem(sessionKey, '1');
+    } catch (e) {}
+
+    const newCount = currentViews + 1;
+
+    // Update local cache immediately
+    try {
+      const stored = localStorage.getItem('pinPotha_dhamma_views');
+      const map = stored ? JSON.parse(stored) : {};
+      map[itemId] = newCount;
+      localStorage.setItem('pinPotha_dhamma_views', JSON.stringify(map));
+    } catch (e) {}
+
+    // Persist to cloud in background
+    if (isCloudReady && db) {
+      try {
+        const { doc, setDoc, updateDoc, increment } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+        await setDoc(doc(db, COLLECTIONS.SETTINGS, 'dhamma_views'), {
+          [itemId]: increment(1)
+        }, { merge: true });
+
+        // If item is a community submission, also increment on the doc itself
+        if (itemId.startsWith('dhamma_sub_') || itemId.length > 15) {
+          try {
+            await updateDoc(doc(db, COLLECTIONS.DHAMMA_SUBMISSIONS || 'dhamma_library_submissions', itemId), {
+              viewCount: increment(1),
+              views: increment(1)
+            });
+          } catch (subErr) {}
+        }
+      } catch (cloudErr) {
+        console.warn('[Storage] incrementDhammaItemViews cloud error:', cloudErr);
+      }
+    }
+
+    return newCount;
+  },
+
+  /**
+   * Fetches latest Dhamma item view counts from cloud
+   * @returns {Promise<Object>}
+   */
+  async fetchDhammaViews() {
+    if (!isCloudReady || !db) return {};
+    try {
+      const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js');
+      const snap = await getDoc(doc(db, COLLECTIONS.SETTINGS, 'dhamma_views'));
+      if (snap.exists()) {
+        const remoteViews = snap.data() || {};
+        const localStored = localStorage.getItem('pinPotha_dhamma_views');
+        const localMap = localStored ? JSON.parse(localStored) : {};
+        const merged = { ...localMap };
+        for (const [id, count] of Object.entries(remoteViews)) {
+          if (typeof count === 'number') {
+            merged[id] = Math.max(merged[id] || 0, count);
+          }
+        }
+        localStorage.setItem('pinPotha_dhamma_views', JSON.stringify(merged));
+        return merged;
+      }
+    } catch (err) {
+      console.warn('[Storage] fetchDhammaViews error:', err);
+    }
+    return {};
   }
 };
