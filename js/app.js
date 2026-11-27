@@ -813,15 +813,24 @@ export function getDynamicShareUrl(postId) {
 }
 window.getDynamicShareUrl = getDynamicShareUrl;
 
-const GENERIC_SHARE_TITLES = ['පින්කම', 'සටහන', 'පින්කමක්', 'සටහනක්', 'merit', 'post', 'untitled'];
+const GENERIC_SHARE_TITLES = [
+  'පින්කම', 'පින්කමක්', 'උතුම් පින්කම', 'උතුම් පින්කමක්', 'උතුම පින්කම', 'උතුම පින්කමක්',
+  'සටහන', 'සටහනක්', 'පුණ්‍ය සටහන', 'පුණ්‍ය සටහනක්', 'කුසල් සටහන', 'දෛනික කුසල්', 'දෛනික කුසල් සටහන',
+  'merit', 'post', 'untitled', 'pin potha', 'ape pin potha', 'share'
+];
 
-function isMeaningfulShareTitle(title) {
+export function isMeaningfulShareTitle(title) {
   if (!title || typeof title !== 'string') return false;
-  const clean = title.trim();
-  if (clean.length < 2) return false;
-  if (GENERIC_SHARE_TITLES.includes(clean.toLowerCase())) return false;
-  return true;
+  const clean = title
+    .replace(/<[^>]*>?/gm, '')
+    .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u27BF]|\uD83C[\uDF00-\uDFFF]|\uD83D[\uDC00-\uDE4F]|\uD83E[\uDD00-\uDDFF]/g, '')
+    .replace(/[\s\-_.,;!?]+/g, ' ')
+    .trim()
+    .toLowerCase();
+  if (clean.length < 3) return false;
+  return !GENERIC_SHARE_TITLES.includes(clean);
 }
+window.isMeaningfulShareTitle = isMeaningfulShareTitle;
 
 /**
  * Normalizes Unicode string (NFC) and removes stray/unpaired surrogates to prevent '?' replacement boxes
@@ -924,29 +933,50 @@ export function getShareCategoryBadge(post) {
 window.getShareCategoryBadge = getShareCategoryBadge;
 
 /**
- * Extracts a concise, meaningful topic snippet (45-60 characters) from post title or content
+ * Extracts a concise, meaningful topic hook (35-50 characters) from post title or opening content
  */
-export function extractMeaningfulTopicSnippet(post, maxLen = 50) {
-  if (!post || typeof post !== 'object') return 'උතුම් පුණ්‍ය සටහනක්';
+export function extractMeaningfulTopicSnippet(post, maxLen = 45) {
+  if (!post || typeof post !== 'object') return 'උතුම් පුණ්‍ය සටහන';
 
   let raw = '';
   if (isMeaningfulShareTitle(post.title)) {
     raw = post.title.trim();
   } else if (post.description && typeof post.description === 'string') {
     raw = post.description.trim();
+  } else if (post.content && typeof post.content === 'string') {
+    raw = post.content.trim();
+  } else if (post.text && typeof post.text === 'string') {
+    raw = post.text.trim();
   }
 
-  if (!raw) return 'උතුම් පුණ්‍ය සටහනක්';
+  // Fallback to category-specific natural label if content is completely empty
+  if (!raw) {
+    if (isCareRequestPost(post)) return 'කාරුණික සත්කාරක ඉල්ලීම';
+    if (post.type === 'reel') return 'සදහම් වීඩියෝව';
+    if (post.category === 'දානමය') return 'උතුම් දානමය පින්කම';
+    if (post.category === 'ශීලමය') return 'උතුම් ශීලමය පින්කම';
+    if (post.category === 'භාවනාමය') return 'භාවනාමය සිතුවිල්ල';
+    return 'උතුම් පුණ්‍ය සටහන';
+  }
 
-  const clean = raw
+  let clean = raw
     .replace(/<[^>]*>?/gm, ' ')
+    .replace(/https?:\/\/\S+/gi, ' ')
     .replace(/[\r\n\t]+/g, ' ')
-    .replace(/\s+/g, ' ')
     .trim();
 
-  if (!clean) return 'උතුම් පුණ්‍ය සටහනක්';
+  // Strip repetitive checklist headers, decorative emojis, or boilerplate greetings
+  clean = clean.replace(/^(?:🌸\s*)?අද\s+දින\s*(?:\([^)]+\))?\s*(?:මම|අප)?\s*සම්පූර්ණ\s*කළ\s*දෛනික\s*කුසල්\s*[:\-\s]*/i, '');
+  clean = clean.replace(/^(?:🌸|✨|🙏|✅|👉|•|-|\*)\s*/, '');
+  clean = clean.replace(/^(?:සාදරයෙන්\s+පිළිගනිමු!?|සාදු\s+සාදු\s+සාදු!?)\s*/i, '');
+  clean = clean.replace(/\s+/g, ' ').trim();
 
-  return safeUnicodeSlice(clean, maxLen).replace(/[\s.,;:!-]+$/, '');
+  if (!clean) {
+    return 'උතුම් පුණ්‍ය සටහන';
+  }
+
+  let sliced = safeUnicodeSlice(clean, maxLen);
+  return sliced.replace(/\.{2,}$/, '').replace(/[\s.,;:!\-]+$/, '').trim();
 }
 window.extractMeaningfulTopicSnippet = extractMeaningfulTopicSnippet;
 
@@ -1045,13 +1075,14 @@ export function getPostShareMetadata(rawPost) {
     : (StorageService.resolveAuthorName(canonical) || 'කල්‍යාණ මිත්‍රයෙක්');
 
   const categoryBadge = getShareCategoryBadge(canonical);
-  const topicSnippet = extractMeaningfulTopicSnippet(canonical, 50);
+  const topicSnippet = extractMeaningfulTopicSnippet(canonical, 45);
 
-  // Context-aware og:title
+  // Context-aware og:title (clean emoji/category + topic hook + author + site name)
   const isOfficial = Boolean(canonical.isOfficial || authorName === 'අපේ පිං පොත' || authorName === 'අපේ පින් පොත');
+  const isGeneralCategory = (categoryBadge === '🌸 පුණ්‍ය සටහනක්' || categoryBadge === '🌸 උතුම් පින්කමක්');
   const ogTitle = isOfficial 
-    ? `${categoryBadge}: ${topicSnippet} | අපේ පිං පොත`
-    : `${categoryBadge}: ${topicSnippet} — ${authorName} | අපේ පිං පොත`;
+    ? (isGeneralCategory ? `🌸 ${topicSnippet} | අපේ පිං පොත` : `${categoryBadge}: ${topicSnippet} | අපේ පිං පොත`)
+    : (isGeneralCategory ? `🌸 ${topicSnippet} — ${authorName} | අපේ පිං පොත` : `${categoryBadge}: ${topicSnippet} — ${authorName} | අපේ පිං පොත`);
 
   // Cleaner, natural og:description
   const ogDescription = extractCleanShareDescription(canonical, 155);
