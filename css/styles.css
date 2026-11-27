@@ -208,13 +208,22 @@ body {
 
 .header-container {
   max-width: 1240px;
+  width: 100%;
   margin: 0 auto;
   padding: 0 16px;
   height: 64px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 10px;
+  box-sizing: border-box;
+}
+
+@media (min-width: 1366px) {
+  .header-container {
+    max-width: 1340px;
+    gap: 14px;
+  }
 }
 
 .brand-section {
@@ -256,6 +265,21 @@ body {
   font-weight: 500;
   letter-spacing: 0.15px;
   line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+@media (min-width: 1100px) {
+  .brand-subtitle {
+    max-width: 170px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .brand-subtitle {
+    max-width: 230px;
+  }
 }
 
 /* Search Input */
@@ -265,12 +289,12 @@ body {
   background: rgba(26, 10, 2, 0.4);
   border: 1px solid rgba(251, 191, 36, 0.25);
   border-radius: var(--radius-full);
-  padding: 6px 14px;
-  min-width: 180px;
+  padding: 6px 12px;
+  min-width: 160px;
   width: auto;
-  max-width: 260px;
-  flex: 1 1 200px;
-  flex-shrink: 0;
+  max-width: 240px;
+  flex: 1 1 auto;
+  flex-shrink: 1;
   transition: all 0.25s ease;
   box-sizing: border-box;
 }
@@ -283,17 +307,17 @@ body {
 
 @media (min-width: 1100px) {
   .search-wrapper {
-    min-width: 200px;
-    max-width: 280px;
-    flex: 1 1 240px;
+    min-width: 170px;
+    max-width: 270px;
+    flex: 1 1 220px;
   }
 }
 
 @media (min-width: 1280px) {
   .search-wrapper {
-    min-width: 220px;
-    max-width: 320px;
-    flex: 1 1 280px;
+    min-width: 180px;
+    max-width: 300px;
+    flex: 1 1 260px;
   }
 }
 
@@ -301,8 +325,7 @@ body {
   background: rgba(26, 10, 2, 0.7);
   border-color: var(--color-primary-400);
   box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.25);
-  max-width: 340px;
-  flex: 1 1 260px;
+  max-width: 300px;
 }
 
 .search-wrapper input {
@@ -977,7 +1000,7 @@ body {
   background: rgba(26, 10, 2, 0.45);
   color: #fffbeb;
   border: 1px solid rgba(251, 191, 36, 0.3);
-  padding: 3px 11px 3px 5px;
+  padding: 3px 10px 3px 5px;
   height: 36px;
   border-radius: var(--radius-full);
   font-size: 0.75rem;
@@ -985,15 +1008,16 @@ body {
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   transition: all 0.2s ease;
   flex-shrink: 0;
   white-space: nowrap;
   box-sizing: border-box;
+  max-width: 165px;
 }
 
 #userNameDisplay {
-  max-width: 105px;
+  max-width: 95px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1001,9 +1025,21 @@ body {
   vertical-align: middle;
 }
 
-@media (min-width: 1240px) {
+@media (min-width: 1100px) {
+  .user-profile-btn {
+    max-width: 185px;
+  }
   #userNameDisplay {
-    max-width: 145px;
+    max-width: 110px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .user-profile-btn {
+    max-width: 220px;
+  }
+  #userNameDisplay {
+    max-width: 140px;
   }
 }
 
@@ -7635,24 +7671,24 @@ html, body {
   white-space: nowrap;
 }
 
-/* Medium-to-large desktop responsive tuning to keep search bar spacious */
-@media (min-width: 769px) and (max-width: 1100px) {
+/* Medium-to-large desktop responsive tuning to keep search bar spacious without overflowing header */
+@media (min-width: 769px) and (max-width: 1024px) {
   .header-container {
     gap: 8px;
     padding: 0 12px;
   }
   .brand-subtitle {
-    max-width: 140px;
+    max-width: 110px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   .nav-tabs-desktop {
-    gap: 3px;
+    gap: 2px;
   }
   .nav-tab-btn {
-    min-width: 44px;
-    padding: 0 10px;
+    min-width: 42px;
+    padding: 0 9px;
     font-size: 1.15rem;
   }
   .header-actions {
@@ -7662,7 +7698,7 @@ html, body {
     display: none;
   }
   .header-pwa-install-btn {
-    padding: 0 10px;
+    padding: 0;
     width: 36px;
     justify-content: center;
   }
@@ -7672,6 +7708,41 @@ html, body {
   }
   #userNameDisplay {
     max-width: 85px;
+  }
+}
+
+@media (min-width: 1025px) and (max-width: 1240px) {
+  .header-container {
+    gap: 10px;
+    padding: 0 14px;
+  }
+  .brand-subtitle {
+    max-width: 150px;
+  }
+  .nav-tabs-desktop {
+    gap: 3px;
+  }
+  .nav-tab-btn {
+    min-width: 46px;
+    padding: 0 11px;
+  }
+  .header-actions {
+    gap: 6px;
+  }
+  .header-pwa-install-btn span {
+    display: none;
+  }
+  .header-pwa-install-btn {
+    padding: 0;
+    width: 36px;
+    justify-content: center;
+  }
+  .btn-post-action {
+    padding: 0 10px;
+    font-size: 0.74rem;
+  }
+  #userNameDisplay {
+    max-width: 110px;
   }
 }
 
